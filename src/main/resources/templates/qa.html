@@ -54,6 +54,38 @@
         .qa-status-eval { background:#e9ecef; color:#495057; }
         .qa-status-conforme { background:#d1f5e6; color:#0f9d6c; }
         .qa-status-non-conforme { background:#fbe1e3; color:#c53040; }
+        /* ===== Vue d'ensemble : rubriques repliées tant qu'on ne clique pas ===== */
+        #qaOverviewPane .kpi { animation: qaRise .45s ease both; transition: transform .18s ease, box-shadow .18s ease; }
+        #qaOverviewPane .kpi:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,87,184,.10); }
+        #qaOverviewPane .col-lg-3:nth-child(2) .kpi { animation-delay: .07s; }
+        #qaOverviewPane .col-lg-3:nth-child(3) .kpi { animation-delay: .14s; }
+        #qaOverviewPane .col-lg-3:nth-child(4) .kpi { animation-delay: .21s; }
+        #qaOverviewPane .kpi .bi { display: inline-block; animation: qaFloat 3.2s ease-in-out infinite; }
+        .qa-rubric-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .qa-rubric-tile { position: relative; overflow: hidden; text-align: left; border: 1px solid #eef1f5; border-radius: 14px; background: #fff; padding: 1rem 1.1rem; display: flex; align-items: center; gap: .85rem; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; animation: qaRise .45s ease both; }
+        .qa-rubric-tile:nth-child(2) { animation-delay: .08s; } .qa-rubric-tile:nth-child(3) { animation-delay: .16s; } .qa-rubric-tile:nth-child(4) { animation-delay: .24s; }
+        .qa-rubric-tile::after { content: ""; position: absolute; inset: 0; background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,.65) 50%, transparent 70%); transform: translateX(-100%); transition: transform .6s ease; pointer-events: none; }
+        .qa-rubric-tile:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,87,184,.10); border-color: #cfe0f7; }
+        .qa-rubric-tile:hover::after { transform: translateX(100%); }
+        .qa-rubric-tile.active { border-color: #0057B8; box-shadow: 0 0 0 3px rgba(0,87,184,.12); background: linear-gradient(135deg, #f5f9ff, #fff); }
+        .qa-rubric-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; transition: transform .25s ease; }
+        .qa-rubric-tile:hover .qa-rubric-icon, .qa-rubric-tile.active .qa-rubric-icon { transform: scale(1.08) rotate(-6deg); }
+        .qa-rubric-name { font-weight: 700; color: #1f2a44; font-size: .95rem; }
+        .qa-rubric-desc { font-size: .76rem; color: #8a93a3; }
+        .qa-rubric-count { margin-left: auto; font-size: .75rem; font-weight: 700; color: #0057B8; background: #eaf2ff; border-radius: 20px; padding: 2px 10px; flex-shrink: 0; }
+        .qa-rubric-chevron { color: #9aa4b2; transition: transform .25s ease; flex-shrink: 0; }
+        .qa-rubric-tile.active .qa-rubric-chevron { transform: rotate(180deg); color: #0057B8; }
+        .qa-rubric { display: none; }
+        .qa-rubric.open { display: block; animation: qaOpen .35s ease both; }
+        .qa-rubric-hint { text-align: center; color: #9aa4b2; font-size: .85rem; padding: 1.5rem 0 .5rem; animation: qaRise .5s ease .3s both; }
+        .qa-rubric-hint .bi { display: inline-block; animation: qaNudge 1.6s ease-in-out infinite; }
+        @keyframes qaRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        @keyframes qaOpen { from { opacity: 0; transform: translateY(-8px) scale(.99); } to { opacity: 1; transform: none; } }
+        @keyframes qaFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        @keyframes qaNudge { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+        @media (prefers-reduced-motion: reduce) {
+            #qaOverviewPane *, #qaOverviewPane *::after { animation: none !important; transition: none !important; }
+        }
     </style>
 </head>
 
@@ -136,7 +168,36 @@
                     </div>
                 </div>
 
+                <!-- Rubriques : rien n'est déplié tant que l'utilisateur ne clique pas sur une tuile -->
+                <div class="qa-rubric-tiles" id="qaRubricTiles">
+                    <button type="button" class="qa-rubric-tile" data-rubric="charts">
+                        <span class="qa-rubric-icon" style="background:#eaf2ff;color:#0057B8;"><i class="bi bi-graph-up-arrow"></i></span>
+                        <span><span class="qa-rubric-name d-block">Graphiques</span><span class="qa-rubric-desc">Tendance, statuts, équipes, critères</span></span>
+                        <i class="bi bi-chevron-down qa-rubric-chevron ms-auto"></i>
+                    </button>
+                    <button type="button" class="qa-rubric-tile" data-rubric="listens">
+                        <span class="qa-rubric-icon" style="background:#e6f7ec;color:#0a8a3e;"><i class="bi bi-headset"></i></span>
+                        <span><span class="qa-rubric-name d-block">Écoutes</span><span class="qa-rubric-desc">Évaluations d'appels</span></span>
+                        <span class="qa-rubric-count" data-count-for="evaluationsTable">0</span>
+                        <i class="bi bi-chevron-down qa-rubric-chevron"></i>
+                    </button>
+                    <button type="button" class="qa-rubric-tile" data-rubric="coaching">
+                        <span class="qa-rubric-icon" style="background:#fff3e0;color:#b06a00;"><i class="bi bi-person-up"></i></span>
+                        <span><span class="qa-rubric-name d-block">Plans de coaching</span><span class="qa-rubric-desc">Axes de progrès des agents</span></span>
+                        <span class="qa-rubric-count" data-count-for="coachingList">0</span>
+                        <i class="bi bi-chevron-down qa-rubric-chevron"></i>
+                    </button>
+                    <button type="button" class="qa-rubric-tile" data-rubric="dossiers">
+                        <span class="qa-rubric-icon" style="background:#f3eaff;color:#7b2ff7;"><i class="bi bi-folder2-open"></i></span>
+                        <span><span class="qa-rubric-name d-block">Dossiers agents</span><span class="qa-rubric-desc">Notes et pièces par agent</span></span>
+                        <span class="qa-rubric-count" data-count-for="dossierList">0</span>
+                        <i class="bi bi-chevron-down qa-rubric-chevron"></i>
+                    </button>
+                </div>
+                <p class="qa-rubric-hint" id="qaRubricHint"><i class="bi bi-hand-index"></i> Cliquez sur une rubrique pour l'afficher.</p>
+
                 <!-- Graphiques -->
+                <div class="qa-rubric" data-rubric="charts">
                 <div class="row g-4 mb-4">
                     <div class="col-lg-8">
                         <div class="card dashboard-card shadow-sm">
@@ -167,7 +228,10 @@
                     </div>
                 </div>
 
+                </div>
+
                 <!-- Liste des écoutes -->
+                <div class="qa-rubric" data-rubric="listens">
                 <div class="card dashboard-card shadow-sm mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <span>Écoutes</span>
@@ -185,9 +249,12 @@
                     </div>
                 </div>
 
-                <!-- Coaching & Dossiers agents -->
+                </div>
+
+                <!-- Plans de coaching -->
+                <div class="qa-rubric" data-rubric="coaching">
                 <div class="row g-4 mb-4">
-                    <div class="col-lg-6">
+                    <div class="col-12">
                         <div class="card dashboard-card shadow-sm h-100">
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 Plans de coaching
@@ -205,7 +272,13 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-6">
+                </div>
+                </div>
+
+                <!-- Dossiers agents -->
+                <div class="qa-rubric" data-rubric="dossiers">
+                <div class="row g-4 mb-4">
+                    <div class="col-12">
                         <div class="card dashboard-card shadow-sm h-100">
                             <div class="card-header">Dossiers agents</div>
                             <div class="card-body">
@@ -219,6 +292,8 @@
                             </div>
                         </div>
                     </div>
+                </div>
+
                 </div>
 
                 <!-- Formulaire d'évaluation -->

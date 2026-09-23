@@ -39,10 +39,59 @@
         var passCount = evaluations.filter(function (e) { return e.passed; }).length;
         var failCount = evaluations.filter(function (e) { return e.knockedOut; }).length;
 
-        $("kpiCount").textContent = count;
-        $("kpiAvgScore").textContent = count ? Math.round(avgScore) + "%" : "—";
-        $("kpiPassRate").textContent = count ? Math.round((passCount / count) * 100) + "%" : "—";
-        $("kpiFailCount").textContent = failCount;
+        countUp($("kpiCount"), count, "");
+        if (count) countUp($("kpiAvgScore"), Math.round(avgScore), "%"); else $("kpiAvgScore").textContent = "—";
+        if (count) countUp($("kpiPassRate"), Math.round((passCount / count) * 100), "%"); else $("kpiPassRate").textContent = "—";
+        countUp($("kpiFailCount"), failCount, "");
+        setRubricCount("evaluationsTable", count);
+    }
+
+    /** Compteur animé (0 → valeur) pour les KPI ; instantané si l'utilisateur réduit les animations. */
+    function countUp(el, target, suffix) {
+        if (!el) return;
+        var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (reduce || !target) { el.textContent = target + suffix; return; }
+        var start = null, duration = 700;
+        function step(ts) {
+            if (start === null) start = ts;
+            var t = Math.min(1, (ts - start) / duration);
+            el.textContent = Math.round(target * (1 - Math.pow(1 - t, 3))) + suffix;
+            if (t < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+    }
+
+    // ===== Rubriques repliées (Graphiques, Écoutes, Coaching, Dossiers) =====
+    // Rien n'est déplié à l'arrivée : un clic sur une tuile ouvre sa rubrique (une à la fois),
+    // un second clic la referme.
+
+    function setRubricCount(countFor, value) {
+        var badge = document.querySelector('.qa-rubric-count[data-count-for="' + countFor + '"]');
+        if (badge) badge.textContent = value;
+    }
+
+    function wireRubrics() {
+        var tiles = document.querySelectorAll(".qa-rubric-tile");
+        Array.prototype.forEach.call(tiles, function (tile) {
+            tile.addEventListener("click", function () { toggleRubric(tile.getAttribute("data-rubric")); });
+        });
+    }
+
+    function toggleRubric(name, forceOpen) {
+        var tile = document.querySelector('.qa-rubric-tile[data-rubric="' + name + '"]');
+        var willOpen = forceOpen || !(tile && tile.classList.contains("active"));
+        Array.prototype.forEach.call(document.querySelectorAll(".qa-rubric-tile"), function (t) {
+            t.classList.toggle("active", willOpen && t === tile);
+        });
+        Array.prototype.forEach.call(document.querySelectorAll(".qa-rubric"), function (section) {
+            section.classList.toggle("open", willOpen && section.getAttribute("data-rubric") === name);
+        });
+        var hint = $("qaRubricHint");
+        if (hint) hint.style.display = willOpen ? "none" : "";
+        // Les graphiques créés pendant que la rubrique était masquée doivent reprendre leur taille.
+        if (willOpen && name === "charts") {
+            [scoreEvolutionChart, statusChart, criteriaChart, teamChart].forEach(function (c) { if (c) c.resize(); });
+        }
     }
 
     // ===== Graphiques =====
@@ -582,6 +631,7 @@
 
     function loadCoaching() {
         getJson("/api/coaching-plans").then(function (plans) {
+            setRubricCount("coachingList", plans.length);
             $("coachingList").innerHTML = plans.map(function (p) {
                 var statusBadge = p.status === "done" ? '<span class="badge bg-success">Fait</span>' :
                     p.status === "in_progress" ? '<span class="badge bg-warning">En cours</span>' :
@@ -625,6 +675,7 @@
 
     function loadDossiers() {
         getJson("/api/agent-dossiers").then(function (dossiers) {
+            setRubricCount("dossierList", dossiers.length);
             $("dossierList").innerHTML = dossiers.map(function (d) {
                 return '<div class="border rounded p-2 small d-flex justify-content-between align-items-start">' +
                     '<div><strong>' + escapeHtml(d.linkedUserName || d.linkedUserMatricule || "Sans agent lié") + '</strong>' +
@@ -778,6 +829,7 @@
         }
     });
 
+    wireRubrics();
     wirePeriodFilter();
     wireAgentLookup();
     wireAudioPreview();
