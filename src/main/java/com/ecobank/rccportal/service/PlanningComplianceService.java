@@ -297,8 +297,16 @@ public class PlanningComplianceService {
         return ids;
     }
 
+    /** Optionnel (injection par setter) : exempte aussi le personnel du portail QA du suivi de présence. */
+    private com.ecobank.rccportal.repository.UserServiceAssignmentRepository userServiceAssignmentRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setUserServiceAssignmentRepository(com.ecobank.rccportal.repository.UserServiceAssignmentRepository repo) {
+        this.userServiceAssignmentRepository = repo;
+    }
+
     private Set<String> teamLeaderUsernames() {
-        Set<String> out = new HashSet<>();
+        Set<String> out = new HashSet<>(ShiftService.qaStaffUsernames(userServiceAssignmentRepository));
         userRoleRepository.findByRoleNameIgnoreCase("TEAM_LEADER").forEach(ur -> {
             if (ur.getUser() != null && ur.getUser().getUsername() != null) {
                 out.add(ur.getUser().getUsername().toLowerCase(Locale.ROOT));

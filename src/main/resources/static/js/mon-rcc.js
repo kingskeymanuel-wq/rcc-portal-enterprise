@@ -72,7 +72,7 @@
             return;
         }
         container.innerHTML = posts.map(function (p) {
-            var image = p.imageUrl ? '<div class="ig-post-image"><img src="' + escapeHtml(p.imageUrl) + '" alt=""></div>' : "";
+            var image = p.imageUrl ? '<div class="ig-post-image">' + mediaHtml(p.imageUrl, 'style="width:100%;max-height:560px;"') + '</div>' : "";
 
             var likeIconClass = p.likedByMe ? "bi-heart-fill" : "bi-heart";
             // Modération : QA/Admin peuvent tout gérer, mais l'auteur doit aussi pouvoir
@@ -274,7 +274,7 @@
                 : "";
 
             bar.innerHTML = addBtn + stories.map(function (s) {
-                var isVideo = s.imageUrl && /\.(mp4|mov)$/i.test(s.imageUrl);
+                var isVideo = s.imageUrl && isVideoUrl(s.imageUrl);
                 var thumb = s.imageUrl
                     ? (isVideo
                         ? '<video src="' + s.imageUrl + '" style="width:100%;height:100%;object-fit:cover;"></video>'
@@ -378,7 +378,7 @@
         document.getElementById("storyViewerProgress").innerHTML = progressHtml;
 
         var mediaBox = document.getElementById("storyViewerMedia");
-        var isVideo = story.imageUrl && /\.(mp4|mov)$/i.test(story.imageUrl);
+        var isVideo = story.imageUrl && isVideoUrl(story.imageUrl);
         if (story.imageUrl) {
             mediaBox.innerHTML = isVideo
                 ? '<video src="' + story.imageUrl + '" style="max-width:100%;max-height:100%;" controls autoplay></video>'
@@ -407,27 +407,22 @@
             var file = this.files[0];
             if (!file) return;
             var statusBox = document.getElementById("storyUploadStatus");
-            statusBox.className = "small mt-2 text-muted";
-            statusBox.textContent = "Envoi en cours…";
-
-            var formData = new FormData();
-            formData.append("file", file);
-            fetch("/api/mon-rcc/media/upload", { method: "POST", credentials: "same-origin", body: formData })
-                .then(function (res) {
-                    if (!res.ok) return res.text().then(function (t) { return Promise.reject(new Error(t || "HTTP " + res.status)); });
-                    return res.json();
-                })
-                .then(function (result) {
-                    pendingStoryMediaUrl = result.url;
-                    document.getElementById("storyFilePreview").src = result.url;
-                    document.getElementById("storyFilePreviewWrap").style.display = "";
-                    statusBox.className = "small mt-2 text-success";
-                    statusBox.textContent = "Fichier prêt.";
-                })
-                .catch(function (e) {
-                    statusBox.className = "small mt-2 text-danger";
-                    statusBox.textContent = "Erreur : " + e.message;
-                });
+            uploadMedia(file, statusBox, function (url, video) {
+                pendingStoryMediaUrl = url;
+                var preview = document.getElementById("storyFilePreview");
+                var oldVideo = document.getElementById("storyVideoPreview");
+                if (oldVideo) oldVideo.remove();
+                if (video) {
+                    preview.style.display = "none";
+                    preview.insertAdjacentHTML("afterend", '<video id="storyVideoPreview" src="' + escapeHtml(url) + '" controls playsinline style="max-width:100%;max-height:260px;"></video>');
+                } else {
+                    preview.style.display = "";
+                    preview.src = url;
+                }
+                document.getElementById("storyFilePreviewWrap").style.display = "";
+                statusBox.className = "small mt-2 text-success";
+                statusBox.textContent = (video ? "Vidéo" : "Photo") + " prête.";
+            });
         });
 
         document.getElementById("publishStoryBtn").addEventListener("click", function () {
@@ -565,32 +560,91 @@
         });
     }
 
+    // ===== Envoi de photo / vidéo (fil + stories) =====
+    // XMLHttpRequest plutôt que fetch : barre de progression pour les vidéos, et un message
+    // clair si le serveur coupe la connexion (au lieu d'un « Failed to fetch » incompréhensible).
+    var MAX_VIDEO_MB = 500, MAX_IMAGE_MB = 20;
+    var VIDEO_RE = /\.(mp4|m4v|mov|webm)(\?|$)/i;
+
+    function isVideoUrl(url) { return !!url && VIDEO_RE.test(url); }
+
+    function mediaHtml(url, attrs) {
+        return isVideoUrl(url)
+            ? '<video src="' + escapeHtml(url) + '" controls playsinline preload="metadata" ' + (attrs || "") + '></video>'
+            : '<img src="' + escapeHtml(url) + '" alt="" ' + (attrs || "") + '>';
+    }
+
+    function uploadMedia(file, statusBox, onDone) {
+        var video = /^video\//.test(file.type) || VIDEO_RE.test(file.name);
+        var maxMb = video ? MAX_VIDEO_MB : MAX_IMAGE_MB;
+        if (file.size > maxMb * 1024 * 1024) {
+            statusBox.className = "small mt-1 text-danger";
+            statusBox.textContent = (video ? "Vidéo" : "Photo") + " trop volumineuse (" + Math.round(file.size / 1048576) + " Mo, maximum " + maxMb + " Mo).";
+            return;
+        }
+        if (video && !/\.(mp4|m4v|mov|webm)$/i.test(file.name)) {
+            statusBox.className = "small mt-1 text-danger";
+            statusBox.textContent = "Format vidéo non pris en charge : utilisez MP4, MOV ou WEBM.";
+            return;
+        }
+        var formData = new FormData();
+        formData.append("file", file);
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/mon-rcc/media/upload");
+        xhr.withCredentials = true;
+        statusBox.className = "small mt-1 text-muted";
+        statusBox.innerHTML = 'Envoi en cours… <span class="mr-upload-pct">0 %</span><div class="progress mt-1" style="height:6px;max-width:280px;"><div class="progress-bar" style="width:0%"></div></div>';
+        xhr.upload.onprogress = function (e) {
+            if (!e.lengthComputable) return;
+            var pct = Math.round(e.loaded * 100 / e.total);
+            var bar = statusBox.querySelector(".progress-bar"), label = statusBox.querySelector(".mr-upload-pct");
+            if (bar) bar.style.width = pct + "%";
+            if (label) label.textContent = pct + " %" + (pct === 100 ? " — enregistrement…" : "");
+        };
+        xhr.onload = function () {
+            var data = null;
+            try { data = JSON.parse(xhr.responseText); } catch (ignore) {}
+            if (xhr.status >= 200 && xhr.status < 300 && data && data.url) { onDone(data.url, video); return; }
+            statusBox.className = "small mt-1 text-danger";
+            statusBox.textContent = "Erreur : " + (data && data.error && data.error.message ? data.error.message
+                : xhr.status === 413 ? "fichier trop volumineux pour le serveur." : "envoi refusé (HTTP " + xhr.status + ").");
+        };
+        xhr.onerror = function () {
+            statusBox.className = "small mt-1 text-danger";
+            statusBox.textContent = "Envoi interrompu : connexion coupée par le serveur ou le réseau. Si la vidéo est lourde, " +
+                "réduisez-la (moins de " + MAX_VIDEO_MB + " Mo) ou contactez l'administrateur (limite du serveur / proxy).";
+        };
+        xhr.send(formData);
+    }
+
+    function showPostPreview(url) {
+        var wrap = document.getElementById("postImagePreviewWrap");
+        var img = document.getElementById("postImagePreview");
+        var old = document.getElementById("postVideoPreview");
+        if (old) old.remove();
+        if (isVideoUrl(url)) {
+            img.style.display = "none";
+            img.insertAdjacentHTML("afterend", '<video id="postVideoPreview" src="' + escapeHtml(url) + '" controls playsinline class="rounded" style="max-height:280px;max-width:100%;"></video>');
+        } else {
+            img.style.display = "";
+            img.src = url;
+        }
+        wrap.style.display = "";
+    }
+
     function wirePostForm() {
         document.getElementById("postImageFileInput").addEventListener("change", function () {
             var file = this.files[0];
             if (!file) return;
             var statusBox = document.getElementById("postImageUploadStatus");
-            statusBox.className = "small mt-1 text-muted";
-            statusBox.textContent = "Envoi en cours…";
-
-            var formData = new FormData();
-            formData.append("file", file);
-            fetch("/api/mon-rcc/media/upload", { method: "POST", credentials: "same-origin", body: formData })
-                .then(function (res) {
-                    if (!res.ok) return res.text().then(function (t) { return Promise.reject(new Error(t || "HTTP " + res.status)); });
-                    return res.json();
-                })
-                .then(function (result) {
-                    document.getElementById("postImageInput").value = result.url;
-                    document.getElementById("postImagePreview").src = result.url;
-                    document.getElementById("postImagePreviewWrap").style.display = "";
-                    statusBox.className = "small mt-1 text-success";
-                    statusBox.textContent = "Fichier prêt à être publié.";
-                })
-                .catch(function (e) {
-                    statusBox.className = "small mt-1 text-danger";
-                    statusBox.textContent = "Erreur : " + e.message;
-                });
+            var input = this;
+            uploadMedia(file, statusBox, function (url, video) {
+                document.getElementById("postImageInput").value = url;
+                showPostPreview(url);
+                statusBox.className = "small mt-1 text-success";
+                statusBox.textContent = (video ? "Vidéo" : "Photo") + " prête à être publiée.";
+                input.value = "";
+            });
         });
 
         document.getElementById("addPostImageBtn").addEventListener("click", function () {
@@ -609,8 +663,7 @@
             var url = this.value.trim();
             var wrap = document.getElementById("postImagePreviewWrap");
             if (url) {
-                document.getElementById("postImagePreview").src = url;
-                wrap.style.display = "";
+                showPostPreview(url);
             } else {
                 wrap.style.display = "none";
             }
@@ -864,7 +917,7 @@
         }
         container.innerHTML = messages.map(function (m) {
             var cls = m.mine ? "mon-rcc-msg-mine" : "mon-rcc-msg-theirs";
-            var isVideo = m.mediaUrl && /\.(mp4|mov)$/i.test(m.mediaUrl);
+            var isVideo = m.mediaUrl && isVideoUrl(m.mediaUrl);
             var mediaHtml = "";
             if (m.mediaUrl) {
                 mediaHtml = isVideo

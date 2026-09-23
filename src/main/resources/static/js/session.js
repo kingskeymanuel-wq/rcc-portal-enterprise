@@ -363,7 +363,7 @@ window.RccSession = (function () {
 
     // Profils qui n'ont pas de shift personnel à pointer — ils reçoivent un bouton
     // Déconnexion à la place du widget de suivi de shift dans la barre latérale.
-    var NO_SHIFT_PROFILES = ["TEAM_LEADER", "SUPERVISOR", "RH", "EXCELLIAM", "ADMIN"];
+    var NO_SHIFT_PROFILES = ["TEAM_LEADER", "SUPERVISOR", "RH", "EXCELLIAM", "ADMIN", "QA", "QA_SUPERVISOR", "FORMATEUR"];
 
     /** Remplace le contenu du widget de shift par un simple bouton Déconnexion. */
     function wireSidebarLogoutButton(shiftWidget) {

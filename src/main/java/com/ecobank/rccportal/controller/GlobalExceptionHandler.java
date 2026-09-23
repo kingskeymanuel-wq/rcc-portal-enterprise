@@ -38,6 +38,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorBody("bad_request", message));
     }
 
+    /** Fichier plus gros que spring.servlet.multipart.max-file-size : message clair (413) au lieu de « file is required ». */
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleTooLarge(org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(errorBody("payload_too_large",
+                "Fichier trop volumineux pour le serveur (limite : " + (ex.getMaxUploadSize() > 0 ? (ex.getMaxUploadSize() / (1024 * 1024)) + " Mo" : "configurée") + ")."));
+    }
+
     /** Fichier manquant/absent sur un endpoint multipart (ex. POST /api/transcribe sans "file"). */
     @ExceptionHandler({MissingServletRequestPartException.class, MultipartException.class})
     public ResponseEntity<Map<String, Object>> handleMultipart(Exception ex) {

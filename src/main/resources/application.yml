@@ -1,5 +1,10 @@
 server:
   port: 8081
+  tomcat:
+    # Vidéos Mon RCC : ne jamais couper la connexion pendant l'envoi d'un gros fichier (sinon le
+    # navigateur n'affiche que « Failed to fetch ») — le dépassement est refusé proprement (413).
+    max-swallow-size: -1
+    connection-timeout: 120s
 spring:
   application:
     name: rcc-portal
@@ -31,8 +36,10 @@ spring:
     cache: false
   servlet:
     multipart:
-      max-file-size: 50MB
-      max-request-size: 50MB
+      # Photos et vidéos Mon RCC (voir ImageStorageService) — réglable sans recompiler.
+      max-file-size: ${RCC_UPLOAD_MAX_SIZE:500MB}
+      max-request-size: ${RCC_UPLOAD_MAX_SIZE:500MB}
+      file-size-threshold: 2MB
   mail:
     host: ${RCC_MAIL_HOST:localhost}
     port: ${RCC_MAIL_PORT:25}
@@ -113,6 +120,8 @@ rcc:
   uploads:
     photos-dir: ${RCC_PHOTOS_DIR:C:/rcc-portal-photos}
     kb-files-dir: ${RCC_KB_FILES_DIR:C:/rcc-portal-kb-files}
+    # Vidéos Mon RCC : taille maximale en Mo (garder ≤ spring.servlet.multipart.max-file-size).
+    max-video-mb: ${RCC_UPLOAD_MAX_VIDEO_MB:500}
   map:
     # Fond de carte de l'onglet « Agences / Carte » (Base de connaissance, bank-map.js).
     # Le réseau Ecobank peut bloquer tile.openstreetmap.org : pointer alors vers un serveur de

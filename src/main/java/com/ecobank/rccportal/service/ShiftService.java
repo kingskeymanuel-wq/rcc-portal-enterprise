@@ -70,11 +70,43 @@ public class ShiftService {
      *  un membre à suivre : il ne doit jamais apparaître dans les vues "Équipe"/"En direct" du
      *  Suivi de shift (voir demande utilisateur), seulement dans sa propre vue "Moi-même". */
     private java.util.Set<String> teamLeaderUsernames() {
-        return userRoleRepository.findByRoleNameIgnoreCase("TEAM_LEADER").stream()
+        java.util.Set<String> out = userRoleRepository.findByRoleNameIgnoreCase("TEAM_LEADER").stream()
                 .map(ur -> ur.getUser().getUsername())
                 .filter(java.util.Objects::nonNull)
                 .map(String::toLowerCase)
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(java.util.stream.Collectors.toCollection(java.util.HashSet::new));
+        // Portail QA (Quality Assurance, Superviseur QA, Formateur) : pas de shift à suivre.
+        out.addAll(qaStaffUsernames(userServiceAssignmentRepository));
+        return out;
+    }
+
+    /** Services du portail QA — exemptés du suivi de shift (pas de planning d'appels). */
+    public static final java.util.Set<String> QA_SERVICE_CODES = java.util.Set.of("QUALITY_ASSURANCE", "SUPERVISEUR_QA", "FORMATEUR");
+
+    public static java.util.Set<String> qaStaffUsernames(com.ecobank.rccportal.repository.UserServiceAssignmentRepository repo) {
+        if (repo == null) return java.util.Set.of();
+        try {
+            return repo.findAll().stream()
+                    .filter(a -> a.getService() != null && a.getService().getCode() != null
+                            && QA_SERVICE_CODES.contains(a.getService().getCode().toUpperCase()))
+                    .map(a -> a.getUser() != null ? a.getUser().getUsername() : null)
+                    .filter(java.util.Objects::nonNull)
+                    .map(String::toLowerCase)
+                    .collect(java.util.stream.Collectors.toSet());
+        } catch (Exception e) {
+            return java.util.Set.of();
+        }
+    }
+
+    private boolean isQaStaff(User user) {
+        if (user == null || user.getId() == null) return false;
+        try {
+            return userServiceAssignmentRepository.findByUserId(user.getId()).stream()
+                    .anyMatch(a -> a.getService() != null && a.getService().getCode() != null
+                            && QA_SERVICE_CODES.contains(a.getService().getCode().toUpperCase()));
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private List<ShiftEventResponse> excludingTeamLeaders(List<ShiftEventResponse> events) {
@@ -87,6 +119,7 @@ public class ShiftService {
 
     @Transactional
     public void recordLogin(User user) {
+        if (isQaStaff(user)) return; // portail QA : aucun shift enregistré
         saveEvent(user, "LOGIN");
     }
 
