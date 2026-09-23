@@ -12,6 +12,7 @@ import com.ecobank.rccportal.repository.ProcedureRepository;
 import com.ecobank.rccportal.repository.ProcedureStepRepository;
 import com.ecobank.rccportal.repository.SlaRuleRepository;
 import com.ecobank.rccportal.util.ApiException;
+import com.ecobank.rccportal.util.SearchText;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,20 +39,6 @@ import java.util.*;
 public class RalphSearchService {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RalphSearchService.class);
-
-    /** URL d'un service de traduction interne éventuellement hébergé par l'IT Ecobank —
-     *  vide par défaut (aucun impact si non configuré). Voir translateViaCustomEndpointIfConfigured(). */
-    @org.springframework.beans.factory.annotation.Value("${rcc.translation.custom-url:}")
-    private String customTranslationUrl;
-
-    /** Stopwords déjà désaccentués — comparés à du texte normalisé par {@link #normalize(String)}. Utilisé par {@link #search(String)}. */
-    private static final Set<String> STOPWORDS = Set.of(
-            "le", "la", "les", "un", "une", "des", "de", "du", "et", "ou", "a", "au", "aux",
-            "ce", "ces", "cette", "que", "qui", "pour", "avec", "sur", "dans", "en", "est",
-            "sont", "vous", "votre", "nous", "notre", "je", "il", "elle", "se", "sa", "son",
-            "leur", "leurs", "pas", "ne", "plus", "bien", "etre", "avoir", "faire", "par",
-            "comment", "quoi", "quel", "quelle"
-    );
 
     /** Expressions qui, seules ou en tête de question, déclenchent le mode "détails" sur la dernière réponse. */
     private static final List<String> DETAIL_TRIGGERS = List.of(
@@ -80,16 +67,6 @@ public class RalphSearchService {
     private final ProcedureRepository procedureRepository;
     private final ProcedureStepRepository procedureStepRepository;
     private final com.ecobank.rccportal.repository.CourseRepository courseRepository;
-    /** connectTimeout explicite (le défaut de la JVM peut dépasser la minute sur un réseau qui
-     *  bloque silencieusement plutôt que de refuser la connexion — on préfère échouer vite et
-     *  basculer sur la source suivante). Respecte automatiquement un proxy sortant configuré
-     *  au niveau JVM (-Dhttps.proxyHost / -Dhttps.proxyPort), s'il y en a un sur ce réseau. */
-    private final java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
-            .connectTimeout(java.time.Duration.ofSeconds(8))
-            .followRedirects(java.net.http.HttpClient.Redirect.NORMAL)
-            .build();
-    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
-
     /** Référentiel SLA RCC — seule source de vérité injectée dans le prompt système
      *  de RAF (voir {@link #buildSlaContext()}) pour qu'il ne devine jamais un délai. */
     private final SlaRuleRepository slaRuleRepository;
@@ -104,7 +81,7 @@ public class RalphSearchService {
      *  de RAF (voir {@link #buildQuizKnowledgeContext()}), même principe que buildSlaContext(). */
     private final QuizQuestionService quizQuestionService;
 
-    private final LocalTranslationClient localTranslationClient;
+    private final TranslationService translationService;
 
     public RalphSearchService(KnowledgeArticleRepository articleRepository, ProcedureRepository procedureRepository,
                               ProcedureStepRepository procedureStepRepository,
@@ -116,7 +93,7 @@ public class RalphSearchService {
                               RafConversationMemoryService conversationMemoryService,
                               DocumentTextExtractionService documentTextExtractionService,
                               QuizQuestionService quizQuestionService,
-                              LocalTranslationClient localTranslationClient) {
+                              TranslationService translationService) {
         this.articleRepository = articleRepository;
         this.procedureRepository = procedureRepository;
         this.procedureStepRepository = procedureStepRepository;
@@ -128,7 +105,7 @@ public class RalphSearchService {
         this.conversationMemoryService = conversationMemoryService;
         this.documentTextExtractionService = documentTextExtractionService;
         this.quizQuestionService = quizQuestionService;
-        this.localTranslationClient = localTranslationClient;
+        this.translationService = translationService;
     }
 
     /**
@@ -410,205 +387,11 @@ public class RalphSearchService {
     }
 
     /**
-     * Traduit un texte libre — utilisé par le bouton "Traduire" de RAF et par le Traducteur
-     * dédié (/translator). Aucune dépendance IA : uniquement des API de traduction dédiées,
-     * avec plusieurs sources indépendantes en repli les unes des autres pour la robustesse.
-     * Conservé pour compatibilité (RalphSearchController) — délègue à translateDetailed()
-     * avec source "auto".
+     * Traduit un texte libre (détection automatique de la langue source). Conservé pour
+     * compatibilité — la logique de traduction vit maintenant dans {@link TranslationService}.
      */
     public String translate(String text, String targetLang) {
-        return translateDetailed(text, "auto", targetLang).translatedText();
-    }
-
-    /**
-     * Traduit un texte libre entre deux langues quelconques (source explicite ou détection
-     * automatique) — cœur du Traducteur dédié (/translator). Chaîne de repli, TOUJOURS sans
-     * IA et SANS Google Translate (retiré à la demande — plus aucune dépendance vers ce
-     * service) :
-     *   1. Traduction locale (Argos Translate, hors-ligne), si configurée.
-     *   2. Point d'entrée interne Ecobank, s'il est configuré (contourne un blocage réseau).
-     *   3. MyMemory Translation API (gratuite, sans clé) — seulement si la langue source est
-     *      explicite (elle ne gère pas la détection automatique "auto").
-     * Une IndexOutOfBounds ou un HTTP non-200 sur une source bascule sur la suivante, jamais
-     * une exception qui remonterait telle quelle à l'agent.
-     */
-    public TranslateResult translateDetailed(String text, String sourceLang, String targetLang) {
-        if (text == null || text.isBlank()) {
-            throw ApiException.badRequest("Le texte à traduire ne peut pas être vide.");
-        }
-        String target = (targetLang != null && !targetLang.isBlank()) ? targetLang.toLowerCase() : "fr";
-        String source = (sourceLang != null && !sourceLang.isBlank()) ? sourceLang.toLowerCase() : "auto";
-
-        if (source.equals(target)) {
-            return new TranslateResult(text, source);
-        }
-
-        // Traduction locale (Argos Translate, voir LocalTranslationClient/scripts/translate.py)
-        // en PREMIER quand elle est configurée — c'est la seule des sources qui ne dépend
-        // d'aucun accès internet au moment de traduire, donc la plus fiable sur ce réseau.
-        if (localTranslationClient.isConfigured()) {
-            try {
-                var local = localTranslationClient.translate(text, source, target);
-                return new TranslateResult(local.translatedText(), local.detectedSourceLang());
-            } catch (Exception localFailure) {
-                log.warn("[TRANSLATE] Traduction locale a échoué : {} — repli sur les sources suivantes.", localFailure.getMessage());
-            }
-        }
-
-        java.util.Optional<String> customResult = translateViaCustomEndpointIfConfigured(text, source, target);
-        if (customResult.isPresent()) return new TranslateResult(customResult.get(), source);
-
-        if (!"auto".equals(source)) {
-            try {
-                return new TranslateResult(translateViaMyMemory(text, source, target), source);
-            } catch (Exception myMemoryFailure) {
-                log.warn("[TRANSLATE] MyMemory a échoué : {} — {}", myMemoryFailure.getClass().getSimpleName(), myMemoryFailure.getMessage());
-            }
-        }
-
-        String hint = localTranslationClient.isConfigured()
-                ? " La traduction locale a aussi échoué pour cette paire de langues — voir scripts/translate.py pour installer le paquet de langue manquant."
-                : " Aucune traduction locale n'est configurée sur ce serveur (voir rcc.translation.offline.* dans application.yml) — c'est la solution recommandée sur un réseau qui bloque l'accès à internet.";
-        String autoHint = "auto".equals(source)
-                ? " La détection automatique de la langue source nécessite la traduction locale ou le point d'entrée interne Ecobank — MyMemory ne la gère pas ; précisez la langue source si aucun des deux n'est configuré."
-                : "";
-        throw ApiException.serviceUnavailable(
-                "La traduction a échoué sur toutes les sources disponibles" +
-                (!"auto".equals(source) ? " (MyMemory)" : "") + "." + hint + autoHint);
-    }
-
-    /** Traduction + langue source réellement utilisée (utile quand source="auto"). */
-    public record TranslateResult(String translatedText, String detectedSourceLang) {}
-
-    /**
-     * Diagnostic réseau — teste chaque source de traduction indépendamment avec une phrase
-     * fixe et courte, pour dire précisément laquelle est joignable depuis ce serveur. Utile
-     * pour l'IT : distingue un vrai bug applicatif d'un simple blocage réseau vers tel ou tel
-     * domaine externe, sans avoir à éplucher les logs. Jamais d'exception : chaque source
-     * réussie/échouée est rapportée avec la classe d'exception exacte (UnknownHostException =
-     * DNS bloqué, ConnectException = port/pare-feu bloqué, HttpTimeoutException = accessible
-     * mais trop lent, etc.). Google Translate a été retiré de cette liste — n'est plus une
-     * source utilisée par le Traducteur, donc plus testé ici non plus.
-     */
-    public java.util.List<java.util.Map<String, String>> diagnoseTranslationSources() {
-        java.util.List<java.util.Map<String, String>> report = new java.util.ArrayList<>();
-        String probe = "bonjour";
-
-        report.add(diagnoseOne("Traduction locale (Argos Translate, hors-ligne)", () -> {
-            if (!localTranslationClient.isConfigured()) {
-                throw new IllegalStateException("Non configurée (rcc.translation.offline.python-executable vide) — voir scripts/translate.py pour l'installer.");
-            }
-            return localTranslationClient.translate(probe, "fr", "en").translatedText();
-        }));
-
-        report.add(diagnoseOne("Point d'entrée interne Ecobank", () -> {
-            if (customTranslationUrl == null || customTranslationUrl.isBlank()) {
-                throw new IllegalStateException("Non configuré (rcc.translation.custom-url vide).");
-            }
-            return translateViaCustomEndpointIfConfigured(probe, "fr", "en")
-                    .orElseThrow(() -> new RuntimeException("Configuré mais n'a renvoyé aucun résultat."));
-        }));
-
-        report.add(diagnoseOne("MyMemory", () -> translateViaMyMemory(probe, "fr", "en")));
-
-        return report;
-    }
-
-    private java.util.Map<String, String> diagnoseOne(String label, java.util.concurrent.Callable<String> probe) {
-        java.util.Map<String, String> row = new java.util.LinkedHashMap<>();
-        row.put("source", label);
-        try {
-            String result = probe.call();
-            row.put("status", "OK");
-            row.put("detail", "Répond correctement (« " + result + " »).");
-        } catch (Exception e) {
-            row.put("status", "ÉCHEC");
-            row.put("detail", e.getClass().getSimpleName() + " : " + e.getMessage());
-        }
-        return row;
-    }
-
-    /**
-     * Appelle un service de traduction interne éventuellement hébergé par l'IT Ecobank sur
-     * son propre réseau (contourne tout blocage de pare-feu vers l'extérieur, puisqu'aucun
-     * appel externe n'est nécessaire). Contrat attendu — POST JSON :
-     * requête {@code {"text": "...", "sourceLang": "fr", "targetLang": "en"}},
-     * réponse {@code {"translatedText": "..."}}.
-     * Retourne Optional.empty() si non configuré OU si l'appel échoue (jamais d'exception —
-     * un mauvais paramétrage ne doit jamais empêcher le repli sur MyMemory).
-     */
-    private java.util.Optional<String> translateViaCustomEndpointIfConfigured(String text, String sourceLang, String targetLang) {
-        if (customTranslationUrl == null || customTranslationUrl.isBlank()) return java.util.Optional.empty();
-        try {
-            String json = objectMapper.writeValueAsString(java.util.Map.of(
-                    "text", text, "sourceLang", sourceLang, "targetLang", targetLang));
-            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
-                    .uri(java.net.URI.create(customTranslationUrl))
-                    .timeout(java.time.Duration.ofSeconds(10))
-                    .header("Content-Type", "application/json")
-                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(json, java.nio.charset.StandardCharsets.UTF_8))
-                    .build();
-            java.net.http.HttpResponse<String> response = httpClient.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                log.warn("[TRANSLATE] Point d'entrée interne a répondu HTTP {} — repli sur les sources suivantes.", response.statusCode());
-                return java.util.Optional.empty();
-            }
-            String translated = objectMapper.readTree(response.body()).path("translatedText").asText(null);
-            return (translated == null || translated.isBlank()) ? java.util.Optional.empty() : java.util.Optional.of(translated);
-        } catch (Exception e) {
-            log.warn("[TRANSLATE] Point d'entrée interne inaccessible ({}) — repli sur les sources suivantes.", e.getMessage());
-            return java.util.Optional.empty();
-        }
-    }
-
-    /**
-     * MyMemory Translation API — service public gratuit, sans clé d'API requise. Traduit
-     * texte par texte (découpe sur les phrases pour rester sous la limite de ~500 caractères
-     * par requête de l'API gratuite) puis recolle le résultat. Seule source externe restante
-     * depuis le retrait de Google Translate.
-     */
-    private String translateViaMyMemory(String text, String sourceLang, String targetLang) throws Exception {
-        String[] chunks = splitForTranslation(text, 450);
-        StringBuilder out = new StringBuilder();
-        for (String chunk : chunks) {
-            // langpair="fr|en" — le "|" est un caractère illégal pour java.net.URI.create tel
-            // quel (IllegalArgumentException: "Illegal character in query"), il doit être
-            // encodé comme le reste du paramètre, pas concaténé brut.
-            String url = "https://api.mymemory.translated.net/get?q=" + java.net.URLEncoder.encode(chunk, java.nio.charset.StandardCharsets.UTF_8)
-                    + "&langpair=" + java.net.URLEncoder.encode(sourceLang + "|" + targetLang, java.nio.charset.StandardCharsets.UTF_8);
-            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
-                    .uri(java.net.URI.create(url))
-                    .timeout(java.time.Duration.ofSeconds(10))
-                    .GET()
-                    .build();
-            java.net.http.HttpResponse<String> response = httpClient.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                throw new RuntimeException("MyMemory a répondu HTTP " + response.statusCode());
-            }
-            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(response.body());
-            String translated = root.path("responseData").path("translatedText").asText(null);
-            if (translated == null || translated.isBlank()) {
-                throw new RuntimeException("MyMemory n'a renvoyé aucune traduction.");
-            }
-            out.append(translated).append(" ");
-        }
-        return out.toString().trim();
-    }
-
-    /** Découpe un texte en morceaux sur les frontières de phrase, sous la limite fournie — MyMemory limite la taille par requête. */
-    private String[] splitForTranslation(String text, int maxChunkLength) {
-        if (text.length() <= maxChunkLength) return new String[]{text};
-        List<String> chunks = new ArrayList<>();
-        StringBuilder current = new StringBuilder();
-        for (String sentence : text.split("(?<=[.!?])\\s+")) {
-            if (current.length() + sentence.length() > maxChunkLength && current.length() > 0) {
-                chunks.add(current.toString());
-                current = new StringBuilder();
-            }
-            current.append(sentence).append(" ");
-        }
-        if (current.length() > 0) chunks.add(current.toString());
-        return chunks.toArray(new String[0]);
+        return translationService.translate(text, "auto", targetLang).translatedText();
     }
 
     /** Construit le prompt utilisateur envoyé à Anthropic Claude — plus de contexte interne Ecobank, juste la question et le web éventuel. */
@@ -674,8 +457,7 @@ public class RalphSearchService {
             throw ApiException.badRequest("keyword is required.");
         }
 
-        Set<String> queryWords = significantWords(normalize(keyword));
-        if (queryWords.isEmpty()) {
+        if (SearchText.queryTerms(keyword).isEmpty()) {
             return new RalphSearchResponse("Précise un peu plus ta recherche avec des mots plus spécifiques.", List.of());
         }
 
@@ -699,48 +481,77 @@ public class RalphSearchService {
                 internal.results().isEmpty() && webResults.isEmpty() ? 0 : 60, sourcesConsulted);
     }
 
-    /** Assemble le contexte (articles + étapes de procédures) pour {@link #search(String)} — utilisé uniquement par la barre de recherche classique. */
+    /**
+     * Assemble le contexte (articles + étapes de procédures + formations) pour
+     * {@link #search(String)} et le repli local de RAF. Pertinence calculée par
+     * {@link SearchText} (accents, pluriels, fautes de frappe, pondération titre/contenu)
+     * au lieu de l'ancien {@code contains()} qui faisait matcher « art » dans « carte ».
+     */
     private InternalContext buildInternalContext(String question) {
-        Set<String> queryWords = significantWords(normalize(question));
-        if (queryWords.isEmpty()) {
+        List<String> terms = SearchText.queryTerms(question);
+        if (terms.isEmpty()) {
             return new InternalContext(List.of(), List.of(), List.of(), List.of());
         }
+        int termCount = terms.size();
 
         List<Scored<KnowledgeArticle>> articleMatches = new ArrayList<>();
         for (KnowledgeArticle article : articleRepository.findAll()) {
-            String plainText = stripHtml(article.getContentHtml());
-            int score = overlapScore(queryWords, normalize(article.getTitle() + " " + plainText + " " + article.getTags()));
-            if (score > 0) articleMatches.add(new Scored<>(article, score));
+            SearchText.Match m = SearchText.score(question, terms,
+                    SearchText.Field.of(article.getTitle(), 3.0),
+                    SearchText.Field.of(article.getTags(), 2.0),
+                    SearchText.Field.of(stripHtml(article.getContentHtml()), 1.0));
+            if (m.isRelevant(termCount)) articleMatches.add(new Scored<>(article, m.score()));
         }
-        articleMatches.sort((a, b) -> b.score - a.score);
+        articleMatches.sort((a, b) -> Double.compare(b.score, a.score));
 
+        // Toutes les étapes en UNE requête (l'ancienne boucle faisait une requête SQL par procédure).
+        List<Procedure> procedures = procedureRepository.findAll();
+        Map<Integer, List<ProcedureStep>> stepsByProcedure = procedures.isEmpty() ? Map.of()
+                : procedureStepRepository.findByProcedureIn(procedures).stream()
+                .collect(java.util.stream.Collectors.groupingBy(st -> st.getProcedure().getProcedureId()));
         List<Scored<ProcedureStepMatch>> stepMatches = new ArrayList<>();
-        for (Procedure procedure : procedureRepository.findAll()) {
-            for (ProcedureStep step : procedureStepRepository.findByProcedureOrderByStepNumberAsc(procedure)) {
+        for (Procedure procedure : procedures) {
+            // Une seule entrée par procédure (sa meilleure étape) — évite qu'une procédure
+            // longue occupe à elle seule toute la liste de résultats.
+            Scored<ProcedureStepMatch> best = null;
+            for (ProcedureStep step : stepsByProcedure.getOrDefault(procedure.getProcedureId(), List.of())) {
                 if (isPlaceholderStepContent(step.getContent())) continue; // pas encore rédigée par QA
-                int score = overlapScore(queryWords, normalize(procedure.getTitle() + " " + step.getContent()));
-                if (score > 0) stepMatches.add(new Scored<>(new ProcedureStepMatch(procedure, step), score));
+                SearchText.Match m = SearchText.score(question, terms,
+                        SearchText.Field.of(procedure.getTitle(), 3.0),
+                        SearchText.Field.of(step.getContent(), 1.0));
+                if (m.isRelevant(termCount) && (best == null || m.score() > best.score)) {
+                    best = new Scored<>(new ProcedureStepMatch(procedure, step), m.score());
+                }
             }
+            if (best != null) stepMatches.add(best);
         }
-        stepMatches.sort((a, b) -> b.score - a.score);
+        stepMatches.sort((a, b) -> Double.compare(b.score, a.score));
 
         List<Scored<com.ecobank.rccportal.model.Course>> courseMatches = new ArrayList<>();
         for (com.ecobank.rccportal.model.Course course : courseRepository.findAll()) {
-            String haystack = normalize(course.getTitle() + " " + safe(course.getDescription()) + " " + safe(course.getCategory()));
-            int score = overlapScore(queryWords, haystack);
-            if (score > 0) courseMatches.add(new Scored<>(course, score));
+            SearchText.Match m = SearchText.score(question, terms,
+                    SearchText.Field.of(course.getTitle(), 3.0),
+                    SearchText.Field.of(safe(course.getCategory()), 1.5),
+                    SearchText.Field.of(safe(course.getDescription()), 1.0));
+            if (m.isRelevant(termCount)) courseMatches.add(new Scored<>(course, m.score()));
         }
-        courseMatches.sort((a, b) -> b.score - a.score);
+        courseMatches.sort((a, b) -> Double.compare(b.score, a.score));
 
-        List<RalphResultItem> results = new ArrayList<>();
-        articleMatches.stream().limit(4).forEach(m -> results.add(new RalphResultItem(
-                "ARTICLE", m.value.getArticleId(), m.value.getTitle(), snippet(stripHtml(m.value.getContentHtml())))));
-        courseMatches.stream().limit(4).forEach(m -> results.add(new RalphResultItem(
-                "COURSE", m.value.getCourseId(), m.value.getTitle(), snippet(safe(m.value.getDescription())))));
-        stepMatches.stream().limit(4).forEach(m -> results.add(new RalphResultItem(
+        // Résultats fusionnés et triés par pertinence globale (et non plus « tous les articles
+        // puis toutes les formations puis toutes les procédures », qui cachait le meilleur résultat).
+        List<Scored<RalphResultItem>> merged = new ArrayList<>();
+        articleMatches.stream().limit(5).forEach(m -> merged.add(new Scored<>(new RalphResultItem(
+                "ARTICLE", m.value.getArticleId(), m.value.getTitle(),
+                SearchText.snippetAround(stripHtml(m.value.getContentHtml()), terms, 180)), m.score)));
+        courseMatches.stream().limit(5).forEach(m -> merged.add(new Scored<>(new RalphResultItem(
+                "COURSE", m.value.getCourseId(), m.value.getTitle(),
+                SearchText.snippetAround(safe(m.value.getDescription()), terms, 180)), m.score)));
+        stepMatches.stream().limit(5).forEach(m -> merged.add(new Scored<>(new RalphResultItem(
                 "PROCEDURE", m.value.procedure.getProcedureId(),
                 m.value.procedure.getTitle() + " — étape " + m.value.step.getStepNumber(),
-                snippet(m.value.step.getContent()))));
+                SearchText.snippetAround(m.value.step.getContent(), terms, 180)), m.score)));
+        merged.sort((a, b) -> Double.compare(b.score, a.score));
+        List<RalphResultItem> results = merged.stream().limit(12).map(m -> m.value).toList();
 
         return new InternalContext(articleMatches, stepMatches, courseMatches, results);
     }
@@ -832,22 +643,6 @@ public class RalphSearchService {
         return sb.toString();
     }
 
-    private int overlapScore(Set<String> queryWords, String normalizedText) {
-        int score = 0;
-        for (String word : queryWords) {
-            if (normalizedText.contains(word)) score++;
-        }
-        return score;
-    }
-
-    private Set<String> significantWords(String normalizedText) {
-        Set<String> words = new HashSet<>();
-        for (String word : normalizedText.split("\\s+")) {
-            if (word.length() > 2 && !STOPWORDS.contains(word)) words.add(word);
-        }
-        return words;
-    }
-
     private String normalize(String text) {
         if (text == null) return "";
         String withoutAccents = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFD)
@@ -873,8 +668,8 @@ public class RalphSearchService {
 
     private static class Scored<T> {
         final T value;
-        final int score;
-        Scored(T value, int score) { this.value = value; this.score = score; }
+        final double score;
+        Scored(T value, double score) { this.value = value; this.score = score; }
     }
 
     private static class ProcedureStepMatch {

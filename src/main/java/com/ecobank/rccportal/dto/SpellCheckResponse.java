@@ -4,7 +4,8 @@ import java.util.List;
 
 public record SpellCheckResponse(
         String language,
-        List<IssueDto> issues
+        List<IssueDto> issues,
+        String engine
 ) {
     public record IssueDto(
             String message,
@@ -13,7 +14,9 @@ public record SpellCheckResponse(
             int length,
             List<String> suggestions,
             String ruleId,
-            String category
+            String category,
+            /** misspelling / grammar / typographical / style / other — couleur du surlignage. */
+            String type
     ) {
     }
 }

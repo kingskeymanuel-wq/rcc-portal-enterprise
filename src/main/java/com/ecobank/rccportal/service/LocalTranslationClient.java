@@ -55,20 +55,34 @@ public class LocalTranslationClient {
                     "Traduction locale non configurée (rcc.translation.offline.python-executable / script-path).");
         }
 
+        Process process = null;
         try {
             ProcessBuilder pb = new ProcessBuilder(pythonExecutable, scriptPath, sourceLang, targetLang);
-            pb.redirectErrorStream(false);
-            Process process = pb.start();
+            // UTF-8 forcé : sous Windows, Python lit/écrit par défaut en cp1252 — les accents
+            // arrivaient corrompus dans le script et la sortie JSON (ensure_ascii=False) plantait
+            // sur tout caractère hors cp1252 (arabe, chinois...).
+            pb.environment().put("PYTHONIOENCODING", "utf-8");
+            pb.environment().put("PYTHONUTF8", "1");
+            // stderr ignoré (Argos/Stanza y écrivent des avertissements) : sans ça, un tampon
+            // stderr plein bloquait le script indéfiniment. Les erreurs utiles sortent en JSON sur stdout.
+            pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+            process = pb.start();
+            final Process running = process;
+
+            // Lecture de stdout en tâche de fond : l'ancienne lecture bloquante rendait le
+            // timeout inopérant (readLines() attendait la fin du script avant waitFor()).
+            java.util.concurrent.CompletableFuture<String> stdout = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(running.getInputStream(), StandardCharsets.UTF_8))) {
+                    return reader.lines().collect(Collectors.joining("\n"));
+                } catch (IOException e) {
+                    return "";
+                }
+            });
 
             // Le texte part sur STDIN, jamais en argument — voir la javadoc de la classe.
             try (OutputStream stdin = process.getOutputStream()) {
                 stdin.write(text.getBytes(StandardCharsets.UTF_8));
-            }
-
-            String output;
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                output = reader.lines().collect(Collectors.joining("\n"));
             }
 
             boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
@@ -76,12 +90,15 @@ public class LocalTranslationClient {
                 process.destroyForcibly();
                 throw ApiException.serviceUnavailable("Traduction locale — délai dépassé (" + timeoutSeconds + "s).");
             }
+            String output = stdout.get(5, TimeUnit.SECONDS);
             if (output == null || output.isBlank()) {
-                throw ApiException.serviceUnavailable("Traduction locale n'a renvoyé aucune sortie.");
+                throw ApiException.serviceUnavailable("Traduction locale n'a renvoyé aucune sortie (code " + process.exitValue() + ").");
             }
 
             com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(output);
+            // Seule la dernière ligne est le JSON de résultat (des bibliothèques peuvent imprimer avant).
+            String lastLine = output.substring(output.lastIndexOf('\n') + 1).trim();
+            com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(lastLine);
             if (root.has("error")) {
                 throw ApiException.serviceUnavailable("Traduction locale : " + root.get("error").asText());
             }
@@ -94,9 +111,13 @@ public class LocalTranslationClient {
 
         } catch (IOException e) {
             throw ApiException.serviceUnavailable("Erreur d'exécution de la traduction locale : " + e.getMessage());
+        } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException e) {
+            throw ApiException.serviceUnavailable("Traduction locale — lecture de la sortie impossible.");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw ApiException.serviceUnavailable("Traduction locale interrompue.");
+        } finally {
+            if (process != null && process.isAlive()) process.destroyForcibly();
         }
     }
 }

@@ -81,41 +81,87 @@ graph:
   tenant-id: ${AZURE_TENANT_ID:}
   client-id: ${AZURE_CLIENT_ID:}
   client-secret: ${AZURE_CLIENT_SECRET:}
-# Recherche web (Bing Web Search API, Azure Cognitive Services) — utilisée par RAF
-# UNIQUEMENT en repli, quand la Base de connaissances / procédures internes ne
-# donnent pas assez de résultats pertinents. Clé disponible en créant une ressource
-# "Bing Search" ou "Bing Custom Search" dans le portail Azure (Keys and Endpoint).
+# Recherche web — complément de la barre de recherche globale et de RAF quand la Base de
+# connaissances / les procédures internes ne suffisent pas. Plusieurs moteurs, essayés dans
+# l'ordre de provider-order jusqu'au premier qui répond. Bing Web Search API a été RETIRÉE
+# par Microsoft (août 2025) : utilisez SearXNG (auto-hébergé, recommandé), Brave, Tavily ou
+# Google Programmable Search. Wikipédia (gratuit, sans clé) sert de filet de sécurité.
+# Diagnostic (IT) : GET /api/ralph/search/diagnose
 websearch:
   enabled: ${WEBSEARCH_ENABLED:false}
+  provider-order: ${WEBSEARCH_PROVIDER_ORDER:searxng,brave,tavily,google,wikipedia}
+  language: ${WEBSEARCH_LANGUAGE:fr}
+  result-count: ${WEBSEARCH_RESULT_COUNT:5}
+  timeout-seconds: ${WEBSEARCH_TIMEOUT_SECONDS:10}
+  cache-minutes: ${WEBSEARCH_CACHE_MINUTES:15}
+  searxng:
+    url: ${WEBSEARCH_SEARXNG_URL:}
+  brave:
+    key: ${WEBSEARCH_BRAVE_KEY:}
+  tavily:
+    key: ${WEBSEARCH_TAVILY_KEY:}
+  google:
+    key: ${WEBSEARCH_GOOGLE_KEY:}
+    cx: ${WEBSEARCH_GOOGLE_CX:}
   bing:
     endpoint: ${WEBSEARCH_BING_ENDPOINT:https://api.bing.microsoft.com/v7.0/search}
     key: ${WEBSEARCH_BING_KEY:}
     market: ${WEBSEARCH_BING_MARKET:fr-FR}
-    result-count: ${WEBSEARCH_BING_RESULT_COUNT:5}
-    timeout-seconds: ${WEBSEARCH_BING_TIMEOUT_SECONDS:15}
+  wikipedia:
+    enabled: ${WEBSEARCH_WIKIPEDIA_ENABLED:true}
 rcc:
   uploads:
     photos-dir: ${RCC_PHOTOS_DIR:C:/rcc-portal-photos}
     kb-files-dir: ${RCC_KB_FILES_DIR:C:/rcc-portal-kb-files}
   translation:
-    # Service de traduction interne éventuellement hébergé par l'IT Ecobank sur le réseau
-    # interne (contourne un blocage de pare-feu vers l'extérieur — MyMemory/Google restent
-    # utilisés en repli si non configuré). Voir RalphSearchService pour le contrat attendu.
+    # Traducteur (/translator + bouton « Traduire » de RAF) — aucune IA générative. Les sources
+    # configurées sont essayées dans cet ordre jusqu'à la première qui répond correctement ;
+    # une source sans clé/URL est simplement ignorée. Diagnostic : bouton « Diagnostiquer la
+    # connexion » du Traducteur. Voir docs/TRANSLATION_OFFLINE_SETUP.md.
+    provider-order: "${RCC_TRANSLATION_PROVIDER_ORDER:local,custom,libretranslate,deepl,azure,mymemory}"
+    timeout-seconds: ${RCC_TRANSLATION_TIMEOUT_SECONDS:12}
+    cache-size: 500
+    # Service de traduction interne éventuellement hébergé par l'IT Ecobank.
+    # Contrat : POST {"text","sourceLang","targetLang"} -> {"translatedText"}.
     custom-url: "${RCC_TRANSLATION_CUSTOM_URL:}"
+    # LibreTranslate (open source) — idéalement auto-hébergé sur le réseau interne
+    # (docker run -p 5000:5000 libretranslate/libretranslate), ex. http://srv-traduction:5000
+    libretranslate:
+      url: "${RCC_TRANSLATION_LIBRETRANSLATE_URL:}"
+      api-key: "${RCC_TRANSLATION_LIBRETRANSLATE_API_KEY:}"
+    # DeepL API — clé gratuite (se termine par ":fx") ou Pro ; l'URL est déduite de la clé.
+    deepl:
+      api-key: "${RCC_TRANSLATION_DEEPL_API_KEY:}"
+      url: "${RCC_TRANSLATION_DEEPL_URL:}"
+    # Azure AI Translator — ressource « Translator » du portail Azure (Keys and Endpoint).
+    azure:
+      key: "${RCC_TRANSLATION_AZURE_KEY:}"
+      region: "${RCC_TRANSLATION_AZURE_REGION:}"
+      endpoint: "${RCC_TRANSLATION_AZURE_ENDPOINT:https://api.cognitive.microsofttranslator.com}"
+    # MyMemory — gratuit, sans clé, dernier recours. Renseigner un e-mail valide fait passer
+    # le quota gratuit de 5 000 à 50 000 caractères/jour.
+    mymemory:
+      enabled: ${RCC_TRANSLATION_MYMEMORY_ENABLED:true}
+      email: "${RCC_TRANSLATION_MYMEMORY_EMAIL:}"
     offline:
-      # Traduction locale hors-ligne (Argos Translate via scripts/translate.py) — SEULE source
-      # qui ne dépend d'aucun accès internet au moment de traduire (contrairement à Google/
-      # MyMemory ci-dessus, bloqués sur ce réseau). Essayée EN PREMIER quand configurée — voir
-      # RalphSearchService.translateDetailed(). Vide par défaut : tant que ces 2 valeurs ne
-      # sont pas renseignées, le Traducteur se rabat sur les sources réseau (qui échoueront
-      # tant que l'IT n'aura pas ouvert l'accès aux domaines externes).
-      # Prérequis à installer manuellement (voir l'en-tête de scripts/translate.py pour la
-      # procédure complète, y compris le téléchargement — une seule fois — des paquets de
-      # langue nécessaires) :
-      #   pip install argostranslate langdetect --break-system-packages
+      # Traduction locale hors-ligne (Argos Translate via scripts/translate.py) — aucune
+      # dépendance à internet au moment de traduire. Vide par défaut (source ignorée).
+      # Prérequis : pip install argostranslate langdetect --break-system-packages
       python-executable: "${RCC_TRANSLATION_OFFLINE_PYTHON_EXECUTABLE:}"
       script-path: "${RCC_TRANSLATION_OFFLINE_SCRIPT_PATH:}"
-      timeout-seconds: 20
+      timeout-seconds: 30
+  spellcheck:
+    # Correcteur (onglet « Correcteur » du Traducteur). fr/en tournent en local (LanguageTool
+    # embarqué). Pour les autres langues (es, pt, de, it, nl...), renseigner un serveur
+    # LanguageTool auto-hébergé (docker run -p 8010:8010 erikvl87/languagetool), ex.
+    # http://srv-languagetool:8010 — jamais le service public languagetool.org pour des
+    # données clients.
+    remote-url: "${RCC_SPELLCHECK_REMOTE_URL:}"
+    # Règles désactivées : purement stylistiques/typographiques, elles noyaient les vraies
+    # fautes (ex. « écrire 3 en lettres », espaces insécables, apostrophes typographiques).
+    disabled-rules: "${RCC_SPELLCHECK_DISABLED_RULES:NOMBRES_EN_LETTRES,NOMBRES_EN_LETTRES_2,FRENCH_WHITESPACE,APOS_TYP,APOS_INCORRECT,TOO_LONG_SENTENCE,FR_SPLIT_WORDS_HYPHEN,EN_QUOTES,DASH_RULE,WHITESPACE_PARAGRAPH,PUNCTUATION_PARAGRAPH_END,EN_UNPAIRED_QUOTES,UNPAIRED_BRACKETS}"
+    # Vocabulaire métier jamais signalé comme faute (complète la table WordTerms).
+    ignore-words: "${RCC_SPELLCHECK_IGNORE_WORDS:Ecobank,Rapidtransfer,Xpress,XpressCash,CashXpress,Omni,Ecobankpay,EcobankPay,UEMOA,CEDEAO,BCEAO,RCC,RIB,IBAN,SWIFT,OTP,PIN,DAB,GAB,TPE,KYC,FCFA,XOF,XAF,MoMo,Orange,Wave,Visa,Mastercard,GIMAC,GIM,Clairaudio,RAF}"
   ocr:
     # OCR local (PaddleOCR via scripts/ocr.py) pour l'import KPI par capture d'écran — gratuit,
     # sans cloud, fonctionne même si le crédit Anthropic est épuisé. Vide par défaut : tant que

@@ -10,6 +10,7 @@ import com.ecobank.rccportal.repository.KnowledgeCategoryRepository;
 import com.ecobank.rccportal.repository.KnowledgeCountryRepository;
 import com.ecobank.rccportal.repository.RccNotificationRepository;
 import com.ecobank.rccportal.util.ApiException;
+import com.ecobank.rccportal.util.SearchText;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -195,8 +196,27 @@ public class KnowledgeService {
 
     @Transactional(readOnly = true)
     public List<KnowledgeArticleResponse> search(String query) {
-        return articleRepository.findByTitleContainingIgnoreCaseOrTagsContainingIgnoreCase(query, query).stream()
-                .map(this::toArticleResponse).toList();
+        if (query == null || query.isBlank()) return List.of();
+        // Recherche par pertinence (titre > mots-clés > contenu), insensible aux accents, aux
+        // pluriels et aux petites fautes de frappe — l'ancien LIKE sur titre/tags ignorait le
+        // contenu des articles et exigeait la requête mot pour mot. Voir SearchText.
+        List<String> terms = SearchText.queryTerms(query);
+        if (terms.isEmpty()) return List.of();
+        record Hit(KnowledgeArticle article, double score) {}
+        return articleRepository.findAll().stream()
+                .map(a -> {
+                    var match = SearchText.score(query, terms,
+                            SearchText.Field.of(a.getTitle(), 3.0),
+                            SearchText.Field.of(a.getTags(), 2.0),
+                            SearchText.Field.of(
+                                    SearchText.stripHtml(a.getContentHtml()), 1.0));
+                    return match.isRelevant(terms.size()) ? new Hit(a, match.score()) : null;
+                })
+                .filter(java.util.Objects::nonNull)
+                .sorted((x, y) -> Double.compare(y.score(), x.score()))
+                .limit(50)
+                .map(h -> toArticleResponse(h.article()))
+                .toList();
     }
 
     @Transactional(readOnly = true)

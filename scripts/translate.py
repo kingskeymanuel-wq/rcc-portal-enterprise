@@ -25,10 +25,26 @@ pour cette paire précise).
 """
 import sys
 import json
+import io
+
+# UTF-8 forcé sur STDIN/STDOUT : sous Windows, Python utilise cp1252 par défaut — les accents
+# arrivaient corrompus et print(ensure_ascii=False) plantait sur l'arabe, le chinois, etc.
+sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding="utf-8", errors="replace")
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+
+# Codes du portail (ISO 639-1, parfois avec région) -> codes des paquets Argos.
+ARGOS_CODES = {"zh-cn": "zh", "zh-hans": "zh", "zh": "zh", "zh-tw": "zt", "zh-hant": "zt", "iw": "he",
+               "pt-br": "pt", "pt-pt": "pt", "en-gb": "en", "en-us": "en"}
+
+
+def to_argos(code):
+    code = (code or "").strip().lower().replace("_", "-")
+    return ARGOS_CODES.get(code, code.split("-")[0])
 
 
 def fail(message, code=1):
     print(json.dumps({"error": message}, ensure_ascii=False))
+    sys.stdout.flush()
     sys.exit(code)
 
 
@@ -37,7 +53,7 @@ def main():
         fail("Usage: python translate.py <sourceLang|auto> <targetLang>")
 
     source_lang = sys.argv[1].strip().lower()
-    target_lang = sys.argv[2].strip().lower()
+    target_lang = to_argos(sys.argv[2])
 
     text = sys.stdin.read()
     if not text or not text.strip():
@@ -48,17 +64,23 @@ def main():
     except ImportError:
         fail("argostranslate non installé. Exécutez : pip install argostranslate --break-system-packages")
 
-    detected = source_lang
     if source_lang == "auto":
         try:
-            from langdetect import detect
-            detected = detect(text)
+            from langdetect import detect, DetectorFactory
+            DetectorFactory.seed = 0  # résultat stable d'un appel à l'autre (langdetect est aléatoire sinon)
+            detected = to_argos(detect(text))
         except ImportError:
-            # langdetect absent — repli documenté sur le français plutôt qu'un blocage total,
-            # cohérent avec le reste du projet (contenu du portail à la base en français).
-            detected = "fr"
+            # Plus de repli silencieux sur le français (qui produisait des « traductions » absurdes
+            # d'un texte anglais traité comme du français) : on demande une langue explicite.
+            fail("Détection automatique indisponible (langdetect non installé) — précisez la langue source.", 2)
         except Exception:
-            detected = "fr"
+            fail("Impossible de détecter la langue de ce texte — précisez la langue source.", 2)
+    else:
+        detected = to_argos(source_lang)
+
+    if detected == target_lang:
+        print(json.dumps({"translatedText": text, "detectedSourceLang": detected}, ensure_ascii=False))
+        return
 
     try:
         installed_languages = argostranslate.translate.get_installed_languages()
@@ -70,16 +92,18 @@ def main():
 
     if not from_candidates:
         fail("Langue source « " + detected + " » non installée localement. "
-             "Voir l'en-tête de ce script pour la procédure d'installation d'un paquet de langue.", 2)
+             "Voir docs/TRANSLATION_OFFLINE_SETUP.md pour installer le paquet de langue.", 2)
     if not to_candidates:
         fail("Langue cible « " + target_lang + " » non installée localement. "
-             "Voir l'en-tête de ce script pour la procédure d'installation d'un paquet de langue.", 2)
+             "Voir docs/TRANSLATION_OFFLINE_SETUP.md pour installer le paquet de langue.", 2)
 
     try:
         translation = from_candidates[0].get_translation(to_candidates[0])
         if translation is None:
             fail("Aucun paquet de traduction installé pour la paire " + detected + " → " + target_lang + ".", 2)
-        result = translation.translate(text)
+        # Ligne par ligne : conserve les sauts de ligne et paragraphes du texte d'origine.
+        lines = text.split("\n")
+        result = "\n".join(translation.translate(line) if line.strip() else line for line in lines)
     except Exception as e:
         fail("Erreur de traduction : " + str(e))
 

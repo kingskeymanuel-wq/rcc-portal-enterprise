@@ -10,6 +10,7 @@ import com.ecobank.rccportal.model.UserServiceAssignment;
 import com.ecobank.rccportal.repository.*;
 import com.ecobank.rccportal.security.AuthenticatedUser;
 import com.ecobank.rccportal.util.ApiException;
+import com.ecobank.rccportal.util.SearchText;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -439,9 +440,34 @@ public class ProcedureService {
             return listAll(requester);
         }
 
-        List<ProcedureSummaryResponse> results = toSummaries(
-                procedureRepository.findByTitleContainingIgnoreCaseOrderByTitleAsc(keyword.trim()), requester
-        );
+        // Recherche par pertinence sur le titre ET le contenu des étapes (l'ancien LIKE ne
+        // regardait que le titre, mot pour mot et sensible aux accents) — voir SearchText.
+        List<String> terms = SearchText.queryTerms(keyword);
+        if (terms.isEmpty()) return List.of();
+
+        List<Procedure> all = procedureRepository.findAllByOrderByTitleAsc();
+        if (all.isEmpty()) return List.of();
+        Map<Integer, String> stepsTextByProcedureId = procedureStepRepository.findByProcedureIn(all).stream()
+                .filter(s -> s.getContent() != null)
+                .collect(Collectors.groupingBy(s -> s.getProcedure().getProcedureId(),
+                        Collectors.mapping(ProcedureStep::getContent, Collectors.joining(" "))));
+
+        record Hit(Procedure procedure, double score) {}
+        List<Hit> hits = new java.util.ArrayList<>();
+        for (Procedure p : all) {
+            SearchText.Match match = SearchText.score(keyword, terms,
+                    SearchText.Field.of(p.getTitle(), 3.0),
+                    SearchText.Field.of(p.getService() != null ? p.getService().getName() : null, 1.5),
+                    SearchText.Field.of(p.getResponsibleTeam(), 1.0),
+                    SearchText.Field.of(stepsTextByProcedureId.get(p.getProcedureId()), 1.0));
+            if (match.isRelevant(terms.size())) hits.add(new Hit(p, match.score()));
+        }
+        List<Procedure> ranked = hits.stream()
+                .sorted((a, b) -> Double.compare(b.score(), a.score()))
+                .map(Hit::procedure)
+                .toList();
+
+        List<ProcedureSummaryResponse> results = toSummaries(ranked, requester);
         return filterVisible(results, requester);
     }
 
