@@ -1,5 +1,43 @@
 # Traducteur, correcteur et recherche web — configuration des API
 
+## Chaîne de traduction (par défaut)
+
+```
+Application (/translator, bouton « Traduire » de RAF)
+     ↓
+TranslationService.java
+     ↓
+LibreTranslate local  (http://localhost:5000, sur le même serveur que le portail)
+     ↓
+Argos Translate       (moteur utilisé par LibreTranslate, modèles en mémoire)
+     ↓
+Traduction            (aucune donnée ne sort du serveur)
+```
+
+**Mise en place (Windows)** — une seule commande, sur le serveur du portail :
+
+```powershell
+.\scripts\start-libretranslate.ps1                         # fr,en,es,pt,ar
+.\scripts\start-libretranslate.ps1 -Languages "fr,en,es,pt,ar,sw,ha"
+```
+
+- Premier lancement : installe LibreTranslate dans `C:\rcc-libretranslate` (Python 3.10/3.11
+  requis) et télécharge les modèles de langue — accès internet nécessaire ce jour-là
+  seulement (pypi.org, github.com).
+- Ensuite : 100 % hors-ligne. Le serveur écoute sur `127.0.0.1` uniquement.
+- Côté portail, rien à configurer : `rcc.translation.libretranslate.url` vaut
+  `http://localhost:5000` par défaut (`RCC_TRANSLATION_LIBRETRANSLATE_URL` pour un autre
+  hôte/port, ou vide pour désactiver).
+- Vérification : Traducteur → **Diagnostiquer la connexion** → ligne « LibreTranslate
+  (local) » à **OK**, avec la liste des langues chargées.
+- Une langue non chargée renvoie un message explicite (« … is not supported ») : l'ajouter
+  à `-Languages` et relancer le script.
+- Pour un démarrage automatique, créer une tâche planifiée Windows « Au démarrage » qui
+  lance ce script (ou utiliser NSSM pour en faire un service).
+- Alternative Docker : `docker run -d -p 127.0.0.1:5000:5000 -e LT_LOAD_ONLY=fr,en,es,pt,ar libretranslate/libretranslate`.
+
+Si LibreTranslate est arrêté, le portail passe automatiquement aux sources suivantes.
+
 ## Sources de traduction (ordre d'essai)
 
 Le Traducteur (`/translator` et bouton « Traduire » de RAF) essaie les sources configurées
@@ -9,9 +47,9 @@ correctement. Une source sans clé/URL est ignorée. L'interface affiche la sour
 
 | Id | Source | Configuration | Remarques |
 |---|---|---|---|
-| `local` | Argos Translate (hors-ligne) | `RCC_TRANSLATION_OFFLINE_PYTHON_EXECUTABLE`, `RCC_TRANSLATION_OFFLINE_SCRIPT_PATH` | Aucun accès internet, voir ci-dessous |
+| `libretranslate` | **LibreTranslate local (principal)** | `RCC_TRANSLATION_LIBRETRANSLATE_URL` (défaut `http://localhost:5000`) | Voir « Chaîne de traduction » ci-dessus |
+| `local` | Argos Translate en direct (secours) | `RCC_TRANSLATION_OFFLINE_PYTHON_EXECUTABLE`, `RCC_TRANSLATION_OFFLINE_SCRIPT_PATH` | Même moteur, mais rechargé à chaque traduction (lent) — voir en bas de page |
 | `custom` | Service interne Ecobank | `RCC_TRANSLATION_CUSTOM_URL` | Contrat `POST {text,sourceLang,targetLang}` → `{translatedText}` |
-| `libretranslate` | LibreTranslate | `RCC_TRANSLATION_LIBRETRANSLATE_URL` (+ `_API_KEY`) | **Recommandé** : `docker run -p 5000:5000 libretranslate/libretranslate` sur un serveur interne (même moteur qu'Argos, mais chargé une seule fois → bien plus rapide) |
 | `deepl` | DeepL API | `RCC_TRANSLATION_DEEPL_API_KEY` | Meilleure qualité fr/en/es/pt ; clé gratuite en `:fx` (500 000 car./mois) |
 | `azure` | Azure AI Translator | `RCC_TRANSLATION_AZURE_KEY`, `RCC_TRANSLATION_AZURE_REGION` | Couvre haoussa, yoruba, igbo, swahili, lingala, somali… ; offre gratuite 2 M car./mois |
 | `mymemory` | MyMemory | `RCC_TRANSLATION_MYMEMORY_EMAIL` (optionnel) | Gratuit sans clé, dernier recours ; l'e-mail porte le quota de 5 000 à 50 000 car./jour |

@@ -30,9 +30,13 @@ import java.util.regex.Pattern;
  * uniquement des moteurs de traduction dédiés, essayés dans l'ordre configuré
  * ({@code rcc.translation.provider-order}) jusqu'au premier qui répond correctement :
  * <ol>
- *   <li><b>local</b> — Argos Translate hors-ligne (scripts/translate.py) ;</li>
+ *   <li><b>libretranslate</b> — LibreTranslate local (serveur HTTP qui s'appuie sur le moteur
+ *       Argos Translate, modèles chargés une fois en mémoire : rapide, hors-ligne, détection
+ *       auto) — <b>chemin principal</b> : Application → TranslationService → LibreTranslate
+ *       local → Argos Translate → traduction ;</li>
+ *   <li><b>local</b> — Argos Translate appelé directement (scripts/translate.py), secours si
+ *       le serveur LibreTranslate est arrêté ;</li>
  *   <li><b>custom</b> — point d'entrée interne Ecobank (contrat JSON historique) ;</li>
- *   <li><b>libretranslate</b> — LibreTranslate (open source, auto-hébergeable, détection auto) ;</li>
  *   <li><b>deepl</b> — DeepL API (clé gratuite « :fx » ou Pro) ;</li>
  *   <li><b>azure</b> — Azure AI Translator (cohérent avec le reste de la pile Azure du portail,
  *       couvre haoussa, yoruba, igbo, swahili, lingala, somali...) ;</li>
@@ -97,7 +101,7 @@ public class TranslationService {
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 
-    @Value("${rcc.translation.provider-order:local,custom,libretranslate,deepl,azure,mymemory}")
+    @Value("${rcc.translation.provider-order:libretranslate,local,custom,deepl,azure,mymemory}")
     private String providerOrder;
     @Value("${rcc.translation.timeout-seconds:12}")
     private int timeoutSeconds;
@@ -223,7 +227,12 @@ public class TranslationService {
                 try {
                     TranslationResult r = provider.translate(probe, "fr", "en");
                     row.put("status", "OK");
-                    row.put("detail", "« " + r.translatedText() + " » en " + (System.currentTimeMillis() - start) + " ms.");
+                    String detail = "« " + r.translatedText() + " » en " + (System.currentTimeMillis() - start) + " ms.";
+                    if ("libretranslate".equals(provider.id())) {
+                        List<String> langs = libreLanguages();
+                        if (!langs.isEmpty()) detail += " Langues chargées : " + String.join(", ", langs) + ".";
+                    }
+                    row.put("detail", detail);
                 } catch (Exception e) {
                     row.put("status", "ÉCHEC");
                     row.put("detail", e.getClass().getSimpleName() + " : " + e.getMessage());
@@ -297,10 +306,11 @@ public class TranslationService {
     private Provider libreProvider() {
         return new Provider() {
             public String id() { return "libretranslate"; }
-            public String label() { return "LibreTranslate"; }
+            public String label() { return "LibreTranslate (local)"; }
             public boolean isConfigured() { return notBlank(libreUrl); }
             public String notConfiguredHint() {
-                return "rcc.translation.libretranslate.url vide (ex. http://serveur-interne:5000 — LibreTranslate auto-hébergé).";
+                return "rcc.translation.libretranslate.url vide — démarrez LibreTranslate (scripts/start-libretranslate.ps1) "
+                        + "et renseignez http://localhost:5000.";
             }
             public boolean nativeAutoDetect() { return true; }
             public TranslationResult translate(String text, String source, String target) throws Exception {
@@ -310,16 +320,46 @@ public class TranslationService {
                 body.put("target", libreCode(target));
                 body.put("format", "text");
                 if (notBlank(libreApiKey)) body.put("api_key", libreApiKey);
-                String url = libreUrl.replaceAll("/+$", "") + (libreUrl.endsWith("/translate") ? "" : "/translate");
-                HttpResponse<String> response = send(HttpRequest.newBuilder(URI.create(url))
+                HttpRequest request = HttpRequest.newBuilder(URI.create(libreBase() + "/translate"))
+                        .timeout(Duration.ofSeconds(timeoutSeconds))
                         .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body), StandardCharsets.UTF_8)));
-                JsonNode root = objectMapper.readTree(response.body());
-                if (root.hasNonNull("error")) throw new IllegalStateException(root.get("error").asText());
+                        .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body), StandardCharsets.UTF_8))
+                        .build();
+                HttpResponse<String> response;
+                try {
+                    response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                } catch (java.net.ConnectException e) {
+                    throw new IllegalStateException("serveur injoignable sur " + libreBase()
+                            + " — LibreTranslate est-il démarré ? (scripts/start-libretranslate.ps1)");
+                }
+                JsonNode root = response.body() == null || response.body().isBlank()
+                        ? objectMapper.createObjectNode() : objectMapper.readTree(response.body());
+                if (response.statusCode() / 100 != 2 || root.hasNonNull("error")) {
+                    // Ex. 400 {"error":"ha is not supported"} : paire non chargée au démarrage (--load-only).
+                    String error = root.path("error").asText("HTTP " + response.statusCode());
+                    throw new IllegalStateException(error + (response.statusCode() == 400
+                            ? " (langue non chargée dans LibreTranslate — voir LT_LOAD_ONLY dans scripts/start-libretranslate.ps1)" : ""));
+                }
                 String detected = root.path("detectedLanguage").path("language").asText(null);
                 return new TranslationResult(root.path("translatedText").asText(null), detected, label());
             }
         };
+    }
+
+    private String libreBase() {
+        return libreUrl.trim().replaceAll("/+$", "").replaceAll("/translate$", "");
+    }
+
+    /** Langues chargées par le serveur LibreTranslate (GET /languages) — affichées par le diagnostic. */
+    List<String> libreLanguages() {
+        try {
+            HttpResponse<String> response = send(HttpRequest.newBuilder(URI.create(libreBase() + "/languages")).GET());
+            List<String> codes = new ArrayList<>();
+            for (JsonNode lang : objectMapper.readTree(response.body())) codes.add(lang.path("code").asText());
+            return codes;
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
     private Provider deeplProvider() {

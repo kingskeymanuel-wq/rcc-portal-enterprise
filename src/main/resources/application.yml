@@ -120,16 +120,19 @@ rcc:
     # configurées sont essayées dans cet ordre jusqu'à la première qui répond correctement ;
     # une source sans clé/URL est simplement ignorée. Diagnostic : bouton « Diagnostiquer la
     # connexion » du Traducteur. Voir docs/TRANSLATION_OFFLINE_SETUP.md.
-    provider-order: "${RCC_TRANSLATION_PROVIDER_ORDER:local,custom,libretranslate,deepl,azure,mymemory}"
+    provider-order: "${RCC_TRANSLATION_PROVIDER_ORDER:libretranslate,local,custom,deepl,azure,mymemory}"
     timeout-seconds: ${RCC_TRANSLATION_TIMEOUT_SECONDS:12}
     cache-size: 500
     # Service de traduction interne éventuellement hébergé par l'IT Ecobank.
     # Contrat : POST {"text","sourceLang","targetLang"} -> {"translatedText"}.
     custom-url: "${RCC_TRANSLATION_CUSTOM_URL:}"
-    # LibreTranslate (open source) — idéalement auto-hébergé sur le réseau interne
-    # (docker run -p 5000:5000 libretranslate/libretranslate), ex. http://srv-traduction:5000
+    # Chemin principal : Application -> TranslationService -> LibreTranslate local -> Argos
+    # Translate -> traduction. LibreTranslate tourne sur le même serveur que le portail
+    # (scripts/start-libretranslate.ps1), aucune donnée ne sort du réseau Ecobank.
+    # Si le serveur LibreTranslate est arrêté, le portail passe à la source suivante (Argos
+    # en direct via scripts/translate.py, si configuré). Vider l'URL pour le désactiver.
     libretranslate:
-      url: "${RCC_TRANSLATION_LIBRETRANSLATE_URL:}"
+      url: "${RCC_TRANSLATION_LIBRETRANSLATE_URL:http://localhost:5000}"
       api-key: "${RCC_TRANSLATION_LIBRETRANSLATE_API_KEY:}"
     # DeepL API — clé gratuite (se termine par ":fx") ou Pro ; l'URL est déduite de la clé.
     deepl:
