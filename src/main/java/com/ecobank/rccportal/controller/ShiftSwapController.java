@@ -27,7 +27,7 @@ public class ShiftSwapController {
     @PostMapping
     public ShiftSwapResponse submit(@RequestBody CreateShiftSwapRequest request,
                                      @AuthenticationPrincipal AuthenticatedUser requester) {
-        return shiftSwapService.submit(requester.username(), request.requesterDate(),
+        return shiftSwapService.submit(requester.username(), requester.role(), request.requesterDate(),
                 request.targetUsername(), request.targetDate(), request.message());
     }
 
@@ -55,6 +55,13 @@ public class ShiftSwapController {
     public List<ShiftSwapResponse> pendingForTeamLeader(@AuthenticationPrincipal AuthenticatedUser requester) {
         requireTeamLeader(requester);
         return shiftSwapService.listPendingForTeamLeader(requester.username());
+    }
+
+    /** Toutes les permutations de l'équipe du Team Leader, tous statuts — réservé au rôle TEAM_LEADER. */
+    @GetMapping("/team-leader")
+    public List<ShiftSwapResponse> allForTeamLeader(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireTeamLeader(requester);
+        return shiftSwapService.listForTeamLeader(requester.username());
     }
 
     @PostMapping("/{id}/team-leader-decide")

@@ -21,9 +21,15 @@ import java.util.Set;
 public class ScheduleController {
 
     private final ScheduleService scheduleService;
+    private final com.ecobank.rccportal.service.PlanningComplianceService planningComplianceService;
+    private final com.ecobank.rccportal.repository.UserRepository userRepository;
 
-    public ScheduleController(ScheduleService scheduleService) {
+    public ScheduleController(ScheduleService scheduleService,
+                              com.ecobank.rccportal.service.PlanningComplianceService planningComplianceService,
+                              com.ecobank.rccportal.repository.UserRepository userRepository) {
         this.scheduleService = scheduleService;
+        this.planningComplianceService = planningComplianceService;
+        this.userRepository = userRepository;
     }
 
     @PostMapping(value = "/import", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -44,6 +50,29 @@ public class ScheduleController {
         requireSupervisorOrAdmin(requester);
         LocalDate targetDate = date != null ? LocalDate.parse(date) : LocalDate.now();
         return scheduleService.latenessForDate(targetDate);
+    }
+
+    /**
+     * Retards / absences du jour calculés sur le planning PROPRE à chaque agent. Même portée
+     * que le planning d'équipe : QA/RH/Superviseur/Admin/Excelliam = toutes les équipes (ou
+     * celle demandée), Team Leader = SON équipe, agent = lui-même.
+     */
+    @GetMapping("/compliance")
+    public List<com.ecobank.rccportal.dto.PlanningComplianceResponse> compliance(
+            @RequestParam(required = false) String date, @RequestParam(required = false) String team,
+            @AuthenticationPrincipal AuthenticatedUser requester) {
+        LocalDate targetDate = date != null && !date.isBlank() ? LocalDate.parse(date) : LocalDate.now();
+        return planningComplianceService.forDateScoped(requester, targetDate, team);
+    }
+
+    /** Ma situation du jour par rapport à mon planning (affichée sous le minuteur de shift). */
+    @GetMapping("/compliance/me")
+    public com.ecobank.rccportal.dto.PlanningComplianceResponse myCompliance(
+            @RequestParam(required = false) String date, @AuthenticationPrincipal AuthenticatedUser requester) {
+        LocalDate targetDate = date != null && !date.isBlank() ? LocalDate.parse(date) : LocalDate.now();
+        com.ecobank.rccportal.model.User self = userRepository.findFirstByUsernameIgnoreCase(requester.username())
+                .orElseThrow(() -> ApiException.unauthorized("Unknown user."));
+        return planningComplianceService.forUser(self, targetDate).orElse(null);
     }
 
     /** Mon propre planning — chaque agent voit le sien, pas besoin d'être QA/Admin. */

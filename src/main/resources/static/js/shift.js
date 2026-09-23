@@ -265,7 +265,7 @@
             return;
         }
         container.innerHTML = '<div class="card dashboard-card shadow-sm"><div class="card-body">' +
-            '<div class="shift-timeline-row"><div class="shift-agent-label">Moi-même' + disconnectionBadge(events) + '</div>' +
+            '<div class="shift-timeline-row" data-username="' + escapeHtml(currentUsername || "") + '"><div class="shift-agent-label">Moi-même' + disconnectionBadge(events) + '</div>' +
             '<div class="shift-bar-wrap">' + renderBar(events, isToday) + '</div></div>' +
             '<div class="shift-bar-ruler"><span>06h</span><span>10h</span><span>14h</span><span>18h</span><span>22h</span></div>' +
             '</div></div>';
@@ -293,7 +293,7 @@
                 var barContent = leaveUsernames.indexOf(u.username) !== -1
                     ? '<div style="background:#e5e7eb;height:100%;display:flex;align-items:center;justify-content:center;" class="small text-muted"><i class="bi bi-airplane"></i> Congé / absence</div>'
                     : renderBar(u.events, isToday);
-                return '<div class="shift-timeline-row">' +
+                return '<div class="shift-timeline-row" data-username="' + escapeHtml(u.username) + '">' +
                     '<div class="shift-agent-label">' + escapeHtml(u.fullName || u.username) + disconnectionBadge(u.events) + '</div>' +
                     '<div class="shift-bar-wrap">' + barContent + '</div>' +
                     '</div>';
@@ -303,6 +303,7 @@
             '<div class="card dashboard-card shadow-sm"><div class="card-body">' + rows +
             '<div class="shift-bar-ruler"><span>06h</span><span>10h</span><span>14h</span><span>18h</span><span>22h</span></div>' +
             '</div></div>';
+        decorateWithPlanning(containerId || "shiftTree", dateIso, $("teamSelect").value);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -585,31 +586,105 @@
         $("shiftTree").innerHTML = '<p class="text-danger text-center">Erreur : ' + escapeHtml(e.message) + '</p>';
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // Présence vs planning — retards / absences calculés sur le planning PROPRE à chaque
+    // agent (voir PlanningComplianceService) : bande « planning » sur chaque frise, pastille
+    // de statut, et carte récapitulative.
+    // ═══════════════════════════════════════════════════════════════════
+
+    var COMPLIANCE_META = {
+        ABSENT: { label: "Absent", cls: "bg-danger" },
+        LATE: { label: "En retard", cls: "bg-warning text-dark" },
+        UNPLANNED: { label: "Hors planning", cls: "bg-info text-dark" },
+        NOT_YET: { label: "Pas encore arrivé", cls: "bg-light text-dark border" },
+        PLANNED_ABSENCE: { label: "Absence prévue", cls: "bg-secondary" },
+        ON_TIME: { label: "À l'heure", cls: "bg-success" },
+        LEAVE: { label: "Congé", cls: "bg-secondary" },
+        OFF: { label: "Repos", cls: "bg-light text-muted border" }
+    };
+
+    /** Dernier résultat par date|équipe — réappliqué quand une frise est (re)dessinée. */
+    var complianceCache = {};
+
+    function complianceKey(dateIso, team) { return dateIso + "|" + (team || ""); }
+
+    function fetchCompliance(dateIso, team) {
+        var url = "/api/schedule/compliance?date=" + dateIso + (team ? "&team=" + encodeURIComponent(team) : "");
+        return getJson(url).then(function (rows) {
+            var byUser = {};
+            (rows || []).forEach(function (r) { byUser[r.username] = r; });
+            complianceCache[complianceKey(dateIso, team)] = { rows: rows || [], byUser: byUser };
+            return complianceCache[complianceKey(dateIso, team)];
+        });
+    }
+
+    function timeToMinutes(t) {
+        if (!t) return null;
+        var p = t.split(":");
+        return Number(p[0]) * 60 + Number(p[1]);
+    }
+
+    function complianceBadge(r) {
+        var meta = COMPLIANCE_META[r.status] || { label: r.status, cls: "bg-light text-dark" };
+        var text = meta.label + (r.status === "LATE" && r.lateMinutes ? " " + RccShiftTimeline.formatDuration(r.lateMinutes) : "");
+        if (r.earlyLeaveMinutes) text += " · départ anticipé";
+        return ' <span class="badge ' + meta.cls + ' shift-compliance-badge" title="' + escapeHtml(r.detail || "") + '">' + escapeHtml(text) + '</span>' +
+            (r.swapped ? ' <span class="badge bg-light text-primary border" title="Shift issu d\'une permutation validée"><i class="bi bi-arrow-left-right"></i></span>' : '');
+    }
+
+    /** Ajoute sur chaque frise la plage planifiée de l'agent et sa pastille retard/absence. */
+    function decorateWithPlanning(containerId, dateIso, team) {
+        var cached = complianceCache[complianceKey(dateIso, team)];
+        var container = $(containerId);
+        if (!cached || !container) return;
+        Array.prototype.forEach.call(container.querySelectorAll(".shift-timeline-row[data-username]"), function (row) {
+            var r = cached.byUser[row.getAttribute("data-username")];
+            if (!r) return;
+            var label = row.querySelector(".shift-agent-label");
+            if (label && !label.querySelector(".shift-compliance-badge")) {
+                label.insertAdjacentHTML("beforeend", complianceBadge(r) +
+                    (r.shiftCode ? ' <span class="small text-muted">' + escapeHtml(r.shiftCode) + '</span>' : ''));
+            }
+            var wrap = row.querySelector(".shift-bar-wrap");
+            var startMin = timeToMinutes(r.plannedStart), endMin = timeToMinutes(r.plannedEnd);
+            if (wrap && startMin !== null && !wrap.querySelector(".shift-bar-planned")) {
+                if (endMin === null) endMin = startMin + 9 * 60;
+                if (r.overnight || endMin <= startMin) endMin = WINDOW_END_MIN;
+                var left = pct(startMin), right = pct(endMin);
+                wrap.insertAdjacentHTML("afterbegin", '<div class="shift-bar-planned" style="left:' + left + '%;width:' + Math.max(0.5, right - left) + '%;" ' +
+                    'title="Planning : ' + escapeHtml((r.plannedStart || "").slice(0, 5) + " → " + (r.plannedEnd || "?").slice(0, 5) + (r.shiftLabel ? " (" + r.shiftLabel + ")" : "")) + '"></div>');
+            }
+        });
+    }
+
     function loadLateness() {
         var date = $("shiftDate").value;
-        getJson("/api/schedule/lateness?date=" + date).then(function (rows) {
+        var team = currentWho === "team" ? $("teamSelect").value : "";
+        fetchCompliance(date, team).then(function (cached) {
             var card = $("latenessCard");
             var list = $("latenessList");
-            var lateRows = rows.filter(function (r) { return r.lateMinutes !== null; });
-
+            var rows = cached.rows;
+            decorateWithPlanning("shiftTree", date, team);
             if (!rows.length) { card.style.display = "none"; return; }
             card.style.display = "";
 
-            if (!lateRows.length) {
-                list.innerHTML = '<p class="text-success small mb-0"><i class="bi bi-check-circle"></i> Aucun retard sur les plannings du jour.</p>';
-                return;
-            }
-
-            list.innerHTML = lateRows.map(function (r) {
-                var expected = r.plannedStartTime ? r.plannedStartTime.slice(0, 5) : "—";
-                var actual = r.actualLoginTime ? r.actualLoginTime.slice(0, 5) : "—";
-                var shift = r.shiftCode ? ' <span class="badge bg-light text-dark border">' + escapeHtml(r.shiftCode) + '</span>' : '';
-                return '<div class="d-flex justify-content-between align-items-center border-bottom py-1 small">' +
-                    '<span>' + escapeHtml(r.fullName || r.username) + (r.service ? ' <span class="text-muted">(' + escapeHtml(r.service) + ')</span>' : '') + shift +
-                    '<span class="text-muted ms-1">— son shift : ' + expected + ', connecté à ' + actual + '</span></span>' +
-                    '<span class="badge bg-danger">' + r.lateMinutes + ' min de retard</span>' +
-                    '</div>';
+            var counts = {};
+            rows.forEach(function (r) { counts[r.status] = (counts[r.status] || 0) + 1; });
+            var chips = Object.keys(COMPLIANCE_META).filter(function (k) { return counts[k]; }).map(function (k) {
+                return '<span class="badge ' + COMPLIANCE_META[k].cls + ' me-1">' + COMPLIANCE_META[k].label + ' : ' + counts[k] + '</span>';
             }).join("");
+
+            var toAct = rows.filter(function (r) { return ["ABSENT", "LATE", "UNPLANNED", "PLANNED_ABSENCE"].indexOf(r.status) !== -1 || r.earlyLeaveMinutes; });
+            var body = toAct.length ? toAct.map(function (r) {
+                var planned = r.plannedStart ? r.plannedStart.slice(0, 5) + (r.plannedEnd ? "–" + r.plannedEnd.slice(0, 5) : "") : "—";
+                return '<div class="d-flex justify-content-between align-items-center border-bottom py-1 small gap-2">' +
+                    '<span>' + escapeHtml(r.fullName || r.username) +
+                    (r.shiftCode ? ' <span class="badge bg-light text-dark border">' + escapeHtml(r.shiftCode) + ' ' + planned + '</span>' : '') +
+                    '<span class="text-muted ms-1">' + escapeHtml(r.detail || "") + '</span></span>' +
+                    complianceBadge(r) + '</div>';
+            }).join("") : '<p class="text-success small mb-0"><i class="bi bi-check-circle"></i> Aucun retard ni absence par rapport aux plannings du jour.</p>';
+
+            list.innerHTML = '<div class="mb-2">' + chips + '</div>' + body;
         }).catch(function () { $("latenessCard").style.display = "none"; });
     }
 
@@ -978,6 +1053,7 @@
             getJson("/api/shift/leave-days?date=" + today).catch(function () { return []; })
         ]).then(function (r) {
             renderDayTeam(r[0], r[1] || [], today, "shiftLiveTree");
+            fetchCompliance(today, team).then(function () { decorateWithPlanning("shiftLiveTree", today, team); }).catch(function () {});
         }).catch(function (e) {
             container.innerHTML = '<p class="text-center text-danger">Erreur : ' + escapeHtml(e.message) + '</p>';
         });
@@ -1065,14 +1141,48 @@
             .catch(function (e) { alert("Erreur : " + e.message); });
     }
 
+    /** Filtre courant de la vue Team Leader (pending | peer | approved | rejected | all). */
+    var swapTlFilter = "pending";
+
+    var SWAP_TL_FILTERS = [
+        { key: "pending", label: "À valider", test: function (s) { return s.teamLeaderStatus === "PENDING"; } },
+        { key: "peer", label: "En attente du collègue", test: function (s) { return s.peerStatus === "PENDING"; } },
+        { key: "approved", label: "Validées", test: function (s) { return s.teamLeaderStatus === "APPROVED"; } },
+        { key: "rejected", label: "Refusées", test: function (s) { return s.teamLeaderStatus === "REJECTED" || s.peerStatus === "REJECTED"; } },
+        { key: "all", label: "Toutes", test: function () { return true; } }
+    ];
+
+    /**
+     * Vue Team Leader du bouton « Permutations » : TOUTES les permutations de son équipe
+     * (filtrables par statut), avec Valider / Refuser (motif obligatoire) sur celles qui
+     * l'attendent. Le Team Leader ne demande pas de permutation lui-même (réservé aux agents).
+     */
     function loadSwapTeamLeader() {
         if (currentProfile !== "TEAM_LEADER") { $("swapTeamLeaderCard").style.display = "none"; return; }
-        getJson("/api/shift-swaps/pending-for-team-leader").then(function (swaps) {
-            swapTlPendingCount = swaps.length;
-            $("swapTeamLeaderCard").style.display = swaps.length ? "" : "none";
+        getJson("/api/shift-swaps/team-leader").then(function (all) {
+            swapTlPendingCount = all.filter(SWAP_TL_FILTERS[0].test).length;
             refreshSwapBadgeFromCounts();
-            if (!swaps.length) { $("swapTeamLeaderList").innerHTML = ""; return; }
+            $("swapTeamLeaderCard").style.display = "";
+            var filter = SWAP_TL_FILTERS.filter(function (f) { return f.key === swapTlFilter; })[0] || SWAP_TL_FILTERS[0];
+            var swaps = all.filter(filter.test);
+            $("swapTlFilters").innerHTML = SWAP_TL_FILTERS.map(function (f) {
+                var n = all.filter(f.test).length;
+                return '<button type="button" class="btn btn-sm ' + (f.key === filter.key ? "btn-primary" : "btn-outline-primary") +
+                    ' swap-tl-filter" data-filter="' + f.key + '">' + f.label + ' <span class="badge bg-light text-dark">' + n + '</span></button>';
+            }).join("");
+            Array.prototype.forEach.call($("swapTlFilters").querySelectorAll(".swap-tl-filter"), function (btn) {
+                btn.addEventListener("click", function () { swapTlFilter = btn.getAttribute("data-filter"); loadSwapTeamLeader(); });
+            });
+            if (!swaps.length) {
+                $("swapTeamLeaderList").innerHTML = '<p class="text-muted small mb-0">Aucune permutation dans cette catégorie.</p>';
+                return;
+            }
             $("swapTeamLeaderList").innerHTML = swaps.map(function (s) {
+                if (s.teamLeaderStatus !== "PENDING") {
+                    var ro = swapRowHtml(s);
+                    return '<div class="border-bottom py-2 small"><div>' + ro.title + '</div><div class="mt-1">' + ro.sub + '</div>' +
+                        (s.requesterMessage ? '<div class="text-muted mt-1">« ' + escapeHtml(s.requesterMessage) + ' »</div>' : '') + '</div>';
+                }
                 var r = swapRowHtml(s);
                 return '<div class="border-bottom py-2 small" data-swap-row="' + s.swapRequestId + '"><div>' + r.title + '</div>' +
                     (s.requesterMessage ? '<div class="text-muted mt-1">« ' + escapeHtml(s.requesterMessage) + ' »</div>' : '') +
@@ -1107,7 +1217,7 @@
 
     function decideSwapTeamLeader(id, approve, comment) {
         sendJson("/api/shift-swaps/" + id + "/team-leader-decide", "POST", { approve: approve, comment: comment })
-            .then(function () { loadSwapTeamLeader(); loadSwapMine(); })
+            .then(function () { loadSwapTeamLeader(); })
             .catch(function (e) { alert("Erreur : " + e.message); });
     }
 
@@ -1128,6 +1238,16 @@
         }).catch(function () {});
     }
 
+    /** Permutation = agents uniquement ; Team Leader = consultation + validation ; autres profils : pas de bouton. */
+    function applySwapProfile() {
+        var isTeamLeader = currentProfile === "TEAM_LEADER";
+        var isAgent = TEAM_ONLY_PROFILES.indexOf(currentProfile) === -1;
+        $("shiftSwapBtn").style.display = (isAgent || isTeamLeader) ? "" : "none";
+        $("swapRequestCard").style.display = isAgent ? "" : "none";
+        $("swapMineCard").style.display = isAgent ? "" : "none";
+        if (!isAgent) $("swapPeerCard").style.display = "none";
+    }
+
     function wireShiftSwap() {
         $("shiftSwapBtn").addEventListener("click", function () {
             var section = $("shiftSwapSection");
@@ -1136,10 +1256,13 @@
             this.classList.toggle("btn-primary", !showing);
             this.classList.toggle("btn-outline-primary", showing);
             if (!showing) {
-                loadSwapColleagues();
-                loadSwapMine();
-                loadSwapPeer();
-                loadSwapTeamLeader();
+                if (currentProfile === "TEAM_LEADER") {
+                    loadSwapTeamLeader();
+                } else {
+                    loadSwapColleagues();
+                    loadSwapMine();
+                    loadSwapPeer();
+                }
             }
         });
 
@@ -1532,8 +1655,8 @@
             });
         }
 
-        loadSwapPeer();
-        loadSwapTeamLeader();
+        applySwapProfile();
+        if (currentProfile === "TEAM_LEADER") loadSwapTeamLeader(); else loadSwapPeer();
         loadLeaveTeamLeader();
 
         // Ouverture directe d'une section depuis un lien externe (voir le portail Team Leader,

@@ -26,6 +26,7 @@
         .shift-bar-segment { position:absolute; top:0; bottom:0; }
         .shift-bar-seg-work { background:#22c55e; }
         .shift-bar-seg-pause { background:#ef4444; }
+        .shift-bar-planned { position:absolute; top:0; bottom:0; border:2px dashed #0057B8; border-radius:4px; background:rgba(0,87,184,.06); pointer-events:auto; z-index:0; }
         .shift-bar-seg-offline { background:repeating-linear-gradient(45deg,#9ca3af 0 4px,#d1d5db 4px 8px); }
         .shift-badge-offline { background:#6b7280; color:#fff; font-weight:500; }
         .shift-badge-reconnected { background:#fef3c7; color:#92400e; font-weight:500; }
@@ -148,7 +149,7 @@
                      en tant que Team Leader. Visible à la demande (bouton Permutations), pas
                      imposé dans le flux normal de consultation du planning. -->
                 <div id="shiftSwapSection" style="display:none;" class="mb-4">
-                    <div class="card dashboard-card shadow-sm mb-3">
+                    <div class="card dashboard-card shadow-sm mb-3" id="swapRequestCard">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <h6 class="card-title mb-0"><i class="bi bi-arrow-left-right"></i> Proposer une permutation de shift</h6>
@@ -185,12 +186,14 @@
 
                     <div class="card dashboard-card shadow-sm mb-3" id="swapTeamLeaderCard" style="display:none;">
                         <div class="card-body">
-                            <h6 class="card-title mb-2"><i class="bi bi-clipboard-check"></i> Permutations à valider (Team Leader)</h6>
+                            <h6 class="card-title mb-2"><i class="bi bi-clipboard-check"></i> Permutations de shift de mon équipe</h6>
+                            <p class="text-muted small mb-2">Demandées entre agents de votre équipe : le collègue visé accepte d'abord, puis vous validez (les plannings sont alors échangés) ou refusez avec un motif.</p>
+                            <div class="d-flex flex-wrap gap-1 mb-2" id="swapTlFilters"></div>
                             <div id="swapTeamLeaderList"></div>
                         </div>
                     </div>
 
-                    <div class="card dashboard-card shadow-sm">
+                    <div class="card dashboard-card shadow-sm" id="swapMineCard">
                         <div class="card-body">
                             <h6 class="card-title mb-2"><i class="bi bi-clock-history"></i> Mes permutations</h6>
                             <div id="swapMineList"></div>
@@ -270,12 +273,13 @@
                     <span><span class="dot" style="background:#22c55e;"></span>Temps de travail</span>
                     <span><span class="dot" style="background:#ef4444;"></span>Pause / pause déjeuner</span>
                     <span><span class="dot shift-bar-seg-offline"></span>Déconnecté (absence en cours de shift)</span>
+                    <span><span class="dot" style="border:2px dashed #0057B8;"></span>Horaire planifié de l'agent</span>
                     <span><span class="dot" style="background:#eef0f4;border:1px solid #dee2e6;"></span>Hors shift</span>
                 </div>
 
                 <div class="card dashboard-card shadow-sm mb-3" id="latenessCard" style="display:none;">
                     <div class="card-body">
-                        <h6 class="card-title mb-2"><i class="bi bi-alarm"></i> Retards du jour</h6>
+                        <h6 class="card-title mb-2"><i class="bi bi-alarm"></i> Présence par rapport au planning de chaque agent</h6>
                         <div id="latenessList"></div>
                     </div>
                 </div>

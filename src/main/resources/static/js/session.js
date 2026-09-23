@@ -264,6 +264,7 @@ window.RccSession = (function () {
         badge.textContent = SHIFT_STATE_LABELS[status.currentState] || status.currentState;
 
         updateShiftTimer(status);
+        loadMyPlanningInfo();
 
         pauseBtn.style.display = "none";
         lunchBtn.style.display = "none";
@@ -294,6 +295,35 @@ window.RccSession = (function () {
         // Une resynchronisation ne doit jamais laisser un bouton désactivé par
         // une action précédente encore verrouillée si aucune requête n'est en cours.
         if (!shiftActionInFlight) setShiftButtonsDisabled(false);
+    }
+
+    /**
+     * Rappel du planning personnel sous le minuteur : horaire prévu du jour et, le cas
+     * échéant, retard constaté — calculé côté serveur sur SON planning (PlanningComplianceService).
+     */
+    var planningInfoLoaded = false;
+    function loadMyPlanningInfo() {
+        var box = document.getElementById("shiftPlanningInfo");
+        if (!box || planningInfoLoaded) return;
+        planningInfoLoaded = true;
+        getJson("/api/schedule/compliance/me").then(function (r) {
+            if (!r || !r.status) return;
+            var parts = [];
+            if (r.plannedStart) {
+                parts.push("Planning : " + (r.shiftCode ? r.shiftCode + " " : "") + r.plannedStart.slice(0, 5) + (r.plannedEnd ? "–" + r.plannedEnd.slice(0, 5) : ""));
+            } else if (r.status === "OFF") {
+                parts.push("Planning : repos aujourd'hui");
+            } else if (r.status === "LEAVE") {
+                parts.push("Planning : congé");
+            } else if (r.status === "UNPLANNED") {
+                parts.push("Aucun planning validé aujourd'hui");
+            }
+            if (r.status === "LATE" && r.lateMinutes) parts.push("retard " + durationLabel(r.lateMinutes));
+            if (!parts.length) return;
+            box.textContent = parts.join(" · ");
+            box.title = r.detail || "";
+            box.style.display = "";
+        }).catch(function () { planningInfoLoaded = false; });
     }
 
     function refreshShiftStatus() {

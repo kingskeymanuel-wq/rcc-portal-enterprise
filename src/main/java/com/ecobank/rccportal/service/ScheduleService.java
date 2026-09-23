@@ -615,6 +615,8 @@ public class ScheduleService {
     @Transactional(readOnly = true)
     public List<LatenessResponse> latenessForDate(LocalDate date) {
         List<AgentSchedule> schedules = agentScheduleRepository.findByWorkDate(date).stream()
+                // Un planning encore en attente de validation ne peut pas rendre un agent « en retard ».
+                .filter(s -> "APPROVED".equals(s.getApprovalStatus()))
                 .filter(s -> s.getPlannedStartTime() != null)
                 .toList();
         if (schedules.isEmpty()) return List.of();

@@ -51,9 +51,28 @@ public class ShiftSwapService {
     // Étape 1 — l'agent demandeur propose l'échange à un pair de son équipe
     // ═══════════════════════════════════════════════════════════════════
 
+    /** Rôles qui ne sont PAS des agents : ils encadrent ou planifient, ils n'échangent pas de shift. */
+    private static final java.util.Set<String> NON_AGENT_ROLES =
+            java.util.Set.of("TEAM_LEADER", "SUPERVISOR", "RH", "ADMIN", "EXCELLIAM");
+
+    /** Compatibilité — sans rôle connu, seul le contrôle sur les rôles en base s'applique. */
     @Transactional
     public ShiftSwapResponse submit(String requesterUsername, LocalDate requesterDate, String targetUsername,
                                      LocalDate targetDate, String message) {
+        return submit(requesterUsername, null, requesterDate, targetUsername, targetDate, message);
+    }
+
+    /**
+     * La permutation de shift concerne UNIQUEMENT les agents : ni le demandeur ni l'agent visé
+     * ne peuvent être Team Leader, Superviseur, RH, Admin ou Excelliam (le Team Leader, lui,
+     * valide ou refuse — voir decideByTeamLeader).
+     */
+    @Transactional
+    public ShiftSwapResponse submit(String requesterUsername, String requesterRole, LocalDate requesterDate,
+                                     String targetUsername, LocalDate targetDate, String message) {
+        if (requesterRole != null && NON_AGENT_ROLES.contains(requesterRole.toUpperCase(java.util.Locale.ROOT))) {
+            throw ApiException.forbidden("La permutation de shift est réservée aux agents.");
+        }
         if (requesterDate == null || targetDate == null) {
             throw ApiException.badRequest("Les deux dates sont requises.");
         }
@@ -64,6 +83,13 @@ public class ShiftSwapService {
         User requester = findUser(requesterUsername);
         User target = userRepository.findFirstByUsernameIgnoreCase(targetUsername.trim())
                 .orElseThrow(() -> ApiException.badRequest("Agent inconnu : " + targetUsername));
+
+        if (!isAgent(requester)) {
+            throw ApiException.forbidden("La permutation de shift est réservée aux agents.");
+        }
+        if (!isAgent(target)) {
+            throw ApiException.badRequest("La permutation n'est possible qu'avec un agent (pas un Team Leader, superviseur, RH ou administrateur).");
+        }
 
         if (requester.getId().equals(target.getId())) {
             throw ApiException.badRequest("Vous ne pouvez pas vous faire une demande à vous-même.");
@@ -259,6 +285,30 @@ public class ShiftSwapService {
                 .filter(s -> teamLeader.getLedTeam().equalsIgnoreCase(s.getRequester().getActivity()))
                 .map(this::toResponse)
                 .toList();
+    }
+
+    /**
+     * Toutes les permutations de l'équipe du Team Leader (tous statuts, plus récentes d'abord) —
+     * bouton « Permutations » du portail Team Leader : il voit l'ensemble (en attente du
+     * collègue, à valider, validées, refusées) et décide celles qui l'attendent.
+     */
+    @Transactional(readOnly = true)
+    public List<ShiftSwapResponse> listForTeamLeader(String teamLeaderUsername) {
+        User teamLeader = findUser(teamLeaderUsername);
+        if (teamLeader.getLedTeam() == null || teamLeader.getLedTeam().isBlank()) return List.of();
+        return shiftSwapRequestRepository.findAll(org.springframework.data.domain.Sort.by(
+                        org.springframework.data.domain.Sort.Direction.DESC, "createdAt")).stream()
+                .filter(s -> teamLeader.getLedTeam().equalsIgnoreCase(s.getRequester().getActivity()))
+                .map(this::toResponse)
+                .toList();
+    }
+
+    private boolean isAgent(User user) {
+        if (user.getLedTeam() != null && !user.getLedTeam().isBlank()) return false; // dirige une équipe
+        return userRoleRepository.findRolesByUserId(user.getId()).stream()
+                .map(ur -> ur.getRole() != null ? ur.getRole().getName() : null)
+                .filter(java.util.Objects::nonNull)
+                .noneMatch(name -> NON_AGENT_ROLES.contains(name.toUpperCase(java.util.Locale.ROOT)));
     }
 
     private ShiftSwapRequest findSwap(Integer id) {
