@@ -129,6 +129,9 @@
 .ef-player-title { font-size: 1.45rem; font-weight: 800; margin-top: .35rem; }
 .ef-player-body { padding: 1.4rem 1.6rem; }
 
+.ef-eval-link { transition: transform .15s ease, box-shadow .15s ease; background: linear-gradient(135deg, #f6f1ff, #fff); }
+.ef-eval-link:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(90, 63, 192, .12); }
+
 /* ---------- Badges / classement / barème ---------- */
 .ef-badges { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; }
 .ef-badge { text-align: center; padding: .7rem .35rem; border-radius: 14px; border: 1px dashed #d9dee6; background: #fafbfc; transition: transform .18s ease; }

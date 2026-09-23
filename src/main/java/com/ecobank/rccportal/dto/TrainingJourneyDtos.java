@@ -23,7 +23,12 @@ public final class TrainingJourneyDtos {
                           String nextLevel, int lessonsCompleted, int coursesCompleted, int quizzesTaken,
                           int quizzesPassed, int bestScore, int streakDays, int certificatesIssued,
                           List<Badge> badges, List<LeaderboardEntry> teamLeaderboard, Integer myTeamRank,
-                          List<Eligible> eligibleCertificates) {}
+                          List<Eligible> eligibleCertificates, int gamesPlayed, int evaluationsTaken,
+                          int evaluationsPassed, List<GameResult> gameResults) {}
+
+    /** Résultat de l'agent sur un jeu du Centre d'Évaluation (parties + évaluation notée du tour en cours). */
+    public record GameResult(String gameKey, int plays, Integer bestPlayScore, Integer evaluationScore,
+                             Integer evaluationAttempts, Boolean evaluationPassed, LocalDateTime lastPlayedAt) {}
 
     public record Activity(LocalDateTime at, String userName, String teamLabel, String type, String title,
                            Integer score, Boolean passed) {}

@@ -115,6 +115,14 @@
                                 <div class="ef-card-title"><i class="bi bi-bar-chart-steps"></i> Classement de mon équipe <span class="ef-muted small fw-normal" id="efTeamLabel"></span></div>
                                 <ol class="ef-leaderboard" id="efLeaderboard"><li class="ef-muted small">Chargement…</li></ol>
                             </div>
+                            <a class="ef-card ef-eval-link mb-4 d-block text-decoration-none" th:href="@{/games}">
+                                <div class="ef-card-title"><i class="bi bi-controller"></i> Centre d'Évaluation <i class="bi bi-arrow-right ms-auto"></i></div>
+                                <div class="d-flex gap-3">
+                                    <div><b class="fs-4 d-block text-dark" id="efEvalPlays">0</b><small class="ef-muted">parties jouées</small></div>
+                                    <div><b class="fs-4 d-block text-dark" id="efEvalPassed">0</b><small class="ef-muted">évaluations réussies</small></div>
+                                </div>
+                                <small class="ef-muted d-block mt-2">Même XP, même niveau et même classement que la Formation.</small>
+                            </a>
                             <div class="ef-card ef-rules">
                                 <div class="ef-card-title"><i class="bi bi-info-circle"></i> Comment gagner de l'XP ?</div>
                                 <ul>
@@ -124,6 +132,8 @@
                                     <li><span>Bonus sans faute (100 %)</span><b>+20 XP</b></li>
                                     <li><span>Évaluation tentée</span><b>+10 XP</b></li>
                                     <li><span>Certificat validé par QA</span><b>+100 XP</b></li>
+                                    <li><span>Partie au Centre d'Évaluation (max 25/j)</span><b>+5 XP</b></li>
+                                    <li><span>Évaluation de jeu réussie</span><b>+40 XP</b></li>
                                 </ul>
                             </div>
                         </div>

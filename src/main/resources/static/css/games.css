@@ -158,3 +158,24 @@
     .gm-stage-body { padding: 18px; border-radius: 14px; }
     .gm-memory-grid { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* ===== Galerie au format de l'espace Formation (evaluation.js / formation.css) ===== */
+.ev-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+.gm-card.ev-card { background: #fff; color: #172033; padding: 0; min-height: 0; border: 1px solid #e7ebf3; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 6px 25px rgba(30, 41, 80, .05); animation: efIn .4s ease both; }
+.gm-card.ev-card::after { display: none; }
+.gm-card.ev-card:hover { transform: translateY(-4px); box-shadow: 0 16px 34px rgba(0, 87, 184, .14); }
+.ev-card-band { position: relative; height: 104px; display: flex; align-items: center; justify-content: center; color: #fff; }
+.ev-card-band::before { content: ""; position: absolute; width: 140px; height: 140px; border-radius: 50%; background: rgba(255,255,255,.12); right: -40px; top: -60px; }
+.ev-card-icon { font-size: 2.3rem; filter: drop-shadow(0 4px 6px rgba(0,0,0,.2)); transition: transform .25s ease; }
+.gm-card.ev-card:hover .ev-card-icon { transform: scale(1.12) rotate(-6deg); }
+.ev-card-best { position: absolute; right: .7rem; top: .7rem; background: rgba(0,0,0,.25); border-radius: 999px; padding: 2px 9px; font-size: .72rem; font-weight: 800; }
+.ev-card-kind { position: absolute; left: .7rem; bottom: .6rem; background: rgba(255,255,255,.92); color: #172033; border-radius: 999px; padding: 2px 9px; font-size: .68rem; font-weight: 800; }
+.ev-card-body { padding: .9rem 1rem 1rem; display: flex; flex-direction: column; gap: .35rem; flex: 1; }
+.ev-card-body h5 { font-size: 1rem; font-weight: 800; margin: 0; color: #172033; }
+.ev-card-body p { font-size: .8rem; color: #5b6475; margin: 0; opacity: 1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ev-card-status { display: flex; flex-wrap: wrap; gap: .3rem; min-height: 22px; }
+.gm-card.ev-card .ev-play { margin-top: auto; align-self: flex-start; background: #eaf2ff; color: #0057B8; border: 0; }
+.gm-card.ev-card .ev-play:hover { background: #0057B8; color: #fff; }
+.gm-card.ev-card.ev-hidden { display: none; }
+.ef-pane-qa { display: none; }
+.ef-pane-qa.active { display: block !important; animation: efIn .35s ease both; }

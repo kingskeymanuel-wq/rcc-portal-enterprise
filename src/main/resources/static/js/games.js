@@ -159,18 +159,28 @@ window.RccGames = (function () {
     function renderGallery() {
         var container = $("gmGallery");
         if (!gamesCache.length) { container.innerHTML = '<p class="text-muted text-center">Aucun jeu disponible pour l\'instant.</p>'; return; }
-        container.innerHTML = gamesCache.map(function (g) {
-            var bestBadge = g.bestScore != null ? '<div class="gm-best"><i class="bi bi-trophy-fill"></i> ' + g.bestScore + '</div>' : "";
+        // Cartes au format de l'espace Formation : bandeau couleur du jeu + corps clair avec le type
+        // (évaluation notée ou entraînement) et la place [data-ev-status] remplie par evaluation.js.
+        container.innerHTML = gamesCache.map(function (g, i) {
+            var isEval = EVALUATION_MECHANICS.indexOf(g.mechanic) !== -1;
             var inactiveClass = g.active ? "" : " gm-inactive";
             return (
-                '<div class="gm-card' + inactiveClass + '" style="background:linear-gradient(135deg,' + g.colorFrom + ',' + g.colorTo + ');" data-game-key="' + g.gameKey + '">' +
-                    bestBadge +
-                    '<div class="gm-icon"><i class="bi ' + (g.icon || "bi-controller") + '"></i></div>' +
-                    '<div><h5>' + escapeHtml(g.title) + '</h5><p>' + escapeHtml(g.description || "") + '</p></div>' +
-                    '<span class="gm-play-btn"><i class="bi bi-play-fill"></i> ' + (g.active ? "Jouer" : "Indisponible") + '</span>' +
+                '<div class="gm-card ev-card' + inactiveClass + '" data-game-key="' + g.gameKey + '" data-kind="' + (isEval ? "eval" : "train") + '" style="animation-delay:' + Math.min(i * 40, 360) + 'ms">' +
+                    '<div class="ev-card-band" style="background:linear-gradient(135deg,' + g.colorFrom + ',' + g.colorTo + ');">' +
+                        '<span class="ev-card-icon"><i class="bi ' + (g.icon || "bi-controller") + '"></i></span>' +
+                        (g.bestScore != null ? '<span class="ev-card-best"><i class="bi bi-trophy-fill"></i> ' + g.bestScore + '</span>' : '') +
+                        '<span class="ev-card-kind">' + (isEval ? '<i class="bi bi-clipboard-check"></i> Évaluation notée' : '<i class="bi bi-joystick"></i> Entraînement') + '</span>' +
+                    '</div>' +
+                    '<div class="ev-card-body">' +
+                        '<h5>' + escapeHtml(g.title) + '</h5>' +
+                        '<p>' + escapeHtml(g.description || "") + '</p>' +
+                        '<div class="ev-card-status" data-ev-status="' + g.gameKey + '"></div>' +
+                        '<span class="gm-play-btn ev-play"><i class="bi bi-play-fill"></i> ' + (g.active ? "Jouer" : "Indisponible") + '</span>' +
+                    '</div>' +
                 '</div>'
             );
         }).join("");
+        document.dispatchEvent(new CustomEvent("rcc:games-rendered", { detail: { games: gamesCache } }));
 
         Array.prototype.forEach.call(container.querySelectorAll(".gm-card"), function (card) {
             card.addEventListener("click", function () {
@@ -717,6 +727,7 @@ window.RccGames = (function () {
     function loadMyCompetitions() {
         getJson("/api/competitions/mine").then(function (comps) {
             var container = $("gmMyCompetitions");
+            document.dispatchEvent(new CustomEvent("rcc:competitions-loaded", { detail: { count: comps.length } }));
             if (!comps.length) { container.style.display = "none"; return; }
             container.style.display = "";
             container.innerHTML = comps.map(function (c) {
@@ -774,6 +785,11 @@ window.RccGames = (function () {
         drawTerms: drawTerms, playCorrect: playCorrect, playWrong: playWrong, playClick: playClick,
         playWin: playWin, playTick: playTick, confettiBurst: confettiBurst, stageBody: stageBody,
         setStageScore: setStageScore, resultScreen: resultScreen, closeStage: closeStage,
-        getJson: getJson, sendJson: sendJson
+        getJson: getJson, sendJson: sendJson,
+        launchByKey: function (key) {
+            var def = gamesCache.filter(function (g) { return g.gameKey === key; })[0];
+            if (def && def.active) { playClick(); launchGame(def); }
+        },
+        isEvaluation: function (g) { return EVALUATION_MECHANICS.indexOf(g.mechanic) !== -1; }
     };
 })();

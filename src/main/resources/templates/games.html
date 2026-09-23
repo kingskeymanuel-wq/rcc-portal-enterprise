@@ -8,6 +8,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <link rel="stylesheet" th:href="@{/css/games.css}">
+    <link rel="stylesheet" th:href="@{/css/formation.css}">
 </head>
 <body>
 <div class="layout">
@@ -17,26 +18,137 @@
         <main id="page-content">
             <div class="container-fluid">
 
-                <div class="welcome-banner gm-hero">
+                <!-- ===================== EN-TÊTE + BARRE PERSONNELLE (même modèle que Formation) ===================== -->
+                <div class="ef-page">
+                <div class="ef-top">
                     <div>
-                        <h2><i class="bi bi-controller"></i> Centre d'Évaluation Ecobank</h2>
-                        <p class="text-muted mb-0">Révisez vos connaissances en vous amusant — 10 jeux, un seul objectif : maîtriser vos parcours de traitement.</p>
+                        <span class="ef-muted">RCC Portal • Centre d'Évaluation</span>
+                        <h2>Évaluation</h2>
                     </div>
-                    <button class="btn btn-outline-primary qa-only" id="gmAdminToggleBtn" style="display:none;">
-                        <i class="bi bi-clipboard-check"></i> Administration
-                    </button>
+                    <div class="ef-personal">
+                        <div class="ef-avatar" id="evAvatar">👤</div>
+                        <div class="ef-personal-copy">
+                            <b id="evName">Mon espace</b>
+                            <small id="evLevel">—</small>
+                        </div>
+                        <span class="ef-pill" id="evXpPill"><i class="bi bi-lightning-charge-fill"></i> 0 XP</span>
+                    </div>
                 </div>
 
-                <!-- ===================== MES COMPÉTITIONS ===================== -->
-                <div id="gmMyCompetitions" style="display:none;" class="mb-4"></div>
+                <nav class="ef-tabs" id="evTabs" role="tablist">
+                    <button type="button" class="active" data-ev-tab="jeux"><i class="bi bi-controller"></i> Les jeux</button>
+                    <button type="button" data-ev-tab="resultats"><i class="bi bi-clipboard-data"></i> Mes résultats</button>
+                    <button type="button" data-ev-tab="classement"><i class="bi bi-bar-chart-steps"></i> Classement</button>
+                    <button type="button" data-ev-tab="competitions"><i class="bi bi-trophy"></i> Compétitions <span class="ef-tab-count" id="evCompCount" style="display:none;">0</span></button>
+                    <a class="ef-btn ef-btn-soft ms-auto" th:href="@{/training}"><i class="bi bi-mortarboard"></i> Ma Formation</a>
+                    <button type="button" class="qa-only ef-tab-qa" id="gmAdminToggleBtn" data-ev-tab="qa" style="display:none;margin-left:0;"><i class="bi bi-shield-check"></i> Espace QA</button>
+                </nav>
 
-                <!-- ===================== GALERIE DE JEUX ===================== -->
-                <div id="gmGallery" class="gm-grid">
-                    <p class="text-muted text-center">Chargement des jeux…</p>
-                </div>
+                <!-- ===================== LES JEUX ===================== -->
+                <section class="ef-pane active" data-ev-pane="jeux">
+                    <section class="ef-hero ef-hero-quiz">
+                        <div class="ef-hero-copy">
+                            <span class="ef-pill ef-pill-light">🎯 Apprendre en jouant</span>
+                            <h1>Centre d'Évaluation Ecobank</h1>
+                            <p>10 jeux pour réviser et être évalué sur vos parcours de traitement. Chaque partie et chaque évaluation réussie fait progresser votre niveau — le même que dans l'espace Formation.</p>
+                            <div class="ef-level" aria-label="Progression de niveau">
+                                <div class="ef-level-head"><span id="evLevelName">Niveau —</span><span id="evLevelNext">—</span></div>
+                                <div class="ef-level-track"><i id="evLevelBar" style="width:0%"></i></div>
+                            </div>
+                            <div class="ef-actions">
+                                <button type="button" class="ef-btn ef-btn-light" id="evPlayNextBtn"><i class="bi bi-play-fill"></i> Évaluation suivante</button>
+                                <button type="button" class="ef-btn ef-btn-ghost" data-ev-go="resultats"><i class="bi bi-clipboard-data"></i> Mes résultats</button>
+                            </div>
+                        </div>
+                        <img th:src="@{/images/formation/pexels-5926382.jpg}" alt="" class="ef-hero-img">
+                    </section>
+
+                    <div class="ef-grid-4">
+                        <div class="ef-card ef-stat"><span class="ef-iconbox" style="background:#f3eaff;color:#7b2ff7;"><i class="bi bi-controller"></i></span>Parties jouées<strong id="evKpiPlays">0</strong></div>
+                        <div class="ef-card ef-stat"><span class="ef-iconbox" style="background:#e6f7ec;color:#0a8a3e;"><i class="bi bi-clipboard-check"></i></span>Évaluations réussies<strong id="evKpiPassed">0</strong></div>
+                        <div class="ef-card ef-stat"><span class="ef-iconbox" style="background:#fff4e0;color:#c77700;"><i class="bi bi-hourglass-split"></i></span>Évaluations à passer<strong id="evKpiTodo">0</strong></div>
+                        <div class="ef-card ef-stat"><span class="ef-iconbox" style="background:#eaf2ff;color:#0057B8;"><i class="bi bi-lightning-charge-fill"></i></span>Mon XP total<strong id="evKpiXp">0</strong></div>
+                    </div>
+
+                    <div class="ef-section-head">
+                        <div>
+                            <h3>Les jeux</h3>
+                            <p class="ef-muted mb-0">Les évaluations notées comptent 2 tentatives (réussite à 70 %) ; les autres jeux servent à s'entraîner.</p>
+                        </div>
+                        <div class="ef-filter" id="evGameFilter">
+                            <button type="button" class="active" data-filter="all">Tous</button>
+                            <button type="button" data-filter="eval">Évaluations</button>
+                            <button type="button" data-filter="train">Entraînement</button>
+                            <button type="button" data-filter="todo">À passer</button>
+                        </div>
+                    </div>
+                    <div id="gmGallery" class="ev-grid">
+                        <p class="text-muted text-center">Chargement des jeux…</p>
+                    </div>
+                </section>
+
+                <!-- ===================== MES RÉSULTATS ===================== -->
+                <section class="ef-pane" data-ev-pane="resultats">
+                    <div class="row g-4">
+                        <div class="col-xl-8">
+                            <div class="ef-card mb-4">
+                                <div class="ef-card-title"><i class="bi bi-clipboard-data"></i> Mes résultats par jeu</div>
+                                <div class="table-responsive">
+                                    <table class="table ef-table align-middle mb-0">
+                                        <thead><tr><th>Jeu</th><th>Parties</th><th>Meilleur score</th><th>Évaluation</th><th>Dernière partie</th><th></th></tr></thead>
+                                        <tbody id="evResultsBody"><tr><td colspan="6" class="text-muted text-center">Chargement…</td></tr></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-4">
+                            <div class="ef-card mb-4">
+                                <div class="ef-card-title"><i class="bi bi-award"></i> Mes badges</div>
+                                <div class="ef-badges" id="evBadges"><p class="ef-muted small mb-0">Chargement…</p></div>
+                            </div>
+                            <div class="ef-card ef-rules">
+                                <div class="ef-card-title"><i class="bi bi-info-circle"></i> XP du Centre d'Évaluation</div>
+                                <ul>
+                                    <li><span>Partie jouée (max 25 XP / jour)</span><b>+5 XP</b></li>
+                                    <li><span>Évaluation réussie (≥ 70 %)</span><b>+40 XP</b></li>
+                                    <li><span>Évaluation tentée</span><b>+10 XP</b></li>
+                                </ul>
+                                <p class="small ef-muted mb-0 mt-2">L'XP s'ajoute à celle de la Formation : un seul niveau, un seul classement.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ===================== CLASSEMENT ===================== -->
+                <section class="ef-pane" data-ev-pane="classement">
+                    <div class="row g-4">
+                        <div class="col-lg-6">
+                            <div class="ef-card">
+                                <div class="ef-card-title"><i class="bi bi-people"></i> Classement de mon équipe <span class="ef-muted small fw-normal" id="evTeamLabel"></span></div>
+                                <ol class="ef-leaderboard" id="evLeaderboard"><li class="ef-muted small">Chargement…</li></ol>
+                            </div>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="ef-card">
+                                <div class="ef-card-title"><i class="bi bi-trophy"></i> Meilleurs scores par jeu</div>
+                                <select class="form-select form-select-sm mb-3" id="evLbGame"></select>
+                                <ol class="ef-leaderboard" id="evGameLeaderboard"><li class="ef-muted small">Choisissez un jeu.</li></ol>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ===================== COMPÉTITIONS ===================== -->
+                <section class="ef-pane" data-ev-pane="competitions">
+                    <div class="ef-card">
+                        <div class="ef-card-title"><i class="bi bi-trophy-fill text-warning"></i> Mes compétitions</div>
+                        <div id="gmMyCompetitions"></div>
+                        <p class="ef-muted small mb-0" id="evNoCompetition">Aucune compétition en cours pour vous. Votre Team Leader ou la QA vous inscrira aux prochaines.</p>
+                    </div>
+                </section>
 
                 <!-- ===================== ADMINISTRATION (QA/ADMIN) ===================== -->
-                <div id="gmAdminPanel" class="card dashboard-card shadow-sm mt-4" style="display:none;">
+                <div id="gmAdminPanel" class="card dashboard-card shadow-sm ef-pane-qa" data-ev-pane="qa" style="display:none;">
                     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <span><i class="bi bi-clipboard-check"></i> Administration de l'évaluation</span>
                         <ul class="nav nav-tabs card-header-tabs" style="border:none;">
@@ -168,6 +280,7 @@
                     </div>
                 </div>
 
+                </div><!-- /.ef-page -->
             </div>
         </main>
     </div>
@@ -304,5 +417,6 @@
 <script th:src="@{/js/games.js}"></script>
 <script th:src="@{/js/games-engines.js}"></script>
 <script th:src="@{/js/quiz-bank.js}"></script>
+<script th:src="@{/js/evaluation.js}"></script>
 </body>
 </html>

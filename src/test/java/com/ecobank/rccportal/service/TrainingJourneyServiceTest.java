@@ -25,6 +25,8 @@ class TrainingJourneyServiceTest {
     private TrainingProgressRepository progressRepository;
     private TrainingLessonRepository lessonRepository;
     private TrainingCertificateRepository certificateRepository;
+    private GameScoreRepository gameScoreRepository;
+    private GameEvaluationAttemptRepository gameAttemptRepository;
     private TrainingJourneyService service;
 
     private User awa, koffi;
@@ -41,8 +43,11 @@ class TrainingJourneyServiceTest {
         progressRepository = mock(TrainingProgressRepository.class);
         lessonRepository = mock(TrainingLessonRepository.class);
         certificateRepository = mock(TrainingCertificateRepository.class);
+        gameScoreRepository = mock(GameScoreRepository.class);
+        gameAttemptRepository = mock(GameEvaluationAttemptRepository.class);
         service = new TrainingJourneyService(userRepository, teamRepository, courseRepository, attemptRepository,
-                progressRepository, lessonRepository, certificateRepository);
+                progressRepository, lessonRepository, certificateRepository, gameScoreRepository, gameAttemptRepository,
+                mock(GameDefinitionRepository.class));
 
         awa = new User(); awa.setId(1L); awa.setUsername("awa"); awa.setName("Awa Traoré"); awa.setActivity("INBOUND");
         koffi = new User(); koffi.setId(2L); koffi.setUsername("koffi"); koffi.setName("Koffi N'Guessan"); koffi.setActivity("INBOUND");
@@ -95,6 +100,33 @@ class TrainingJourneyServiceTest {
         assertEquals("Inbound Voix", s.teamLabel());
         // parcours terminé à 100 % + quiz réussi → 2 certificats à demander
         assertEquals(2, s.eligibleCertificates().size());
+    }
+
+    @Test
+    void evaluationCenterGamesFeedXpBadgesAndResults() {
+        LocalDateTime now = LocalDateTime.now();
+        when(progressRepository.findAll()).thenReturn(List.of());
+        when(attemptRepository.findAll()).thenReturn(List.of());
+        List<GameScore> plays = new java.util.ArrayList<>();
+        for (int i = 0; i < 7; i++) plays.add(GameScore.builder().gameKey("quiz-eclair").userId(1L).score(40 + i).playedAt(now).build());
+        when(gameScoreRepository.findAll()).thenReturn(plays);
+        when(gameAttemptRepository.findAll()).thenReturn(List.of(
+                GameEvaluationAttempt.builder().gameKey("quiz-eclair").userId(1L).attemptNumber(1).evaluationRound(1).score(55).correctCount(11).totalCount(20).createdAt(now).build(),
+                GameEvaluationAttempt.builder().gameKey("quiz-eclair").userId(1L).attemptNumber(2).evaluationRound(1).score(85).correctCount(17).totalCount(20).createdAt(now).build(),
+                GameEvaluationAttempt.builder().gameKey("duel-chrono").userId(1L).attemptNumber(1).evaluationRound(1).score(40).correctCount(4).totalCount(10).createdAt(now).build()));
+
+        Summary s = service.summary("awa");
+
+        // 7 parties le même jour → plafond 25 ; quiz-eclair réussi +40 ; duel tenté +10
+        assertEquals(25 + 40 + 10, s.xp());
+        assertEquals(7, s.gamesPlayed());
+        assertEquals(2, s.evaluationsTaken());
+        assertEquals(1, s.evaluationsPassed());
+        var quiz = s.gameResults().stream().filter(g -> g.gameKey().equals("quiz-eclair")).findFirst().orElseThrow();
+        assertEquals(7, quiz.plays());
+        assertEquals(46, quiz.bestPlayScore());
+        assertEquals(85, quiz.evaluationScore());
+        assertTrue(quiz.evaluationPassed());
     }
 
     @Test

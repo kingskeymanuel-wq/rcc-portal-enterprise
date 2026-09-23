@@ -53,6 +53,11 @@ public class TrainingJourneyService {
     static final int XP_QUIZ_PERFECT_BONUS = 20;
     static final int XP_QUIZ_FAILED = 10;
     static final int XP_CERTIFICATE = 100;
+    /** Centre d'Évaluation : partie jouée (plafonnée par jour), évaluation notée réussie / tentée. */
+    static final int XP_GAME_PLAY = 5;
+    static final int XP_GAME_PLAY_DAILY_CAP = 25;
+    static final int XP_GAME_EVAL_PASSED = 40;
+    static final int XP_GAME_EVAL_TRIED = 10;
 
     /** Paliers de niveau (XP minimum → nom). */
     static final int[] LEVEL_FLOORS = {0, 100, 300, 600, 1000, 1600};
@@ -68,11 +73,17 @@ public class TrainingJourneyService {
     private final TrainingProgressRepository progressRepository;
     private final TrainingLessonRepository lessonRepository;
     private final TrainingCertificateRepository certificateRepository;
+    private final com.ecobank.rccportal.repository.GameScoreRepository gameScoreRepository;
+    private final com.ecobank.rccportal.repository.GameEvaluationAttemptRepository gameAttemptRepository;
+    private final com.ecobank.rccportal.repository.GameDefinitionRepository gameDefinitionRepository;
 
     public TrainingJourneyService(UserRepository userRepository, TeamRepository teamRepository,
                                   CourseRepository courseRepository, CourseAttemptRepository attemptRepository,
                                   TrainingProgressRepository progressRepository, TrainingLessonRepository lessonRepository,
-                                  TrainingCertificateRepository certificateRepository) {
+                                  TrainingCertificateRepository certificateRepository,
+                                  com.ecobank.rccportal.repository.GameScoreRepository gameScoreRepository,
+                                  com.ecobank.rccportal.repository.GameEvaluationAttemptRepository gameAttemptRepository,
+                                  com.ecobank.rccportal.repository.GameDefinitionRepository gameDefinitionRepository) {
         this.userRepository = userRepository;
         this.teamRepository = teamRepository;
         this.courseRepository = courseRepository;
@@ -80,6 +91,9 @@ public class TrainingJourneyService {
         this.progressRepository = progressRepository;
         this.lessonRepository = lessonRepository;
         this.certificateRepository = certificateRepository;
+        this.gameScoreRepository = gameScoreRepository;
+        this.gameAttemptRepository = gameAttemptRepository;
+        this.gameDefinitionRepository = gameDefinitionRepository;
     }
 
     // ───────────────────────── Tableau de bord agent ─────────────────────────
@@ -109,7 +123,42 @@ public class TrainingJourneyService {
                 mine.xp, LEVEL_NAMES[levelIdx], LEVEL_FLOORS[levelIdx], nextXp, nextName,
                 mine.lessonsCompleted, mine.selfAssessmentsDone, mine.quizzesTaken, mine.quizzesPassed, mine.bestScore,
                 streak(mine.activityDays), mine.certificatesIssued, badges(mine), top, myRank,
-                eligible(me, snap));
+                eligible(me, snap), mine.gamesPlayed, mine.evaluationsTaken, mine.evaluationsPassed, gameResults(me.getId(), snap));
+    }
+
+    /** Par jeu : nombre de parties, meilleur score, et l'évaluation notée du dernier tour ouvert. */
+    private List<com.ecobank.rccportal.dto.TrainingJourneyDtos.GameResult> gameResults(Long userId, Snapshot snap) {
+        Map<String, List<com.ecobank.rccportal.model.GameScore>> plays = snap.gameScoresByUser.getOrDefault(userId, List.of()).stream()
+                .collect(Collectors.groupingBy(com.ecobank.rccportal.model.GameScore::getGameKey));
+        Map<String, List<com.ecobank.rccportal.model.GameEvaluationAttempt>> evals = snap.gameAttemptsByUser.getOrDefault(userId, List.of()).stream()
+                .collect(Collectors.groupingBy(com.ecobank.rccportal.model.GameEvaluationAttempt::getGameKey));
+        java.util.Set<String> keys = new java.util.TreeSet<>(plays.keySet());
+        keys.addAll(evals.keySet());
+        List<com.ecobank.rccportal.dto.TrainingJourneyDtos.GameResult> out = new ArrayList<>();
+        for (String key : keys) {
+            List<com.ecobank.rccportal.model.GameScore> p = plays.getOrDefault(key, List.of());
+            Integer best = p.stream().map(com.ecobank.rccportal.model.GameScore::getScore).filter(Objects::nonNull).max(Integer::compare).orElse(null);
+            LocalDateTime last = p.stream().map(com.ecobank.rccportal.model.GameScore::getPlayedAt).filter(Objects::nonNull).max(Comparator.naturalOrder()).orElse(null);
+            Integer evalScore = null, evalAttempts = null;
+            Boolean evalPassed = null;
+            List<com.ecobank.rccportal.model.GameEvaluationAttempt> e = evals.getOrDefault(key, List.of());
+            if (!e.isEmpty()) {
+                int round = e.stream().map(a -> a.getEvaluationRound() == null ? 1 : a.getEvaluationRound()).max(Integer::compare).orElse(1);
+                List<com.ecobank.rccportal.model.GameEvaluationAttempt> current = e.stream()
+                        .filter(a -> (a.getEvaluationRound() == null ? 1 : a.getEvaluationRound()) == round).toList();
+                evalAttempts = current.size();
+                evalScore = current.stream().map(com.ecobank.rccportal.model.GameEvaluationAttempt::getScore).filter(Objects::nonNull).max(Integer::compare).orElse(null);
+                evalPassed = current.stream().anyMatch(TrainingJourneyService::isPassedGameEval);
+            }
+            out.add(new com.ecobank.rccportal.dto.TrainingJourneyDtos.GameResult(key, p.size(), best, evalScore, evalAttempts, evalPassed, last));
+        }
+        return out;
+    }
+
+    static boolean isPassedGameEval(com.ecobank.rccportal.model.GameEvaluationAttempt a) {
+        if (a.getScore() != null && a.getScore() >= CourseService.passThreshold()) return true;
+        return a.getTotalCount() != null && a.getTotalCount() > 0 && a.getCorrectCount() != null
+                && a.getCorrectCount() * 100 >= CourseService.passThreshold() * a.getTotalCount();
     }
 
     private List<Badge> badges(Stats s) {
@@ -122,6 +171,8 @@ public class TrainingJourneyService {
         list.add(badge("QUIZ_MASTER", "As des quiz", "bi-stars", "Réussir 5 évaluations", s.quizzesPassed, 5));
         list.add(badge("PERFECT", "Sans faute", "bi-bullseye", "Obtenir 100 % à une évaluation", s.bestScore >= 100 ? 1 : 0, 1));
         list.add(badge("STREAK", "Régulier", "bi-fire", "Se former 3 jours d'affilée", streak(s.activityDays), 3));
+        list.add(badge("PLAYER", "Joueur", "bi-controller", "Jouer 10 parties au Centre d'Évaluation", s.gamesPlayed, 10));
+        list.add(badge("EVALUATED", "Évalué", "bi-clipboard-check", "Réussir 3 évaluations du Centre d'Évaluation", s.evaluationsPassed, 3));
         list.add(badge("GRADUATE", "Certifié", "bi-patch-check-fill", "Obtenir un certificat validé par QA", s.certificatesIssued, 1));
         return list;
     }
@@ -306,6 +357,20 @@ public class TrainingJourneyService {
                         a.getCourse().getTitle(), a.getScore(), passed));
             }
         }
+        for (Long uid : scopeIds) {
+            User u = snap.usersById.get(uid);
+            for (com.ecobank.rccportal.model.GameEvaluationAttempt a : snap.gameAttemptsByUser.getOrDefault(uid, List.of())) {
+                if (a.getCreatedAt() == null) continue;
+                if (a.getCreatedAt().toLocalDate().equals(today)) activeToday.add(uid);
+                boolean passed = isPassedGameEval(a);
+                if (a.getCreatedAt().isAfter(weekAgo)) { if (passed) passedWeek++; else failedWeek++; }
+                activity.add(new Activity(a.getCreatedAt(), displayName(u), teamLabel(u.getActivity(), snap.teams), "GAME",
+                        snap.gameTitles.getOrDefault(a.getGameKey(), a.getGameKey()), a.getScore(), passed));
+            }
+            for (com.ecobank.rccportal.model.GameScore g : snap.gameScoresByUser.getOrDefault(uid, List.of())) {
+                if (g.getPlayedAt() != null && g.getPlayedAt().toLocalDate().equals(today)) activeToday.add(uid);
+            }
+        }
         activity.sort(Comparator.comparing(Activity::at).reversed());
 
         int pending = (int) snap.certificates.stream().filter(c -> "PENDING".equals(c.getStatus())
@@ -362,6 +427,13 @@ public class TrainingJourneyService {
                 .filter(a -> a.getUser() != null)
                 .collect(Collectors.groupingBy(a -> a.getUser().getId()));
         s.certificates = certificateRepository.findAll();
+        s.gameScoresByUser = gameScoreRepository.findAll().stream().filter(g -> g.getUserId() != null)
+                .collect(Collectors.groupingBy(com.ecobank.rccportal.model.GameScore::getUserId));
+        s.gameAttemptsByUser = gameAttemptRepository.findAll().stream().filter(g -> g.getUserId() != null)
+                .collect(Collectors.groupingBy(com.ecobank.rccportal.model.GameEvaluationAttempt::getUserId));
+        s.gameTitles = gameDefinitionRepository.findAll().stream().filter(g -> g.getGameKey() != null)
+                .collect(Collectors.toMap(com.ecobank.rccportal.model.GameDefinition::getGameKey,
+                        g -> g.getTitle() != null ? g.getTitle() : g.getGameKey(), (a, b) -> a));
         s.issuedByUser = s.certificates.stream().filter(c -> "ISSUED".equals(c.getStatus()))
                 .collect(Collectors.groupingBy(TrainingCertificate::getUserId, Collectors.counting()));
         return s;
@@ -375,6 +447,9 @@ public class TrainingJourneyService {
         Map<Long, List<CourseAttempt>> attemptsByUser;
         List<TrainingCertificate> certificates;
         Map<Long, Long> issuedByUser;
+        Map<Long, List<com.ecobank.rccportal.model.GameScore>> gameScoresByUser = Map.of();
+        Map<Long, List<com.ecobank.rccportal.model.GameEvaluationAttempt>> gameAttemptsByUser = Map.of();
+        Map<String, String> gameTitles = Map.of();
         private final Map<Long, Stats> cache = new HashMap<>();
 
         Stats stats(Long userId) {
@@ -399,6 +474,25 @@ public class TrainingJourneyService {
                     }
                     st.xp += attemptXp(a);
                 }
+                // Centre d'Évaluation : parties (XP plafonnée par jour) et évaluations notées (une fois par jeu et par tour).
+                Map<LocalDate, Integer> playsPerDay = new HashMap<>();
+                for (com.ecobank.rccportal.model.GameScore g : gameScoresByUser.getOrDefault(id, List.of())) {
+                    st.gamesPlayed++;
+                    LocalDate day = g.getPlayedAt() != null ? g.getPlayedAt().toLocalDate() : LocalDate.MIN;
+                    if (g.getPlayedAt() != null) st.activityDays.add(day);
+                    playsPerDay.merge(day, 1, Integer::sum);
+                }
+                playsPerDay.values().forEach(n -> st.xp += Math.min(n * XP_GAME_PLAY, XP_GAME_PLAY_DAILY_CAP));
+                Map<String, Boolean> evalOutcome = new HashMap<>();
+                for (com.ecobank.rccportal.model.GameEvaluationAttempt a : gameAttemptsByUser.getOrDefault(id, List.of())) {
+                    String k = a.getGameKey() + "#" + (a.getEvaluationRound() == null ? 1 : a.getEvaluationRound());
+                    evalOutcome.merge(k, isPassedGameEval(a), Boolean::logicalOr);
+                    if (a.getCreatedAt() != null) st.activityDays.add(a.getCreatedAt().toLocalDate());
+                }
+                st.evaluationsTaken = evalOutcome.size();
+                st.evaluationsPassed = (int) evalOutcome.values().stream().filter(Boolean::booleanValue).count();
+                st.xp += st.evaluationsPassed * XP_GAME_EVAL_PASSED + (st.evaluationsTaken - st.evaluationsPassed) * XP_GAME_EVAL_TRIED;
+
                 st.certificatesIssued = issuedByUser.getOrDefault(id, 0L).intValue();
                 st.xp += st.lessonsCompleted * XP_LESSON + st.certificatesIssued * XP_CERTIFICATE;
                 return st;
@@ -407,7 +501,8 @@ public class TrainingJourneyService {
     }
 
     private static final class Stats {
-        int xp, lessonsCompleted, selfAssessmentsDone, quizzesTaken, quizzesPassed, bestScore, certificatesIssued;
+        int xp, lessonsCompleted, selfAssessmentsDone, quizzesTaken, quizzesPassed, bestScore, certificatesIssued,
+                gamesPlayed, evaluationsTaken, evaluationsPassed;
         final Set<LocalDate> activityDays = new HashSet<>();
     }
 

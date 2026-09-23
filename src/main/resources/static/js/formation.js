@@ -120,6 +120,11 @@
         var earned = s.badges.filter(function (b) { return b.earned; }).length;
         $("efKpiBadges").textContent = earned + " / " + s.badges.length;
         $("efStreak").textContent = s.streakDays;
+        // Centre d'Évaluation (même XP, même niveau) — voir evaluation.js.
+        if ($("efEvalPlays")) {
+            $("efEvalPlays").textContent = s.gamesPlayed || 0;
+            $("efEvalPassed").textContent = (s.evaluationsPassed || 0) + " / " + (s.evaluationsTaken || 0);
+        }
 
         $("efBadges").innerHTML = s.badges.map(function (b) {
             return '<div class="ef-badge' + (b.earned ? " earned" : "") + '" title="' + esc(b.description) + '">' +
@@ -351,7 +356,8 @@
             var ICONS = {
                 LESSON: ['<i class="bi bi-journal-check"></i>', "#eaf2ff", "#0057B8", "a terminé la leçon"],
                 QUIZ: ['<i class="bi bi-trophy"></i>', "#e6f7ec", "#0a8a3e", "a passé l'évaluation"],
-                SELF_ASSESSMENT: ['<i class="bi bi-person-check"></i>', "#f3eaff", "#7b2ff7", "a réalisé l'auto-diagnostic"]
+                SELF_ASSESSMENT: ['<i class="bi bi-person-check"></i>', "#f3eaff", "#7b2ff7", "a réalisé l'auto-diagnostic"],
+                GAME: ['<i class="bi bi-controller"></i>', "#fff4e0", "#c77700", "a passé l'évaluation du jeu"]
             };
             $("efQaFeed").innerHTML = o.recentActivity.length ? o.recentActivity.map(function (a) {
                 var ic = ICONS[a.type] || ICONS.LESSON;
