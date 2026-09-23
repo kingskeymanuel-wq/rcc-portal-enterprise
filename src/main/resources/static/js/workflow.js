@@ -5,13 +5,18 @@
     var TYPE_LABELS = {
         LEAVE: "Congé / absence",
         PROCEDURE_CHANGE: "Changement de procédure",
-        ACCESS: "Matériel / accès",
+        ACCESS: "Accès",
+        TOOL: "Outils",
+        EQUIPMENT: "Matériel",
+        DIFFICULTY: "Autre difficulté",
         TEAM_ASSIGNMENT: "Affectation initiale"
     };
 
     var TEAM_LABELS = {
         QA: "Quality Assurance",
-        ADMIN: "Administration"
+        ADMIN: "Administration",
+        TEAM_LEADER: "Team Leader",
+        SUPERVISOR: "Supervision"
     };
 
     var STATUS_BADGES = {
@@ -119,21 +124,30 @@
 
     // ===== Mes demandes =====
 
+    var mineFilter = "open";
+
     function renderMine(requests) {
         mineCache = requests || [];
-        var body = document.getElementById("mineBody");
-        if (!requests.length) {
-            body.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Aucune demande.</td></tr>';
-            return;
+        // Demandes d'aide (accès/outils/matériel/difficulté) en cartes avec suivi ; les autres en tableau.
+        var support = mineCache.filter(function (r) { return window.RccSupport && RccSupport.isSupport(r); });
+        var shown = support.filter(function (r) {
+            return mineFilter === "all" || (mineFilter === "open" ? r.status === "PENDING" : r.status !== "PENDING");
+        });
+        RccSupport.render(document.getElementById("mineCards"), shown, "agent", loadMine);
+        if (!shown.length && support.length) {
+            document.getElementById("mineCards").innerHTML = '<div class="sr-empty"><i class="bi bi-inbox"></i>Aucune demande dans ce filtre.</div>';
         }
-        body.innerHTML = requests.map(function (r) {
+
+        var others = mineCache.filter(function (r) { return !(window.RccSupport && RccSupport.isSupport(r)); });
+        document.getElementById("mineOtherWrap").style.display = others.length ? "" : "none";
+        var body = document.getElementById("mineBody");
+        body.innerHTML = others.map(function (r) {
             var slaWarning = r.slaBreached ? ' <span class="badge bg-danger" title="Délai de traitement dépassé"><i class="bi bi-exclamation-triangle"></i> ' + formatHoursOpen(r.hoursOpen) + '</span>' : "";
             return "" +
                 "<tr>" +
                 "<td>" + escapeHtml(TYPE_LABELS[r.type] || r.type) + "</td>" +
                 "<td>" + escapeHtml(r.title) + "</td>" +
-                "<td>" + escapeHtml(formatPeriod(r)) + "</td>" +
-                "<td>" + escapeHtml(TEAM_LABELS[r.assignedTeam] || r.assignedTeam) + "</td>" +
+                "<td>" + escapeHtml(r.assignedToName || TEAM_LABELS[r.assignedTeam] || r.assignedTeam) + "</td>" +
                 "<td>" + (STATUS_BADGES[r.status] || escapeHtml(r.status)) + slaWarning + "</td>" +
                 "<td>" + formatDate(r.createdAt) + "</td>" +
                 '<td class="text-end"><button class="btn btn-sm btn-outline-danger delete-mine-btn" data-id="' + r.requestId + '"><i class="bi bi-trash"></i></button></td>' +
@@ -153,10 +167,74 @@
         updateOverviewAndBadges();
     }
 
+    // ===== Demande d'aide (accès / outils / matériel / difficulté) =====
+
+    var srType = "ACCESS";
+
+    function wireSupportForm() {
+        var box = document.getElementById("srTypes");
+        if (!box || !window.RccSupport) return;
+        box.innerHTML = Object.keys(RccSupport.TYPES).map(function (code) {
+            var t = RccSupport.TYPES[code];
+            return '<button type="button" class="sr-type-btn' + (code === srType ? " active" : "") + '" data-type="' + code + '">' +
+                '<span class="sr-type" style="background:' + t.bg + ";color:" + t.color + '"><i class="bi ' + t.icon + '"></i></span>' +
+                "<span><b>" + escapeHtml(t.label) + "</b><small>" + escapeHtml(t.hint) + "</small></span></button>";
+        }).join("");
+        Array.prototype.forEach.call(box.querySelectorAll(".sr-type-btn"), function (b) {
+            b.addEventListener("click", function () {
+                srType = b.getAttribute("data-type");
+                Array.prototype.forEach.call(box.querySelectorAll(".sr-type-btn"), function (x) { x.classList.toggle("active", x === b); });
+            });
+        });
+
+        getJson("/api/workflow/requests/my-team-leader").then(function (info) {
+            var route = document.getElementById("srRoute");
+            var days = Math.round((Number(info.escalationHours) || 72) / 24);
+            if (info.teamLeaderName) {
+                route.innerHTML = '<i class="bi bi-person-badge"></i><span>Envoyée à votre Team Leader <b>' + escapeHtml(info.teamLeaderName) +
+                    "</b>. Sans résolution sous " + days + " jour(s), elle est escaladée automatiquement au Superviseur.</span>";
+            } else {
+                route.classList.add("warn");
+                route.innerHTML = '<i class="bi bi-exclamation-triangle"></i><span>Aucun Team Leader configuré pour votre équipe : votre demande ira directement à la <b>supervision</b>.</span>';
+            }
+        }).catch(function () {
+            document.getElementById("srRoute").innerHTML = '<i class="bi bi-person-badge"></i><span>Votre demande sera envoyée à votre Team Leader.</span>';
+        });
+
+        document.getElementById("supportRequestForm").addEventListener("submit", function (evt) {
+            evt.preventDefault();
+            var title = document.getElementById("srTitle").value.trim();
+            if (!title) return;
+            var btn = document.getElementById("srSubmitBtn");
+            btn.disabled = true;
+            postJson("/api/workflow/requests", {
+                type: srType,
+                title: title,
+                details: document.getElementById("srDetails").value.trim(),
+                periodType: "DAY",
+                priority: (document.querySelector('input[name="srPriority"]:checked') || {}).value || "NORMAL"
+            }).then(function () {
+                document.getElementById("supportRequestForm").reset();
+                mineFilter = "open";
+                Array.prototype.forEach.call(document.querySelectorAll("#mineFilter button"), function (x) { x.classList.toggle("active", x.getAttribute("data-filter") === "open"); });
+                loadMine();
+            }).catch(function (e) { alert("Erreur : " + e.message); })
+              .then(function () { btn.disabled = false; });
+        });
+
+        Array.prototype.forEach.call(document.querySelectorAll("#mineFilter button"), function (b) {
+            b.addEventListener("click", function () {
+                mineFilter = b.getAttribute("data-filter");
+                Array.prototype.forEach.call(document.querySelectorAll("#mineFilter button"), function (x) { x.classList.toggle("active", x === b); });
+                renderMine(mineCache);
+            });
+        });
+    }
+
     function loadMine() {
         getJson("/api/workflow/requests/mine").then(renderMine).catch(function (e) {
-            document.getElementById("mineBody").innerHTML =
-                '<tr><td colspan="6" class="text-center text-danger">Erreur (' + escapeHtml(e.message) + ')</td></tr>';
+            document.getElementById("mineCards").innerHTML =
+                '<div class="sr-empty text-danger">Erreur (' + escapeHtml(e.message) + ')</div>';
         });
     }
 
@@ -1194,6 +1272,7 @@
         wfTemplateModal = new bootstrap.Modal(document.getElementById("wfTemplateModal"));
         loadMotifCatalog();
         wireForm();
+        wireSupportForm();
         wireTabs();
         wirePolesTab();
         wireHistoryFilters();

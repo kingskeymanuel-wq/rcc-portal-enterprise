@@ -81,4 +81,24 @@ public class WorkflowRequest extends Auditable {
 
     @Column(name = "DecidedAt")
     private LocalDateTime decidedAt;
+
+    // ── Demandes « faciliter mon travail » (accès, outils, matériel, difficulté) ──
+
+    /** NORMAL | URGENT | BLOQUANT — urgence ressentie par l'agent. */
+    @Column(name = "Priority", length = 20)
+    private String priority;
+
+    /** Le Team Leader (ou le supérieur) a pris la demande en charge — la demande reste ouverte. */
+    @Column(name = "AcknowledgedAt")
+    private LocalDateTime acknowledgedAt;
+
+    @Column(name = "AcknowledgedBy", length = 150)
+    private String acknowledgedBy;
+
+    @Column(name = "AcknowledgementNote", length = 500)
+    private String acknowledgementNote;
+
+    /** Escalade automatique au portail supérieur (Superviseur) après le délai sans résolution. */
+    @Column(name = "EscalatedAt")
+    private LocalDateTime escalatedAt;
 }

@@ -27,6 +27,13 @@ public record WorkflowRequestResponse(
         String decisionComment,
         LocalDateTime decidedAt,
         Long hoursOpen,
-        Boolean slaBreached
+        Boolean slaBreached,
+        String priority,
+        LocalDateTime acknowledgedAt,
+        String acknowledgedBy,
+        String acknowledgementNote,
+        LocalDateTime escalatedAt,
+        LocalDateTime escalationDueAt,
+        String decidedByName
 ) {
 }

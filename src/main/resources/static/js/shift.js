@@ -657,34 +657,198 @@
         });
     }
 
+    // ===== Présence par rapport au planning — regroupée par équipe =====
+    // Ordre de gravité : ce qui demande une action en haut, les agents en règle en bas.
+    var SEVERITY = { ABSENT: 0, LATE: 1, UNPLANNED: 2, NOT_YET: 3, PLANNED_ABSENCE: 4, LEAVE: 5, ON_TIME: 6, OFF: 7 };
+    var ISSUE_STATUSES = ["ABSENT", "LATE", "UNPLANNED", "PLANNED_ABSENCE"];
+    var presenceFilter = "issues";
+    var presenceSearch = "";
+    var presenceOpenTeams = {};
+    var presenceRows = [];
+    var presenceCtx = { date: null, team: "" };
+
+    function isIssue(r) { return ISSUE_STATUSES.indexOf(r.status) !== -1 || !!r.earlyLeaveMinutes; }
+
+    function severityOf(r) {
+        var s = SEVERITY[r.status];
+        if (s === undefined) s = 9;
+        return r.earlyLeaveMinutes && s > 1 ? 1.5 : s;
+    }
+
+    var presenceTeamLabels = null; // code équipe → libellé (/api/teams), chargé une fois
+
+    function teamLabelOf(code) {
+        if (!code) return "Sans équipe";
+        var label = presenceTeamLabels && presenceTeamLabels[String(code).toUpperCase()];
+        return label || String(code).replace(/_/g, " ");
+    }
+
+    function ensureTeamLabels() {
+        if (presenceTeamLabels) return;
+        presenceTeamLabels = {};
+        getJson("/api/teams").then(function (teams) {
+            (teams || []).forEach(function (t) { if (t.code) presenceTeamLabels[t.code.toUpperCase()] = t.label || t.code; });
+            if (presenceRows.length) renderPresence();
+        }).catch(function () {});
+    }
+
+    function hhmm(t) { return t ? String(t).slice(0, 5) : "—"; }
+
+    function presenceMatches(r) {
+        if (presenceSearch && (r.fullName || r.username || "").toLowerCase().indexOf(presenceSearch) === -1) return false;
+        if (presenceFilter === "all") return true;
+        if (presenceFilter === "issues") return isIssue(r);
+        if (presenceFilter === "EARLY") return !!r.earlyLeaveMinutes;
+        return r.status === presenceFilter;
+    }
+
+    function renderPresence() {
+        var list = $("latenessList");
+        var rows = presenceRows;
+        var counts = {};
+        rows.forEach(function (r) { counts[r.status] = (counts[r.status] || 0) + 1; });
+        var issues = rows.filter(isIssue).length;
+        var early = rows.filter(function (r) { return r.earlyLeaveMinutes; }).length;
+        var present = rows.filter(function (r) { return r.firstLogin; }).length;
+        var expected = rows.filter(function (r) { return ["OFF", "LEAVE", "PLANNED_ABSENCE"].indexOf(r.status) === -1 && r.status !== "UNPLANNED"; }).length;
+
+        function chip(key, label, cls, n) {
+            return '<button type="button" class="sp-chip ' + cls + (presenceFilter === key ? " active" : "") + '" data-pfilter="' + key + '">' + label + ' <b>' + n + '</b></button>';
+        }
+        var chips = chip("issues", '<i class="bi bi-exclamation-diamond"></i> À surveiller', "sp-chip-alert", issues) +
+            chip("all", "Tous", "", rows.length) +
+            Object.keys(COMPLIANCE_META).filter(function (k) { return counts[k]; }).map(function (k) {
+                return chip(k, COMPLIANCE_META[k].label, "sp-st-" + k.toLowerCase(), counts[k]);
+            }).join("") +
+            (early ? chip("EARLY", "Départ anticipé", "sp-st-late", early) : "");
+
+        // Regroupement par équipe, équipes les plus en difficulté en premier.
+        var groups = {};
+        rows.filter(presenceMatches).forEach(function (r) {
+            var key = r.team || "";
+            (groups[key] = groups[key] || []).push(r);
+        });
+        var allByTeam = {};
+        rows.forEach(function (r) { (allByTeam[r.team || ""] = allByTeam[r.team || ""] || []).push(r); });
+        var teamKeys = Object.keys(groups).sort(function (a, b) {
+            var ia = allByTeam[a].filter(isIssue).length, ib = allByTeam[b].filter(isIssue).length;
+            return ib - ia || teamLabelOf(a).localeCompare(teamLabelOf(b));
+        });
+
+        var teamsHtml = teamKeys.map(function (key) {
+            var members = groups[key].slice().sort(function (a, b) {
+                return severityOf(a) - severityOf(b) || (a.fullName || a.username).localeCompare(b.fullName || b.username);
+            });
+            var all = allByTeam[key];
+            var tc = {};
+            all.forEach(function (r) { tc[r.status] = (tc[r.status] || 0) + 1; });
+            var teamExpected = all.filter(function (r) { return ["OFF", "LEAVE", "PLANNED_ABSENCE", "UNPLANNED"].indexOf(r.status) === -1; }).length;
+            var teamPresent = all.filter(function (r) { return r.firstLogin && r.status !== "UNPLANNED"; }).length;
+            var pctPresent = teamExpected ? Math.round(teamPresent * 100 / teamExpected) : 100;
+            var open = presenceOpenTeams[key] !== undefined ? presenceOpenTeams[key] : (presenceFilter === "issues" || teamKeys.length <= 3);
+            var mini = ["ABSENT", "LATE", "UNPLANNED", "NOT_YET", "ON_TIME"].filter(function (k) { return tc[k]; }).map(function (k) {
+                return '<span class="sp-mini sp-st-' + k.toLowerCase() + '" title="' + COMPLIANCE_META[k].label + '">' + tc[k] + '</span>';
+            }).join("");
+
+            var rowsHtml = members.map(function (r) {
+                var meta = COMPLIANCE_META[r.status] || { label: r.status };
+                var planned = r.plannedStart ? hhmm(r.plannedStart) + "–" + hhmm(r.plannedEnd) : "—";
+                return '<div class="sp-row sp-row-' + (r.status || "").toLowerCase() + '" data-user="' + escapeHtml(r.username) + '">' +
+                    '<button type="button" class="sp-row-main">' +
+                        '<span class="sp-avatar">' + escapeHtml(((r.fullName || r.username || "?").split(/\s+/).slice(0, 2).map(function (x) { return x[0]; }).join("")).toUpperCase()) + '</span>' +
+                        '<span class="sp-name">' + escapeHtml(r.fullName || r.username) + '</span>' +
+                        '<span class="sp-shift">' + (r.shiftCode ? '<b>' + escapeHtml(r.shiftCode) + '</b> ' + planned : '<i class="text-muted">sans planning</i>') + '</span>' +
+                        '<span class="sp-time" title="Première connexion"><i class="bi bi-box-arrow-in-right"></i> ' + hhmm(r.firstLogin) + '</span>' +
+                        '<span class="sp-time" title="Fin de shift"><i class="bi bi-box-arrow-right"></i> ' + hhmm(r.shiftEnd) + '</span>' +
+                        '<span class="sp-status">' + complianceBadge(r) + '</span>' +
+                        '<i class="bi bi-chevron-down sp-caret"></i>' +
+                    '</button>' +
+                    '<div class="sp-detail">' +
+                        '<div class="sp-detail-grid">' +
+                            '<div><small>Planning</small><b>' + (r.shiftLabel ? escapeHtml(r.shiftLabel) + " · " : "") + planned + (r.overnight ? " (nuit)" : "") + '</b></div>' +
+                            '<div><small>Arrivée</small><b>' + hhmm(r.firstLogin) + (r.lateMinutes ? ' <span class="text-danger">(+' + RccShiftTimeline.formatDuration(r.lateMinutes) + ')</span>' : "") + '</b></div>' +
+                            '<div><small>Fin de shift</small><b>' + hhmm(r.shiftEnd) + (r.earlyLeaveMinutes ? ' <span class="text-danger">(−' + RccShiftTimeline.formatDuration(r.earlyLeaveMinutes) + ')</span>' : "") + '</b></div>' +
+                            '<div><small>Déconnexions</small><b>' + (r.disconnectedMinutes ? RccShiftTimeline.formatDuration(r.disconnectedMinutes) : "aucune") + '</b></div>' +
+                        '</div>' +
+                        (r.detail ? '<p class="sp-detail-text"><i class="bi bi-info-circle"></i> ' + escapeHtml(r.detail) + '</p>' : "") +
+                        (r.swapped ? '<p class="sp-detail-text"><i class="bi bi-arrow-left-right"></i> Shift issu d\'une permutation validée.</p>' : "") +
+                        '<button type="button" class="btn btn-sm btn-outline-primary sp-goto" data-user="' + escapeHtml(r.username) + '"><i class="bi bi-bar-chart-steps"></i> Voir sa frise de la journée</button>' +
+                    '</div>' +
+                '</div>';
+            }).join("");
+
+            return '<div class="sp-team' + (open ? " open" : "") + '" data-team="' + escapeHtml(key) + '">' +
+                '<button type="button" class="sp-team-head">' +
+                    '<i class="bi bi-chevron-right sp-team-caret"></i>' +
+                    '<span class="sp-team-name">' + escapeHtml(teamLabelOf(key)) + '</span>' +
+                    '<span class="sp-team-count">' + all.length + ' agent(s)</span>' +
+                    (teamExpected
+                        ? '<span class="sp-team-bar" title="Présents / attendus"><i style="width:' + pctPresent + '%"></i></span>' +
+                          '<span class="sp-team-pct">' + teamPresent + '/' + teamExpected + ' présents</span>'
+                        : '<span class="sp-team-pct ms-auto text-muted">aucun agent attendu</span>') +
+                    '<span class="sp-team-mini">' + mini + '</span>' +
+                '</button>' +
+                '<div class="sp-team-body">' + rowsHtml + '</div>' +
+            '</div>';
+        }).join("");
+
+        list.innerHTML =
+            '<div class="sp-summary">' +
+                '<div class="sp-kpi"><b>' + present + '</b><small>connectés</small></div>' +
+                '<div class="sp-kpi"><b>' + expected + '</b><small>attendus au planning</small></div>' +
+                '<div class="sp-kpi sp-kpi-danger"><b>' + (counts.ABSENT || 0) + '</b><small>absents</small></div>' +
+                '<div class="sp-kpi sp-kpi-warn"><b>' + (counts.LATE || 0) + '</b><small>en retard</small></div>' +
+                '<input type="search" class="form-control form-control-sm sp-search" placeholder="Rechercher un agent…" value="' + escapeHtml(presenceSearch) + '">' +
+            '</div>' +
+            '<div class="sp-chips">' + chips + '</div>' +
+            (teamsHtml || '<p class="text-success small mb-0 mt-2"><i class="bi bi-check-circle"></i> ' +
+                (presenceFilter === "issues" ? "Aucun retard ni absence par rapport aux plannings du jour." : "Aucun agent dans ce filtre.") + '</p>');
+
+        Array.prototype.forEach.call(list.querySelectorAll("[data-pfilter]"), function (b) {
+            b.addEventListener("click", function () { presenceFilter = b.getAttribute("data-pfilter"); presenceOpenTeams = {}; renderPresence(); });
+        });
+        var search = list.querySelector(".sp-search");
+        search.addEventListener("input", function () {
+            presenceSearch = search.value.trim().toLowerCase();
+            renderPresence();
+            var again = $("latenessList").querySelector(".sp-search");
+            again.focus();
+            again.setSelectionRange(again.value.length, again.value.length);
+        });
+        Array.prototype.forEach.call(list.querySelectorAll(".sp-team-head"), function (h) {
+            h.addEventListener("click", function () {
+                var team = h.parentNode;
+                team.classList.toggle("open");
+                presenceOpenTeams[team.getAttribute("data-team")] = team.classList.contains("open");
+            });
+        });
+        Array.prototype.forEach.call(list.querySelectorAll(".sp-row-main"), function (b) {
+            b.addEventListener("click", function () { b.parentNode.classList.toggle("open"); });
+        });
+        Array.prototype.forEach.call(list.querySelectorAll(".sp-goto"), function (b) {
+            b.addEventListener("click", function () {
+                var row = document.querySelector('#shiftTree .shift-timeline-row[data-username="' + b.getAttribute("data-user") + '"]');
+                if (!row) { alert("La frise de cet agent s'affiche en vue « Équipe » (choisissez son équipe)."); return; }
+                row.scrollIntoView({ behavior: "smooth", block: "center" });
+                row.classList.add("sp-flash");
+                setTimeout(function () { row.classList.remove("sp-flash"); }, 2200);
+            });
+        });
+    }
+
     function loadLateness() {
         var date = $("shiftDate").value;
         var team = currentWho === "team" ? $("teamSelect").value : "";
         fetchCompliance(date, team).then(function (cached) {
             var card = $("latenessCard");
-            var list = $("latenessList");
             var rows = cached.rows;
             decorateWithPlanning("shiftTree", date, team);
             if (!rows.length) { card.style.display = "none"; return; }
             card.style.display = "";
-
-            var counts = {};
-            rows.forEach(function (r) { counts[r.status] = (counts[r.status] || 0) + 1; });
-            var chips = Object.keys(COMPLIANCE_META).filter(function (k) { return counts[k]; }).map(function (k) {
-                return '<span class="badge ' + COMPLIANCE_META[k].cls + ' me-1">' + COMPLIANCE_META[k].label + ' : ' + counts[k] + '</span>';
-            }).join("");
-
-            var toAct = rows.filter(function (r) { return ["ABSENT", "LATE", "UNPLANNED", "PLANNED_ABSENCE"].indexOf(r.status) !== -1 || r.earlyLeaveMinutes; });
-            var body = toAct.length ? toAct.map(function (r) {
-                var planned = r.plannedStart ? r.plannedStart.slice(0, 5) + (r.plannedEnd ? "–" + r.plannedEnd.slice(0, 5) : "") : "—";
-                return '<div class="d-flex justify-content-between align-items-center border-bottom py-1 small gap-2">' +
-                    '<span>' + escapeHtml(r.fullName || r.username) +
-                    (r.shiftCode ? ' <span class="badge bg-light text-dark border">' + escapeHtml(r.shiftCode) + ' ' + planned + '</span>' : '') +
-                    '<span class="text-muted ms-1">' + escapeHtml(r.detail || "") + '</span></span>' +
-                    complianceBadge(r) + '</div>';
-            }).join("") : '<p class="text-success small mb-0"><i class="bi bi-check-circle"></i> Aucun retard ni absence par rapport aux plannings du jour.</p>';
-
-            list.innerHTML = '<div class="mb-2">' + chips + '</div>' + body;
+            if (presenceCtx.date !== date || presenceCtx.team !== team) { presenceOpenTeams = {}; presenceCtx = { date: date, team: team }; }
+            presenceRows = rows;
+            ensureTeamLabels();
+            renderPresence();
         }).catch(function () { $("latenessCard").style.display = "none"; });
     }
 

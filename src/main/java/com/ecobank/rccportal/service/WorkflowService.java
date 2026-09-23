@@ -29,11 +29,23 @@ import java.util.Set;
 @Service
 public class WorkflowService {
 
-    private static final Set<String> INTERNAL_TYPES = Set.of("LEAVE", "PROCEDURE_CHANGE", "ACCESS", "TEAM_ASSIGNMENT");
+    private static final Set<String> INTERNAL_TYPES = Set.of("LEAVE", "PROCEDURE_CHANGE", "ACCESS", "TEAM_ASSIGNMENT",
+            "TOOL", "EQUIPMENT", "DIFFICULTY");
+    /**
+     * Demandes « faciliter mon travail » : accès, outils, matériel de travail, autre difficulté.
+     * Toujours envoyées au Team Leader de l'agent (jamais un choix libre), qui les prend en charge
+     * puis les valide une fois la situation réglée ; sans résolution au bout de
+     * {@link #getEscalationHours()} (72 h par défaut) elles sont escaladées automatiquement au
+     * portail Superviseur (voir escalateOverdueSupportRequests()).
+     */
+    public static final Set<String> SUPPORT_TYPES = Set.of("ACCESS", "TOOL", "EQUIPMENT", "DIFFICULTY");
+    private static final Set<String> PRIORITIES = Set.of("NORMAL", "URGENT", "BLOQUANT");
+    public static final String ESCALATION_HOURS_KEY = "workflow.support.escalationHours";
+    private static final int DEFAULT_ESCALATION_HOURS = 72;
     /** TEAM_LEADER ajouté pour LEAVE uniquement — voir submit() : jamais choisi librement par le
      *  demandeur, toujours résolu automatiquement au Team Leader de SA PROPRE équipe (User.activity
      *  -> ledTeam), la demande est bloquée si aucun Team Leader n'est configuré pour cette équipe. */
-    private static final Set<String> INTERNAL_TEAMS = Set.of("QA", "ADMIN", "TEAM_LEADER");
+    private static final Set<String> INTERNAL_TEAMS = Set.of("QA", "ADMIN", "TEAM_LEADER", "SUPERVISOR");
     /** Types/équipes internes + tous les motifs/équipes du référentiel client RCC360 (RccMotifCatalog). */
     private static final Set<String> ALLOWED_TYPES = java.util.stream.Stream.concat(
             INTERNAL_TYPES.stream(),
@@ -204,6 +216,18 @@ public class WorkflowService {
                         + "Un administrateur a été alerté ; réessayez une fois un Team Leader affecté à votre équipe.");
             }
             assignedTeamCode = "TEAM_LEADER";
+        } else if (SUPPORT_TYPES.contains(request.type().toUpperCase())) {
+            // Faciliter le travail de l'agent : directement à SON Team Leader. Sans équipe ou sans
+            // Team Leader configuré, la demande n'est pas bloquée (l'agent a un vrai problème de
+            // travail) : elle part tout de suite au portail Superviseur, et l'admin est alerté.
+            String agentTeam = requester.getActivity();
+            assignedTo = agentTeam == null || agentTeam.isBlank() ? null : findTeamLeaderForTeam(agentTeam);
+            if (assignedTo != null) {
+                assignedTeamCode = "TEAM_LEADER";
+            } else {
+                assignedTeamCode = "SUPERVISOR";
+                if (agentTeam != null && !agentTeam.isBlank()) notifyAdminsOfMissingTeamLeader(requester, agentTeam);
+            }
         } else {
             if (assignedTeamCode == null || !ALLOWED_TEAMS.contains(assignedTeamCode.toUpperCase())) {
                 throw ApiException.badRequest("Unknown assigned team. Allowed: " + ALLOWED_TEAMS);
@@ -233,15 +257,23 @@ public class WorkflowService {
                 .relatedService(relatedService)
                 .requestedBy(requester)
                 .status(STATUS_PENDING)
+                .priority(normalizePriority(request.priority(), request.type()))
+                .escalatedAt("SUPERVISOR".equals(resolvedAssignedTeam) ? LocalDateTime.now() : null)
                 .build();
 
         entity = workflowRequestRepository.save(entity);
+
+        if ("SUPERVISOR".equals(entity.getAssignedTeam())) {
+            notifySupervisors(entity, "Nouvelle demande d'aide sans Team Leader configuré : « " + entity.getTitle() + " » de "
+                    + label(requester) + ".");
+        }
 
         if (assignedTo != null) {
             String requesterLabel = requester.getName() != null ? requester.getName() : requester.getUsername();
             RccNotification notification = RccNotification.builder()
                     .targetUser(assignedTo)
-                    .content("Nouvelle demande à traiter (" + entity.getTitle() + ") de " + requesterLabel)
+                    .content((SUPPORT_TYPES.contains(entity.getType()) ? "Demande d'aide " + priorityLabel(entity.getPriority()) + " à traiter (" : "Nouvelle demande à traiter (")
+                            + entity.getTitle() + ") de " + requesterLabel)
                     .isRead(false)
                     .build();
             notificationRepository.save(notification);
@@ -327,7 +359,10 @@ public class WorkflowService {
         WorkflowRequest entity = workflowRequestRepository.findById(requestId)
                 .orElseThrow(() -> ApiException.notFound("Unknown workflow request."));
 
-        if ("TEAM_LEADER".equals(entity.getAssignedTeam())) {
+        boolean escalatedToSupervisor = entity.getEscalatedAt() != null || "SUPERVISOR".equals(entity.getAssignedTeam());
+        if (escalatedToSupervisor && ("SUPERVISOR".equals(deciderTeam) || "ADMIN".equals(deciderTeam))) {
+            // Demande escaladée : le supérieur (ou l'admin) peut la régler lui-même.
+        } else if ("TEAM_LEADER".equals(entity.getAssignedTeam())) {
             // Contrairement à QA/ADMIN (n'importe qui de l'équipe décide), une demande TEAM_LEADER
             // est assignée à UNE personne précise (le Team Leader résolu à la soumission, voir
             // submit()) — seul ce Team Leader-là décide, jamais un autre Team Leader ni "TEAM_LEADER"
@@ -349,8 +384,129 @@ public class WorkflowService {
         entity.setDecidedBy(decider);
         entity.setDecisionComment(comment);
         entity.setDecidedAt(LocalDateTime.now());
+        WorkflowRequest saved = workflowRequestRepository.save(entity);
 
-        return toResponse(workflowRequestRepository.save(entity));
+        // L'agent est prévenu de l'issue de sa demande d'aide.
+        if (SUPPORT_TYPES.contains(saved.getType()) && saved.getRequestedBy() != null) {
+            notify(saved.getRequestedBy(), (approve ? "✔ Votre demande « " + saved.getTitle() + " » est résolue"
+                    : "✖ Votre demande « " + saved.getTitle() + " » a été refusée")
+                    + " par " + label(decider) + (comment != null && !comment.isBlank() ? " : " + comment : "."));
+        }
+        return toResponse(saved);
+    }
+
+    /** Prise en charge : le Team Leader (ou le supérieur si escaladée) indique qu'il traite la demande. */
+    @Transactional
+    public WorkflowRequestResponse acknowledge(Integer requestId, String username, String deciderTeam, String note) {
+        WorkflowRequest entity = workflowRequestRepository.findById(requestId)
+                .orElseThrow(() -> ApiException.notFound("Unknown workflow request."));
+        if (!STATUS_PENDING.equals(entity.getStatus())) {
+            throw ApiException.badRequest("Cette demande est déjà clôturée.");
+        }
+        boolean isAssignee = entity.getAssignedTo() != null && entity.getAssignedTo().getUsername().equalsIgnoreCase(username);
+        boolean isSuperior = (entity.getEscalatedAt() != null || "SUPERVISOR".equals(entity.getAssignedTeam()))
+                && ("SUPERVISOR".equals(deciderTeam) || "ADMIN".equals(deciderTeam));
+        if (!isAssignee && !isSuperior) {
+            throw ApiException.forbidden("Seul le Team Leader assigné (ou le supérieur après escalade) peut prendre cette demande en charge.");
+        }
+        User actor = findUser(username);
+        entity.setAcknowledgedAt(LocalDateTime.now());
+        entity.setAcknowledgedBy(label(actor));
+        entity.setAcknowledgementNote(note == null || note.isBlank() ? null : note.trim());
+        WorkflowRequest saved = workflowRequestRepository.save(entity);
+        if (saved.getRequestedBy() != null) {
+            notify(saved.getRequestedBy(), "Votre demande « " + saved.getTitle() + " » est prise en charge par " + label(actor)
+                    + (saved.getAcknowledgementNote() != null ? " : " + saved.getAcknowledgementNote() : "."));
+        }
+        return toResponse(saved);
+    }
+
+    /** Demandes escaladées au portail Superviseur : ouvertes d'abord, puis clôturées récentes (30 j). */
+    @Transactional(readOnly = true)
+    public List<WorkflowRequestResponse> listEscalated() {
+        LocalDateTime since = LocalDateTime.now().minusDays(30);
+        List<WorkflowRequest> escalated = new java.util.ArrayList<>(workflowRequestRepository.findByEscalatedAtIsNotNullOrderByEscalatedAtDesc());
+        escalated.removeIf(r -> !STATUS_PENDING.equals(r.getStatus()) && (r.getDecidedAt() == null || r.getDecidedAt().isBefore(since)));
+        escalated.sort(java.util.Comparator.comparing((WorkflowRequest r) -> STATUS_PENDING.equals(r.getStatus()) ? 0 : 1)
+                .thenComparing(WorkflowRequest::getEscalatedAt, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())));
+        return escalated.stream().map(this::toResponse).toList();
+    }
+
+    /** Team Leader affiché à l'agent dans le formulaire (« votre demande ira à … »). */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, String> myTeamLeader(String username) {
+        User me = findUser(username);
+        User tl = me.getActivity() == null || me.getActivity().isBlank() ? null : findTeamLeaderForTeam(me.getActivity());
+        java.util.Map<String, String> out = new java.util.HashMap<>();
+        out.put("team", me.getActivity());
+        out.put("teamLeaderName", tl != null ? label(tl) : null);
+        out.put("teamLeaderUsername", tl != null ? tl.getUsername() : null);
+        out.put("escalationHours", String.valueOf(getEscalationHours()));
+        return out;
+    }
+
+    public int getEscalationHours() {
+        try {
+            String v = siteSettingService.get(ESCALATION_HOURS_KEY);
+            if (v != null && !v.isBlank()) return Math.max(1, Integer.parseInt(v.trim()));
+        } catch (Exception ignored) { }
+        return DEFAULT_ESCALATION_HOURS;
+    }
+
+    /**
+     * Escalade automatique (appelée par WorkflowEscalationScheduler) : toute demande d'aide encore
+     * ouverte après le délai est marquée escaladée et le supérieur (Superviseurs), le Team Leader
+     * et l'agent sont notifiés. Une demande n'est escaladée qu'une fois.
+     */
+    @Transactional
+    public int escalateOverdueSupportRequests() {
+        LocalDateTime limit = LocalDateTime.now().minusHours(getEscalationHours());
+        int count = 0;
+        for (WorkflowRequest r : workflowRequestRepository.findByStatusAndTypeIn(STATUS_PENDING, SUPPORT_TYPES)) {
+            if (r.getEscalatedAt() != null || r.getCreatedAt() == null || r.getCreatedAt().isAfter(limit)) continue;
+            r.setEscalatedAt(LocalDateTime.now());
+            workflowRequestRepository.save(r);
+            count++;
+            User requester = safeUser(r.getRequestedBy());
+            User tl = safeUser(r.getAssignedTo());
+            long days = java.time.Duration.between(r.getCreatedAt(), LocalDateTime.now()).toDays();
+            notifySupervisors(r, "⚠ Escalade : la demande « " + r.getTitle() + " » de " + (requester != null ? label(requester) : "un agent")
+                    + (tl != null ? " (Team Leader : " + label(tl) + ")" : "") + " est sans résolution depuis " + days + " jour(s).");
+            if (tl != null) notify(tl, "⚠ La demande « " + r.getTitle() + " » a été escaladée à la supervision (sans résolution depuis " + days + " jour(s)).");
+            if (requester != null) notify(requester, "Votre demande « " + r.getTitle() + " » a été transmise à la supervision faute de résolution.");
+        }
+        return count;
+    }
+
+    private void notifySupervisors(WorkflowRequest r, String content) {
+        java.util.Set<Long> seen = new java.util.HashSet<>();
+        userRoleRepository.findByRoleNameIgnoreCase("SUPERVISOR").stream()
+                .map(com.ecobank.rccportal.model.UserRole::getUser)
+                .filter(u -> u != null && seen.add(u.getId()))
+                .forEach(u -> notify(u, content));
+        userServiceAssignmentRepository.findAll().stream()
+                .filter(a -> a.getService() != null && "SUPERVISEUR".equalsIgnoreCase(a.getService().getCode()))
+                .map(com.ecobank.rccportal.model.UserServiceAssignment::getUser)
+                .filter(u -> u != null && seen.add(u.getId()))
+                .forEach(u -> notify(u, content));
+    }
+
+    private void notify(User target, String content) {
+        notificationRepository.save(RccNotification.builder().targetUser(target).content(content).isRead(false).build());
+    }
+
+    private static String label(User u) {
+        return u.getName() != null && !u.getName().isBlank() ? u.getName() : u.getUsername();
+    }
+
+    private static String normalizePriority(String priority, String type) {
+        if (type == null || !SUPPORT_TYPES.contains(type.toUpperCase())) return null;
+        String p = priority == null ? "NORMAL" : priority.trim().toUpperCase();
+        return PRIORITIES.contains(p) ? p : "NORMAL";
+    }
+
+    private static String priorityLabel(String p) {
+        return "BLOQUANT".equals(p) ? "BLOQUANTE" : "URGENT".equals(p) ? "URGENTE" : "";
     }
 
     /** Le demandeur peut retirer sa propre demande (peu importe le statut) ; QA/Admin peut
@@ -442,6 +598,11 @@ public class WorkflowService {
                 .map(com.ecobank.rccportal.model.UserRole::getUser)
                 .filter(u -> u.getLedTeam() != null && u.getLedTeam().equalsIgnoreCase(team))
                 .findFirst()
+                // Team Leader désigné par le seul service « Team Leader … » (sans rôle explicite) :
+                // User.ledTeam reste la source de vérité de l'équipe menée.
+                .or(() -> userRepository.findAll().stream()
+                        .filter(u -> u.getLedTeam() != null && u.getLedTeam().equalsIgnoreCase(team))
+                        .findFirst())
                 .orElse(null);
     }
 
@@ -498,7 +659,15 @@ public class WorkflowService {
                 e.getDecisionComment(),
                 e.getDecidedAt(),
                 hoursOpen,
-                slaBreached
+                slaBreached,
+                e.getPriority(),
+                e.getAcknowledgedAt(),
+                e.getAcknowledgedBy(),
+                e.getAcknowledgementNote(),
+                e.getEscalatedAt(),
+                SUPPORT_TYPES.contains(e.getType()) && e.getCreatedAt() != null && e.getEscalatedAt() == null
+                        ? e.getCreatedAt().plusHours(getEscalationHours()) : null,
+                decidedBy != null ? label(decidedBy) : null
         );
     }
 

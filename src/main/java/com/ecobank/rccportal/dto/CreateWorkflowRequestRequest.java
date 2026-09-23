@@ -11,6 +11,7 @@ public record CreateWorkflowRequestRequest(
         LocalDate periodTo,
         String assignedTeam,
         String assignedToUsername,
-        String serviceCode
+        String serviceCode,
+        String priority
 ) {
 }

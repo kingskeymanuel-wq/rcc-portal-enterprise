@@ -16,6 +16,10 @@ public interface WorkflowRequestRepository extends JpaRepository<WorkflowRequest
 
     List<WorkflowRequest> findByTypeAndStatus(String type, String status);
 
+    List<WorkflowRequest> findByStatusAndTypeIn(String status, java.util.Collection<String> types);
+
+    List<WorkflowRequest> findByEscalatedAtIsNotNullOrderByEscalatedAtDesc();
+
     List<WorkflowRequest> findByAssignedTeamOrderByCreatedAtDesc(String assignedTeam);
 
     List<WorkflowRequest> findByTypeOrderByCreatedAtDesc(String type);

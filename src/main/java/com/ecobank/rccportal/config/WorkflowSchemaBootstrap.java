@@ -479,6 +479,12 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         addColumnIfMissing("CourseAttempts", "Finalized", "ALTER TABLE dbo.CourseAttempts ADD Finalized BIT NOT NULL DEFAULT 0");
         addColumnIfMissing("WorkflowRequests", "AssignedToUserId", "ALTER TABLE dbo.WorkflowRequests ADD AssignedToUserId BIGINT NULL");
         addColumnIfMissing("WorkflowRequests", "RelatedServiceId", "ALTER TABLE dbo.WorkflowRequests ADD RelatedServiceId INT NULL");
+        // Demandes d'aide agent (accès/outils/matériel/difficulté) : urgence, prise en charge TL, escalade.
+        addColumnIfMissing("WorkflowRequests", "Priority", "ALTER TABLE dbo.WorkflowRequests ADD Priority NVARCHAR(20) NULL");
+        addColumnIfMissing("WorkflowRequests", "AcknowledgedAt", "ALTER TABLE dbo.WorkflowRequests ADD AcknowledgedAt DATETIME2 NULL");
+        addColumnIfMissing("WorkflowRequests", "AcknowledgedBy", "ALTER TABLE dbo.WorkflowRequests ADD AcknowledgedBy NVARCHAR(150) NULL");
+        addColumnIfMissing("WorkflowRequests", "AcknowledgementNote", "ALTER TABLE dbo.WorkflowRequests ADD AcknowledgementNote NVARCHAR(500) NULL");
+        addColumnIfMissing("WorkflowRequests", "EscalatedAt", "ALTER TABLE dbo.WorkflowRequests ADD EscalatedAt DATETIME2 NULL");
         addColumnIfMissing("USERS", "GENDER", "ALTER TABLE dbo.USERS ADD GENDER NVARCHAR(1) NULL");
         addColumnIfMissing("USERS", "CONTRACT_TYPE", "ALTER TABLE dbo.USERS ADD CONTRACT_TYPE NVARCHAR(30) NULL");
         addColumnIfMissing("USERS", "CONTRACT_STATUS", "ALTER TABLE dbo.USERS ADD CONTRACT_STATUS NVARCHAR(10) NULL");

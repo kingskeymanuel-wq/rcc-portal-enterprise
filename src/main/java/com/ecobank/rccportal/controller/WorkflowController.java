@@ -68,11 +68,39 @@ public class WorkflowController {
         return workflowService.listLeaveRequestsForHr(requester.username(), isAdmin || isSupervisor || isExcelliam);
     }
 
+    /** Team Leader destinataire des demandes d'aide de l'agent connecté (affiché dans le formulaire). */
+    @GetMapping("/my-team-leader")
+    public java.util.Map<String, String> myTeamLeader(@AuthenticationPrincipal AuthenticatedUser requester) {
+        return workflowService.myTeamLeader(requester.username());
+    }
+
+    /** Portail Superviseur : demandes d'aide escaladées (sans résolution après le délai). */
+    @GetMapping("/escalated")
+    public List<WorkflowRequestResponse> escalated(@AuthenticationPrincipal AuthenticatedUser requester) {
+        String team = requireReviewerTeam(requester);
+        if (!"SUPERVISOR".equals(team) && !"ADMIN".equals(team)) {
+            throw ApiException.forbidden("Réservé au Superviseur et à l'administration.");
+        }
+        return workflowService.listEscalated();
+    }
+
+    /** Prise en charge d'une demande d'aide par son Team Leader (ou le supérieur si escaladée). */
+    @PostMapping("/{id}/acknowledge")
+    public WorkflowRequestResponse acknowledge(@PathVariable Integer id,
+                                               @RequestBody(required = false) WorkflowDecisionRequest request,
+                                               @AuthenticationPrincipal AuthenticatedUser requester) {
+        String team = requireReviewerTeam(requester);
+        return workflowService.acknowledge(id, requester.username(), team, request != null ? request.comment() : null);
+    }
+
     /** File d'attente à traiter — équipe QA/ADMIN classique, ou file personnelle d'un Team Leader. */
     @GetMapping("/pending")
     public List<WorkflowRequestResponse> pending(@AuthenticationPrincipal AuthenticatedUser requester) {
         if ("team_leader".equalsIgnoreCase(requester != null ? requester.role() : null)) {
             return workflowService.listPendingForAssignee(requester.username());
+        }
+        if ("supervisor".equalsIgnoreCase(requester != null ? requester.role() : null)) {
+            return workflowService.listEscalated().stream().filter(r -> "PENDING".equals(r.status())).toList();
         }
         return workflowService.listPendingForTeam(requireReviewerTeam(requester));
     }
@@ -169,6 +197,9 @@ public class WorkflowController {
 
         boolean isTeamLeader = requester != null && "team_leader".equalsIgnoreCase(requester.role());
         if (isTeamLeader) return "TEAM_LEADER";
+
+        boolean isSupervisor = requester != null && "supervisor".equalsIgnoreCase(requester.role());
+        if (isSupervisor) return "SUPERVISOR";
 
         boolean isQa = requester != null && requester.service() != null
                 && "quality assurance".equals(requester.service().toLowerCase().replace('_', ' '));

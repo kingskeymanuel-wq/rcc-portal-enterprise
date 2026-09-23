@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/support-requests.css}">
     <style>
         .wf-tab-nav .btn.nav-link { border: none; border-bottom: 3px solid transparent; border-radius: 0; color: #6b7280; font-weight: 600; padding: .75rem 1.1rem; }
         .wf-tab-nav .btn.nav-link.active { color: #0057B8; border-bottom-color: #0057B8; background: transparent; }
@@ -130,7 +131,7 @@
                 <div class="welcome-banner">
                     <div>
                         <h2>Workflow</h2>
-                        <p class="text-muted">Congé/absence, changement de procédure, matériel/accès — vue d'ensemble, validation et suivi d'équipe</p>
+                        <p class="text-muted">Demandes d'aide (accès, outils, matériel, difficultés) envoyées au Team Leader et escaladées si besoin — suivi, validation et SLA</p>
                     </div>
                 </div>
 
@@ -223,66 +224,98 @@
                 </div>
 
                 <!-- ===================== MES DEMANDES ===================== -->
+                <!-- Accent sur ce qui facilite le travail de l'agent (accès, outils, matériel, difficulté) :
+                     envoyé à SON Team Leader, pris en charge puis validé une fois la situation réglée,
+                     escaladé automatiquement au Superviseur sans résolution après le délai (support-requests.js). -->
                 <div id="wfPaneMine" class="wf-tab-pane" style="display:none;">
                     <div class="row g-4">
                         <div class="col-lg-5">
-                            <div class="card dashboard-card shadow-sm h-100">
+                            <div class="card dashboard-card shadow-sm">
                                 <div class="card-body">
-                                    <h5 class="card-title mb-3"><i class="bi bi-plus-circle"></i> Nouvelle demande</h5>
-                                    <form id="newRequestForm">
-                                        <div class="mb-3" id="templateSelectGroup" style="display:none;">
-                                            <label class="form-label small"><i class="bi bi-file-earmark-text"></i> Utiliser un modèle (optionnel)</label>
-                                            <select id="templateSelectInput" class="form-select form-select-sm">
-                                                <option value="">— Saisie libre —</option>
-                                            </select>
+                                    <h5 class="card-title mb-1"><i class="bi bi-life-preserver"></i> Besoin d'aide pour bien travailler ?</h5>
+                                    <p class="text-muted small mb-3">Un accès bloqué, un outil qui ne marche pas, du matériel manquant ? Votre Team Leader est prévenu tout de suite.</p>
+                                    <form id="supportRequestForm">
+                                        <div class="sr-types" id="srTypes"></div>
+                                        <div class="sr-route" id="srRoute"><i class="bi bi-person-badge"></i><span>Recherche de votre Team Leader…</span></div>
+                                        <div class="mb-2">
+                                            <label class="form-label small">En quelques mots</label>
+                                            <input id="srTitle" type="text" class="form-control" maxlength="200" required placeholder="ex. Pas d'accès à RCC360 depuis ce matin">
                                         </div>
                                         <div class="mb-2">
-                                            <label class="form-label small">Type</label>
-                                            <select id="typeInput" class="form-select" required>
-                                                <option value="PROCEDURE_CHANGE">Changement de procédure</option>
-                                                <option value="ACCESS">Matériel / accès</option>
-                                            </select>
+                                            <label class="form-label small">Détails <span class="text-muted">(depuis quand, message d'erreur, poste…)</span></label>
+                                            <textarea id="srDetails" class="form-control" rows="3" maxlength="2000"></textarea>
                                         </div>
-                                        <div class="mb-2">
-                                            <label class="form-label small">Titre</label>
-                                            <input id="titleInput" type="text" class="form-control" maxlength="200" required>
-                                        </div>
-                                        <div class="mb-2">
-                                            <label class="form-label small">Détails</label>
-                                            <textarea id="detailsInput" class="form-control" rows="3" maxlength="2000"></textarea>
-                                        </div>
-
-                                        <div class="mb-2">
-                                            <label class="form-label small">Service concerné</label>
-                                            <select id="serviceCodeInput" class="form-select">
-                                                <option value="">— Choisir —</option>
-                                            </select>
-                                        </div>
-
-                                        <!-- periodTypeInput reste nécessaire côté backend (WorkflowService.submit exige une valeur
-                                             valide même hors congé) mais n'a plus de sens à choisir depuis que LEAVE (le seul type
-                                             qui en avait besoin) est parti vers Shift — figé sur DAY, caché à l'agent. -->
-                                        <input type="hidden" id="periodTypeInput" value="DAY">
-
                                         <div class="mb-3">
-                                            <label class="form-label small">Assigner à</label>
-                                            <select id="assignedTeamInput" class="form-select" required>
-                                                <option value="ADMIN">Équipe Administration</option>
-                                                <option value="QA">Équipe Quality Assurance</option>
-                                            </select>
+                                            <label class="form-label small d-block">Urgence</label>
+                                            <div class="sr-prio">
+                                                <input type="radio" name="srPriority" id="srPrioNormal" value="NORMAL" checked><label for="srPrioNormal">Normale</label>
+                                                <input type="radio" name="srPriority" id="srPrioUrgent" value="URGENT"><label for="srPrioUrgent"><i class="bi bi-lightning-charge-fill"></i> Urgente</label>
+                                                <input type="radio" name="srPriority" id="srPrioBlock" value="BLOQUANT"><label for="srPrioBlock"><i class="bi bi-sign-stop-fill"></i> Je suis bloqué(e)</label>
+                                            </div>
                                         </div>
-
-                                        <div class="mb-3">
-                                            <label class="form-label small">Responsable désigné (optionnel — reçoit une priorité)</label>
-                                            <select id="assignedToInput" class="form-select">
-                                                <option value="">— Aucun en particulier —</option>
-                                            </select>
-                                        </div>
-
-                                        <button type="submit" class="btn btn-primary w-100">
-                                            <i class="bi bi-send"></i> Soumettre
+                                        <button type="submit" class="btn btn-primary w-100" id="srSubmitBtn">
+                                            <i class="bi bi-send"></i> Envoyer à mon Team Leader
                                         </button>
                                     </form>
+
+                                    <details class="mt-3" id="otherRequestDetails">
+                                        <summary class="small text-muted" style="cursor:pointer;">Autre type de demande (changement de procédure, référentiel RCC360…)</summary>
+                                        <div class="pt-3">
+                                            <form id="newRequestForm">
+                                                <div class="mb-3" id="templateSelectGroup" style="display:none;">
+                                                    <label class="form-label small"><i class="bi bi-file-earmark-text"></i> Utiliser un modèle (optionnel)</label>
+                                                    <select id="templateSelectInput" class="form-select form-select-sm">
+                                                        <option value="">— Saisie libre —</option>
+                                                    </select>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label small">Type</label>
+                                                    <select id="typeInput" class="form-select" required>
+                                                        <option value="PROCEDURE_CHANGE">Changement de procédure</option>
+                                                    </select>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label small">Titre</label>
+                                                    <input id="titleInput" type="text" class="form-control" maxlength="200" required>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label small">Détails</label>
+                                                    <textarea id="detailsInput" class="form-control" rows="3" maxlength="2000"></textarea>
+                                                </div>
+
+                                                <div class="mb-2">
+                                                    <label class="form-label small">Service concerné</label>
+                                                    <select id="serviceCodeInput" class="form-select">
+                                                        <option value="">— Choisir —</option>
+                                                    </select>
+                                                </div>
+
+                                                <!-- periodTypeInput reste nécessaire côté backend (WorkflowService.submit exige une valeur
+                                                     valide même hors congé) mais n'a plus de sens à choisir depuis que LEAVE (le seul type
+                                                     qui en avait besoin) est parti vers Shift — figé sur DAY, caché à l'agent. -->
+                                                <input type="hidden" id="periodTypeInput" value="DAY">
+
+                                                <div class="mb-3">
+                                                    <label class="form-label small">Assigner à</label>
+                                                    <select id="assignedTeamInput" class="form-select" required>
+                                                        <option value="ADMIN">Équipe Administration</option>
+                                                        <option value="QA">Équipe Quality Assurance</option>
+                                                    </select>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label class="form-label small">Responsable désigné (optionnel — reçoit une priorité)</label>
+                                                    <select id="assignedToInput" class="form-select">
+                                                        <option value="">— Aucun en particulier —</option>
+                                                    </select>
+                                                </div>
+
+                                                <button type="submit" class="btn btn-primary w-100">
+                                                    <i class="bi bi-send"></i> Soumettre
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </details>
                                 </div>
                             </div>
                         </div>
@@ -290,19 +323,25 @@
                         <div class="col-lg-7">
                             <div class="card dashboard-card shadow-sm h-100">
                                 <div class="card-body">
-                                    <h5 class="card-title mb-3"><i class="bi bi-list-check"></i> Mes demandes</h5>
-                                    <div class="table-responsive">
-                                        <table class="table table-hover align-middle">
-                                            <thead>
-                                            <tr>
-                                                <th>Type</th><th>Titre</th><th>Période</th><th>Assignée à</th>
-                                                <th>Statut</th><th>Soumise le</th><th></th>
-                                            </tr>
-                                            </thead>
-                                            <tbody id="mineBody">
-                                            <tr><td colspan="7" class="text-center text-muted">Chargement…</td></tr>
-                                            </tbody>
-                                        </table>
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                        <h5 class="card-title mb-0"><i class="bi bi-list-check"></i> Mes demandes</h5>
+                                        <div class="sr-filter" id="mineFilter">
+                                            <button type="button" class="active" data-filter="open">En cours</button>
+                                            <button type="button" data-filter="closed">Clôturées</button>
+                                            <button type="button" data-filter="all">Toutes</button>
+                                        </div>
+                                    </div>
+                                    <div class="sr-list" id="mineCards"><div class="sr-empty">Chargement…</div></div>
+                                    <div id="mineOtherWrap" class="mt-4" style="display:none;">
+                                        <h6 class="text-muted small text-uppercase mb-2">Autres demandes</h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-hover align-middle mb-0">
+                                                <thead>
+                                                <tr><th>Type</th><th>Titre</th><th>Assignée à</th><th>Statut</th><th>Soumise le</th><th></th></tr>
+                                                </thead>
+                                                <tbody id="mineBody"></tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -541,6 +580,7 @@
 <script th:src="@{/js/preferences.js}"></script>
 <script th:src="@{/js/rcc-api.js}"></script>
 <script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/support-requests.js}"></script>
 <script th:src="@{/js/workflow.js}"></script>
 <!-- Modale détail d'une demande à valider -->
 <div class="modal fade" id="wfPendingDetailModal" tabindex="-1">

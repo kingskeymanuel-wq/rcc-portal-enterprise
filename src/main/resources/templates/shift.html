@@ -67,6 +67,67 @@
         #shiftTree.shift-fade-in, #shiftLiveSection.shift-fade-in { animation: shiftFadeIn .28s ease-out; }
         .dashboard-card { transition: box-shadow .15s ease-out; }
         .planning-chip { transition: outline-color .15s ease-out; }
+        /* ===== Présence par rapport au planning — par équipe (shift.js renderPresence) ===== */
+        .sp-summary { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-bottom: .7rem; }
+        .sp-kpi { background: #f7f9fc; border-radius: 12px; padding: .45rem .8rem; min-width: 96px; }
+        .sp-kpi b { display: block; font-size: 1.25rem; line-height: 1.1; color: #172033; }
+        .sp-kpi small { color: #718096; font-size: .72rem; }
+        .sp-kpi-danger b { color: #d93025; } .sp-kpi-warn b { color: #c77700; }
+        .sp-search { max-width: 240px; margin-left: auto; }
+        .sp-chips { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .8rem; }
+        .sp-chip { border: 1px solid #e3e8f0; background: #fff; border-radius: 999px; padding: .22rem .7rem; font-size: .76rem; font-weight: 600; color: #4a5568; transition: all .15s ease; }
+        .sp-chip b { margin-left: 2px; }
+        .sp-chip:hover { border-color: #b9cbe6; }
+        .sp-chip.active { background: #0057B8; border-color: #0057B8; color: #fff; }
+        .sp-chip-alert:not(.active) { color: #b33e4c; border-color: #f3c3ca; }
+        .sp-team { border: 1px solid #e7ebf3; border-radius: 14px; margin-bottom: .6rem; overflow: hidden; background: #fff; }
+        .sp-team-head { width: 100%; border: 0; background: #f8fafd; display: flex; align-items: center; gap: .7rem; padding: .6rem .85rem; text-align: left; flex-wrap: wrap; }
+        .sp-team-head:hover { background: #f1f5fb; }
+        .sp-team-caret { transition: transform .2s ease; color: #718096; }
+        .sp-team.open .sp-team-caret { transform: rotate(90deg); }
+        .sp-team-name { font-weight: 700; color: #172033; }
+        .sp-team-count { font-size: .75rem; color: #718096; }
+        .sp-team-bar { width: 110px; height: 7px; border-radius: 6px; background: #e8edf4; overflow: hidden; margin-left: auto; }
+        .sp-team-bar i { display: block; height: 100%; background: linear-gradient(90deg, #00A651, #3ee089); }
+        .sp-team-pct { font-size: .75rem; color: #4a5568; min-width: 90px; }
+        .sp-team-mini { display: flex; gap: .25rem; }
+        .sp-mini { font-size: .7rem; font-weight: 700; border-radius: 999px; padding: 1px 7px; }
+        .sp-team-body { display: none; }
+        .sp-team.open .sp-team-body { display: block; }
+        .sp-row { border-top: 1px solid #f0f3f7; }
+        .sp-row-main { width: 100%; border: 0; background: #fff; display: grid; grid-template-columns: 30px minmax(160px, 2fr) minmax(120px, 1.2fr) 70px 70px minmax(150px, auto) 16px; gap: .6rem; align-items: center; padding: .45rem .85rem; text-align: left; font-size: .83rem; }
+        .sp-row-main:hover { background: #fafcff; }
+        .sp-avatar { width: 28px; height: 28px; border-radius: 50%; background: #eaf2ff; color: #0057B8; font-size: .68rem; font-weight: 800; display: grid; place-items: center; }
+        .sp-row-absent .sp-avatar { background: #ffe9ec; color: #b33e4c; }
+        .sp-row-late .sp-avatar { background: #fff4e0; color: #b06a00; }
+        .sp-row-on_time .sp-avatar { background: #e4f7ef; color: #0b7a4b; }
+        .sp-name { font-weight: 600; color: #172033; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sp-shift { color: #4a5568; font-size: .78rem; white-space: nowrap; }
+        .sp-time { color: #4a5568; font-size: .78rem; white-space: nowrap; }
+        .sp-status { text-align: right; white-space: nowrap; }
+        .sp-caret { color: #9aa4b2; transition: transform .2s ease; }
+        .sp-row.open .sp-caret { transform: rotate(180deg); }
+        .sp-detail { display: none; padding: .2rem .85rem .8rem 3.2rem; background: #fafcff; }
+        .sp-row.open .sp-detail { display: block; animation: spIn .2s ease; }
+        .sp-detail-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6rem; margin-bottom: .4rem; }
+        .sp-detail-grid small { display: block; color: #8a93a3; font-size: .7rem; text-transform: uppercase; letter-spacing: .03em; }
+        .sp-detail-grid b { font-size: .84rem; color: #172033; }
+        .sp-detail-text { font-size: .8rem; color: #4a5568; margin: .2rem 0 .5rem; }
+        .sp-st-absent { background: #ffe9ec; color: #b33e4c; } .sp-chip.sp-st-absent:not(.active) { background: #fff; color: #b33e4c; }
+        .sp-st-late { background: #fff4e0; color: #b06a00; } .sp-chip.sp-st-late:not(.active) { background: #fff; color: #b06a00; }
+        .sp-st-unplanned { background: #e0f6fb; color: #0b7285; } .sp-chip.sp-st-unplanned:not(.active) { background: #fff; color: #0b7285; }
+        .sp-st-not_yet { background: #f2f4f7; color: #4a5568; }
+        .sp-st-on_time { background: #e4f7ef; color: #0b7a4b; } .sp-chip.sp-st-on_time:not(.active) { background: #fff; color: #0b7a4b; }
+        .shift-timeline-row.sp-flash { background: #fff7d6; transition: background .3s ease; border-radius: 8px; }
+        @keyframes spIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+        @media (max-width: 900px) {
+            .sp-row-main { grid-template-columns: 30px 1fr auto 16px; }
+            .sp-row-main .sp-shift, .sp-row-main .sp-time { display: none; }
+            .sp-detail { padding-left: .85rem; }
+            .sp-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .sp-team-bar { margin-left: 0; }
+            .sp-search { max-width: none; width: 100%; margin-left: 0; }
+        }
     </style>
 </head>
 <body>
