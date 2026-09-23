@@ -13,3 +13,6 @@ application-secrets.yml
 .vscode/
 .DS_Store
 __pycache__/
+
+# Copies de travail temporaires des agents Claude Code
+.claude/worktrees/
