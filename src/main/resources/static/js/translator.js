@@ -3,8 +3,11 @@
 (function () {
     var $ = function (id) { return document.getElementById(id); };
 
-    // Liste volontairement large — MyMemory (et la traduction locale Argos, si configurée)
-    // couvrent la quasi-totalité de ces codes ISO 639-1. "auto" n'apparaît que côté source.
+    var MAX_LENGTH = 5000;
+    var PREFS_KEY = "rcc.translator.langs";
+
+    // "auto" n'apparaît que côté source. Couverture réelle selon les sources configurées
+    // (Azure et LibreTranslate couvrent la quasi-totalité ; Argos/DeepL moins).
     var LANGUAGES = [
         ["auto", "Détecter la langue"],
         ["fr", "Français"], ["en", "Anglais"], ["es", "Espagnol"], ["pt", "Portugais"],
@@ -19,10 +22,18 @@
 
     var sourceLang = "auto";
     var targetLang = "en";
-    var lastTranslatedSourceText = "";
+    var detectedLang = null;
+    var lastRequestKey = "";
+    var requestSeq = 0;
     var debounceTimer = null;
     var recognition = null;
     var recognizing = false;
+
+    function escapeHtml(s) {
+        var div = document.createElement("div");
+        div.textContent = s == null ? "" : String(s);
+        return div.innerHTML;
+    }
 
     function populateSelect(select, includeAuto) {
         select.innerHTML = LANGUAGES.filter(function (l) { return includeAuto || l[0] !== "auto"; })
@@ -30,8 +41,26 @@
     }
 
     function languageLabel(code) {
-        var found = LANGUAGES.filter(function (l) { return l[0] === code; })[0];
+        if (!code) return "";
+        var lower = code.toLowerCase();
+        var found = LANGUAGES.filter(function (l) { return l[0].toLowerCase() === lower || l[0].toLowerCase() === lower.split("-")[0]; })[0];
         return found ? found[1] : code;
+    }
+
+    function hasLanguage(code) {
+        return LANGUAGES.some(function (l) { return l[0] === code; });
+    }
+
+    function savePrefs() {
+        try { localStorage.setItem(PREFS_KEY, JSON.stringify({ source: sourceLang, target: targetLang })); } catch (ignore) {}
+    }
+
+    function loadPrefs() {
+        try {
+            var saved = JSON.parse(localStorage.getItem(PREFS_KEY) || "null");
+            if (saved && hasLanguage(saved.source)) sourceLang = saved.source;
+            if (saved && hasLanguage(saved.target) && saved.target !== "auto") targetLang = saved.target;
+        } catch (ignore) {}
     }
 
     function setStatus(message, isError) {
@@ -40,21 +69,36 @@
         box.className = "tr-status" + (isError ? " text-danger" : "");
     }
 
-    function doTranslate() {
+    function parseError(e) {
+        var message = (e && e.message) || "";
+        try { var parsed = JSON.parse(message); message = parsed.message || parsed.error || message; } catch (ignore) {}
+        return message || "erreur inconnue";
+    }
+
+    function doTranslate(force) {
         var text = $("sourceText").value;
-        $("charCount").textContent = text.length + " / 4000";
+        $("charCount").textContent = text.length + " / " + MAX_LENGTH;
         $("clearBtn").style.display = text ? "" : "none";
 
         if (!text.trim()) {
+            requestSeq++; // invalide toute réponse encore en vol
             $("targetText").textContent = "";
             $("detectedLangLabel").textContent = "";
-            lastTranslatedSourceText = "";
+            $("retryBtn").style.display = "none";
+            lastRequestKey = "";
+            detectedLang = null;
             setStatus("");
             return;
         }
-        if (text === lastTranslatedSourceText) return;
+        var key = sourceLang + "|" + targetLang + "|" + text;
+        if (!force && key === lastRequestKey) return;
+        lastRequestKey = key;
 
+        // Numéro de requête : une réponse lente d'une frappe précédente ne doit jamais écraser
+        // la traduction du texte actuel (cause des traductions « incohérentes » à l'écran).
+        var seq = ++requestSeq;
         setStatus("Traduction…");
+        $("targetText").classList.add("opacity-50");
         fetch("/api/ralph/translate", {
             method: "POST",
             credentials: "same-origin",
@@ -64,36 +108,54 @@
             if (!res.ok) return res.text().then(function (t) { return Promise.reject(new Error(t || "HTTP " + res.status)); });
             return res.json();
         }).then(function (result) {
-            lastTranslatedSourceText = text;
+            if (seq !== requestSeq) return;
+            $("targetText").classList.remove("opacity-50");
             $("targetText").textContent = result.translated || "";
-            if (sourceLang === "auto" && result.detectedSourceLang) {
-                $("detectedLangLabel").textContent = "Détecté : " + languageLabel(result.detectedSourceLang);
-            } else {
-                $("detectedLangLabel").textContent = "";
-            }
+            $("retryBtn").style.display = "none";
+            detectedLang = result.detectedSourceLang || null;
+            var parts = [];
+            if (sourceLang === "auto" && detectedLang) parts.push("Détecté : " + languageLabel(detectedLang));
+            if (result.provider) parts.push("via " + result.provider);
+            $("detectedLangLabel").textContent = parts.join(" · ");
             setStatus("");
         }).catch(function (e) {
-            var message = e.message || "";
-            try { var parsed = JSON.parse(message); message = parsed.message || message; } catch (ignore) {}
-            setStatus("Traduction indisponible : " + message, true);
+            if (seq !== requestSeq) return;
+            $("targetText").classList.remove("opacity-50");
+            $("targetText").textContent = "";
+            $("retryBtn").style.display = "";
+            lastRequestKey = ""; // autorise une nouvelle tentative sur le même texte
+            setStatus("Traduction indisponible : " + parseError(e), true);
         });
     }
 
     function scheduleTranslate() {
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(doTranslate, 500);
+        var text = $("sourceText").value;
+        $("charCount").textContent = text.length + " / " + MAX_LENGTH;
+        $("clearBtn").style.display = text ? "" : "none";
+        debounceTimer = setTimeout(function () { doTranslate(false); }, 600);
     }
 
-    function copyText(text) {
+    function copyText(text, btn) {
         if (!text) return;
-        navigator.clipboard.writeText(text).catch(function () {});
+        var done = function () {
+            if (!btn) return;
+            var icon = btn.querySelector("i");
+            if (!icon) return;
+            icon.className = "bi bi-check2";
+            setTimeout(function () { icon.className = "bi bi-copy"; }, 1200);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done).catch(function () {});
+        }
     }
 
     function speak(text, lang) {
         if (!text || !window.speechSynthesis) return;
         window.speechSynthesis.cancel();
         var utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = lang === "auto" ? "" : lang;
+        var effective = lang === "auto" ? detectedLang : lang;
+        if (effective) utterance.lang = effective;
         window.speechSynthesis.speak(utterance);
     }
 
@@ -109,8 +171,9 @@
         recognition.interimResults = false;
         recognition.onresult = function (event) {
             var transcript = event.results[0][0].transcript;
-            $("sourceText").value = ($("sourceText").value ? $("sourceText").value + " " : "") + transcript;
-            doTranslate();
+            var current = $("sourceText").value;
+            $("sourceText").value = (current ? current + " " : "") + transcript;
+            doTranslate(false);
         };
         recognition.onerror = function () { setStatus("Dictée vocale : erreur de reconnaissance.", true); };
         recognition.onend = function () {
@@ -122,7 +185,8 @@
     function toggleMic() {
         if (!recognition) return;
         if (recognizing) { recognition.stop(); return; }
-        recognition.lang = sourceLang === "auto" ? "fr-FR" : sourceLang;
+        var lang = sourceLang === "auto" ? (detectedLang || "fr") : sourceLang;
+        recognition.lang = lang === "fr" ? "fr-FR" : lang;
         try {
             recognition.start();
             recognizing = true;
@@ -132,16 +196,20 @@
     }
 
     function swapLanguages() {
-        if (sourceLang === "auto") { setStatus("Impossible d'inverser depuis « Détecter la langue ».", true); return; }
-        var newSource = targetLang;
-        var newTarget = sourceLang;
-        var sourceValue = $("targetText").textContent;
-        sourceLang = newSource; targetLang = newTarget;
+        // Depuis « Détecter la langue », on utilise la langue détectée plutôt que de refuser.
+        var effectiveSource = sourceLang === "auto" ? detectedLang : sourceLang;
+        if (!effectiveSource || !hasLanguage(effectiveSource)) {
+            setStatus("Choisissez d'abord la langue source (aucune langue détectée pour l'instant).", true);
+            return;
+        }
+        var translated = $("targetText").textContent;
+        sourceLang = targetLang;
+        targetLang = effectiveSource;
         $("sourceLangSelect").value = sourceLang;
         $("targetLangSelect").value = targetLang;
-        $("sourceText").value = sourceValue;
-        lastTranslatedSourceText = "";
-        doTranslate();
+        if (translated) $("sourceText").value = translated;
+        savePrefs();
+        doTranslate(true);
     }
 
     function runDiagnose() {
@@ -149,51 +217,84 @@
         box.style.display = "";
         box.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm"></span> Test des sources de traduction en cours…</div>';
         fetch("/api/ralph/translate/diagnose", { credentials: "same-origin" })
-            .then(function (res) { return res.json(); })
+            .then(function (res) {
+                if (!res.ok) throw new Error("HTTP " + res.status);
+                return res.json();
+            })
             .then(function (rows) {
+                var badgeFor = function (status) {
+                    if (status === "OK") return '<span class="badge bg-success">OK</span>';
+                    if (status === "NON CONFIGURÉ") return '<span class="badge bg-secondary">Non configuré</span>';
+                    return '<span class="badge bg-danger">Échec</span>';
+                };
                 box.innerHTML = '<div class="table-responsive"><table class="table table-sm table-bordered mb-0">' +
-                    '<thead><tr><th>Source</th><th>Statut</th><th>Détail</th></tr></thead><tbody>' +
+                    '<thead><tr><th>Source (ordre d\'essai)</th><th>Statut</th><th>Détail</th></tr></thead><tbody>' +
                     rows.map(function (r) {
-                        var badge = r.status === "OK" ? '<span class="badge bg-success">OK</span>' : '<span class="badge bg-danger">Échec</span>';
-                        return "<tr><td>" + r.source + "</td><td>" + badge + "</td><td class=\"small\">" + r.detail + "</td></tr>";
+                        return "<tr><td>" + escapeHtml(r.source) + "</td><td>" + badgeFor(r.status) +
+                            "</td><td class=\"small\">" + escapeHtml(r.detail) + "</td></tr>";
                     }).join("") + "</tbody></table></div>";
             })
-            .catch(function (e) { box.innerHTML = '<div class="text-danger small">Diagnostic indisponible : ' + e.message + '</div>'; });
+            .catch(function (e) { box.innerHTML = '<div class="text-danger small">Diagnostic indisponible : ' + escapeHtml(e.message) + '</div>'; });
+    }
+
+    function loadProviders() {
+        fetch("/api/ralph/translate/providers", { credentials: "same-origin" })
+            .then(function (res) { return res.ok ? res.json() : []; })
+            .then(function (providers) {
+                var box = $("trProviders");
+                if (!box) return;
+                box.textContent = providers && providers.length
+                    ? "Sources actives : " + providers.join(" → ")
+                    : "Aucune source de traduction configurée — cliquez sur « Diagnostiquer la connexion ».";
+                box.className = "small mt-1 " + (providers && providers.length ? "text-muted" : "text-danger");
+            })
+            .catch(function () {});
     }
 
     function init() {
+        loadPrefs();
         populateSelect($("sourceLangSelect"), true);
         populateSelect($("targetLangSelect"), false);
         $("sourceLangSelect").value = sourceLang;
         $("targetLangSelect").value = targetLang;
+        $("sourceText").setAttribute("maxlength", String(MAX_LENGTH));
+        $("charCount").textContent = "0 / " + MAX_LENGTH;
 
         $("sourceLangSelect").addEventListener("change", function () {
             sourceLang = this.value;
-            lastTranslatedSourceText = "";
-            doTranslate();
+            savePrefs();
+            doTranslate(true);
         });
         $("targetLangSelect").addEventListener("change", function () {
             targetLang = this.value;
-            lastTranslatedSourceText = "";
-            doTranslate();
+            savePrefs();
+            doTranslate(true);
         });
         $("swapLangBtn").addEventListener("click", swapLanguages);
         $("sourceText").addEventListener("input", scheduleTranslate);
+        $("sourceText").addEventListener("keydown", function (e) {
+            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                clearTimeout(debounceTimer);
+                doTranslate(true);
+            }
+        });
         $("clearBtn").addEventListener("click", function () {
             $("sourceText").value = "";
-            doTranslate();
+            doTranslate(false);
             $("sourceText").focus();
         });
-        $("retryBtn").addEventListener("click", function () { lastTranslatedSourceText = ""; doTranslate(); });
-        $("copySourceBtn").addEventListener("click", function () { copyText($("sourceText").value); });
-        $("copyTargetBtn").addEventListener("click", function () { copyText($("targetText").textContent); });
+        $("retryBtn").addEventListener("click", function () { doTranslate(true); });
+        $("copySourceBtn").addEventListener("click", function () { copyText($("sourceText").value, this); });
+        $("copyTargetBtn").addEventListener("click", function () { copyText($("targetText").textContent, this); });
         $("speakSourceBtn").addEventListener("click", function () { speak($("sourceText").value, sourceLang); });
         $("speakTargetBtn").addEventListener("click", function () { speak($("targetText").textContent, targetLang); });
         $("micBtn").addEventListener("click", toggleMic);
         $("diagnoseBtn").addEventListener("click", runDiagnose);
 
         initSpeechRecognition();
-        window.RccSession.init().catch(function () {});
+        loadProviders();
+        if (window.RccSession) window.RccSession.init().catch(function () {});
     }
 
     document.addEventListener("DOMContentLoaded", init);

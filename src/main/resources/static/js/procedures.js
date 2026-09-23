@@ -348,21 +348,28 @@
         });
     }
 
+    /** Minuscules sans accents — « procédure » et « procedure » doivent se retrouver. */
+    function normalizeForSearch(text) {
+        return (text || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    }
+
     function searchCourses(searchTerm) {
         var container = $("courseSearchResults");
         container.innerHTML = '<p class="text-muted small">Recherche…</p>';
-        var term = searchTerm.toLowerCase();
+        // Tous les mots significatifs doivent apparaître (dans n'importe quel ordre) au lieu
+        // de l'expression exacte, sensible aux accents, de l'ancienne version.
+        var words = normalizeForSearch(searchTerm).split(/[^a-z0-9]+/).filter(function (w) { return w.length > 2; });
         getJson("/api/courses").then(function (courses) {
             var matches = courses.filter(function (c) {
-                return (c.title || "").toLowerCase().indexOf(term) !== -1 ||
-                    (c.description || "").toLowerCase().indexOf(term) !== -1;
+                var haystack = normalizeForSearch([c.title, c.description, c.category].join(" "));
+                return words.length > 0 && words.every(function (w) { return haystack.indexOf(w) !== -1; });
             });
             if (!matches.length) {
                 container.innerHTML = '<p class="text-muted small">Aucun cours.</p>';
                 return;
             }
             container.innerHTML = matches.map(function (c) {
-                return '<a href="/training" class="d-block small mb-1">' +
+                return '<a href="/training?openCourseId=' + encodeURIComponent(c.courseId) + '" class="d-block small mb-1">' +
                     '<i class="bi bi-mortarboard"></i> ' + escapeHtml(c.title) + '</a>';
             }).join("");
         }).catch(function () {

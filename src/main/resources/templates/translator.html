@@ -40,7 +40,10 @@
         html[data-theme="dark"] .tr-swap-btn { background:#1a2233; border-color:#2a3448; color:#edf3fb; }
         @media (max-width: 700px) { .tr-panes { flex-direction:column; } .tr-pane-right { border-left:none; border-top:1px solid rgba(0,0,0,.06); } }
         #scEditor:empty:before { content: attr(data-placeholder); color:#9aa0a6; }
-        #scEditor mark.sc-issue { background: rgba(220,53,69,.18); border-bottom: 2px solid #dc3545; cursor: pointer; }
+        #scEditor { white-space: pre-wrap; word-wrap: break-word; min-height: 220px; }
+        #scEditor mark.sc-issue { background: rgba(220,53,69,.12); color: inherit; padding: 0; border-bottom: 2px solid #dc3545; cursor: pointer; }
+        .sc-issue-card-active { box-shadow: 0 0 0 2px rgba(0,87,184,.35); }
+        .tr-output { transition: opacity .15s; }
         .sc-issue-card { border:1px solid rgba(0,0,0,.08); border-radius:.5rem; padding:.6rem .75rem; margin-bottom:.5rem; }
         .sc-issue-card .sc-msg { color:#495057; }
         .sc-suggestion-btn { margin:.2rem .3rem 0 0; }
@@ -58,7 +61,8 @@
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div>
                             <h1 class="h4 mb-1"><i class="bi bi-translate"></i> Traducteur &amp; correcteur</h1>
-                            <p class="text-muted mb-0" id="trSubtitle">Traduction instantanée entre n'importe quelle paire de langues — sans IA, avec une source locale hors-ligne en priorité (voir <code>docs/TRANSLATION_OFFLINE_SETUP.md</code>).</p>
+                            <p class="text-muted mb-0" id="trSubtitle">Traduction instantanée entre n'importe quelle paire de langues — sans IA générative, plusieurs moteurs en repli (voir <code>docs/TRANSLATION_OFFLINE_SETUP.md</code>).</p>
+                            <div class="small mt-1 text-muted" id="trProviders"></div>
                         </div>
                         <button type="button" class="btn btn-sm btn-outline-secondary" id="diagnoseBtn"><i class="bi bi-heart-pulse"></i> Diagnostiquer la connexion</button>
                     </div>
@@ -83,14 +87,14 @@
 
                         <div class="tr-panes">
                             <div class="tr-pane">
-                                <textarea class="tr-textarea" id="sourceText" placeholder="Saisissez du texte…" maxlength="4000"></textarea>
+                                <textarea class="tr-textarea" id="sourceText" placeholder="Saisissez du texte… (Ctrl+Entrée pour traduire tout de suite)" maxlength="5000"></textarea>
                                 <button type="button" class="tr-clear-btn" id="clearBtn" style="display:none;" title="Effacer"><i class="bi bi-x-lg"></i></button>
                                 <div class="tr-toolbar">
                                     <div class="tr-icon-group">
                                         <button type="button" class="tr-icon-btn tr-icon-btn-fill" id="micBtn" title="Dicter"><i class="bi bi-mic-fill"></i></button>
                                     </div>
                                     <div class="tr-icon-group">
-                                        <span class="tr-charcount" id="charCount">0 / 4000</span>
+                                        <span class="tr-charcount" id="charCount">0 / 5000</span>
                                         <button type="button" class="tr-icon-btn" id="speakSourceBtn" title="Écouter"><i class="bi bi-volume-up"></i></button>
                                         <button type="button" class="tr-icon-btn" id="copySourceBtn" title="Copier"><i class="bi bi-copy"></i></button>
                                     </div>
@@ -118,21 +122,30 @@
                             <div class="tr-langbar">
                                 <select class="tr-lang-select" id="scLangSelect">
                                     <option value="fr">Français</option>
-                                    <option value="en">Anglais</option>
+                                    <option value="en-US">Anglais (US)</option>
+                                    <option value="en-GB">Anglais (UK)</option>
+                                    <option value="auto">Détecter la langue</option>
                                 </select>
                                 <div style="flex:1"></div>
-                                <span class="text-muted small"><i class="bi bi-shield-check"></i> Correction locale — aucune donnée envoyée hors du portail</span>
+                                <span class="text-muted small"><i class="bi bi-shield-check"></i> Correction locale — aucune donnée envoyée hors du réseau Ecobank</span>
                             </div>
                             <div class="tr-panes">
                                 <div class="tr-pane">
-                                    <div id="scEditor" class="tr-textarea" contenteditable="true" style="font-size:1.05rem; font-weight:400; overflow-y:auto;" data-placeholder="Saisissez ou collez votre texte…"></div>
+                                    <div id="scEditor" class="tr-textarea" contenteditable="true" style="font-size:1.05rem; font-weight:400; overflow-y:auto;" data-placeholder="Saisissez ou collez votre texte… (Ctrl+Entrée pour vérifier)" spellcheck="false"></div>
                                     <div class="tr-toolbar">
                                         <span class="tr-charcount" id="scCharCount">0 caractère(s)</span>
-                                        <button type="button" class="btn btn-sm btn-primary" id="scCheckBtn"><i class="bi bi-check2-circle"></i> Vérifier</button>
+                                        <div class="d-flex gap-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" id="scCopyBtn" title="Copier le texte"><i class="bi bi-copy"></i></button>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" id="scFixAllBtn" disabled title="Appliquer la première suggestion de chaque erreur"><i class="bi bi-magic"></i> Tout corriger</button>
+                                            <button type="button" class="btn btn-sm btn-primary" id="scCheckBtn"><i class="bi bi-check2-circle"></i> Vérifier</button>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="tr-pane tr-pane-right">
-                                    <div class="fw-semibold small mb-2">Corrections suggérées</div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="fw-semibold small">Corrections suggérées</span>
+                                        <span class="text-muted" style="font-size:.72rem" id="scEngineInfo"></span>
+                                    </div>
                                     <div id="scIssuesList" class="small flex-grow-1" style="overflow-y:auto;">
                                         <div class="text-muted">Cliquez sur « Vérifier » pour analyser votre texte.</div>
                                     </div>

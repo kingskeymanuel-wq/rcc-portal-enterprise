@@ -365,6 +365,8 @@ window.RccSession = (function () {
         });
     }
 
+    var globalSearchSeq = 0;
+
     function runGlobalSearch(term, modalEl) {
         if (!term) return;
         if (!globalSearchModal) globalSearchModal = new bootstrap.Modal(modalEl);
@@ -373,10 +375,17 @@ window.RccSession = (function () {
         resultsBox.innerHTML = '<p class="text-muted text-center">Recherche en cours…</p>';
         globalSearchModal.show();
 
+        // Numéro de requête : avec la recherche « au fil de la frappe », une réponse lente pour
+        // « car » pouvait arriver après celle de « carte bloquée » et écraser les bons résultats.
+        var seq = ++globalSearchSeq;
         fetch("/api/ralph/search?keyword=" + encodeURIComponent(term), { credentials: "same-origin" })
             .then(function (res) { return res.ok ? res.json() : { results: [], webResults: [] }; })
-            .then(function (data) { renderGlobalSearchResults(data.results || [], data.webResults || [], term); })
+            .then(function (data) {
+                if (seq !== globalSearchSeq) return;
+                renderGlobalSearchResults(data.results || [], data.webResults || [], term);
+            })
             .catch(function () {
+                if (seq !== globalSearchSeq) return;
                 resultsBox.innerHTML = '<p class="text-danger text-center">La recherche a échoué. Réessayez.</p>';
             });
     }

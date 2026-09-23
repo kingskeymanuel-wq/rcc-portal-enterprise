@@ -412,14 +412,19 @@
                 fetch("/api/ralph/translate", {
                     method: "POST", credentials: "same-origin",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ text: text, targetLang: document.getElementById("ralphTranslateTargetLang").value })
+                    body: JSON.stringify({ text: text, sourceLang: "auto", targetLang: document.getElementById("ralphTranslateTargetLang").value })
                 })
                     .then(function (res) {
                         if (!res.ok) return res.text().then(function (msg) { return Promise.reject(new Error(msg || "HTTP " + res.status)); });
                         return res.json();
                     })
                     .then(function (result) { resultBox.value = result.translated; })
-                    .catch(function (e) { resultBox.value = ""; alert("Traduction impossible : " + e.message); })
+                    .catch(function (e) {
+                        var message = e.message || "";
+                        try { var parsed = JSON.parse(message); message = parsed.message || message; } catch (ignore) {}
+                        resultBox.value = "";
+                        alert("Traduction impossible : " + message);
+                    })
                     .finally(function () { translateSubmitBtn.disabled = false; });
             });
         }
