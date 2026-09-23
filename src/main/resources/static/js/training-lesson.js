@@ -35,6 +35,11 @@
         document.getElementById('lessonMaxRateBadge').innerHTML =
             `<i class="bi bi-shield-lock"></i> Vitesse vidéo max : ${maxAllowedRate}x`;
 
+        document.getElementById('readerCrumb').textContent = ((lesson.formationTitle || 'Formation') + ' · LEÇON ' + ((lesson.orderIndex || 0) + 1)).toUpperCase();
+        document.getElementById('readerDuration').textContent = lesson.estimatedMinutes ? lesson.estimatedMinutes + ' min' : 'à votre rythme';
+        if (!lesson.videoUrl) document.getElementById('readerVideoHint').style.display = 'none';
+        loadLessonList();
+
         setupNavButtons();
         updateProgressUi(lesson.scrollPercent || 0, lesson.videoWatchedPercent || 0, !!lesson.completed);
 
@@ -43,6 +48,26 @@
         }
 
         setupScrollTracking();
+    }
+
+    // Liste des leçons du parcours (colonne de gauche, modèle EduFun) — coche verte = terminée.
+    async function loadLessonList() {
+        const box = document.getElementById('readerLessons');
+        if (!lesson.formationId) { box.innerHTML = ''; return; }
+        try {
+            const lessons = await RccApi.getJson(`/api/training/formations/${lesson.formationId}/lessons`);
+            const done = lessons.filter(l => l.completed).length;
+            document.getElementById('readerFormationTitle').textContent = lesson.formationTitle || 'Ce parcours';
+            document.getElementById('readerFormationCount').textContent = `${done} / ${lessons.length} leçon(s) terminée(s)`;
+            document.getElementById('readerFormationBar').style.width = (lessons.length ? Math.round(done * 100 / lessons.length) : 0) + '%';
+            box.innerHTML = lessons.map((l, i) =>
+                `<a class="ef-reader-lesson${l.lessonId === lessonId ? ' active' : ''}" href="/training/lesson/${l.lessonId}">` +
+                `<span class="num">${String(i + 1).padStart(2, '0')}</span>` +
+                `<span><b>${RccApi.escapeHtml(l.title)}</b><small>${[l.estimatedMinutes ? l.estimatedMinutes + ' min' : '', l.videoUrl ? 'vidéo' : ''].filter(Boolean).join(' · ')}</small></span>` +
+                (l.completed ? '<i class="bi bi-check-circle-fill done"></i>' : '') + `</a>`).join('');
+        } catch (e) {
+            box.innerHTML = '<span class="ef-muted small">Liste indisponible.</span>';
+        }
     }
 
     function setupNavButtons() {
@@ -180,7 +205,10 @@
         document.getElementById('lessonPercentBadge').textContent = overall + '%';
         const banner = document.getElementById('lessonCompleteBanner');
         if (completed) {
+            if (!banner.classList.contains('show') && lesson && lesson.__wasIncomplete) loadLessonList();
             banner.classList.add('show');
+        } else if (lesson) {
+            lesson.__wasIncomplete = true;
         }
     }
 

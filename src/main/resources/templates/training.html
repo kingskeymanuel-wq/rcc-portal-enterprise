@@ -1,119 +1,225 @@
 <!DOCTYPE html>
 <html lang="fr" xmlns:th="http://www.thymeleaf.org">
-
 <head>
-
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
     <title>RCC Portal Enterprise — Formation</title>
-
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
           rel="stylesheet">
-
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
           rel="stylesheet">
-
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
-
+    <link rel="stylesheet" th:href="@{/css/formation.css}">
 </head>
-
 <body>
-
 <div class="layout">
-
     <div th:replace="~{fragments/sidebar :: sidebar}"></div>
-
     <div class="content">
-
         <div th:replace="~{fragments/header :: header}"></div>
-
         <main id="page-content">
+            <div class="container-fluid ef-page">
 
-            <div class="container-fluid">
-
-                <div class="welcome-banner">
+                <!-- ===================== EN-TÊTE + BARRE PERSONNELLE (modèle EduFun) ===================== -->
+                <div class="ef-top">
                     <div>
+                        <span class="ef-muted">RCC Portal • Centre de formation</span>
                         <h2>Formation</h2>
-                        <p class="text-muted">Parcours, évaluations et auto-diagnostics</p>
                     </div>
+                    <div class="ef-personal">
+                        <div class="ef-avatar" id="efAvatar">👤</div>
+                        <div class="ef-personal-copy">
+                            <b id="efName">Mon espace</b>
+                            <small id="efLevel">—</small>
+                        </div>
+                        <span class="ef-pill" id="efXpPill"><i class="bi bi-lightning-charge-fill"></i> 0 XP</span>
+                    </div>
+                </div>
+
+                <!-- Navigation des espaces (équivalent de la barre latérale EduFun) -->
+                <nav class="ef-tabs" id="efTabs" role="tablist">
+                    <button type="button" class="active" data-ef-tab="dashboard"><i class="bi bi-house-door"></i> Tableau de bord</button>
+                    <button type="button" data-ef-tab="parcours"><i class="bi bi-journal-bookmark"></i> Mon parcours</button>
+                    <button type="button" data-ef-tab="quiz"><i class="bi bi-lightning-charge"></i> Quiz &amp; défis</button>
+                    <button type="button" data-ef-tab="agenda"><i class="bi bi-calendar-week"></i> Formations programmées</button>
+                    <button type="button" data-ef-tab="certificats"><i class="bi bi-patch-check"></i> Certificats</button>
+                    <button type="button" class="qa-only ef-tab-qa" data-ef-tab="qa" style="display:none;"><i class="bi bi-shield-check"></i> Espace QA <span class="ef-tab-count" id="efQaPendingCount" style="display:none;">0</span></button>
+                </nav>
+
+                <!-- Lecteur de cours (agent) — commun à tous les espaces, s'ouvre au-dessus -->
+                <div class="ef-card ef-player mb-4" id="coursePlayerCard" style="display:none;">
+                    <div class="ef-player-head">
+                        <span class="ef-eyebrow">COURS INTERACTIF</span>
+                        <div class="ef-player-title" id="coursePlayerTitle"></div>
+                    </div>
+                    <div class="ef-player-body" id="coursePlayerBody"></div>
                 </div>
 
                 <!-- ===================== TABLEAU DE BORD ===================== -->
-                <div class="card dashboard-card shadow-sm mb-4 text-white position-relative" id="formationBanner" style="background:linear-gradient(120deg,#0057B8,#003E8A);border:none;overflow:hidden;">
-                    <div id="formationBannerImageLayer" style="position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;"></div>
-                    <div class="card-body py-4 position-relative">
-                        <p class="mb-1 opacity-75">Bienvenue sur votre espace</p>
-                        <h2 class="fw-bold mb-2" id="formationBannerTitle">Centre de Formation</h2>
-                        <p class="mb-0 opacity-75" id="formationBannerSubtitle">Développez vos compétences avec nos modules interactifs et évaluations.</p>
-                    </div>
-                </div>
+                <section class="ef-pane active" data-ef-pane="dashboard">
+                    <!-- Hero -->
+                    <section class="ef-hero" id="formationBanner">
+                        <div id="formationBannerImageLayer" class="ef-hero-layer"></div>
+                        <div class="ef-hero-copy">
+                            <span class="ef-pill ef-pill-light">🚀 Ton parcours personnalisé</span>
+                            <h1 id="formationBannerTitle">Apprendre devient une aventure.</h1>
+                            <p id="formationBannerSubtitle">Des cours adaptés à ton équipe, des quiz, des défis, des parcours programmés et des certificats validés par la Quality Assurance.</p>
+                            <div class="ef-level" aria-label="Progression de niveau">
+                                <div class="ef-level-head"><span id="efLevelName">Niveau —</span><span id="efLevelNext">—</span></div>
+                                <div class="ef-level-track"><i id="efLevelBar" style="width:0%"></i></div>
+                            </div>
+                            <div class="ef-actions">
+                                <button type="button" class="ef-btn ef-btn-light" data-ef-go="parcours"><i class="bi bi-book"></i> Explorer mes cours</button>
+                                <button type="button" class="ef-btn ef-btn-ghost" data-ef-go="quiz"><i class="bi bi-controller"></i> Relever un défi</button>
+                            </div>
+                        </div>
+                        <img th:src="@{/images/formation/advisor-main.jpg}" alt="Conseillers en formation" class="ef-hero-img">
+                    </section>
 
-                <div class="row g-3 mb-4">
-                    <div class="col-6 col-lg-3">
-                        <div class="card dashboard-card shadow-sm h-100">
-                            <div class="card-body text-center">
-                                <i class="bi bi-check2-square fs-3 text-primary"></i>
-                                <div class="fs-4 fw-bold mt-2" id="statModulesCompleted">0/0</div>
-                                <div class="text-muted small">Modules complétés</div>
-                            </div>
-                        </div>
+                    <div class="ef-grid-4">
+                        <div class="ef-card ef-stat"><span class="ef-iconbox" style="background:#eaf2ff;color:#0057B8;"><i class="bi bi-journal-check"></i></span>Mes leçons terminées<strong id="efKpiLessons">0</strong></div>
+                        <div class="ef-card ef-stat"><span class="ef-iconbox" style="background:#fff4e0;color:#c77700;"><i class="bi bi-lightning-charge-fill"></i></span>Mon XP gagné<strong id="efKpiXp">0</strong></div>
+                        <div class="ef-card ef-stat"><span class="ef-iconbox" style="background:#e6f7ec;color:#0a8a3e;"><i class="bi bi-trophy-fill"></i></span>Quiz réussis<strong id="efKpiQuiz">0</strong></div>
+                        <div class="ef-card ef-stat"><span class="ef-iconbox" style="background:#f3eaff;color:#7b2ff7;"><i class="bi bi-award-fill"></i></span>Badges obtenus<strong id="efKpiBadges">0</strong></div>
                     </div>
-                    <div class="col-6 col-lg-3">
-                        <div class="card dashboard-card shadow-sm h-100">
-                            <div class="card-body text-center">
-                                <i class="bi bi-trophy fs-3 text-success"></i>
-                                <div class="fs-4 fw-bold mt-2" id="statAvgScore">0%</div>
-                                <div class="text-muted small">Score moyen</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-lg-3">
-                        <div class="card dashboard-card shadow-sm h-100">
-                            <div class="card-body text-center">
-                                <i class="bi bi-clock-history fs-3 text-warning"></i>
-                                <div class="fs-4 fw-bold mt-2" id="statAttempts">0</div>
-                                <div class="text-muted small">Tentatives effectuées</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-lg-3">
-                        <div class="card dashboard-card shadow-sm h-100">
-                            <div class="card-body text-center">
-                                <i class="bi bi-award fs-3" style="color:#7b2ff7;"></i>
-                                <div class="fs-4 fw-bold mt-2" id="statBadges">0</div>
-                                <div class="text-muted small">Modules réussis</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
-                <div class="card dashboard-card shadow-sm mb-4">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between mb-1">
-                            <strong>Progression globale</strong>
-                            <strong id="progressLabel">0%</strong>
+                    <div class="row g-4">
+                        <div class="col-xl-8">
+                            <div class="ef-card mb-4">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <strong>Progression globale de mes modules</strong>
+                                    <strong id="progressLabel">0%</strong>
+                                </div>
+                                <div class="ef-progress"><i id="progressBar" style="width:0%;"></i></div>
+                                <div class="ef-mini-stats">
+                                    <span><b id="statModulesCompleted">0/0</b> modules complétés</span>
+                                    <span><b id="statAvgScore">0%</b> score moyen</span>
+                                    <span><b id="statAttempts">0</b> tentatives</span>
+                                    <span><b id="statBadges">0</b> modules réussis</span>
+                                    <span><i class="bi bi-fire text-danger"></i> <b id="efStreak">0</b> jour(s) d'affilée</span>
+                                </div>
+                            </div>
+
+                            <div class="ef-section-head">
+                                <h3>À découvrir maintenant</h3>
+                                <button type="button" class="ef-btn ef-btn-soft" data-ef-go="parcours">Tout voir <i class="bi bi-arrow-right"></i></button>
+                            </div>
+                            <div class="row g-3 mb-4" id="quickAccessModules"></div>
                         </div>
-                        <div class="progress" style="height:10px;">
-                            <div class="progress-bar" id="progressBar" style="width:0%;"></div>
+
+                        <div class="col-xl-4">
+                            <div class="ef-card mb-4">
+                                <div class="ef-card-title"><i class="bi bi-award"></i> Mes badges</div>
+                                <div class="ef-badges" id="efBadges"><p class="ef-muted small mb-0">Chargement…</p></div>
+                            </div>
+                            <div class="ef-card mb-4">
+                                <div class="ef-card-title"><i class="bi bi-bar-chart-steps"></i> Classement de mon équipe <span class="ef-muted small fw-normal" id="efTeamLabel"></span></div>
+                                <ol class="ef-leaderboard" id="efLeaderboard"><li class="ef-muted small">Chargement…</li></ol>
+                            </div>
+                            <div class="ef-card ef-rules">
+                                <div class="ef-card-title"><i class="bi bi-info-circle"></i> Comment gagner de l'XP ?</div>
+                                <ul>
+                                    <li><span>Leçon terminée</span><b>+20 XP</b></li>
+                                    <li><span>Auto-diagnostic réalisé</span><b>+30 XP</b></li>
+                                    <li><span>Évaluation réussie (≥ 70 %)</span><b>+50 XP</b></li>
+                                    <li><span>Bonus sans faute (100 %)</span><b>+20 XP</b></li>
+                                    <li><span>Évaluation tentée</span><b>+10 XP</b></li>
+                                    <li><span>Certificat validé par QA</span><b>+100 XP</b></li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <h6 class="mb-3">Accès rapide aux modules</h6>
-                <div class="row g-3 mb-4" id="quickAccessModules"></div>
+                <!-- ===================== MON PARCOURS (programme par thématique) ===================== -->
+                <section class="ef-pane" data-ef-pane="parcours">
+                    <div class="ef-hero ef-hero-small">
+                        <div class="ef-hero-copy">
+                            <span class="ef-eyebrow">PARCOURS PERSONNALISÉ</span>
+                            <h1>Apprendre, pratiquer, réussir.</h1>
+                            <p>Choisis une thématique : chaque module contient le contenu, la vidéo et son évaluation. Seuls les cours publiés par la Quality Assurance apparaissent ici.</p>
+                        </div>
+                        <img th:src="@{/images/formation/pexels-3184465.jpg}" alt="" class="ef-hero-img">
+                    </div>
+
+                    <div class="ef-card mb-4" id="courseCategoriesCard">
+                        <div class="ef-section-head mt-0">
+                            <div>
+                                <h3>Mes cours — par thématique</h3>
+                                <p class="ef-muted mb-0">Le programme s'adapte à ton équipe.</p>
+                            </div>
+                        </div>
+                        <div class="row g-3" id="courseCategoryGrid">
+                            <div class="col-12 text-center ef-muted">Chargement…</div>
+                        </div>
+                    </div>
+
+                    <div class="ef-card mb-4" id="courseCategoryDetailCard" style="display:none;">
+                        <div class="ef-section-head mt-0 flex-wrap gap-2">
+                            <h3 id="courseCategoryDetailTitle"></h3>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <a href="#" class="ef-btn ef-btn-success" id="launchEvaluationBtn" style="display:none;" target="_blank">
+                                    <i class="bi bi-controller"></i> Lancer l'évaluation
+                                </a>
+                                <button class="ef-btn ef-btn-primary qa-only" id="addCourseToCategoryBtn" style="display:none;">
+                                    <i class="bi bi-plus-lg"></i> Ajouter un cours à cette rubrique
+                                </button>
+                                <button class="ef-btn ef-btn-soft" id="courseCategoryBackBtn"><i class="bi bi-arrow-left"></i> Retour aux thématiques</button>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover ef-table align-middle mb-0">
+                                <thead>
+                                <tr><th>Titre</th><th>Type</th><th>Obligatoire</th><th>Statut</th><th></th></tr>
+                                </thead>
+                                <tbody id="myCoursesTable">
+                                <tr><td colspan="5" class="text-muted text-center">Chargement...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ===================== QUIZ & DÉFIS ===================== -->
+                <section class="ef-pane" data-ef-pane="quiz">
+                    <div class="ef-hero ef-hero-small ef-hero-quiz">
+                        <div class="ef-hero-copy">
+                            <span class="ef-eyebrow">DÉFI DU JOUR</span>
+                            <h1>Teste tes connaissances.</h1>
+                            <p>Réponds aux évaluations publiées par la QA, reçois ton résultat immédiatement et gagne de l'XP. Deux tentatives par évaluation, réussite à 70 %.</p>
+                        </div>
+                        <img th:src="@{/images/formation/pexels-5926382.jpg}" alt="" class="ef-hero-img">
+                    </div>
+                    <div class="ef-card">
+                        <div class="ef-section-head mt-0">
+                            <div>
+                                <h3>Quiz disponibles</h3>
+                                <p class="ef-muted mb-0">Les quiz sont créés et publiés par la Quality Assurance.</p>
+                            </div>
+                            <div class="ef-filter" id="efQuizFilter">
+                                <button type="button" class="active" data-filter="all">Tous</button>
+                                <button type="button" data-filter="todo">À faire</button>
+                                <button type="button" data-filter="passed">Réussis</button>
+                                <button type="button" data-filter="retry">À repasser</button>
+                            </div>
+                        </div>
+                        <div class="row g-3" id="efQuizGrid"><div class="col-12 ef-empty">Chargement…</div></div>
+                    </div>
+                </section>
 
                 <!-- ===================== FORMATIONS PROGRAMMÉES (jour/semaine/mois) ===================== -->
-                <div class="card dashboard-card shadow-sm mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <span><i class="bi bi-calendar-week"></i> Formations programmées</span>
-                        <div class="btn-group btn-group-sm" role="group" id="scheduleViewToggle">
-                            <button type="button" class="btn btn-outline-primary active" data-view="day">Jour</button>
-                            <button type="button" class="btn btn-outline-primary" data-view="week">Semaine</button>
-                            <button type="button" class="btn btn-outline-primary" data-view="month">Mois</button>
+                <section class="ef-pane" data-ef-pane="agenda">
+                    <div class="ef-card mb-4">
+                        <div class="ef-section-head mt-0 flex-wrap gap-2">
+                            <div>
+                                <h3><i class="bi bi-calendar-week"></i> Formations programmées</h3>
+                                <p class="ef-muted mb-0">Chaque leçon s'ouvre dans le lecteur : lecture complète et vidéo suivie jusqu'au bout.</p>
+                            </div>
+                            <div class="btn-group btn-group-sm" role="group" id="scheduleViewToggle">
+                                <button type="button" class="btn btn-outline-primary active" data-view="day">Jour</button>
+                                <button type="button" class="btn btn-outline-primary" data-view="week">Semaine</button>
+                                <button type="button" class="btn btn-outline-primary" data-view="month">Mois</button>
+                            </div>
                         </div>
-                    </div>
-                    <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <button class="btn btn-sm btn-outline-secondary" id="scheduleNavPrev"><i class="bi bi-chevron-left"></i></button>
                             <strong id="scheduleRangeLabel">—</strong>
@@ -123,81 +229,113 @@
                             <p class="text-muted text-center mb-0">Chargement des formations programmées…</p>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <!-- ===================== ESPACE AGENT ===================== -->
-                <div class="card dashboard-card shadow-sm mb-4" id="courseCategoriesCard">
-                    <div class="card-header">Mes cours — par thématique</div>
-                    <div class="card-body">
-                        <div class="row g-3" id="courseCategoryGrid">
-                            <div class="col-12 text-center text-muted">Chargement…</div>
+                <!-- ===================== CERTIFICATS ===================== -->
+                <section class="ef-pane" data-ef-pane="certificats">
+                    <div class="row g-4">
+                        <div class="col-lg-8">
+                            <div class="ef-card mb-4">
+                                <div class="ef-section-head mt-0">
+                                    <div>
+                                        <h3>Mes certificats</h3>
+                                        <p class="ef-muted mb-0">Délivrés après validation de la Quality Assurance, vérifiables par leur numéro.</p>
+                                    </div>
+                                    <span class="ef-pill"><i class="bi bi-patch-check-fill"></i> Vérifiables en ligne</span>
+                                </div>
+                                <div class="row g-3" id="efCertList"><div class="col-12 ef-empty">Chargement…</div></div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="ef-card mb-4">
+                                <div class="ef-card-title"><i class="bi bi-hourglass-split"></i> Prêts à être demandés</div>
+                                <div id="efEligible"><p class="ef-muted small mb-0">Chargement…</p></div>
+                            </div>
+                            <div class="ef-card">
+                                <div class="ef-card-title"><i class="bi bi-search"></i> Vérifier un certificat</div>
+                                <form id="efVerifyForm" class="d-flex gap-2">
+                                    <input class="form-control form-control-sm" id="efVerifyInput" placeholder="RCC-2026-XXXXXX" required>
+                                    <button class="ef-btn ef-btn-primary" type="submit">Vérifier</button>
+                                </form>
+                                <div id="efVerifyResult" class="mt-2 small"></div>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <div class="card dashboard-card shadow-sm mb-4" id="courseCategoryDetailCard" style="display:none;">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span id="courseCategoryDetailTitle"></span>
-                        <div class="d-flex gap-2">
-                            <a href="#" class="btn btn-sm btn-success" id="launchEvaluationBtn" style="display:none;" target="_blank">
-                                <i class="bi bi-controller"></i> Lancer l'évaluation
-                            </a>
-                            <button class="btn btn-sm btn-primary qa-only" id="addCourseToCategoryBtn" style="display:none;">
-                                <i class="bi bi-plus-lg"></i> Ajouter un cours à cette rubrique
-                            </button>
-                            <button class="btn btn-sm btn-outline-secondary" id="courseCategoryBackBtn"><i class="bi bi-arrow-left"></i> Retour aux rubriques</button>
+                <!-- ===================== ESPACE QA (contrôle & synchronisation) ===================== -->
+                <section class="ef-pane qa-only" data-ef-pane="qa" style="display:none;">
+                    <div class="ef-sync-bar">
+                        <span class="ef-sync-dot"></span>
+                        <span>Suivi synchronisé en direct avec l'activité des agents — <b id="efSyncLabel">connexion…</b></span>
+                        <select class="form-select form-select-sm ms-auto" id="efQaTeam" style="max-width:220px;">
+                            <option value="">Toutes les équipes</option>
+                        </select>
+                        <button type="button" class="ef-btn ef-btn-soft" id="efQaRefresh"><i class="bi bi-arrow-repeat"></i> Actualiser</button>
+                    </div>
+
+                    <div class="ef-grid-4">
+                        <div class="ef-card ef-stat"><span class="ef-iconbox" style="background:#fff4e0;color:#c77700;"><i class="bi bi-patch-question"></i></span>Certificats à valider<strong id="efQaPending">0</strong></div>
+                        <div class="ef-card ef-stat"><span class="ef-iconbox" style="background:#f2f4f7;color:#6b7684;"><i class="bi bi-pencil-square"></i></span>Cours en brouillon<strong id="efQaDraft">0</strong></div>
+                        <div class="ef-card ef-stat"><span class="ef-iconbox" style="background:#e6f7ec;color:#0a8a3e;"><i class="bi bi-people"></i></span>Apprenants actifs aujourd'hui<strong id="efQaActive">0</strong></div>
+                        <div class="ef-card ef-stat"><span class="ef-iconbox" style="background:#eaf2ff;color:#0057B8;"><i class="bi bi-graph-up-arrow"></i></span>7 derniers jours<strong id="efQaWeek">0</strong><small class="ef-muted" id="efQaWeekDetail"></small></div>
+                    </div>
+
+                    <div class="row g-4 mb-4">
+                        <div class="col-xl-7">
+                            <div class="ef-card h-100">
+                                <div class="ef-card-title"><i class="bi bi-patch-check"></i> Demandes de certificat
+                                    <select class="form-select form-select-sm ms-auto" id="efCertStatusFilter" style="max-width:170px;">
+                                        <option value="PENDING">En attente</option>
+                                        <option value="ISSUED">Validés</option>
+                                        <option value="REJECTED">Refusés</option>
+                                        <option value="REVOKED">Révoqués</option>
+                                        <option value="">Tous</option>
+                                    </select>
+                                </div>
+                                <div id="efQaCertificates"><p class="ef-muted small mb-0">Chargement…</p></div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="card-body">
-                        <table class="table table-hover">
-                            <thead>
-                            <tr><th>Titre</th><th>Type</th><th>Obligatoire</th><th>Statut</th><th></th></tr>
-                            </thead>
-                            <tbody id="myCoursesTable">
-                            <tr><td colspan="5" class="text-muted text-center">Chargement...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Lecteur de cours (agent) -->
-                <div class="card dashboard-card shadow-sm mb-4" id="coursePlayerCard" style="display:none;">
-                    <div class="card-header" id="coursePlayerTitle"></div>
-                    <div class="card-body" id="coursePlayerBody"></div>
-                </div>
-
-                <!-- ===================== ESPACE QA/ADMIN ===================== -->
-                <div class="row g-4 qa-only" style="display:none;">
-
-                    <div class="col-lg-6">
-                        <div class="card dashboard-card shadow-sm">
-                            <div class="card-header"><i class="bi bi-graph-up"></i> Suivi du parcours (A à Z)</div>
-                            <div class="card-body">
-                                <select class="form-select mb-3" id="schedStatsFormationSelect"></select>
-
-                                <h6 class="small text-muted mb-2">Par équipe</h6>
-                                <table class="table table-sm table-hover mb-3">
-                                    <thead><tr><th>Équipe</th><th>Agents</th><th>Terminés</th><th>Non commencés</th><th>Moyenne</th></tr></thead>
-                                    <tbody id="schedTeamStatsTable">
-                                    <tr><td colspan="5" class="text-muted text-center">Choisissez une formation programmée.</td></tr>
-                                    </tbody>
-                                </table>
-
-                                <h6 class="small text-muted mb-2">Par agent</h6>
-                                <table class="table table-sm table-hover">
-                                    <thead><tr><th>Agent</th><th>Équipe</th><th>Leçons</th><th>Parcours</th><th>Statut</th></tr></thead>
-                                    <tbody id="schedAgentStatsTable">
-                                    <tr><td colspan="5" class="text-muted text-center">—</td></tr>
-                                    </tbody>
-                                </table>
+                        <div class="col-xl-5">
+                            <div class="ef-card h-100">
+                                <div class="ef-card-title"><i class="bi bi-activity"></i> Activité en direct</div>
+                                <ul class="ef-feed" id="efQaFeed"><li class="ef-muted small">Chargement…</li></ul>
                             </div>
                         </div>
                     </div>
 
-                    <div class="col-lg-6">
-                        <div class="card dashboard-card shadow-sm">
-                            <div class="card-header">Créer un cours</div>
-                            <div class="card-body">
+                    <div class="row g-4 mb-4">
+                        <div class="col-xl-8">
+                            <div class="ef-card h-100">
+                                <div class="ef-card-title"><i class="bi bi-megaphone"></i> Publication des cours
+                                    <span class="ef-muted small fw-normal ms-2">Un cours n'est visible des agents qu'une fois publié.</span>
+                                </div>
+                                <div class="ef-filter mb-2" id="efPubFilter">
+                                    <button type="button" class="active" data-filter="">Tous</button>
+                                    <button type="button" data-filter="DRAFT">Brouillons</button>
+                                    <button type="button" data-filter="PUBLISHED">Publiés</button>
+                                    <button type="button" data-filter="ARCHIVED">Archivés</button>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table ef-table align-middle mb-0">
+                                        <thead><tr><th>Cours</th><th>Type</th><th>Équipe</th><th>Questions</th><th>Statut</th><th class="text-end">Action</th></tr></thead>
+                                        <tbody id="efPubTable"><tr><td colspan="6" class="text-muted text-center">Chargement…</td></tr></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-4">
+                            <div class="ef-card h-100">
+                                <div class="ef-card-title"><i class="bi bi-trophy"></i> Classement des apprenants</div>
+                                <ol class="ef-leaderboard" id="efQaLeaderboard"><li class="ef-muted small">Chargement…</li></ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-4">
+                        <div class="col-lg-6">
+                            <div class="ef-card mb-4">
+                                <div class="ef-card-title"><i class="bi bi-plus-circle"></i> Créer un cours</div>
                                 <div class="alert alert-primary py-2 px-3 small mb-2" id="createCourseCategoryHint" style="display:none;"></div>
                                 <input type="text" class="form-control mb-2" id="newCourseTitle" placeholder="Titre">
                                 <textarea class="form-control mb-2" id="newCourseDescription" rows="2" placeholder="Description courte"></textarea>
@@ -219,15 +357,13 @@
                                     <input class="form-check-input" type="checkbox" id="newCourseMandatory">
                                     <label class="form-check-label" for="newCourseMandatory">Obligatoire</label>
                                 </div>
-                                <button class="btn btn-primary w-100" id="createCourseBtn">Créer le cours</button>
+                                <p class="small ef-muted mb-2"><i class="bi bi-info-circle"></i> Le cours est créé en <b>brouillon</b> : publiez-le dans « Publication des cours » quand il est prêt.</p>
+                                <button class="ef-btn ef-btn-primary w-100" id="createCourseBtn">Créer le cours</button>
                             </div>
-                        </div>
 
-                        <!-- Questions de l'évaluation — visible uniquement après la création d'un
-                             cours "Évaluation notée" (STANDARD), s'appuie directement dessus. -->
-                        <div class="card dashboard-card shadow-sm mt-3" id="courseQuestionsCard" style="display:none;">
-                            <div class="card-header">Questions de l'évaluation — <span id="courseQuestionsForTitle"></span></div>
-                            <div class="card-body">
+                            <!-- Questions de l'évaluation — visible après la création d'un cours "Évaluation notée". -->
+                            <div class="ef-card mb-4" id="courseQuestionsCard" style="display:none;">
+                                <div class="ef-card-title">Questions de l'évaluation — <span id="courseQuestionsForTitle"></span></div>
                                 <div id="courseQuestionsList" class="mb-3"></div>
                                 <input type="text" class="form-control mb-2" id="newQuestionText" placeholder="Intitulé de la question">
                                 <div id="newQuestionOptions">
@@ -251,39 +387,99 @@
                                 <button class="btn btn-outline-primary w-100 mb-2" id="addCourseQuestionBtn">Ajouter la question</button>
                                 <button class="btn btn-link w-100" id="doneCourseQuestionsBtn">Terminer — fermer cette évaluation</button>
                             </div>
-                        </div>
-                    </div>
 
-                    <div class="col-lg-6">
-                        <div class="card dashboard-card shadow-sm">
-                            <div class="card-header">Résultats des agents</div>
-                            <div class="card-body">
+                            <div class="ef-card mb-4">
+                                <div class="ef-card-title"><i class="bi bi-clipboard-data"></i> Résultats des agents</div>
                                 <div class="d-flex gap-2 mb-3">
                                     <select class="form-select" id="resultsCourseSelect"></select>
                                     <select class="form-select" id="resultsTeamSelect" style="max-width:220px;">
                                         <option value="">Toutes les équipes</option>
                                     </select>
                                 </div>
-                                <table class="table table-hover">
-                                    <thead>
-                                    <tr><th>Agent</th><th>Statut</th><th>Score</th><th>Terminé le</th></tr>
-                                    </thead>
-                                    <tbody id="resultsTable">
-                                    <tr><td colspan="4" class="text-muted text-center">Choisissez un cours.</td></tr>
-                                    </tbody>
-                                </table>
+                                <div class="table-responsive">
+                                    <table class="table table-hover ef-table mb-0">
+                                        <thead><tr><th>Agent</th><th>Statut</th><th>Score</th><th>Terminé le</th></tr></thead>
+                                        <tbody id="resultsTable">
+                                        <tr><td colspan="4" class="text-muted text-center">Choisissez un cours.</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-6">
+                            <div class="ef-card mb-4">
+                                <div class="ef-card-title"><i class="bi bi-calendar-plus"></i> Programmer une formation</div>
+                                <input type="text" class="form-control mb-2" id="schedTitle" placeholder="Titre de la formation">
+                                <textarea class="form-control mb-2" id="schedDescription" rows="2" placeholder="Objectif / description"></textarea>
+                                <input type="text" class="form-control mb-2" id="schedCategory" placeholder="Thématique (optionnel)">
+                                <div class="row g-2 mb-2">
+                                    <div class="col-6"><label class="form-label small mb-1">Date</label><input type="date" class="form-control" id="schedDate"></div>
+                                    <div class="col-6"><label class="form-label small mb-1">Heure</label><input type="time" class="form-control" id="schedTime"></div>
+                                </div>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-6">
+                                        <label class="form-label small mb-1">Récurrence</label>
+                                        <select class="form-select" id="schedRecurrence">
+                                            <option value="NONE">Aucune</option>
+                                            <option value="DAILY">Chaque jour</option>
+                                            <option value="WEEKLY">Chaque semaine</option>
+                                            <option value="MONTHLY">Chaque mois</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small mb-1">Équipe cible</label>
+                                        <select class="form-select" id="schedTeam"><option value="">Toutes les équipes</option></select>
+                                    </div>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="schedMandatory" checked>
+                                    <label class="form-check-label" for="schedMandatory">Obligatoire</label>
+                                </div>
+                                <button class="ef-btn ef-btn-primary w-100" id="createScheduleBtn">Programmer</button>
+                            </div>
+
+                            <div class="ef-card mb-4">
+                                <div class="ef-card-title"><i class="bi bi-list-ol"></i> Leçons du parcours</div>
+                                <select class="form-select mb-2" id="schedFormationSelect"></select>
+                                <div id="schedLessonsList" class="d-flex flex-column gap-2 mb-3">
+                                    <p class="text-muted small mb-0">Sélectionnez une formation ci-dessus.</p>
+                                </div>
+                                <input type="text" class="form-control mb-2" id="schedLessonTitle" placeholder="Titre de la leçon">
+                                <textarea class="form-control mb-2" id="schedLessonContent" rows="4" placeholder="Contenu (HTML accepté : titres, listes, paragraphes…)"></textarea>
+                                <input type="text" class="form-control mb-2" id="schedLessonVideoUrl" placeholder="Lien vidéo MP4 (optionnel)">
+                                <button class="btn btn-outline-primary w-100" id="addScheduleLessonBtn">Ajouter la leçon</button>
+                            </div>
+
+                            <div class="ef-card mb-4">
+                                <div class="ef-card-title"><i class="bi bi-graph-up"></i> Suivi du parcours (A à Z)</div>
+                                <select class="form-select mb-3" id="schedStatsFormationSelect"></select>
+                                <h6 class="small text-muted mb-2">Par équipe</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover ef-table mb-3">
+                                        <thead><tr><th>Équipe</th><th>Agents</th><th>Terminés</th><th>Non commencés</th><th>Moyenne</th></tr></thead>
+                                        <tbody id="schedTeamStatsTable">
+                                        <tr><td colspan="5" class="text-muted text-center">Choisissez une formation programmée.</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <h6 class="small text-muted mb-2">Par agent</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover ef-table mb-0">
+                                        <thead><tr><th>Agent</th><th>Équipe</th><th>Leçons</th><th>Parcours</th><th>Statut</th></tr></thead>
+                                        <tbody id="schedAgentStatsTable">
+                                        <tr><td colspan="5" class="text-muted text-center">—</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
-
-                </div>
+                </section>
 
             </div>
-
         </main>
-
     </div>
-
 </div>
 
 <!-- Modale de lecture vidéo, intégrée au site (pas d'ouverture externe) -->
@@ -299,6 +495,21 @@
     </div>
 </div>
 
+<!-- Certificat (aperçu imprimable) -->
+<div class="modal fade" id="efCertModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body p-3" id="efCertModalBody"></div>
+            <div class="modal-footer py-2 ef-no-print">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-primary" id="efCertPrint"><i class="bi bi-printer"></i> Imprimer / PDF</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="ef-toast" id="efToast"></div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script th:src="@{/js/preferences.js}"></script>
 <script th:src="@{/js/rcc-api.js}"></script>
@@ -306,6 +517,6 @@
 <script th:src="@{/js/session.js}"></script>
 <script th:src="@{/js/training.js}"></script>
 <script th:src="@{/js/training-schedule.js}"></script>
-
+<script th:src="@{/js/formation.js}"></script>
 </body>
 </html>

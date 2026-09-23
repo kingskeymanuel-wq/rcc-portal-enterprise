@@ -70,4 +70,18 @@ public class Course extends Auditable {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "CreatedByUserId")
     private User createdBy;
+
+    /**
+     * Contrôle QA de la publication : DRAFT (préparé, invisible des agents), PUBLISHED (visible),
+     * ARCHIVED (retiré). Les cours existants avant ce champ sont PUBLISHED (DEFAULT SQL).
+     */
+    @Builder.Default
+    @Column(name = "PublicationStatus", length = 20)
+    private String publicationStatus = "PUBLISHED";
+
+    @Column(name = "PublishedAt")
+    private java.time.LocalDateTime publishedAt;
+
+    @Column(name = "PublishedBy", length = 150)
+    private String publishedBy;
 }

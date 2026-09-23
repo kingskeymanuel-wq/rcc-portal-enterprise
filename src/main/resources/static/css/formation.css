@@ -1,0 +1,235 @@
+/*
+ * Espace Formation — reprend le modèle visuel EduFun (hero dégradé + photo, barre personnelle
+ * XP/niveau, cartes arrondies, onglets en pilules, cartes de cours illustrées, lecteur
+ * « cours interactif », certificats) aux couleurs Ecobank.
+ */
+:root {
+    --ef-ink: #172033;
+    --ef-muted: #718096;
+    --ef-line: #e7ebf3;
+    --ef-card: #fff;
+    --ef-brand: #0057B8;
+    --ef-brand-2: #2f7de1;
+    --ef-deep: #0d1b3e;
+    --ef-green: #00A651;
+    --ef-orange: #f59f00;
+    --ef-red: #e45d6a;
+    --ef-soft: #eaf2ff;
+    --ef-shadow: 0 16px 45px rgba(30, 41, 80, .08);
+}
+
+.ef-page { padding-bottom: 3rem; }
+.ef-muted { color: var(--ef-muted); }
+
+/* ---------- En-tête + barre personnelle ---------- */
+.ef-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin: .25rem 0 1.25rem; }
+.ef-top h2 { margin: 2px 0 0; font-weight: 800; color: var(--ef-ink); }
+.ef-personal { display: flex; align-items: center; gap: .65rem; background: #fff; border: 1px solid var(--ef-line); border-radius: 999px; padding: .35rem .45rem .35rem .4rem; box-shadow: 0 6px 20px rgba(30, 41, 80, .05); }
+.ef-avatar { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, var(--ef-brand), var(--ef-green)); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: .9rem; }
+.ef-personal-copy { display: grid; line-height: 1.15; }
+.ef-personal-copy b { font-size: .85rem; color: var(--ef-ink); }
+.ef-personal-copy small { color: var(--ef-muted); font-size: .72rem; }
+
+.ef-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--ef-soft); color: var(--ef-brand); border-radius: 999px; padding: 7px 12px; font-size: .75rem; font-weight: 800; white-space: nowrap; }
+.ef-pill-light { background: rgba(255, 255, 255, .14); color: #fff; backdrop-filter: blur(4px); }
+.ef-pill-sm { padding: 3px 9px; font-size: .68rem; }
+.ef-eyebrow { display: inline-block; font: 800 .7rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .16em; color: #b9d3ff; }
+
+/* ---------- Hero ---------- */
+.ef-hero { position: relative; overflow: hidden; border-radius: 28px; padding: 2.4rem 2.6rem; min-height: 300px; background: linear-gradient(120deg, #0d1b3e, #0057B8 70%, #1f8f6b); color: #fff; display: flex; justify-content: space-between; align-items: center; gap: 2rem; box-shadow: var(--ef-shadow); margin-bottom: 1.4rem; }
+.ef-hero::after { content: ""; position: absolute; width: 330px; height: 330px; border-radius: 50%; background: rgba(255, 255, 255, .07); right: 30%; top: -140px; animation: efFloat 9s ease-in-out infinite; }
+.ef-hero::before { content: ""; position: absolute; width: 180px; height: 180px; border-radius: 50%; background: rgba(0, 166, 81, .18); left: -60px; bottom: -70px; animation: efFloat 11s ease-in-out infinite reverse; }
+.ef-hero-layer { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; pointer-events: none; }
+.ef-hero-copy { position: relative; z-index: 2; max-width: 640px; }
+.ef-hero h1 { font-weight: 800; font-size: clamp(1.8rem, 3.2vw, 2.7rem); line-height: 1.05; margin: .9rem 0 .7rem; }
+.ef-hero p { color: #d9e4f5; font-size: 1.02rem; margin-bottom: 1rem; }
+.ef-hero-img { position: relative; z-index: 2; width: 340px; height: 220px; object-fit: cover; border-radius: 20px; box-shadow: 0 20px 40px rgba(0, 0, 0, .25); flex-shrink: 0; }
+.ef-hero-small { min-height: 220px; padding: 1.9rem 2.2rem; }
+.ef-hero-small .ef-hero-img { width: 280px; height: 170px; }
+.ef-hero-quiz { background: linear-gradient(120deg, #1d1440, #5a3fc0 60%, #0057B8); }
+.ef-level { max-width: 460px; margin: .4rem 0 1.1rem; }
+.ef-level-head { display: flex; justify-content: space-between; font-size: .78rem; font-weight: 700; color: #e6eefc; margin-bottom: .3rem; }
+.ef-level-track { height: 9px; border-radius: 20px; background: rgba(255, 255, 255, .18); overflow: hidden; }
+.ef-level-track i { display: block; height: 100%; border-radius: 20px; background: linear-gradient(90deg, #7cd4ff, #3ee089); transition: width .8s cubic-bezier(.2, .8, .2, 1); }
+.ef-actions { display: flex; gap: .6rem; flex-wrap: wrap; }
+
+/* ---------- Boutons ---------- */
+.ef-btn { border: 0; border-radius: 12px; padding: .6rem 1rem; cursor: pointer; font-weight: 800; font-size: .85rem; display: inline-flex; align-items: center; justify-content: center; gap: .45rem; transition: transform .15s ease, box-shadow .15s ease, background .15s ease; text-decoration: none; }
+.ef-btn:hover { transform: translateY(-1px); }
+.ef-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+.ef-btn-primary { background: var(--ef-brand); color: #fff; box-shadow: 0 8px 18px rgba(0, 87, 184, .22); }
+.ef-btn-primary:hover { color: #fff; background: #004a9e; }
+.ef-btn-light { background: #fff; color: var(--ef-deep); }
+.ef-btn-ghost { background: rgba(255, 255, 255, .14); color: #fff; }
+.ef-btn-soft { background: var(--ef-soft); color: var(--ef-brand); }
+.ef-btn-success { background: #e4f7ef; color: #0b7a4b; }
+.ef-btn-danger { background: #ffe9ec; color: #b33e4c; }
+.ef-btn-sm { padding: .35rem .7rem; font-size: .75rem; border-radius: 10px; }
+
+/* ---------- Onglets (barre latérale EduFun → pilules) ---------- */
+.ef-tabs { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1.4rem; position: sticky; top: 0; z-index: 20; padding: .5rem 0; background: linear-gradient(#f4f6fa 70%, rgba(244, 246, 250, 0)); }
+.ef-tabs button { border: 1px solid var(--ef-line); background: #fff; padding: .6rem 1rem; border-radius: 999px; cursor: pointer; font-weight: 700; font-size: .85rem; color: #4a5568; display: inline-flex; align-items: center; gap: .4rem; transition: all .15s ease; }
+.ef-tabs button:hover { border-color: #bcd3f5; color: var(--ef-brand); }
+.ef-tabs button.active { background: linear-gradient(135deg, var(--ef-brand), var(--ef-brand-2)); border-color: transparent; color: #fff; box-shadow: 0 8px 22px rgba(0, 87, 184, .28); }
+.ef-tab-qa { margin-left: auto; }
+.ef-tab-count { background: var(--ef-red); color: #fff; border-radius: 20px; font-size: .68rem; padding: 1px 7px; }
+.ef-pane { display: none; }
+.ef-pane.active { display: block; animation: efIn .35s ease both; }
+
+/* ---------- Cartes ---------- */
+.ef-card { background: var(--ef-card); border: 1px solid var(--ef-line); border-radius: 20px; padding: 1.3rem 1.4rem; box-shadow: 0 6px 25px rgba(30, 41, 80, .035); }
+.ef-card-title { display: flex; align-items: center; gap: .45rem; font-weight: 800; color: var(--ef-ink); margin-bottom: .9rem; }
+.ef-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.4rem; }
+.ef-stat { font-size: .82rem; color: var(--ef-muted); position: relative; animation: efIn .45s ease both; }
+.ef-stat:nth-child(2) { animation-delay: .06s; } .ef-stat:nth-child(3) { animation-delay: .12s; } .ef-stat:nth-child(4) { animation-delay: .18s; }
+.ef-stat strong { display: block; color: var(--ef-ink); font-size: 1.8rem; font-weight: 800; margin-top: .3rem; }
+.ef-iconbox { position: absolute; right: 1.1rem; top: 1.1rem; width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; font-size: 1.2rem; }
+.ef-section-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin: 1.4rem 0 .9rem; }
+.ef-section-head h3 { margin: 0; font-weight: 800; font-size: 1.25rem; color: var(--ef-ink); }
+.ef-progress { height: 9px; background: #edf0f6; border-radius: 20px; overflow: hidden; }
+.ef-progress i { display: block; height: 100%; background: linear-gradient(90deg, var(--ef-brand), var(--ef-green)); border-radius: 20px; transition: width .6s ease; }
+.ef-mini-stats { display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; margin-top: .8rem; font-size: .8rem; color: var(--ef-muted); }
+.ef-mini-stats b { color: var(--ef-ink); }
+.ef-empty { padding: 2rem 1rem; text-align: center; color: var(--ef-muted); }
+.ef-chip { display: inline-flex; align-items: center; gap: 4px; font-size: .7rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #f3f5fa; color: #5e6a7d; }
+.ef-chip-success { background: #e4f7ef; color: #0b7a4b; }
+.ef-chip-todo { background: #eaf2ff; color: var(--ef-brand); }
+.ef-chip-warn { background: #fff4e0; color: #b06a00; }
+.ef-chip-danger { background: #ffe9ec; color: #b33e4c; }
+.ef-chip-draft { background: #f2f4f7; color: #6b7684; }
+
+/* ---------- Cartes de cours (« À découvrir maintenant ») ---------- */
+.ef-course-card { background: #fff; border: 1px solid var(--ef-line); border-radius: 20px; overflow: hidden; height: 100%; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease; animation: efIn .4s ease both; }
+.ef-course-card:hover { transform: translateY(-4px); box-shadow: 0 16px 34px rgba(0, 87, 184, .12); }
+.ef-course-card img { width: 100%; height: 140px; object-fit: cover; display: block; transition: transform .4s ease; }
+.ef-course-card:hover img { transform: scale(1.04); }
+.ef-course-xp { position: absolute; left: .7rem; top: .7rem; background: rgba(13, 27, 62, .78); color: #ffd772; font-size: .7rem; font-weight: 800; border-radius: 999px; padding: 3px 9px; }
+.ef-course-body { padding: 1rem 1.05rem 1.1rem; }
+.ef-course-body h4 { font-size: 1rem; font-weight: 800; margin: .5rem 0 .25rem; color: var(--ef-ink); }
+.ef-course-desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: #556; font-size: .8rem; line-height: 1.45; margin: 0 0 .6rem; min-height: 2.3em; }
+.ef-course-meta { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .6rem; }
+.ef-course-meta > span:not(.ef-chip) { background: #f3f5fa; color: #5e6a7d; font-size: .7rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+
+/* ---------- Thématiques ---------- */
+.ef-cat-card { position: relative; background: #fff; border: 1px solid var(--ef-line); border-radius: 18px; overflow: hidden; cursor: pointer; height: 100%; transition: transform .18s ease, box-shadow .18s ease; animation: efIn .4s ease both; }
+.ef-cat-card:hover { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(0, 87, 184, .12); }
+.ef-cat-visual { height: 110px; background-size: cover; background-position: center; position: relative; }
+.ef-cat-visual::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(13, 27, 62, 0) 40%, rgba(13, 27, 62, .45)); }
+.ef-cat-body { padding: .8rem .95rem; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.ef-cat-body h6 { margin: 0; font-weight: 800; flex: 1 1 100%; color: var(--ef-ink); }
+.ef-cat-go { margin-left: auto; color: var(--ef-brand); font-size: 1.2rem; transition: transform .18s ease; }
+.ef-cat-card:hover .ef-cat-go { transform: translateX(3px); }
+.ef-cat-card .category-image-btn { position: absolute; top: 8px; right: 8px; z-index: 2; background: rgba(255, 255, 255, .92); }
+.ef-table thead th { color: var(--ef-muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; border-bottom-color: var(--ef-line); }
+.ef-table td { font-size: .85rem; }
+
+/* ---------- Lecteur de cours (« cours interactif ») ---------- */
+.ef-player { padding: 0; overflow: hidden; border: 0; box-shadow: var(--ef-shadow); animation: efIn .35s ease both; }
+.ef-player-head { padding: 1.4rem 1.6rem; background: linear-gradient(135deg, #0d1b3e, #1d3f86); color: #fff; }
+.ef-player-title { font-size: 1.45rem; font-weight: 800; margin-top: .35rem; }
+.ef-player-body { padding: 1.4rem 1.6rem; }
+
+/* ---------- Badges / classement / barème ---------- */
+.ef-badges { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; }
+.ef-badge { text-align: center; padding: .7rem .35rem; border-radius: 14px; border: 1px dashed #d9dee6; background: #fafbfc; transition: transform .18s ease; }
+.ef-badge i { font-size: 1.45rem; color: #b6bfcc; }
+.ef-badge b { display: block; font-size: .72rem; margin-top: .25rem; color: #8a93a3; }
+.ef-badge small { display: block; font-size: .64rem; color: #a0a8b6; }
+.ef-badge.earned { border: 1px solid #ffe2a8; background: linear-gradient(160deg, #fff9ea, #fff); }
+.ef-badge.earned i { color: #f0a500; animation: efPop .6s ease both; }
+.ef-badge.earned b { color: var(--ef-ink); }
+.ef-badge:hover { transform: translateY(-2px); }
+.ef-leaderboard { list-style: none; padding: 0; margin: 0; display: grid; gap: .35rem; }
+.ef-leaderboard li { display: flex; align-items: center; gap: .6rem; padding: .45rem .6rem; border-radius: 12px; font-size: .84rem; }
+.ef-leaderboard li.me { background: var(--ef-soft); font-weight: 700; }
+.ef-rank { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: .72rem; font-weight: 800; background: #f2f4f7; color: #6b7684; flex-shrink: 0; }
+.ef-rank.r1 { background: #ffe8a3; color: #8a5a00; } .ef-rank.r2 { background: #e5e9f0; color: #4a5568; } .ef-rank.r3 { background: #f7d9c4; color: #8a4b1f; }
+.ef-leaderboard .ef-lb-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ef-leaderboard .ef-lb-xp { font-weight: 800; color: var(--ef-brand); font-size: .8rem; }
+.ef-rules ul { list-style: none; padding: 0; margin: 0; }
+.ef-rules li { display: flex; justify-content: space-between; padding: .35rem 0; border-bottom: 1px dashed var(--ef-line); font-size: .82rem; }
+.ef-rules li:last-child { border-bottom: 0; }
+.ef-rules b { color: var(--ef-green); }
+
+/* ---------- Quiz ---------- */
+.ef-filter { display: inline-flex; gap: .3rem; flex-wrap: wrap; }
+.ef-filter button { border: 1px solid var(--ef-line); background: #fff; border-radius: 999px; padding: .3rem .8rem; font-size: .76rem; font-weight: 700; color: #5e6a7d; }
+.ef-filter button.active { background: var(--ef-soft); color: var(--ef-brand); border-color: #cfe0f7; }
+.ef-quiz-card { border: 1px solid var(--ef-line); border-radius: 18px; padding: 1.1rem; height: 100%; display: flex; flex-direction: column; gap: .5rem; background: #fff; position: relative; overflow: hidden; transition: transform .18s ease, box-shadow .18s ease; animation: efIn .35s ease both; }
+.ef-quiz-card:hover { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(90, 63, 192, .12); }
+.ef-quiz-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: #cfd6e2; }
+.ef-quiz-card.todo::before { background: var(--ef-brand); } .ef-quiz-card.passed::before { background: var(--ef-green); }
+.ef-quiz-card.retry::before { background: var(--ef-orange); } .ef-quiz-card.failed::before { background: var(--ef-red); }
+.ef-quiz-card h5 { font-size: .98rem; font-weight: 800; margin: 0; color: var(--ef-ink); }
+.ef-quiz-card .ef-quiz-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.ef-score-ring { --p: 0; width: 46px; height: 46px; border-radius: 50%; background: conic-gradient(var(--ring, var(--ef-green)) calc(var(--p) * 1%), #edf0f6 0); display: grid; place-items: center; flex-shrink: 0; }
+.ef-score-ring span { width: 36px; height: 36px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-size: .7rem; font-weight: 800; }
+
+/* ---------- Certificats ---------- */
+.ef-cert-card { border: 1px solid var(--ef-line); border-radius: 18px; padding: 1.1rem; height: 100%; background: #fff; display: flex; flex-direction: column; gap: .45rem; animation: efIn .35s ease both; }
+.ef-cert-card.issued { background: linear-gradient(160deg, #f4fbf7, #fff 60%); border-color: #c9ecd9; }
+.ef-cert-card h5 { font-size: .95rem; font-weight: 800; margin: 0; }
+.ef-cert-number { font: 700 .75rem ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ef-brand); letter-spacing: .06em; }
+.ef-eligible { display: flex; align-items: center; gap: .6rem; padding: .6rem 0; border-bottom: 1px dashed var(--ef-line); }
+.ef-eligible:last-child { border-bottom: 0; }
+.ef-eligible .ef-eligible-title { flex: 1; font-size: .84rem; font-weight: 700; }
+
+/* Certificat imprimable */
+.ef-certificate { position: relative; border-radius: 18px; padding: 3rem 3.2rem; background:
+        radial-gradient(circle at 12% 18%, rgba(0, 87, 184, .08), transparent 38%),
+        radial-gradient(circle at 88% 82%, rgba(0, 166, 81, .10), transparent 40%), #fff;
+    border: 10px solid #0d1b3e; outline: 2px solid #c9a44c; outline-offset: -18px; text-align: center; color: var(--ef-ink); }
+.ef-certificate .ef-cert-logo { height: 42px; margin-bottom: 1rem; }
+.ef-certificate .ef-cert-kicker { font: 800 .8rem/1 ui-monospace, monospace; letter-spacing: .3em; color: #c9a44c; }
+.ef-certificate h2 { font-family: Georgia, "Times New Roman", serif; font-size: 2.6rem; margin: .6rem 0 1.2rem; color: #0d1b3e; }
+.ef-certificate .ef-cert-holder { font-family: Georgia, serif; font-size: 2rem; font-style: italic; color: var(--ef-brand); border-bottom: 1px solid #d8dde6; display: inline-block; padding: 0 2rem .3rem; margin: .4rem 0 1rem; }
+.ef-certificate .ef-cert-title { font-size: 1.2rem; font-weight: 800; margin: .3rem 0 1.4rem; }
+.ef-certificate .ef-cert-foot { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; margin-top: 2rem; font-size: .8rem; color: #4a5568; text-align: left; }
+.ef-certificate .ef-cert-seal { width: 92px; height: 92px; border-radius: 50%; background: radial-gradient(circle, #e7c46a, #b8892a); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: .72rem; text-align: center; box-shadow: 0 0 0 6px #f6e6b8; line-height: 1.1; }
+
+/* ---------- Espace QA ---------- */
+.ef-sync-bar { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; background: #fff; border: 1px solid var(--ef-line); border-radius: 16px; padding: .6rem .9rem; margin-bottom: 1.2rem; font-size: .85rem; }
+.ef-sync-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ef-green); box-shadow: 0 0 0 0 rgba(0, 166, 81, .5); animation: efPulse 2s infinite; }
+.ef-sync-dot.stale { background: var(--ef-orange); animation: none; }
+.ef-feed { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow: auto; }
+.ef-feed li { display: flex; gap: .6rem; padding: .5rem 0; border-bottom: 1px solid #f2f4f7; font-size: .8rem; animation: efIn .3s ease both; }
+.ef-feed li:last-child { border-bottom: 0; }
+.ef-feed .ef-feed-icon { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; }
+.ef-feed .ef-feed-time { margin-left: auto; color: var(--ef-muted); font-size: .7rem; white-space: nowrap; }
+.ef-cert-row { display: flex; align-items: center; gap: .7rem; padding: .7rem 0; border-bottom: 1px solid #f2f4f7; flex-wrap: wrap; }
+.ef-cert-row:last-child { border-bottom: 0; }
+.ef-cert-row .ef-cert-who { flex: 1; min-width: 200px; font-size: .84rem; }
+
+.ef-toast { position: fixed; right: 24px; bottom: 24px; background: #172033; color: #fff; padding: .8rem 1.1rem; border-radius: 12px; box-shadow: var(--ef-shadow); z-index: 2000; opacity: 0; transform: translateY(10px); pointer-events: none; transition: .25s; font-size: .88rem; }
+.ef-toast.show { opacity: 1; transform: none; }
+
+@keyframes efIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes efFloat { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-30px, 20px); } }
+@keyframes efPop { 0% { transform: scale(.6); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
+@keyframes efPulse { 0% { box-shadow: 0 0 0 0 rgba(0, 166, 81, .5); } 70% { box-shadow: 0 0 0 8px rgba(0, 166, 81, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 166, 81, 0); } }
+
+@media (max-width: 1100px) {
+    .ef-grid-4 { grid-template-columns: repeat(2, 1fr); }
+    .ef-hero-img { width: 260px; height: 180px; }
+}
+@media (max-width: 768px) {
+    .ef-hero { display: block; padding: 1.6rem; border-radius: 22px; }
+    .ef-hero-img { width: 100%; height: 170px; margin-top: 1rem; }
+    .ef-grid-4 { grid-template-columns: 1fr 1fr; }
+    .ef-tab-qa { margin-left: 0; }
+    .ef-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-left: -4px; margin-right: -4px; padding-left: 4px; padding-right: 4px; }
+    .ef-tabs::-webkit-scrollbar { display: none; }
+    .ef-tabs button { flex-shrink: 0; }
+    .ef-badges { grid-template-columns: repeat(3, 1fr); }
+    .ef-certificate { padding: 1.6rem 1.2rem; }
+    .ef-certificate h2 { font-size: 1.8rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ef-page *, .ef-page *::before, .ef-page *::after { animation: none !important; transition: none !important; }
+}
+@media print {
+    body * { visibility: hidden !important; }
+    #efCertModalBody, #efCertModalBody * { visibility: visible !important; }
+    #efCertModalBody { position: fixed; inset: 0; padding: 0 !important; }
+    .ef-no-print { display: none !important; }
+}

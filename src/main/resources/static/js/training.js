@@ -28,6 +28,16 @@
 
     var STATUS_LABELS = { TODO: "À faire", IN_PROGRESS: "En cours", DONE: "Terminé" };
 
+    // Visuels de repli (modèle EduFun) quand QA n'a pas encore choisi d'image : toujours la même
+    // image pour un même cours / une même thématique, pour que l'agent s'y retrouve.
+    var FALLBACK_IMAGES = ["pexels-18804128.jpg", "pexels-5053847.jpg", "pexels-669610.jpg", "pexels-7681091.jpg",
+        "pexels-12903122.jpg", "pexels-5239804.jpg", "pexels-3760067.jpg", "pexels-8152734.jpg", "pexels-53621.jpg",
+        "pexels-60504.jpg", "pexels-1602726.jpg", "advisor-accent.jpg"];
+    function fallbackImage(index) {
+        var n = Math.abs(Number(index) || 0);
+        return "/images/formation/" + FALLBACK_IMAGES[n % FALLBACK_IMAGES.length];
+    }
+
     // ===== Espace agent : "Mes cours" =====
 
     var currentCourseCategory = null; // null = grille de rubriques affichée
@@ -51,6 +61,8 @@
             renderQuickAccessModules();
             renderCourseCategoryGrid();
             if (currentCourseCategory !== null) renderCourseCategoryDetail(currentCourseCategory);
+            // Synchronise l'espace Formation (formation.js : XP, badges, quiz, publication QA).
+            document.dispatchEvent(new CustomEvent("rcc:training-updated", { detail: { courses: coursesCache, attempts: attemptsCache } }));
         }).catch(function (e) { console.error(e); });
     }
 
@@ -89,21 +101,19 @@
 
         grid.innerHTML = courseCategoryOrder.map(function (label) {
             var imageUrl = courseCategoryImages[label];
-            var visual = imageUrl
-                ? '<div style="height:100px;background:url(\'' + escapeHtml(imageUrl) + '\') center/cover;border-radius:8px 8px 0 0;"></div>'
-                : '<div style="height:100px;display:flex;align-items:center;justify-content:center;background:#f0f4fa;border-radius:8px 8px 0 0;">' +
-                  '<i class="bi bi-journal-bookmark-fill text-primary" style="font-size:1.8rem;"></i></div>';
+            var visual = '<div class="ef-cat-visual" style="background-image:url(\'' + escapeHtml(imageUrl || fallbackImage(courseCategoryOrder.indexOf(label) + 1)) + '\');"></div>';
             var qaImageBtn = isQa
                 ? '<button type="button" class="btn btn-sm btn-outline-secondary category-image-btn" data-category="' + escapeHtml(label) + '" ' +
                   'style="position:absolute;top:6px;right:6px;" title="' + (imageUrl ? "Changer l'image" : "Ajouter une image") + '">' +
                   '<i class="bi bi-image"></i></button>' : "";
             var count = counts[label] || 0;
-            return '<div class="col-md-3 col-sm-6">' +
-                '<div class="card h-100 shadow-sm course-category-card" data-category="' + escapeHtml(label) + '" style="cursor:pointer;position:relative;overflow:hidden;">' +
+            return '<div class="col-xl-3 col-md-4 col-sm-6">' +
+                '<div class="ef-cat-card course-category-card" data-category="' + escapeHtml(label) + '">' +
                     qaImageBtn + visual +
-                    '<div class="card-body text-center">' +
-                        '<h6 class="mb-1">' + escapeHtml(label) + '</h6>' +
-                        '<span class="badge ' + (count ? "bg-light text-dark" : "bg-light text-muted") + '">' + count + ' cours</span>' +
+                    '<div class="ef-cat-body">' +
+                        '<h6>' + escapeHtml(label) + '</h6>' +
+                        '<span class="ef-chip">' + count + ' cours</span>' +
+                        '<i class="bi bi-arrow-right-circle-fill ef-cat-go"></i>' +
                     '</div>' +
                 '</div></div>';
         }).join("");
@@ -262,6 +272,10 @@
         $("progressBar").style.width = progress + "%";
     }
 
+    function attemptDone(c) {
+        return attemptsCache.some(function (a) { return a.courseId === c.courseId && a.status === "DONE"; });
+    }
+
     function renderQuickAccessModules() {
         var container = $("quickAccessModules");
         if (!coursesCache.length) {
@@ -269,27 +283,39 @@
             return;
         }
 
-        container.innerHTML = coursesCache.map(function (c) {
+        // « À découvrir maintenant » (modèle EduFun) : d'abord ce qui reste à faire, obligatoires en tête.
+        var ordered = coursesCache.slice().sort(function (a, b) {
+            var da = attemptDone(a) ? 1 : 0, db = attemptDone(b) ? 1 : 0;
+            if (da !== db) return da - db;
+            return (b.mandatory ? 1 : 0) - (a.mandatory ? 1 : 0);
+        }).slice(0, 6);
+        container.innerHTML = ordered.map(function (c) {
             var attempt = attemptsCache.filter(function (a) { return a.courseId === c.courseId; })[0];
-            var statusBadge = attempt && attempt.status === "DONE"
-                ? '<span class="badge bg-success">Complété</span>'
-                : '<span class="badge bg-secondary">À faire</span>';
-            var imageBlock = c.imageUrl
-                ? '<img src="' + c.imageUrl + '" alt="" style="width:100%;height:120px;object-fit:cover;">'
-                : '<div style="width:100%;height:120px;background:linear-gradient(135deg,#7b2ff7,#a63cf0);display:flex;align-items:center;justify-content:center;">' +
-                  '<i class="bi bi-mortarboard text-white fs-2"></i></div>';
+            var done = attempt && attempt.status === "DONE";
+            var statusChip = done
+                ? '<span class="ef-chip ef-chip-success"><i class="bi bi-check2"></i> Complété' + (attempt.score !== null && attempt.score !== undefined ? " · " + attempt.score + "%" : "") + '</span>'
+                : '<span class="ef-chip ef-chip-todo">À faire</span>';
             var uploadBtn = currentProfile === "ADMIN"
-                ? '<label class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-1" style="cursor:pointer;" title="Changer la vignette (admin)">' +
+                ? '<label class="btn btn-sm btn-light position-absolute top-0 end-0 m-2" style="cursor:pointer;" title="Changer la vignette (admin)">' +
                   '<i class="bi bi-camera"></i><input type="file" accept="image/*" class="d-none module-image-input" data-course-id="' + c.courseId + '"></label>'
                 : "";
+            var draft = c.publicationStatus && c.publicationStatus !== "PUBLISHED"
+                ? '<span class="ef-chip ef-chip-draft">' + (c.publicationStatus === "DRAFT" ? "Brouillon" : "Archivé") + '</span>' : "";
+            var xp = c.type === "STANDARD" ? "+50 XP" : "+30 XP";
 
-            return '<div class="col-md-4">' +
-                '<div class="card dashboard-card shadow-sm h-100 open-course-btn position-relative" data-id="' + c.courseId + '" style="cursor:pointer;">' +
-                '<div class="position-relative">' + imageBlock + uploadBtn + '</div>' +
-                '<div class="card-body">' +
-                '<div class="fw-semibold">' + escapeHtml(c.title) + '</div>' +
-                '<div class="small text-muted">' + escapeHtml(c.description || "") + '</div>' +
-                '<div class="mt-2">' + statusBadge + '</div>' +
+            return '<div class="col-md-6 col-xxl-4">' +
+                '<div class="ef-course-card open-course-btn" data-id="' + c.courseId + '">' +
+                '<div class="position-relative"><img src="' + escapeHtml(c.imageUrl || fallbackImage(c.courseId * 7 + 3)) + '" alt="">' +
+                '<span class="ef-course-xp">' + xp + '</span>' + uploadBtn + '</div>' +
+                '<div class="ef-course-body">' +
+                '<span class="ef-pill ef-pill-sm">' + escapeHtml(courseCategoryLabel(c)) + '</span>' +
+                '<h4>' + escapeHtml(c.title) + '</h4>' +
+                '<p class="ef-course-desc">' + escapeHtml(c.description || "") + '</p>' +
+                '<div class="ef-course-meta">' +
+                    '<span>' + (c.type === "STANDARD" ? "🧠 Évaluation" : "📝 Auto-diagnostic") + '</span>' +
+                    (c.mandatory ? '<span>⭐ Obligatoire</span>' : "") +
+                    (c.videoUrl ? '<span>🎬 Vidéo</span>' : "") + draft +
+                '</div>' + statusChip +
                 '</div></div></div>';
         }).join("");
 
@@ -854,6 +880,12 @@
             loadCourseCategoryImages().then(loadMyCoursesTable);
         }
     });
+
+    // Accès pour formation.js (onglet « Quiz & défis », publication QA).
+    window.RccTraining = {
+        openCoursePlayer: function (courseId) { openCoursePlayer(courseId); },
+        reload: function () { loadMyCoursesTable(); loadQaCourseSelects(); }
+    };
 
     loadFormationBanner();
     loadMyCoursesTable();

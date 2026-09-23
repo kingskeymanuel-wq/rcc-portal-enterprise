@@ -336,6 +336,27 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
                 )
                 """);
 
+        // Certificats de formation — demandés par l'agent (parcours terminé / évaluation réussie),
+        // validés ou refusés par QA, vérifiables par leur numéro.
+        createIfMissing("TrainingCertificates", """
+                CREATE TABLE dbo.TrainingCertificates (
+                    CertificateId BIGINT IDENTITY(1,1) PRIMARY KEY,
+                    CertificateNumber NVARCHAR(40) NULL,
+                    UserId BIGINT NOT NULL,
+                    SourceType NVARCHAR(20) NOT NULL,
+                    SourceId INT NOT NULL,
+                    Title NVARCHAR(250) NOT NULL,
+                    Score INT NULL,
+                    Status NVARCHAR(20) NOT NULL DEFAULT 'PENDING',
+                    RequestedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    DecidedAt DATETIME2 NULL,
+                    DecidedBy NVARCHAR(150) NULL,
+                    DecisionNote NVARCHAR(500) NULL,
+                    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    UpdatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+                )
+                """);
+
         createIfMissing("RefreshTokens", """
                 CREATE TABLE dbo.RefreshTokens (
                     RefreshTokenId INT IDENTITY PRIMARY KEY,
@@ -564,6 +585,10 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         addColumnIfMissing("GameEvaluationAttempts", "EvaluationRound", "ALTER TABLE dbo.GameEvaluationAttempts ADD EvaluationRound INT NOT NULL DEFAULT 1");
         addColumnIfMissing("Courses", "FileUrl", "ALTER TABLE dbo.Courses ADD FileUrl NVARCHAR(500) NULL");
         addColumnIfMissing("Courses", "FileName", "ALTER TABLE dbo.Courses ADD FileName NVARCHAR(255) NULL");
+        // Contrôle QA de la publication des cours (Formation) — existants = PUBLISHED.
+        addColumnIfMissing("Courses", "PublicationStatus", "ALTER TABLE dbo.Courses ADD PublicationStatus NVARCHAR(20) NOT NULL CONSTRAINT DF_Courses_PublicationStatus DEFAULT 'PUBLISHED'");
+        addColumnIfMissing("Courses", "PublishedAt", "ALTER TABLE dbo.Courses ADD PublishedAt DATETIME2 NULL");
+        addColumnIfMissing("Courses", "PublishedBy", "ALTER TABLE dbo.Courses ADD PublishedBy NVARCHAR(150) NULL");
 
         createIfMissing("SiteBanner", """
                 CREATE TABLE dbo.SiteBanner (

@@ -70,6 +70,14 @@ public class CourseController {
     }
 
     /** Rubriques de formation avec image — grille façon Base de connaissances. */
+    /** Contrôle QA : DRAFT → PUBLISHED → ARCHIVED (voir CourseService.updatePublication). */
+    @PatchMapping("/{courseId}/publication")
+    public CourseResponse updatePublication(@PathVariable Integer courseId, @RequestParam String status,
+                                            @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireQaOrAdmin(requester);
+        return courseService.updatePublication(courseId, status, requester);
+    }
+
     @GetMapping("/categories")
     public List<com.ecobank.rccportal.dto.CourseCategoryResponse> listCategories() {
         return courseService.listCourseCategories();

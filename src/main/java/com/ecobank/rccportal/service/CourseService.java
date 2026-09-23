@@ -89,10 +89,12 @@ public class CourseService {
         boolean isAdmin = "admin".equalsIgnoreCase(requester.role());
         boolean isQa = requester.service() != null
                 && "quality assurance".equals(requester.service().toLowerCase().replace('_', ' '));
-        if (isAdmin || isQa) return courses;
+        if (isAdmin || isQa || isQaStaff(requester)) return courses;
 
+        // Agent : seulement les cours PUBLIÉS par QA (brouillons et archives invisibles).
         String myTeamCode = currentUserTeamCode(requester.username());
         return courses.stream()
+                .filter(c -> "PUBLISHED".equals(c.publicationStatus()))
                 .filter(c -> c.teamCode() == null || c.teamCode().equalsIgnoreCase(myTeamCode))
                 .toList();
     }
@@ -133,6 +135,8 @@ public class CourseService {
                 .team(team)
                 .category(blankToNull(request.category()))
                 .createdBy(author)
+                // Nouveau cours = brouillon : QA le vérifie (questions, vidéo…) puis le publie.
+                .publicationStatus("DRAFT")
                 .build());
 
         return toResponse(course);
@@ -453,6 +457,39 @@ public class CourseService {
         attemptRepository.save(attempt);
     }
 
+    static final List<String> PUBLICATION_STATUSES = List.of("DRAFT", "PUBLISHED", "ARCHIVED");
+
+    /** QA : publier / repasser en brouillon / archiver un cours (contrôle de ce que voient les agents). */
+    @Transactional
+    public CourseResponse updatePublication(Integer courseId, String status, AuthenticatedUser requester) {
+        String target = status == null ? "" : status.trim().toUpperCase();
+        if (!PUBLICATION_STATUSES.contains(target)) {
+            throw ApiException.badRequest("Statut de publication invalide : DRAFT, PUBLISHED ou ARCHIVED.");
+        }
+        Course course = findCourse(courseId);
+        if ("PUBLISHED".equals(target) && "STANDARD".equals(course.getType())
+                && questionRepository.findByCourseOrderByQuestionNumberAsc(course).isEmpty()) {
+            throw ApiException.badRequest("Ajoutez au moins une question avant de publier une évaluation notée.");
+        }
+        course.setPublicationStatus(target);
+        if ("PUBLISHED".equals(target)) {
+            course.setPublishedAt(LocalDateTime.now());
+            course.setPublishedBy(requester != null ? (requester.name() != null ? requester.name() : requester.username()) : null);
+        }
+        return toResponse(courseRepository.save(course));
+    }
+
+    static String publicationStatusOf(Course c) {
+        return c.getPublicationStatus() == null || c.getPublicationStatus().isBlank() ? "PUBLISHED" : c.getPublicationStatus();
+    }
+
+    private static boolean isQaStaff(AuthenticatedUser requester) {
+        return requester.service() != null && java.util.Set.of("superviseur qa", "formateur")
+                .contains(requester.service().toLowerCase().replace('_', ' '));
+    }
+
+    static int passThreshold() { return PASS_THRESHOLD; }
+
     private CourseResponse toResponse(Course c) {
         int questionCount = questionRepository.findByCourseOrderByQuestionNumberAsc(c).size();
         return new CourseResponse(c.getCourseId(), c.getTitle(), c.getDescription(), c.getContent(),
@@ -461,7 +498,8 @@ public class CourseService {
                 c.getTeam() != null ? c.getTeam().getLabel() : null,
                 c.getCreatedBy() != null ? c.getCreatedBy().getUsername() : null,
                 c.getCreatedBy() != null ? c.getCreatedBy().getName() : null,
-                c.getImageUrl(), c.getFileUrl(), c.getFileName(), c.getCategory());
+                c.getImageUrl(), c.getFileUrl(), c.getFileName(), c.getCategory(),
+                publicationStatusOf(c), c.getPublishedAt(), c.getPublishedBy());
     }
 
     private CourseQuestionResponse toQuestionResponse(CourseQuestion q, boolean includeCorrectAnswer) {
