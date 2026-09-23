@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RCC Portal Enterprise — Ma Performance</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
+          rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <style>
+        /* =====================================================================
+           "Ma Performance" — design system dédié
+           Palette : --pf-ink (texte), --pf-sub (texte secondaire), --pf-line
+           (séparateurs), --pf-surface (fond de carte), --pf-accent-* (marque
+           Ecobank : bleu / vert / ambre / violet, un accent par indicateur).
+           ===================================================================== */
+        :root{
+            --pf-ink:#101828; --pf-sub:#667085; --pf-faint:#98A2B3;
+            --pf-line:#EAECF0; --pf-surface:#FFFFFF; --pf-bg-soft:#F8FAFC;
+            --pf-blue:#0057B8; --pf-green:#00A651; --pf-amber:#F59E0B; --pf-violet:#7C3AED;
+            --pf-radius-lg:1rem; --pf-radius-md:.75rem; --pf-radius-sm:.5rem;
+            --pf-shadow:0 1px 2px rgba(16,24,40,.04), 0 2px 8px rgba(16,24,40,.05);
+            --pf-shadow-hover:0 4px 12px rgba(16,24,40,.06), 0 8px 24px rgba(16,24,40,.08);
+        }
+        html[data-theme="dark"]{
+            --pf-ink:#EDF2FB; --pf-sub:#9AA6BE; --pf-faint:#71809C;
+            --pf-line:#2A3448; --pf-surface:#1A2233; --pf-bg-soft:#161d2c;
+            --pf-shadow:0 1px 2px rgba(0,0,0,.3); --pf-shadow-hover:0 8px 24px rgba(0,0,0,.4);
+        }
+
+        #page-content { font-feature-settings: "tnum"; }
+
+        /* ---- En-tête de page ---- */
+        .pf-page-head { display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem; }
+        .pf-page-head h2 { font-weight:800; color:var(--pf-ink); letter-spacing:-.02em; margin-bottom:.15rem; }
+        .pf-page-head .subtitle { color:var(--pf-sub); font-size:.9rem; margin:0; }
+        .pf-toolbar { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+        .pf-toolbar .form-control-sm { border-radius:.55rem; }
+        .pf-btn { border-radius:.6rem; font-weight:600; font-size:.85rem; }
+
+        /* ---- Section wrapper : remplace les cartes Bootstrap génériques ---- */
+        .pf-section { background:var(--pf-surface); border:1px solid var(--pf-line); border-radius:var(--pf-radius-lg);
+            box-shadow:var(--pf-shadow); padding:1.35rem 1.5rem; margin-bottom:1.25rem; }
+        .pf-section-head { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1.1rem; flex-wrap:wrap; }
+        .pf-section-title { display:flex; align-items:center; gap:.6rem; font-weight:700; font-size:1rem; color:var(--pf-ink); margin:0; }
+        .pf-section-title i { color:var(--pf-blue); font-size:1.05rem; }
+        .pf-section-hint { font-size:.78rem; color:var(--pf-faint); margin:0; }
+        .pf-collapse-toggle { border:none; background:transparent; color:var(--pf-sub); font-size:.8rem; font-weight:600;
+            display:flex; align-items:center; gap:.35rem; padding:.25rem .5rem; border-radius:.4rem; }
+        .pf-collapse-toggle:hover { background:var(--pf-bg-soft); color:var(--pf-ink); }
+        .pf-collapse-toggle .bi { transition:transform .18s ease; }
+        .pf-collapse-toggle.open .bi { transform:rotate(180deg); }
+
+        /* ---- Bandeau de synthèse (hero) ---- */
+        .pf-hero { border-radius:var(--pf-radius-lg); padding:1.75rem 2rem; color:#fff; position:relative; overflow:hidden;
+            background:linear-gradient(135deg,#0057B8 0%,#0068D6 55%,#00A651 145%); margin-bottom:1.25rem; }
+        .pf-hero::after { content:""; position:absolute; inset:0; background:radial-gradient(circle at 88% -15%, rgba(255,255,255,.22), transparent 55%); }
+        .pf-hero-inner { position:relative; z-index:1; display:flex; align-items:center; justify-content:space-between; gap:1.75rem; flex-wrap:wrap; }
+        .pf-hero-value { font-size:2.75rem; font-weight:800; line-height:1; letter-spacing:-.02em; }
+        .pf-hero-label { font-size:.78rem; opacity:.85; text-transform:uppercase; letter-spacing:.08em; margin-bottom:.4rem; font-weight:600; }
+        .pf-hero-badge { display:inline-flex; align-items:center; gap:.4rem; padding:.35rem .85rem; border-radius:2rem;
+            font-weight:600; font-size:.8rem; background:rgba(255,255,255,.18); backdrop-filter:blur(4px); }
+        .pf-hero-ring { width:100px; height:100px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+            background:rgba(255,255,255,.15); border:3px solid rgba(255,255,255,.35); flex-shrink:0; }
+        .pf-hero-ring-value { font-size:1.5rem; font-weight:800; }
+
+        /* ---- Cartes indicateurs (KPI) ---- */
+        .pf-kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.25rem; }
+        @media (max-width:991px){ .pf-kpi-row{ grid-template-columns:repeat(2,1fr); } }
+        @media (max-width:575px){ .pf-kpi-row{ grid-template-columns:1fr; } }
+        .pf-kpi-card { background:var(--pf-surface); border:1px solid var(--pf-line); border-radius:var(--pf-radius-md);
+            box-shadow:var(--pf-shadow); padding:1.1rem 1.25rem; display:flex; align-items:flex-start; gap:.9rem;
+            transition:transform .14s ease, box-shadow .14s ease; position:relative; }
+        .pf-kpi-card.clickable-active { cursor:pointer; }
+        .pf-kpi-card.clickable-active:hover { transform:translateY(-2px); box-shadow:var(--pf-shadow-hover); }
+        .pf-kpi-icon { width:42px; height:42px; border-radius:.7rem; display:flex; align-items:center; justify-content:center;
+            font-size:1.15rem; color:#fff; background:var(--pf-accent, var(--pf-blue)); flex-shrink:0; }
+        .pf-kpi-value { font-size:1.7rem; font-weight:800; color:var(--pf-ink); line-height:1.15; }
+        .pf-kpi-label { font-size:.76rem; color:var(--pf-sub); font-weight:600; text-transform:uppercase; letter-spacing:.03em; margin-bottom:.15rem; }
+        .pf-kpi-detail { font-size:.76rem; color:var(--pf-faint); margin-top:.1rem; }
+
+        /* ---- Mini-cartes (grille KPI du mois) ---- */
+        .pf-mini-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:.85rem; }
+        .pf-mini-card { background:var(--pf-bg-soft); border:1px solid var(--pf-line); border-radius:var(--pf-radius-sm); padding:.9rem 1rem; }
+        .pf-mini-icon { width:30px; height:30px; border-radius:.5rem; display:flex; align-items:center; justify-content:center;
+            font-size:.85rem; color:var(--pf-accent, var(--pf-blue)); background:color-mix(in srgb, var(--pf-accent, var(--pf-blue)) 14%, transparent); flex-shrink:0; }
+        .pf-mini-label { font-size:.7rem; color:var(--pf-sub); font-weight:600; text-transform:uppercase; letter-spacing:.02em; }
+        .pf-mini-value { font-size:1.35rem; font-weight:800; color:var(--pf-ink); }
+        .pf-mini-bar-track { height:5px; border-radius:4px; background:var(--pf-line); overflow:hidden; margin-top:.5rem; }
+        .pf-mini-bar-fill { height:100%; border-radius:4px; background:var(--pf-accent, var(--pf-blue)); transition:width .4s ease; }
+
+        /* ---- Formulaires internes (import / correction) — compacts, sans blocs de texte ---- */
+        .pf-field-label { font-size:.78rem; font-weight:700; color:var(--pf-ink); margin-bottom:.4rem; display:block; }
+        .pf-chip-group { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:.6rem; }
+        .pf-chip { border:1px solid var(--pf-line); background:var(--pf-surface); color:var(--pf-sub); font-size:.78rem;
+            font-weight:600; padding:.3rem .75rem; border-radius:2rem; cursor:pointer; transition:.12s ease; }
+        .pf-chip:hover { border-color:var(--pf-blue); color:var(--pf-blue); }
+        .pf-chip.active { background:var(--pf-blue); border-color:var(--pf-blue); color:#fff; }
+        .pf-inline-note { font-size:.72rem; color:var(--pf-faint); margin-top:.4rem; }
+        .pf-subcard { border:1px dashed var(--pf-line); border-radius:var(--pf-radius-sm); padding:1rem; }
+
+        /* ---- Autres composants réutilisés plus bas dans la page ---- */
+        .pf-gauge { border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:var(--pf-shadow); }
+        .pf-gauge-hole { border-radius:50%; background:var(--pf-surface); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.05rem; color:var(--pf-ink); }
+        .my-shift-bar-wrap { position:relative; height:34px; background:var(--pf-bg-soft); border-radius:.4rem; overflow:hidden; }
+        .my-shift-bar-segment { position:absolute; top:0; bottom:0; }
+        .my-shift-bar-seg-work { background:#22c55e; }
+        .my-shift-bar-seg-pause { background:#ef4444; }
+        .my-shift-bar-ruler { display:flex; justify-content:space-between; font-size:.7rem; color:var(--pf-faint); margin-top:3px; }
+        .my-shift-legend { display:flex; gap:1.25rem; font-size:.82rem; color:var(--pf-sub); align-items:center; }
+        .my-shift-legend .dot { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:.35rem; }
+        .shift-timeline-row { display:flex; align-items:center; gap:.75rem; padding:.5rem 0; border-bottom:1px solid var(--pf-line); }
+        .shift-timeline-row:last-child { border-bottom:none; }
+        .shift-agent-label { width:220px; flex-shrink:0; font-size:.85rem; color:var(--pf-ink); }
+        .shift-bar-wrap { flex-grow:1; position:relative; height:22px; background:var(--pf-bg-soft); border-radius:.3rem; overflow:hidden; }
+        .shift-bar-segment { position:absolute; top:0; bottom:0; }
+        .shift-bar-seg-work { background:#22c55e; }
+        .shift-bar-seg-pause { background:#ef4444; }
+
+        .tr-branch { border:1px solid var(--pf-line); border-radius:var(--pf-radius-sm); margin-bottom:.75rem; overflow:hidden; }
+        .tr-branch-header, .tr-team-header { cursor:pointer; padding:.8rem 1rem; background:var(--pf-bg-soft);
+            display:flex; align-items:center; justify-content:space-between; font-weight:600; color:var(--pf-ink); }
+        .tr-team-header { background:var(--pf-surface); padding-left:1.75rem; font-size:.9rem; border-top:1px solid var(--pf-line); }
+        .tr-branch-body, .tr-team-body { display:none; padding:.75rem 1rem 1rem; }
+        .tr-branch.open > .tr-branch-body, .tr-team.open > .tr-team-body { display:block; }
+        .tr-chevron { transition:transform .15s ease; display:inline-block; }
+        .open > .tr-branch-header .tr-chevron, .open > .tr-team-header .tr-chevron { transform:rotate(90deg); }
+        .tr-summary-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px,1fr)); gap:.6rem; margin-bottom:.75rem; }
+        .tr-summary-card { background:var(--pf-bg-soft); border-radius:.5rem; padding:.6rem .8rem; }
+        .tr-summary-card .value { font-size:1.3rem; font-weight:700; color:var(--pf-ink); }
+        .tr-summary-card .label { font-size:.72rem; color:var(--pf-sub); }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+    <div class="content">
+        <div th:replace="~{fragments/header :: header}"></div>
+        <main id="page-content">
+            <div class="container-fluid">
+
+                <div class="pf-page-head">
+                    <div>
+                        <h2>Ma Performance</h2>
+                        <p class="subtitle">Vos indicateurs personnels pour le mois sélectionné</p>
+                    </div>
+                    <form id="monthForm" class="pf-toolbar">
+                        <input type="month" id="monthInput" class="form-control form-control-sm" style="width:auto;">
+                        <button type="submit" class="btn btn-sm btn-primary pf-btn">Appliquer</button>
+                        <a id="exportMyReportBtn" class="btn btn-sm btn-outline-primary pf-btn" href="#" title="Télécharger mon rapport (Word)">
+                            <i class="bi bi-file-earmark-word"></i> Word
+                        </a>
+                        <a id="exportMyReportPptBtn" class="btn btn-sm btn-outline-danger pf-btn" href="#" title="Télécharger mon rapport (PowerPoint)">
+                            <i class="bi bi-file-earmark-ppt"></i> PowerPoint
+                        </a>
+                    </form>
+                </div>
+
+                <div id="loadError" class="alert alert-danger" style="display:none;"></div>
+
+                <!-- Bandeau de synthèse — statut global en un coup d'œil -->
+                <div class="pf-hero">
+                    <div class="pf-hero-inner">
+                        <div>
+                            <div class="pf-hero-label">Performance globale — <span id="heroMonthLabel"></span></div>
+                            <div class="pf-hero-value" id="heroGlobalValue">—</div>
+                            <div class="mt-2"><span class="pf-hero-badge" id="heroBadge"><i class="bi bi-hourglass-split"></i> En attente de données</span></div>
+                        </div>
+                        <div class="pf-hero-ring" id="heroRing">
+                            <div class="pf-hero-ring-value" id="heroRingValue">—</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Indicateurs individuels — cliquables (QA/Admin/RH) pour voir le détail équipe -->
+                <div class="pf-kpi-row">
+                    <div class="pf-kpi-card" id="presenceCard" style="--pf-accent:var(--pf-blue);">
+                        <div class="pf-kpi-icon"><i class="bi bi-calendar-check"></i></div>
+                        <div>
+                            <div class="pf-kpi-label">Présence</div>
+                            <div class="pf-kpi-value" id="presenceValue">—</div>
+                        </div>
+                    </div>
+                    <div class="pf-kpi-card" id="qualityCard" style="--pf-accent:var(--pf-green);">
+                        <div class="pf-kpi-icon"><i class="bi bi-patch-check"></i></div>
+                        <div>
+                            <div class="pf-kpi-label">Score qualité</div>
+                            <div class="pf-kpi-value" id="qualityValue">—</div>
+                            <div class="pf-kpi-detail" id="qualityDetail"></div>
+                        </div>
+                    </div>
+                    <div class="pf-kpi-card" id="globalCard" style="--pf-accent:var(--pf-amber);">
+                        <div class="pf-kpi-icon"><i class="bi bi-graph-up"></i></div>
+                        <div>
+                            <div class="pf-kpi-label">Performance globale</div>
+                            <div class="pf-kpi-value" id="globalValue">—</div>
+                            <div class="pf-kpi-detail" id="globalDetail"></div>
+                        </div>
+                    </div>
+                    <div class="pf-kpi-card" id="evalCard" style="--pf-accent:var(--pf-violet);">
+                        <div class="pf-kpi-icon"><i class="bi bi-list-check"></i></div>
+                        <div>
+                            <div class="pf-kpi-label">Évaluations qualité</div>
+                            <div class="pf-kpi-value" id="evalCountValue">—</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Import de fichiers Excel — QA/Admin uniquement -->
+                <div class="pf-section" id="importCard" style="display:none;">
+                    <div class="pf-section-head">
+                        <h6 class="pf-section-title"><i class="bi bi-upload"></i> Charger des données d'équipe</h6>
+                        <p class="pf-section-hint">Colonne A = matricule/nom, colonnes suivantes = métriques</p>
+                    </div>
+                    <label class="pf-field-label">Équipe concernée</label>
+                    <div class="pf-chip-group" id="kpiImportTeamPicker">
+                        <button type="button" class="pf-chip active kpi-team-btn" data-team="">Toutes</button>
+                        <button type="button" class="pf-chip kpi-team-btn" data-team="INBOUND_VOICE">Inbound Voix</button>
+                        <button type="button" class="pf-chip kpi-team-btn" data-team="INBOUND_MAIL">Inbound Mail / Rafiki</button>
+                        <button type="button" class="pf-chip kpi-team-btn" data-team="CIB">CIB</button>
+                        <button type="button" class="pf-chip kpi-team-btn" data-team="OUTBOUND">Outbound</button>
+                    </div>
+                    <div class="d-flex gap-2 mb-2 flex-wrap">
+                        <select class="form-select form-select-sm" id="kpiImportCountry" style="max-width:160px;">
+                            <option value="">— Filiale —</option>
+                        </select>
+                        <select class="form-select form-select-sm" id="kpiImportService" style="max-width:200px;">
+                            <option value="">— Service —</option>
+                        </select>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <input type="month" class="form-control form-control-sm" id="kpiImportMonth" style="max-width:160px;">
+                        <input type="file" class="form-control form-control-sm" id="kpiImportFile" accept=".xlsx" style="max-width:260px;">
+                        <button class="btn btn-sm btn-primary text-nowrap pf-btn" id="kpiImportBtn">Importer</button>
+                    </div>
+                    <div class="d-flex gap-2 mt-2 flex-wrap align-items-center">
+                        <input type="file" class="form-control form-control-sm" id="kpiScreenshotFile" accept="image/*" capture="environment" style="display:none;">
+                        <button class="btn btn-sm btn-outline-primary text-nowrap pf-btn" id="kpiScreenshotPickBtn">
+                            <i class="bi bi-camera-fill"></i> Capture d'écran
+                        </button>
+                        <span class="small text-muted" id="kpiScreenshotFileName"></span>
+                        <button class="btn btn-sm btn-primary text-nowrap pf-btn" id="kpiScreenshotUpdateBtn" style="display:none;">
+                            <i class="bi bi-arrow-repeat"></i> Mise à jour
+                        </button>
+                    </div>
+                    <div id="kpiImportResult" class="small mt-2"></div>
+                    <p class="pf-inline-note"><i class="bi bi-calendar3"></i> Le planning s'importe depuis <a href="/shift">Suivi de shift → Planning</a>.</p>
+                </div>
+
+                <!-- Import KPI par pôle/équipe (fichiers agrégés, sans agent) -->
+                <div class="pf-section" id="teamKpiImportCard" style="display:none;">
+                    <div class="pf-section-head">
+                        <h6 class="pf-section-title"><i class="bi bi-building"></i> Charger des données de pôle</h6>
+                        <p class="pf-section-hint">Fichiers « FOCUS PAR PÔLE » — alimente la tendance d'équipe uniquement</p>
+                    </div>
+                    <div class="pf-chip-group" id="teamKpiImportTeamPicker">
+                        <button type="button" class="pf-chip team-kpi-team-btn" data-team="INBOUND_VOICE">Inbound Voix</button>
+                        <button type="button" class="pf-chip team-kpi-team-btn" data-team="INBOUND_MAIL">Inbound Mail / Rafiki</button>
+                        <button type="button" class="pf-chip team-kpi-team-btn" data-team="CIB">CIB</button>
+                        <button type="button" class="pf-chip team-kpi-team-btn" data-team="OUTBOUND">Outbound</button>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <input type="file" class="form-control form-control-sm" id="teamKpiImportFile" accept=".xlsx,.csv" style="max-width:260px;">
+                        <button class="btn btn-sm btn-primary text-nowrap pf-btn" id="teamKpiImportBtn">Importer</button>
+                    </div>
+                    <div id="teamKpiImportResult" class="small mt-2"></div>
+                </div>
+
+                <!-- Tendance pôle -->
+                <div class="pf-section" id="teamKpiTrendCard" style="display:none;">
+                    <div class="pf-section-head">
+                        <h6 class="pf-section-title"><i class="bi bi-graph-up"></i> Tendance du pôle</h6>
+                    </div>
+                    <div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
+                        <select class="form-select form-select-sm" id="teamKpiTrendTeam" style="max-width:220px;"></select>
+                        <select class="form-select form-select-sm" id="teamKpiTrendMetric" style="max-width:260px;"></select>
+                    </div>
+                    <div id="teamKpiTrendChart"><p class="text-muted small">Choisissez une équipe et une métrique.</p></div>
+                </div>
+
+                <!-- Correction manuelle -->
+                <div class="pf-section" id="manualEntryCard" style="display:none;">
+                    <div class="pf-section-head">
+                        <h6 class="pf-section-title"><i class="bi bi-pencil-square"></i> Correction manuelle</h6>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6" id="manualKpiColumn">
+                            <div class="pf-subcard">
+                                <label class="pf-field-label">Valeur KPI <span class="fw-normal text-muted">— une métrique, un agent</span></label>
+                                <div class="row g-2">
+                                    <div class="col-6"><input type="text" class="form-control form-control-sm" id="manualKpiUsername" placeholder="Identifiant agent"></div>
+                                    <div class="col-6"><input type="text" class="form-control form-control-sm" id="manualKpiMetric" placeholder="Code métrique (ex. CAS_CREES)"></div>
+                                    <div class="col-6"><input type="number" step="0.01" class="form-control form-control-sm" id="manualKpiValue" placeholder="Valeur"></div>
+                                    <div class="col-6"><input type="date" class="form-control form-control-sm" id="manualKpiDate"></div>
+                                    <div class="col-12"><button class="btn btn-sm btn-outline-primary w-100 pf-btn" id="manualKpiSaveBtn">Enregistrer</button></div>
+                                </div>
+                                <div id="manualKpiResult" class="small mt-2"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="pf-subcard">
+                                <label class="pf-field-label">Événement de shift <span class="fw-normal text-muted">— pointage oublié</span></label>
+                                <div class="row g-2">
+                                    <div class="col-6"><input type="text" class="form-control form-control-sm" id="manualShiftUsername" placeholder="Identifiant agent"></div>
+                                    <div class="col-6">
+                                        <select class="form-select form-select-sm" id="manualShiftType">
+                                            <option value="LOGIN">Connexion (début)</option>
+                                            <option value="PAUSE_START">Début pause</option>
+                                            <option value="PAUSE_END">Fin pause</option>
+                                            <option value="LUNCH_START">Début pause déjeuner</option>
+                                            <option value="LUNCH_END">Fin pause déjeuner</option>
+                                            <option value="SHIFT_END">Fin de shift</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12"><input type="datetime-local" class="form-control form-control-sm" id="manualShiftDateTime"></div>
+                                    <div class="col-12"><button class="btn btn-sm btn-outline-primary w-100 pf-btn" id="manualShiftSaveBtn">Enregistrer</button></div>
+                                </div>
+                                <div id="manualShiftResult" class="small mt-2"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Résultats de l'équipe importée -->
+                <div class="pf-section" id="teamResultsCard" style="display:none;">
+                    <div class="pf-section-head">
+                        <h6 class="pf-section-title"><i class="bi bi-people-fill"></i> Résultats de l'équipe — <span id="teamResultsLabel"></span></h6>
+                    </div>
+                    <div id="teamResultsTree"><p class="text-center text-muted">Chargement…</p></div>
+                </div>
+
+                <div class="pf-section">
+                    <div class="pf-section-head">
+                        <h6 class="pf-section-title"><i class="bi bi-bar-chart"></i> KPI du mois</h6>
+                    </div>
+                    <div class="pf-mini-grid" id="kpiCardsGrid">
+                        <div class="text-center text-muted" id="kpiCardsEmpty">Chargement…</div>
+                    </div>
+                </div>
+
+                <div class="pf-section">
+                    <div class="pf-section-head">
+                        <h6 class="pf-section-title"><i class="bi bi-clock-history"></i> Historique détaillé des saisies KPI</h6>
+                    </div>
+                    <table class="table table-sm table-hover mb-0">
+                        <thead><tr><th>Métrique</th><th>Valeur</th><th>Période</th><th>Saisi par</th></tr></thead>
+                        <tbody id="manualKpiHistoryBody"><tr><td colspan="4" class="text-muted text-center">Aucune donnée.</td></tr></tbody>
+                    </table>
+                </div>
+
+                <!-- Détail individuel — rubriques réelles importées, cliquer une ligne agent l'ouvre -->
+                <div class="modal fade" id="agentDetailModal" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="agentDetailName">—</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <table class="table table-sm">
+                                    <tbody id="agentDetailBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/preferences.js}"></script>
+<script th:src="@{/js/rcc-api.js}"></script>
+<script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/performance.js}"></script>
+</body>
+</html>

@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RCC Portal Enterprise — Portail Team Leader</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/excelliam-portal.css}">
+    <style>
+        .tl-tab-nav .btn.nav-link { border: none; border-bottom: 3px solid transparent; border-radius: 0; color: #6b7280; font-weight: 600; padding: .75rem 1.1rem; }
+        .tl-tab-nav .btn.nav-link.active { color: #0057B8; border-bottom-color: #0057B8; background: transparent; }
+        .tl-stat-card { border: none; border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,.05); }
+        .tl-stat-value { font-size: 1.7rem; font-weight: 700; }
+        .tl-status-badge.PLANNED, .tl-status-badge.PENDING { background: #fff3cd; color: #7a5b00; }
+        .tl-status-badge.DONE, .tl-status-badge.CONFIRMED { background: #d1f2e0; color: #0a6b3f; }
+        .tl-status-badge.NO_SHOW, .tl-status-badge.CANCELLED { background: #fde2e2; color: #b02a2a; }
+        .tl-bar-wrap { flex-grow:1; position:relative; height:22px; background:#eef0f4; border-radius:.3rem; overflow:hidden; min-width:220px; }
+        .tl-bar-segment { position:absolute; top:0; bottom:0; background:#22c55e; }
+        .tl-bar-empty-label { position:absolute; inset:0; display:flex; align-items:center; padding-left:8px; font-size:.72rem; color:#9aa2b1; }
+        .tl-bar-ruler { display:flex; justify-content:space-between; font-size:.65rem; color:#9aa2b1; }
+        .tl-donut { border-radius: 50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .tl-donut-hole { border-radius: 50%; background:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; }
+        .tl-legend-item { cursor:pointer; user-select:none; border-radius:6px; padding:2px 6px; }
+        .tl-legend-item:hover { background:#f1f3f7; }
+        .tl-legend-item.active { background:#e7f1ff; }
+        .tl-legend-dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; }
+        .tl-agent-row { cursor: pointer; }
+        .tl-sales-agent-row { cursor: pointer; }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+    <div class="content">
+        <div th:replace="~{fragments/header :: header}"></div>
+        <main id="page-content">
+            <div class="container-fluid">
+
+                <div class="welcome-banner d-flex justify-content-between align-items-end flex-wrap gap-2">
+                    <div>
+                        <h2><i class="bi bi-people-fill"></i> Portail Team Leader</h2>
+                        <p class="text-muted mb-0" id="tlSubtitle">Gestion de votre équipe — reporting, qualité, présence</p>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a href="/shift?open=live" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-broadcast"></i> En direct
+                        </a>
+                        <a href="/shift?open=swap" class="btn btn-sm btn-outline-primary position-relative">
+                            <i class="bi bi-arrow-left-right"></i> Permutations
+                            <span class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle" id="tlSwapBadge" style="display:none; font-size:.6rem;">0</span>
+                        </a>
+                        <a href="/shift?open=leave" class="btn btn-sm btn-outline-primary position-relative">
+                            <i class="bi bi-calendar-plus"></i> Congés
+                            <span class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle" id="tlLeaveBadge" style="display:none; font-size:.6rem;">0</span>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="tlNoTeamWarning" class="alert alert-warning" style="display:none;">
+                    <i class="bi bi-exclamation-triangle"></i> Aucune équipe ne vous a été affectée. Contactez votre administrateur.
+                </div>
+
+                <div id="tlContent" style="display:none;">
+                    <div class="row g-3 mb-4">
+                        <div class="col-6 col-lg-4">
+                            <div class="card tl-stat-card h-100"><div class="card-body">
+                                <div class="tl-stat-value" id="tlStatMembers">—</div>
+                                <div class="text-muted small">Agents dans l'équipe</div>
+                            </div></div>
+                        </div>
+                        <div class="col-6 col-lg-4">
+                            <div class="card tl-stat-card h-100"><div class="card-body">
+                                <div class="tl-stat-value" id="tlStatQaScore">—</div>
+                                <div class="text-muted small">Score QA moyen</div>
+                            </div></div>
+                        </div>
+                        <div class="col-6 col-lg-4">
+                            <div class="card tl-stat-card h-100"><div class="card-body">
+                                <div class="tl-stat-value" id="tlStatEval">—</div>
+                                <div class="text-muted small">Évaluations QA (total)</div>
+                            </div></div>
+                        </div>
+                    </div>
+
+                    <div class="card dashboard-card shadow-sm">
+                        <div class="card-header p-0 border-0">
+                            <nav class="tl-tab-nav d-flex flex-wrap">
+                                <button class="btn nav-link active" id="tlTabReportingBtn"><i class="bi bi-bar-chart-fill"></i> Reporting équipe</button>
+                                <button class="btn nav-link" id="tlTabMembersBtn"><i class="bi bi-people"></i> Membres</button>
+                                <button class="btn nav-link" id="tlTabPlanningBtn"><i class="bi bi-calendar2-week"></i> Planning</button>
+                                <button class="btn nav-link" id="tlTabQaBtn"><i class="bi bi-clipboard-check"></i> Évaluations QA</button>
+                                <button class="btn nav-link" id="tlTabSalesBtn" style="display:none;"><i class="bi bi-graph-up-arrow"></i> Ventes équipe</button>
+                                <button class="btn nav-link" id="tlTabRdvBtn" style="display:none;"><i class="bi bi-calendar-check"></i> RDV équipe</button>
+                                <button class="btn nav-link" id="tlTabCampaignsBtn" style="display:none;"><i class="bi bi-megaphone-fill"></i> Campagnes</button>
+                                <button class="btn nav-link" id="tlTabAlertsBtn"><i class="bi bi-exclamation-triangle"></i> Alertes</button>
+                                <button class="btn nav-link" id="tlTabCompetitionsBtn"><i class="bi bi-trophy-fill"></i> Compétitions</button>
+                            </nav>
+                        </div>
+
+                        <!-- ===================== REPORTING ÉQUIPE ===================== -->
+                        <div id="tlPaneReporting" class="card-body">
+                            <div class="row g-2 mb-3 align-items-end">
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-1">Mois</label>
+                                    <input type="month" id="tlReportingMonth" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-md-2">
+                                    <button class="btn btn-sm btn-primary w-100" id="tlReportingApplyBtn">Appliquer</button>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle table-sm">
+                                    <thead><tr><th>Agent</th><th>Score QA</th><th>Score évaluation</th><th>Interactions</th><th id="tlReportingSalesHeader" style="display:none;">Ventes</th><th>Présence</th><th>Performance</th></tr></thead>
+                                    <tbody id="tlReportingBody"><tr><td colspan="6" class="text-center text-muted">Chargement…</td></tr></tbody>
+                                </table>
+                            </div>
+                            <p class="text-muted small mb-0"><i class="bi bi-info-circle"></i> Cliquez sur un agent pour voir son détail.</p>
+                        </div>
+
+                        <!-- ===================== MEMBRES ===================== -->
+                        <div id="tlPaneMembers" class="card-body" style="display:none;">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <p class="text-muted small mb-0"><i class="bi bi-info-circle"></i> Cliquez sur un agent pour voir sa fiche complète (contrat, résidence — modifiables).</p>
+                                <button type="button" class="btn btn-sm btn-primary" id="tlAddMemberBtn"><i class="bi bi-person-plus-fill"></i> Ajouter un agent</button>
+                            </div>
+                            <div id="tlMembersList"></div>
+                        </div>
+
+                        <!-- ===================== PLANNING (comme Excelliam, avec envoi pour validation) ===================== -->
+                        <div id="tlPanePlanning" class="card-body" style="display:none;">
+                            <p class="text-muted small mb-2"><i class="bi bi-info-circle"></i> Construisez le planning de votre équipe comme le fait Excelliam, envoyez-le pour validation, puis cliquez "Mise à jour" une fois validé pour le rendre effectif pour tout le monde.</p>
+
+                            <div class="exc-shift-legend mb-2">
+                                <span class="exc-shift-chip"><span class="dot"></span> 07h–16h (M)</span>
+                                <span class="exc-shift-chip"><span class="dot"></span> 08h–17h (M2)</span>
+                                <span class="exc-shift-chip"><span class="dot"></span> 12h–21h (A)</span>
+                                <span class="exc-shift-chip"><span class="dot"></span> 21h–06h (N)</span>
+                            </div>
+
+                            <div class="exc-period-bar mb-3">
+                                <label class="small fw-semibold mb-0">Période :</label>
+                                <input type="date" class="form-control form-control-sm" id="tlPlanFrom">
+                                <span class="small text-muted">au</span>
+                                <input type="date" class="form-control form-control-sm" id="tlPlanTo">
+                                <div class="form-check ms-auto">
+                                    <input class="form-check-input" type="checkbox" id="tlPlanCheckAll">
+                                    <label class="form-check-label small" for="tlPlanCheckAll">Tout cocher</label>
+                                </div>
+                            </div>
+
+                            <div id="tlPlanAgentList" class="exc-shift-picker">
+                                <p class="text-muted text-center small">Chargement des agents…</p>
+                            </div>
+
+                            <div class="exc-summary-bar">
+                                <span><b id="tlPlanCheckedCount">0</b> agent(s) sélectionné(s)</span>
+                                <span id="tlPlanResult" class="text-muted"></span>
+                            </div>
+
+                            <div class="d-flex justify-content-end gap-2 mt-2">
+                                <button type="button" class="btn btn-outline-primary" id="tlPlanSubmitBtn"><i class="bi bi-send-fill"></i> Envoyer à Excelliam</button>
+                            </div>
+
+                            <hr>
+
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="mb-0">État du planning envoyé sur cette période</h6>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="tlPlanRefreshStatusBtn"><i class="bi bi-arrow-clockwise"></i> Actualiser</button>
+                                    <button type="button" class="btn btn-sm btn-success d-none" id="tlPlanPublishBtn"><i class="bi bi-check2-circle"></i> Mise à jour</button>
+                                </div>
+                            </div>
+                            <div id="tlPlanStatusList"><p class="text-muted small">Choisissez une période puis cliquez "Actualiser".</p></div>
+                        </div>
+
+                        <!-- ===================== ÉVALUATIONS QA ===================== -->
+                        <div id="tlPaneQa" class="card-body" style="display:none;">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle table-sm">
+                                    <thead><tr><th>Date</th><th>Agent</th><th>Motif</th><th>Score</th><th>Résultat</th><th></th></tr></thead>
+                                    <tbody id="tlQaBody"><tr><td colspan="6" class="text-center text-muted">Chargement…</td></tr></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- ===================== VENTES ÉQUIPE (OUTBOUND) ===================== -->
+                        <div id="tlPaneSales" class="card-body" style="display:none;">
+                            <div class="row g-2 mb-3 align-items-end">
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-1">Du</label>
+                                    <input type="date" id="tlSalesFrom" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-1">Au</label>
+                                    <input type="date" id="tlSalesTo" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-md-2">
+                                    <button class="btn btn-sm btn-primary w-100" id="tlSalesApplyBtn">Appliquer</button>
+                                </div>
+                            </div>
+                            <div id="tlSalesGroups"></div>
+                        </div>
+
+                        <!-- ===================== RDV ÉQUIPE (OUTBOUND) ===================== -->
+                        <div id="tlPaneRdv" class="card-body" style="display:none;">
+                            <div class="row g-2 mb-3 align-items-end">
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-1">Du</label>
+                                    <input type="date" id="tlRdvFrom" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-1">Au</label>
+                                    <input type="date" id="tlRdvTo" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-md-2">
+                                    <button class="btn btn-sm btn-primary w-100" id="tlRdvApplyBtn">Appliquer</button>
+                                </div>
+                            </div>
+                            <p class="text-muted small mb-2"><i class="bi bi-info-circle"></i> Cliquez sur un agent pour voir le détail de ses rendez-vous (par jour, semaine ou mois).</p>
+                            <div id="tlRdvGroups"></div>
+                        </div>
+
+                        <!-- ===================== ALERTES ===================== -->
+                        <div id="tlPaneAlerts" class="card-body" style="display:none;">
+                            <p class="text-muted small">Détection automatique chaque nuit à 23h (présence, score QA, score d'évaluation, performance globale, chutes par rapport au mois précédent) — uniquement les agents de votre équipe.</p>
+                            <div class="table-responsive">
+                                <table class="table table-hover table-sm align-middle">
+                                    <thead><tr><th>Agent</th><th>Type</th><th>Sévérité</th><th>Message</th></tr></thead>
+                                    <tbody id="tlAlertsBody"><tr><td colspan="4" class="text-center text-muted">Chargement…</td></tr></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- ===================== COMPÉTITIONS ===================== -->
+                        <div id="tlPaneCompetitions" class="card-body" style="display:none;">
+                            <p class="text-muted small">Compétitions où votre équipe est engagée — choisissez les membres qui participeront.</p>
+                            <div id="tlCompetitionsList"><p class="text-muted text-center">Chargement…</p></div>
+                        </div>
+
+                        <!-- ===================== CAMPAGNES (OUTBOUND) ===================== -->
+                        <div id="tlPaneCampaigns" class="card-body" style="display:none;">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0">Mes campagnes</h6>
+                                <button class="btn btn-sm btn-primary" id="tlNewCampaignBtn"><i class="bi bi-plus-lg"></i> Nouvelle campagne</button>
+                            </div>
+                            <div id="tlCampaignsList"></div>
+                        </div>
+                    </div>
+
+                <!-- ===================== MODALE — RDV D'UN AGENT (JOUR/SEMAINE/MOIS) ===================== -->
+                <div class="modal fade" id="tlAgentRdvModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header"><h5 class="modal-title" id="tlAgentRdvModalTitle"><i class="bi bi-calendar-check"></i></h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                            <div class="modal-body">
+                                <div class="btn-group btn-group-sm mb-3" id="tlAgentRdvGranularity">
+                                    <button type="button" class="btn btn-primary" data-gran="day">Jour</button>
+                                    <button type="button" class="btn btn-outline-primary" data-gran="week">Semaine</button>
+                                    <button type="button" class="btn btn-outline-primary" data-gran="month">Mois</button>
+                                </div>
+                                <div id="tlAgentRdvBody"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </div>
+
+                <!-- ===================== MODALE — NOUVELLE CAMPAGNE ===================== -->
+                <div class="modal fade" id="tlNewCampaignModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header"><h5 class="modal-title"><i class="bi bi-megaphone-fill"></i> Nouvelle campagne</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                            <div class="modal-body">
+                                <div class="mb-2"><label class="form-label small">Nom de la campagne</label>
+                                    <input type="text" class="form-control" id="tlCampaignName" placeholder="Ex. Relance clients CASHXPRESS — Août"></div>
+                                <div class="mb-2"><label class="form-label small">Description (optionnel)</label>
+                                    <textarea class="form-control" id="tlCampaignDescription" rows="2"></textarea></div>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-6"><label class="form-label small">Début (optionnel)</label>
+                                        <input type="date" class="form-control" id="tlCampaignStart"></div>
+                                    <div class="col-6"><label class="form-label small">Fin (optionnel)</label>
+                                        <input type="date" class="form-control" id="tlCampaignEnd"></div>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label small">Équipe ciblée (onglet "Campagne" agent)</label>
+                                    <select class="form-select" id="tlCampaignTargetService">
+                                        <option value="">Toute l'équipe Outbound</option>
+                                        <option value="DIGITAL">Service Digital</option>
+                                        <option value="TELEVENTE">Télévente</option>
+                                    </select>
+                                </div>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-4"><label class="form-label small">Icône (Bootstrap Icons)</label>
+                                        <input type="text" class="form-control" id="tlCampaignIcon" placeholder="bi-credit-card-2-front-fill"></div>
+                                    <div class="col-4"><label class="form-label small">Couleur début</label>
+                                        <input type="color" class="form-control form-control-color w-100" id="tlCampaignColorFrom" value="#0057B8"></div>
+                                    <div class="col-4"><label class="form-label small">Couleur fin</label>
+                                        <input type="color" class="form-control form-control-color w-100" id="tlCampaignColorTo" value="#00A651"></div>
+                                </div>
+
+                                <hr>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0">Questions de la campagne <span class="text-muted small">(affichées à l'agent pendant l'appel)</span></h6>
+                                    <button class="btn btn-sm btn-outline-primary" id="tlCampaignAddFieldBtn"><i class="bi bi-plus-lg"></i> Ajouter une question</button>
+                                </div>
+                                <div id="tlCampaignFieldsEditor"></div>
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                                <button class="btn btn-primary" id="tlSaveCampaignBtn">Créer</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===================== MODALE — DÉTAIL CAMPAGNE (import + contacts) ===================== -->
+                <div class="modal fade" id="tlCampaignDetailModal" tabindex="-1">
+                    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header"><h5 class="modal-title" id="tlCampaignDetailTitle"><i class="bi bi-megaphone-fill"></i></h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                            <div class="modal-body">
+                                <div class="d-flex gap-2 align-items-end mb-3 flex-wrap">
+                                    <div>
+                                        <label class="form-label small mb-1">Importer des contacts (.xlsx — n'importe quelle disposition de colonnes)</label>
+                                        <input type="file" class="form-control form-control-sm" id="tlCampaignImportFile" accept=".xlsx,.xls" style="max-width:320px;">
+                                    </div>
+                                    <button class="btn btn-sm btn-primary" id="tlCampaignImportBtn"><i class="bi bi-upload"></i> Importer</button>
+                                    <span class="small text-muted" id="tlCampaignImportStatus"></span>
+                                </div>
+                                <p class="small text-muted"><i class="bi bi-shield-lock"></i> Le numéro de compte est automatiquement masqué à l'import — jamais stocké en clair.</p>
+
+                                <div class="d-flex align-items-center gap-4 mb-3 flex-wrap" id="tlCampaignDonutRow"></div>
+
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover align-middle">
+                                        <thead><tr><th>Client</th><th>Téléphone</th><th>N° compte</th><th>Agent</th><th>Statut</th><th>Dernier appel</th><th></th></tr></thead>
+                                        <tbody id="tlCampaignContactsBody"><tr><td colspan="7" class="text-center text-muted">Aucun contact importé.</td></tr></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===================== MODALE — MAPPING DES COLONNES AVANT IMPORT ===================== -->
+                <div class="modal fade" id="tlImportMappingModal" tabindex="-1" data-bs-backdrop="static">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header"><h5 class="modal-title"><i class="bi bi-columns-gap"></i> Faire correspondre les colonnes</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                            <div class="modal-body">
+                                <p class="small text-muted mb-3">N'importe quel fichier Excel convient — indiquez simplement quelle colonne correspond à quoi. Un aperçu de la 1ère ligne du fichier est affiché à côté de chaque en-tête pour vous aider.</p>
+                                <div id="tlImportMappingFixedFields" class="mb-3"></div>
+                                <div id="tlImportMappingCustomFields"></div>
+                                <div class="small text-danger" id="tlImportMappingError"></div>
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                                <button class="btn btn-primary" id="tlImportMappingConfirmBtn"><i class="bi bi-upload"></i> Importer</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===================== MODALE — AJOUTER UN AGENT ===================== -->
+                <div class="modal fade" id="tlAddMemberModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header"><h5 class="modal-title"><i class="bi bi-person-plus-fill"></i> Ajouter un agent à mon équipe</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                            <div class="modal-body">
+                                <input type="text" class="form-control mb-2" id="tlAddMemberSearch" placeholder="Rechercher un agent par nom ou identifiant…">
+                                <div id="tlAddMemberResults" class="d-flex flex-column gap-1" style="max-height:320px;overflow:auto;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===================== MODALE — ENTRETIEN QUALITÉ ===================== -->
+                <div class="modal fade" id="tlQaCoachingModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header"><h5 class="modal-title" id="tlQaCoachingTitle"><i class="bi bi-chat-dots-fill"></i></h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                            <div class="modal-body">
+                                <div class="mb-2"><label class="form-label small">Date de l'entretien</label>
+                                    <input type="date" class="form-control" id="tlQaCoachingDate"></div>
+                                <div class="mb-2"><label class="form-label small">Notes / axes d'amélioration discutés</label>
+                                    <textarea class="form-control" id="tlQaCoachingNotes" rows="3"></textarea></div>
+                                <p class="small text-muted mb-0"><i class="bi bi-info-circle"></i> L'agent devra signer pour attester avoir été entretenu. Visible chez RH et le Superviseur.</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                                <button class="btn btn-primary" id="tlSaveQaCoachingBtn">Programmer</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===================== MODALE — DÉTAIL AGENT ===================== -->
+                <div class="modal fade" id="tlAgentModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header"><h5 class="modal-title"><i class="bi bi-person-fill"></i> Fiche agent</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                            <div class="modal-body">
+                                <div class="row g-4">
+                                    <div class="col-md-4 text-center">
+                                        <div class="rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center overflow-hidden"
+                                             style="width:140px;height:140px;background:#e9ecef;" id="tlAgentPhotoWrap">
+                                            <i class="bi bi-person-fill" style="font-size:4rem;color:#adb5bd;"></i>
+                                        </div>
+                                        <div class="rounded px-3 py-2 text-white" style="background:#F5A623;" id="tlAgentNameBadge"></div>
+                                        <div class="small text-muted mt-1" id="tlAgentTeamLabel"></div>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <h6 class="text-uppercase text-muted small mb-2" id="tlAgentWhoTitle">Qui est cet agent</h6>
+                                        <div id="tlAgentModalBody"></div>
+                                        <div id="tlAgentQaBarsSection" style="display:none;">
+                                            <h6 class="text-uppercase text-muted small mt-3 mb-2">Note QA — dernière évaluation</h6>
+                                            <div id="tlAgentQaBars"></div>
+                                        </div>
+                                        <div id="tlAgentQaSummary" style="display:none;">
+                                            <h6 class="text-uppercase text-muted small mt-3 mb-2">Résumé de l'évaluation</h6>
+                                            <div id="tlAgentQaSummaryBody" class="small"></div>
+                                            <button class="btn btn-sm btn-outline-primary mt-2" id="tlAgentCreateTodoBtn">
+                                                <i class="bi bi-check2-square"></i> Créer un TODO d'engagement pour l'agent
+                                            </button>
+                                            <p class="small text-muted mt-1 mb-0">Après un échange avec l'agent sur cette note — il devra valider ce TODO pour attester avoir été entretenu.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="tlAgentHrSection" style="display:none;">
+                                    <h6 class="mt-4 mb-2">Informations RH</h6>
+                                    <div class="row g-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label small text-muted">Type de contrat</label>
+                                            <select class="form-select form-select-sm" id="tlAgentContractType">
+                                                <option value="">—</option>
+                                                <option value="CDI">CDI</option>
+                                                <option value="CDD">CDD</option>
+                                                <option value="Stage">Stage</option>
+                                                <option value="Intérim">Intérim</option>
+                                                <option value="Prestataire">Prestataire</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small text-muted">Statut du contrat</label>
+                                            <select class="form-select form-select-sm" id="tlAgentContractStatus">
+                                                <option value="">—</option>
+                                                <option value="Actif">Actif</option>
+                                                <option value="Suspendu">Suspendu</option>
+                                                <option value="Terminé">Terminé</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small text-muted">Début de contrat</label>
+                                            <input type="date" class="form-control form-control-sm" id="tlAgentContractStart">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small text-muted">Fin de contrat</label>
+                                            <input type="date" class="form-control form-control-sm" id="tlAgentContractEnd">
+                                        </div>
+                                        <div class="col-md-12">
+                                            <label class="form-label small text-muted">Lieu de résidence</label>
+                                            <input type="text" class="form-control form-control-sm" id="tlAgentResidence" placeholder="Ex. Cocody, Abidjan">
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-sm btn-primary mt-2" id="tlAgentSaveHrBtn"><i class="bi bi-check-lg"></i> Enregistrer</button>
+                                    <span class="small text-success ms-2 d-none" id="tlAgentSaveHrStatus">Enregistré.</span>
+                                </div>
+                                <div id="tlAgentAlertHistorySection">
+                                    <h6 class="mt-4 mb-2">Historique des alertes</h6>
+                                    <div id="tlAgentAlertHistory"><p class="text-muted small">Chargement…</p></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- ===================== MODALE — NOTIFICATION AUTOMATIQUE ===================== -->
+<div class="modal fade" id="tlNotifPopupModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center p-4">
+                <div class="rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center overflow-hidden"
+                     style="width:90px;height:90px;background:#e9ecef;" id="tlNotifPhotoWrap">
+                    <i class="bi bi-headset" style="font-size:2.5rem;color:#F5A623;"></i>
+                </div>
+                <p class="mb-3" id="tlNotifMessage"></p>
+                <button class="btn btn-outline-secondary btn-sm me-2" data-bs-dismiss="modal">Plus tard</button>
+                <button class="btn btn-primary btn-sm" id="tlNotifConsultBtn">Consulter</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== MODALE — CHOIX DES MEMBRES POUR LA COMPÉTITION ===================== -->
+<div class="modal fade" id="tlCompParticipantsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-people-fill"></i> Choisir les membres de mon équipe</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="tlCompParticipantsList"><p class="text-muted small">Chargement…</p></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button class="btn btn-primary" id="tlCompValidateBtn">Valider mon équipe</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/rcc-api.js}"></script>
+<script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/team-leader.js}"></script>
+</body>
+</html>

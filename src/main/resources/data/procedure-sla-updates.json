@@ -1,0 +1,117 @@
+{
+  "CONSTITUTION DE DAT NON EFFECTUEE": {
+    "slaDelay": "Non défini dans la procédure",
+    "level": "N2",
+    "responsibleTeam": "RCC Résolution, Opérations Bancaires, Back Office Dépôts"
+  },
+  "COMPTE – DEMANDE DE SOLDE": {
+    "slaDelay": "Immédiat",
+    "level": "N1",
+    "responsibleTeam": "RCC Front Office"
+  },
+  "COMPTE – DEMANDE DE CODE SWIFT DE ECOBANK CI": {
+    "slaDelay": "24h",
+    "level": "N1",
+    "responsibleTeam": "Digital Solicitation, Digital Banking"
+  },
+  "DEMANDE D’ATTESTATION BANCAIRE (Attestation de redevance et non redevance)": {
+    "slaDelay": "5 jours ouvrés",
+    "level": "N2",
+    "responsibleTeam": "RCC Résolution, Agence"
+  },
+  "DEMANDE D’ATTESTATION BANCAIRE (redevance et non redevance, etc.) RESTEE SANS SUITE": {
+    "slaDelay": "5 jours ouvrés",
+    "level": "N2",
+    "responsibleTeam": "RCC Résolution, Agence"
+  },
+  "CARTE – DEBLOCAGE VBV / REINITIALISATION PASS OU WEB CODE CASH XPRESS": {
+    "level": "N1",
+    "responsibleTeam": "Card Services"
+  },
+  "CARTE - DEBLOCAGE": {
+    "level": "N1",
+    "responsibleTeam": "Card Services"
+  },
+  "CARTE- DEBLOCAGE NON EFFECTUE": {
+    "level": "N1",
+    "responsibleTeam": "Card Services"
+  },
+  "ECOBANK MOBILE APP – DIFFICULTE A EFFECTUER DES TRANSACTIONS / DIFFICULTE A GENERER UN E-TOKEN/NON RECEPTION OTP/TRANSFERT IMPOSSIBLE": {
+    "level": "N2",
+    "responsibleTeam": "Mobile Banking, RCC Résolution"
+  },
+  "ECOBANK ONLINE-DIFFICULTE A EFFECTUER DES TRANSACTIONS/TRANSFERT IMPOSSIBLE/NON RECEPTION OTP": {
+    "level": "N1 ou N2",
+    "responsibleTeam": "Digital Banking"
+  },
+  "B2W/W2B – TRANSFERT MOBILE MONEY NON ABOUTI": {
+    "slaDelay": "72h (SLA automatique)",
+    "level": null,
+    "responsibleTeam": "Mobile Money Operations"
+  },
+  "PIN RESET/ PASS RESET CARTE CASHXPRESS": {
+    "level": "N1",
+    "responsibleTeam": "GTP Limited"
+  },
+  "DEBLOCAGE VBV CASHXPRESS": {
+    "level": "N1",
+    "responsibleTeam": "GTP Limited"
+  },
+  "CASHXPRESS – ACHAT DE LA CARTE": {
+    "level": "N1",
+    "responsibleTeam": "GTP Limited"
+  },
+  "CASHXPRESS-BLOCAGE DE CARTE": {
+    "level": "N1",
+    "responsibleTeam": "GTP Limited"
+  },
+  "CASHXPRESS-TRANSACTION NON ABOUTIE": {
+    "slaDelay": "45 jours ouvrés",
+    "level": "N2",
+    "responsibleTeam": "GTP Limited, Card Operations"
+  },
+  "CASHXPRESS-RECHARGEMENT NON EFFECTUE": {
+    "slaDelay": "45 jours ouvrés",
+    "level": "N2",
+    "responsibleTeam": "GTP Limited, Card Operations"
+  },
+  "DEMANDE DE PRET- AUTRE FILIALE": {
+    "slaDelay": "Retour sous 72 heures",
+    "level": "N1",
+    "responsibleTeam": "Crédit Retail, Comité Crédit"
+  },
+  "DEMANDE DE PRET RESTEE SANS SUITE- AUTRE FILIALE": {
+    "slaDelay": "Retour sous 72 heures",
+    "level": "N1",
+    "responsibleTeam": "Crédit Retail, Comité Crédit"
+  },
+  "DEMANDE DE PRET RESTEE SANS SUITE- FILIALE SENEGAL": {
+    "slaDelay": "Retour sous 72 heures",
+    "level": "N1",
+    "responsibleTeam": "Crédit Retail, Comité Crédit"
+  },
+  "PRET-DEMANDE DE RACHAT DE PRET": {
+    "level": "N2",
+    "responsibleTeam": "Crédit Retail"
+  },
+  "PRET-DEMANDE DE RACHAT DE PRET RESTEE SANS SUITE": {
+    "level": "N2",
+    "responsibleTeam": "Crédit Retail"
+  },
+  "PRET-DEMANDE DE REVERSE DE CASH COLL": {
+    "level": "N2",
+    "responsibleTeam": "Crédit, Garanties"
+  },
+  "PRET-DEMANDE DE REVERSE DE CASH COLL RESTEE SANS SUITE": {
+    "level": "N2",
+    "responsibleTeam": "Crédit, Garanties"
+  },
+  "CHEQUE - DEMANDE D'OPPOSITION": {
+    "level": "N2",
+    "responsibleTeam": "Operations, Agence"
+  },
+  "CHEQUE - LEVEE D'OPPOSITION": {
+    "level": "N1",
+    "responsibleTeam": "Agence"
+  }
+}

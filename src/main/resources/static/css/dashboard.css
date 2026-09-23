@@ -1,0 +1,399 @@
+/* ===========================================================
+   RCC Portal Enterprise
+   Dashboard Enterprise V2
+=========================================================== */
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+:root{
+
+    --eco-blue:#0057B8;
+    --eco-blue-dark:#003E8A;
+    --eco-red:#E30613;
+
+    --bg:#F5F7FB;
+    --card:#FFFFFF;
+
+    --border:#E4EAF2;
+
+    --text:#1E293B;
+
+    --shadow:0 15px 40px rgba(0,87,184,.08);
+
+}
+
+html[data-theme="dark"]{
+
+    --bg:#0f1420;
+    --card:#1a2233;
+    --border:#2a3448;
+    --text:#e8ecf4;
+    --shadow:0 15px 40px rgba(0,0,0,.35);
+
+}
+
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .dashboard-card,
+html[data-theme="dark"] .qa-card{
+    background:var(--card);
+    color:var(--text);
+    border-color:var(--border);
+}
+
+html[data-theme="dark"] .table{
+    color:var(--text);
+}
+
+html[data-theme="dark"] .form-control,
+html[data-theme="dark"] .form-select{
+    background:var(--card);
+    color:var(--text);
+    border-color:var(--border);
+}
+
+html,
+body{
+
+    height:100%;
+    background:var(--bg);
+    color:var(--text);
+    transition:background .2s ease, color .2s ease;
+
+    font-family:
+            var(--rcc-font-family, Inter, "Segoe UI", Arial, sans-serif);
+
+}
+
+.layout{
+    display:flex;
+    min-height:100vh;
+}
+
+/* ===========================
+   SIDEBAR
+=========================== */
+
+.sidebar{
+
+    width:270px;
+
+    background:linear-gradient(180deg,#003b5c,#005b96);
+
+    color:white;
+
+    position:fixed;
+
+    top:0;
+
+    left:0;
+
+    bottom:0;
+
+    display:flex;
+
+    flex-direction:column;
+
+    overflow-y:auto;
+
+    box-shadow:4px 0 20px rgba(0,0,0,.15);
+
+}
+
+/* ===========================
+   CONTENT
+=========================== */
+
+.content{
+
+    margin-left:270px;
+
+    width:100%;
+
+    min-height:100vh;
+
+}
+
+.sidebar-header{
+
+    padding:30px 20px;
+    text-align:center;
+    border-bottom:1px solid rgba(255,255,255,.1);
+
+}
+
+.sidebar-header .logo{
+
+    width:140px;
+    margin-bottom:15px;
+
+}
+
+.sidebar-menu{
+
+    display:flex;
+    flex-direction:column;
+    padding:20px 0;
+    flex:1;
+
+}
+
+.sidebar-menu a{
+
+    color:white;
+    text-decoration:none;
+
+    padding:15px 25px;
+
+    display:flex;
+    align-items:center;
+    gap:15px;
+
+    transition:.25s;
+
+}
+
+.sidebar-menu a:hover,
+.sidebar-menu a.active{
+
+    background:#0057B8;
+
+}
+
+.sidebar-footer{
+
+    padding:20px;
+    border-top:1px solid rgba(255,255,255,.1);
+
+}
+
+.sidebar-footer a{
+
+    color:white;
+    text-decoration:none;
+
+}
+/* ===========================
+   HEADER
+=========================== */
+
+.topbar{
+
+    height:75px;
+
+    background:white;
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    padding:0 30px;
+
+    box-shadow:0 2px 10px rgba(0,0,0,.05);
+
+}
+
+.search input{
+
+    width:380px;
+
+    border:none;
+
+    background:#eef2f7;
+
+    border-radius:10px;
+
+    padding:12px 18px;
+
+}
+
+.right{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:18px;
+
+}
+
+.icon{
+
+    width:42px;
+
+    height:42px;
+
+    border:none;
+
+    border-radius:50%;
+
+    background:#eef2f7;
+
+    cursor:pointer;
+
+}
+
+.user{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:12px;
+
+}
+
+.user img{
+
+    width:45px;
+
+    height:45px;
+
+    border-radius:50%;
+
+}
+
+/* ===========================
+   MAIN
+=========================== */
+
+#page-content{
+
+    padding:30px;
+
+}
+
+.kpi{
+
+    border:none;
+
+    border-radius:16px;
+
+    box-shadow:0 10px 25px rgba(0,0,0,.06);
+
+}
+
+.kpi .card-body{
+
+    padding:28px;
+
+}
+
+.kpi small{
+
+    color:#6b7280;
+
+}
+
+.kpi h2{
+
+    margin-top:10px;
+
+    color:#005b96;
+
+    font-size:34px;
+
+}
+
+.card{
+
+    border:none;
+
+    border-radius:16px;
+
+    box-shadow:0 10px 25px rgba(0,0,0,.05);
+
+}
+
+.card-header{
+
+    background:white;
+
+    font-weight:700;
+
+    border-bottom:1px solid #edf2f7;
+
+}
+
+.table{
+
+    margin-bottom:0;
+
+}
+
+/* ===========================
+   RESPONSIVE
+=========================== */
+
+@media(max-width:992px){
+
+    .sidebar{
+
+        width:80px;
+
+    }
+
+    .sidebar span{
+
+        display:none;
+
+    }
+
+    .content{
+
+        margin-left:80px;
+
+    }
+
+    .search input{
+
+        width:220px;
+
+    }
+
+}
+
+@media(max-width:768px){
+
+    .sidebar{
+
+        display:none;
+
+    }
+
+    .content{
+
+        margin-left:0;
+
+    }
+
+}
+
+/* ===== Éditeur de texte riche (RccRichText) ===== */
+.rcc-richtext-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    align-items: center;
+    padding: .4rem;
+    background: #f8f9fb;
+    border: 1px solid #dee2e6;
+    border-bottom: none;
+    border-radius: .375rem .375rem 0 0;
+}
+.rcc-richtext-select { width: auto; min-width: 130px; }
+.rcc-richtext-color { width: 38px; height: 31px; padding: 2px; }
+.rcc-richtext-editable {
+    min-height: 140px;
+    max-height: 420px;
+    overflow-y: auto;
+    border-radius: 0 0 .375rem .375rem;
+    border-top: none;
+    padding: .75rem;
+}
+.rcc-richtext-editable:focus { outline: none; box-shadow: none; }

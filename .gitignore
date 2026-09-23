@@ -1,0 +1,15 @@
+# Build
+target/
+*.class
+*.log
+
+# Secrets locaux — ne jamais committer (clés API, mots de passe)
+application-secrets.yml
+.env
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+__pycache__/

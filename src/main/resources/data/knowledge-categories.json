@@ -1,0 +1,14 @@
+[
+  {"code":"COMPTE","title":"Compte","icon":"bi-wallet2","sortOrder":1},
+  {"code":"TRANSFERT","title":"Transfert","icon":"bi-arrow-left-right","sortOrder":2},
+  {"code":"ATTESTATION BANCAIRE","title":"Attestation Bancaire","icon":"bi-file-earmark-text","sortOrder":3},
+  {"code":"ASSURANCE","title":"Assurance","icon":"bi-shield-check","sortOrder":4},
+  {"code":"ASSURANCE-SOUSCRIPTION CONTESTEE","title":"Assurance - Souscription Contestée","icon":"bi-shield-exclamation","sortOrder":5},
+  {"code":"CARTE ATM","title":"Carte ATM","icon":"bi-credit-card","sortOrder":6},
+  {"code":"CONNEXION PRODUITS DIGITAUX","title":"Connexion Produits Digitaux","icon":"bi-phone","sortOrder":7},
+  {"code":"MMH","title":"MMH (Mobile Money Hub)","icon":"bi-wallet","sortOrder":8},
+  {"code":"CASHXPRESS","title":"CashXpress","icon":"bi-cash-coin","sortOrder":9},
+  {"code":"DEMANDE DE PRET","title":"Demande de Prêt","icon":"bi-cash-stack","sortOrder":10},
+  {"code":"CHEQUE","title":"Chèque","icon":"bi-journal-check","sortOrder":11},
+  {"code":"AUTRE","title":"Autre","icon":"bi-three-dots","sortOrder":12}
+]

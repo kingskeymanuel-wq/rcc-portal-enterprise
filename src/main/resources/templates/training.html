@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>RCC Portal Enterprise — Formation</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
+          rel="stylesheet">
+
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+
+</head>
+
+<body>
+
+<div class="layout">
+
+    <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+
+    <div class="content">
+
+        <div th:replace="~{fragments/header :: header}"></div>
+
+        <main id="page-content">
+
+            <div class="container-fluid">
+
+                <div class="welcome-banner">
+                    <div>
+                        <h2>Formation</h2>
+                        <p class="text-muted">Parcours, évaluations et auto-diagnostics</p>
+                    </div>
+                </div>
+
+                <!-- ===================== TABLEAU DE BORD ===================== -->
+                <div class="card dashboard-card shadow-sm mb-4 text-white position-relative" id="formationBanner" style="background:linear-gradient(120deg,#0057B8,#003E8A);border:none;overflow:hidden;">
+                    <div id="formationBannerImageLayer" style="position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;"></div>
+                    <div class="card-body py-4 position-relative">
+                        <p class="mb-1 opacity-75">Bienvenue sur votre espace</p>
+                        <h2 class="fw-bold mb-2" id="formationBannerTitle">Centre de Formation</h2>
+                        <p class="mb-0 opacity-75" id="formationBannerSubtitle">Développez vos compétences avec nos modules interactifs et évaluations.</p>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-lg-3">
+                        <div class="card dashboard-card shadow-sm h-100">
+                            <div class="card-body text-center">
+                                <i class="bi bi-check2-square fs-3 text-primary"></i>
+                                <div class="fs-4 fw-bold mt-2" id="statModulesCompleted">0/0</div>
+                                <div class="text-muted small">Modules complétés</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="card dashboard-card shadow-sm h-100">
+                            <div class="card-body text-center">
+                                <i class="bi bi-trophy fs-3 text-success"></i>
+                                <div class="fs-4 fw-bold mt-2" id="statAvgScore">0%</div>
+                                <div class="text-muted small">Score moyen</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="card dashboard-card shadow-sm h-100">
+                            <div class="card-body text-center">
+                                <i class="bi bi-clock-history fs-3 text-warning"></i>
+                                <div class="fs-4 fw-bold mt-2" id="statAttempts">0</div>
+                                <div class="text-muted small">Tentatives effectuées</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="card dashboard-card shadow-sm h-100">
+                            <div class="card-body text-center">
+                                <i class="bi bi-award fs-3" style="color:#7b2ff7;"></i>
+                                <div class="fs-4 fw-bold mt-2" id="statBadges">0</div>
+                                <div class="text-muted small">Modules réussis</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card dashboard-card shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-1">
+                            <strong>Progression globale</strong>
+                            <strong id="progressLabel">0%</strong>
+                        </div>
+                        <div class="progress" style="height:10px;">
+                            <div class="progress-bar" id="progressBar" style="width:0%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="mb-3">Accès rapide aux modules</h6>
+                <div class="row g-3 mb-4" id="quickAccessModules"></div>
+
+                <!-- ===================== FORMATIONS PROGRAMMÉES (jour/semaine/mois) ===================== -->
+                <div class="card dashboard-card shadow-sm mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <span><i class="bi bi-calendar-week"></i> Formations programmées</span>
+                        <div class="btn-group btn-group-sm" role="group" id="scheduleViewToggle">
+                            <button type="button" class="btn btn-outline-primary active" data-view="day">Jour</button>
+                            <button type="button" class="btn btn-outline-primary" data-view="week">Semaine</button>
+                            <button type="button" class="btn btn-outline-primary" data-view="month">Mois</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <button class="btn btn-sm btn-outline-secondary" id="scheduleNavPrev"><i class="bi bi-chevron-left"></i></button>
+                            <strong id="scheduleRangeLabel">—</strong>
+                            <button class="btn btn-sm btn-outline-secondary" id="scheduleNavNext"><i class="bi bi-chevron-right"></i></button>
+                        </div>
+                        <div id="scheduleAgendaList" class="d-flex flex-column gap-2">
+                            <p class="text-muted text-center mb-0">Chargement des formations programmées…</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===================== ESPACE AGENT ===================== -->
+                <div class="card dashboard-card shadow-sm mb-4" id="courseCategoriesCard">
+                    <div class="card-header">Mes cours — par thématique</div>
+                    <div class="card-body">
+                        <div class="row g-3" id="courseCategoryGrid">
+                            <div class="col-12 text-center text-muted">Chargement…</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card dashboard-card shadow-sm mb-4" id="courseCategoryDetailCard" style="display:none;">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span id="courseCategoryDetailTitle"></span>
+                        <div class="d-flex gap-2">
+                            <a href="#" class="btn btn-sm btn-success" id="launchEvaluationBtn" style="display:none;" target="_blank">
+                                <i class="bi bi-controller"></i> Lancer l'évaluation
+                            </a>
+                            <button class="btn btn-sm btn-primary qa-only" id="addCourseToCategoryBtn" style="display:none;">
+                                <i class="bi bi-plus-lg"></i> Ajouter un cours à cette rubrique
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" id="courseCategoryBackBtn"><i class="bi bi-arrow-left"></i> Retour aux rubriques</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-hover">
+                            <thead>
+                            <tr><th>Titre</th><th>Type</th><th>Obligatoire</th><th>Statut</th><th></th></tr>
+                            </thead>
+                            <tbody id="myCoursesTable">
+                            <tr><td colspan="5" class="text-muted text-center">Chargement...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Lecteur de cours (agent) -->
+                <div class="card dashboard-card shadow-sm mb-4" id="coursePlayerCard" style="display:none;">
+                    <div class="card-header" id="coursePlayerTitle"></div>
+                    <div class="card-body" id="coursePlayerBody"></div>
+                </div>
+
+                <!-- ===================== ESPACE QA/ADMIN ===================== -->
+                <div class="row g-4 qa-only" style="display:none;">
+
+                    <div class="col-lg-6">
+                        <div class="card dashboard-card shadow-sm">
+                            <div class="card-header"><i class="bi bi-graph-up"></i> Suivi du parcours (A à Z)</div>
+                            <div class="card-body">
+                                <select class="form-select mb-3" id="schedStatsFormationSelect"></select>
+
+                                <h6 class="small text-muted mb-2">Par équipe</h6>
+                                <table class="table table-sm table-hover mb-3">
+                                    <thead><tr><th>Équipe</th><th>Agents</th><th>Terminés</th><th>Non commencés</th><th>Moyenne</th></tr></thead>
+                                    <tbody id="schedTeamStatsTable">
+                                    <tr><td colspan="5" class="text-muted text-center">Choisissez une formation programmée.</td></tr>
+                                    </tbody>
+                                </table>
+
+                                <h6 class="small text-muted mb-2">Par agent</h6>
+                                <table class="table table-sm table-hover">
+                                    <thead><tr><th>Agent</th><th>Équipe</th><th>Leçons</th><th>Parcours</th><th>Statut</th></tr></thead>
+                                    <tbody id="schedAgentStatsTable">
+                                    <tr><td colspan="5" class="text-muted text-center">—</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6">
+                        <div class="card dashboard-card shadow-sm">
+                            <div class="card-header">Créer un cours</div>
+                            <div class="card-body">
+                                <div class="alert alert-primary py-2 px-3 small mb-2" id="createCourseCategoryHint" style="display:none;"></div>
+                                <input type="text" class="form-control mb-2" id="newCourseTitle" placeholder="Titre">
+                                <textarea class="form-control mb-2" id="newCourseDescription" rows="2" placeholder="Description courte"></textarea>
+                                <input type="text" class="form-control mb-2" id="newCourseCategory" placeholder="Thématique (ex. COMPTE, TRANSFERT... — laisser vide = Général)">
+                                <label class="form-label small mb-1">Contenu du cours <span class="text-muted fw-normal">(facultatif)</span></label>
+                                <div id="newCourseContentEditor" class="mb-2"></div>
+                                <input type="text" class="form-control mb-2" id="newCourseVideoUrl" placeholder="Lien vidéo (optionnel)">
+                                <label class="form-label small mb-1">Fichier joint (PDF, Word... — optionnel)</label>
+                                <input type="file" class="form-control mb-2" id="newCourseFile">
+                                <label class="form-label small mb-1">Type de cours</label>
+                                <select class="form-select mb-2" id="newCourseType">
+                                    <option value="SELF_ASSESSMENT" selected>Auto-diagnostic (échelle 1-5, non noté)</option>
+                                    <option value="STANDARD">Évaluation notée (questions à choix multiples, avec score)</option>
+                                </select>
+                                <select class="form-select mb-2" id="newCourseService">
+                                    <option value="">— Générique (assigné à toutes les équipes) —</option>
+                                </select>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="newCourseMandatory">
+                                    <label class="form-check-label" for="newCourseMandatory">Obligatoire</label>
+                                </div>
+                                <button class="btn btn-primary w-100" id="createCourseBtn">Créer le cours</button>
+                            </div>
+                        </div>
+
+                        <!-- Questions de l'évaluation — visible uniquement après la création d'un
+                             cours "Évaluation notée" (STANDARD), s'appuie directement dessus. -->
+                        <div class="card dashboard-card shadow-sm mt-3" id="courseQuestionsCard" style="display:none;">
+                            <div class="card-header">Questions de l'évaluation — <span id="courseQuestionsForTitle"></span></div>
+                            <div class="card-body">
+                                <div id="courseQuestionsList" class="mb-3"></div>
+                                <input type="text" class="form-control mb-2" id="newQuestionText" placeholder="Intitulé de la question">
+                                <div id="newQuestionOptions">
+                                    <div class="input-group mb-2">
+                                        <span class="input-group-text"><input type="radio" name="newQuestionCorrect" value="0" checked></span>
+                                        <input type="text" class="form-control" placeholder="Réponse 1 (cocher si correcte)">
+                                    </div>
+                                    <div class="input-group mb-2">
+                                        <span class="input-group-text"><input type="radio" name="newQuestionCorrect" value="1"></span>
+                                        <input type="text" class="form-control" placeholder="Réponse 2">
+                                    </div>
+                                    <div class="input-group mb-2">
+                                        <span class="input-group-text"><input type="radio" name="newQuestionCorrect" value="2"></span>
+                                        <input type="text" class="form-control" placeholder="Réponse 3">
+                                    </div>
+                                    <div class="input-group mb-2">
+                                        <span class="input-group-text"><input type="radio" name="newQuestionCorrect" value="3"></span>
+                                        <input type="text" class="form-control" placeholder="Réponse 4">
+                                    </div>
+                                </div>
+                                <button class="btn btn-outline-primary w-100 mb-2" id="addCourseQuestionBtn">Ajouter la question</button>
+                                <button class="btn btn-link w-100" id="doneCourseQuestionsBtn">Terminer — fermer cette évaluation</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6">
+                        <div class="card dashboard-card shadow-sm">
+                            <div class="card-header">Résultats des agents</div>
+                            <div class="card-body">
+                                <div class="d-flex gap-2 mb-3">
+                                    <select class="form-select" id="resultsCourseSelect"></select>
+                                    <select class="form-select" id="resultsTeamSelect" style="max-width:220px;">
+                                        <option value="">Toutes les équipes</option>
+                                    </select>
+                                </div>
+                                <table class="table table-hover">
+                                    <thead>
+                                    <tr><th>Agent</th><th>Statut</th><th>Score</th><th>Terminé le</th></tr>
+                                    </thead>
+                                    <tbody id="resultsTable">
+                                    <tr><td colspan="4" class="text-muted text-center">Choisissez un cours.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </main>
+
+    </div>
+
+</div>
+
+<!-- Modale de lecture vidéo, intégrée au site (pas d'ouverture externe) -->
+<div class="modal fade" id="videoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-0">
+                <h6 class="modal-title text-white" id="videoModalTitle">Vidéo</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0" id="videoModalBody"></div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/preferences.js}"></script>
+<script th:src="@{/js/rcc-api.js}"></script>
+<script th:src="@{/js/richtext-editor.js}"></script>
+<script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/training.js}"></script>
+<script th:src="@{/js/training-schedule.js}"></script>
+
+</body>
+</html>

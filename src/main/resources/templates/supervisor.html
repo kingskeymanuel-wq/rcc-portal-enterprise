@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RCC Portal Enterprise — Portail Superviseur</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <style>
+        .sv-tab-nav .btn.nav-link { border: none; border-bottom: 3px solid transparent; border-radius: 0; color: #6b7280; font-weight: 600; padding: .75rem 1.1rem; }
+        .sv-tab-nav .btn.nav-link.active { color: #0057B8; border-bottom-color: #0057B8; background: transparent; }
+        .sv-stat-card { border: none; border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,.05); }
+        .sv-stat-value { font-size: 1.7rem; font-weight: 700; }
+        .sv-readonly-badge { font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+    <div class="content">
+        <div th:replace="~{fragments/header :: header}"></div>
+        <main id="page-content">
+            <div class="container-fluid">
+
+                <div class="welcome-banner d-flex justify-content-between align-items-end flex-wrap gap-2">
+                    <div>
+                        <h2><i class="bi bi-binoculars-fill"></i> Portail Superviseur</h2>
+                        <p class="text-muted mb-0">Vue 360 sur le management — reporting et qualité de toutes les équipes</p>
+                    </div>
+                    <span class="badge bg-secondary sv-readonly-badge"><i class="bi bi-eye"></i> Lecture seule</span>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-lg-4">
+                        <div class="card sv-stat-card h-100"><div class="card-body">
+                            <div class="sv-stat-value" id="svStatAgents">—</div>
+                            <div class="text-muted small">Agents suivis</div>
+                        </div></div>
+                    </div>
+                    <div class="col-6 col-lg-4">
+                        <div class="card sv-stat-card h-100"><div class="card-body">
+                            <div class="sv-stat-value" id="svStatAvgQa">—</div>
+                            <div class="text-muted small">Score QA moyen</div>
+                        </div></div>
+                    </div>
+                    <div class="col-6 col-lg-4">
+                        <div class="card sv-stat-card h-100"><div class="card-body">
+                            <div class="sv-stat-value" id="svStatEvaluations">—</div>
+                            <div class="text-muted small">Évaluations QA (total)</div>
+                        </div></div>
+                    </div>
+                </div>
+
+                <ul class="nav sv-tab-nav mb-3 flex-nowrap overflow-auto">
+                    <li class="nav-item"><button type="button" class="btn nav-link active" id="svTabReportingBtn"><i class="bi bi-diagram-3"></i> Reporting d'équipe</button></li>
+                    <li class="nav-item"><button type="button" class="btn nav-link" id="svTabQaBtn"><i class="bi bi-patch-check"></i> Évaluations QA</button></li>
+                    <li class="nav-item"><button type="button" class="btn nav-link" id="svTabCrmBtn"><i class="bi bi-telephone-outbound-fill"></i> CRM Outbound</button></li>
+                </ul>
+
+                <!-- ===================== REPORTING D'ÉQUIPE ===================== -->
+                <div id="svPaneReporting" class="sv-tab-pane">
+                    <div class="card dashboard-card shadow-sm mb-4">
+                        <div class="card-body">
+                            <div class="row g-2 mb-3 align-items-end">
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-1">Filiale</label>
+                                    <select id="svCountryFilter" class="form-select form-select-sm">
+                                        <option value="CI" selected>Côte d'Ivoire</option>
+                                        <option value="">Toutes filiales</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-1">Granularité</label>
+                                    <select id="svPeriodType" class="form-select form-select-sm">
+                                        <option value="DAY">Jour</option>
+                                        <option value="WEEK">Semaine</option>
+                                        <option value="MONTH" selected>Mois</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-1" id="svPeriodLabel">Mois</label>
+                                    <input type="date" id="svDayInput" class="form-control form-control-sm sv-period-input" style="display:none;">
+                                    <input type="week" id="svWeekInput" class="form-control form-control-sm sv-period-input" style="display:none;">
+                                    <input type="month" id="svMonthInput" class="form-control form-control-sm sv-period-input">
+                                </div>
+                                <div class="col-md-3">
+                                    <button class="btn btn-sm btn-primary w-100" id="svReportingApplyBtn">Appliquer</button>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small mb-1">Équipe</label>
+                                <div class="d-flex flex-wrap gap-2" id="svTeamPicker"></div>
+                            </div>
+
+                            <input type="text" id="svReportingSearch" class="form-control form-control-sm mb-3" placeholder="Rechercher un agent...">
+
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle table-sm">
+                                    <thead>
+                                    <tr>
+                                        <th>Agent</th><th>Filiale</th><th>Service</th><th>Équipe</th>
+                                        <th>Score QA</th><th>Score évaluation</th><th>Interactions</th><th>Présence</th><th>Performance</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="svReportingBody"><tr><td colspan="9" class="text-center text-muted">Chargement…</td></tr></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===================== ÉVALUATIONS QA ===================== -->
+                <div id="svPaneQa" class="sv-tab-pane" style="display:none;">
+                    <div class="card dashboard-card shadow-sm mb-4">
+                        <div class="card-body">
+                            <div class="row g-2 mb-3">
+                                <div class="col-md-4">
+                                    <input type="text" id="svQaSearch" class="form-control form-control-sm" placeholder="Rechercher un agent...">
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle table-sm">
+                                    <thead>
+                                    <tr>
+                                        <th>Agent</th><th>Date d'appel</th><th>Motif</th><th>Score</th>
+                                        <th>Résultat</th><th>Évaluateur</th><th>Statut feedback</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="svQaBody"><tr><td colspan="7" class="text-center text-muted">Chargement…</td></tr></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===================== CRM OUTBOUND (toutes équipes, vue Superviseur) ===================== -->
+                <div id="svPaneCrm" class="sv-tab-pane" style="display:none;">
+                    <ul class="nav nav-tabs mb-3" id="svCrmSubTabs">
+                        <li class="nav-item"><button type="button" class="btn nav-link active" id="svCrmTabCampaignsBtn">Campagnes</button></li>
+                        <li class="nav-item"><button type="button" class="btn nav-link" id="svCrmTabSalesBtn">Ventes</button></li>
+                        <li class="nav-item"><button type="button" class="btn nav-link" id="svCrmTabRdvBtn">Rendez-vous</button></li>
+                    </ul>
+
+                    <div id="svCrmPaneCampaigns">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">Toutes les campagnes Outbound</h6>
+                        </div>
+                        <div id="svCampaignsList"></div>
+                    </div>
+
+                    <div id="svCrmPaneSales" style="display:none;">
+                        <div class="row g-2 mb-3 align-items-end">
+                            <div class="col-md-3"><label class="form-label small mb-1">Du</label><input type="date" id="svSalesFrom" class="form-control form-control-sm"></div>
+                            <div class="col-md-3"><label class="form-label small mb-1">Au</label><input type="date" id="svSalesTo" class="form-control form-control-sm"></div>
+                            <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" id="svSalesApplyBtn">Appliquer</button></div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm align-middle">
+                                <thead><tr><th>Date</th><th>Agent</th><th>Produit</th><th>Client</th><th>Montant</th><th>Statut</th></tr></thead>
+                                <tbody id="svSalesBody"><tr><td colspan="6" class="text-center text-muted">Chargement…</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="svCrmPaneRdv" style="display:none;">
+                        <div class="row g-2 mb-3 align-items-end">
+                            <div class="col-md-3"><label class="form-label small mb-1">Du</label><input type="date" id="svRdvFrom" class="form-control form-control-sm"></div>
+                            <div class="col-md-3"><label class="form-label small mb-1">Au</label><input type="date" id="svRdvTo" class="form-control form-control-sm"></div>
+                            <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" id="svRdvApplyBtn">Appliquer</button></div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm align-middle">
+                                <thead><tr><th>Quand</th><th>Agent</th><th>Client</th><th>Objet</th><th>Statut</th></tr></thead>
+                                <tbody id="svRdvBody"><tr><td colspan="5" class="text-center text-muted">Chargement…</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===================== MODALE — DÉTAIL CAMPAGNE (Superviseur, lecture) ===================== -->
+                <div class="modal fade" id="svCampaignDetailModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="svCampaignDetailTitle"><i class="bi bi-megaphone-fill"></i></h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover align-middle">
+                                        <thead><tr><th>Client</th><th>Téléphone</th><th>N° compte</th><th>Agent</th><th>Statut</th></tr></thead>
+                                        <tbody id="svCampaignContactsBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/rcc-api.js}"></script>
+<script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/supervisor.js}"></script>
+</body>
+</html>

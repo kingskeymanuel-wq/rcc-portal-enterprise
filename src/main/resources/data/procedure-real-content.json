@@ -1,0 +1,1287 @@
+[
+  {
+    "title": "CONSTITUTION DE DAT NON EFFECTUEE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client",
+      "Demander l’agence où il a effectué sa demande de DAT",
+      "Demander la date à laquelle il fait sa demande",
+      "Demande le montant qui doit lui être octroyé",
+      "Demander le numéro de compte",
+      "Authentifier le client",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "COMPTE – CONSTESTATION DU MONTANT DES INTERÊTS CREDITEURS",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom et le numéro de compte du client",
+      "Authentifier le client",
+      "Effectuer les vérifications nécessaires sur le compte du client",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "COMPTE – DEMANDE DE CHANGEMENT DE SIGNATAIRES",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client",
+      "Inviter le client à se rendre en agence avec les personnes concernées afin d’effectuer sa demande sur place muni du numéro de compte et de la pièce d’identités des différents signataires",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "COMPTE – DEMANDE DE CHANGEMENT DE SIGNATAIRES NON-PRISE EN COMPTE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom et le numéro de compte du client",
+      "Authentifier le client",
+      "Demander l’agence où il a effectué sa demande de changement de signataires. Demander les informations à modifier.",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION)"
+    ]
+  },
+  {
+    "title": "COMPTE – DEMANDE DE CODE SWIFT DE ECOBANK CI",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom et le numéro de compte du client",
+      "Demander l’adresse E-mail du client",
+      "Authentifier le client",
+      "Proposer au client de lui transmettre par mail son RIB afin qu’il puisse y trouver son code SWIFT",
+      "Envoyer un mail au service digital joignant le RIB du client pour transmission Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "COMPTE – DEMANDE DE LEVEE DE RESTRICTION",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client",
+      "Inviter le client à se rendre en agence afin de pouvoir remplir le formulaire de levée de restriction et effectuer un versement à sa convenance pour la réactivation du compte",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "COMPTE – DEMANDE DE LEVEE DE RESTRICTION RESTEE SANS SUITE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom et le numéro de compte du client",
+      "Authentifier le client",
+      "Demander l’agence où il a effectué sa demande de levée de restriction",
+      "Demander la date à laquelle il a fait sa demande",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "COMPTE – DEMANDE DE MISE A JOUR DES INFORMATIONS",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client",
+      "Inviter le client à se rendre en agence afin de pouvoir remplir le formulaire pour la mise à jour de ses informations",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "COMPTE – DEMANDE DE MISE A JOUR DES INFORMATIONS RESTEE SANS SUITE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom et le numéro de compte du client",
+      "Authentifier le client",
+      "Demander la date à laquelle il a fait sa demande",
+      "Demander l’agence où il a effectué sa demande de mise à jour d’informations Demander les contacts à rajouter",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "COMPTE – DEMANDE DE MISE DE RESTRICTION (NO DEBIT OU COMPTE DORMANT)",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client",
+      "Inviter le client à se rendre en agence afin de pouvoir faire sa demande munie de sa pièce d’identité et de son numéro de compte",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "COMPTE – DEMANDE DE MISE DE RESTRICTION RESTEE SANS SUITE (NO DEBIT OU COMPTE DORMANT)",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom et le numéro de compte du client",
+      "Authentifier le client",
+      "Demander le motif de mise de restriction et la date à laquelle il a fait sa demande",
+      "Demander l’agence où il a effectué sa demande de mise à jour d’informations",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "COMPTE – DEMANDE DE SOLDE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom et le numéro de compte du client",
+      "Authentifier le client",
+      "Communiquer le solde au client",
+      "Proposer au client le bank to wallet ou l’application mobile ou Ecobank online afin qu’il puisse vérifier ses transactions et aussi faire des transactions à partir des plateformes digitales",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "COMPTE – DEMANDE D’OUVERTURE DE COMPTE",
+    "isNew": false,
+    "steps": [
+      "Si le client est résident 1. Demander le nom et le prénom du client 2. Inviter le client à se rendre en agence avec la documentation requise selon le type de compte qu’il souhaite ouvrir 3. Créer l’incident de niveau 1 et le fermer",
+      "Si le client est non-résident 1. Demander le nom et le prénom du client 2. Proposer au client de faire sa demande directement sur le site en ligne www.aop.ecobank.com 3. Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "COMPTE – DEMANDE D’OUVERTURE DE COMPTE RESTEE SANS SUITE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client",
+      "Demander l’agence où il a effectué sa demande d’ouverture de compte",
+      "Demander la date à laquelle il a fait sa demande. Ainsi que les informations fournies à la demande d’ouverture du compte (contact, email, numéro de CNI, si versement effectué le montant)",
+      "Si compte disponible sur D365, l’authentifier et lui communiquer le numéro de compte. Créer l’incident de niveau 1 et le fermer",
+      "Si compte non trouvé dans D365",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "COMPTE – PRELEVEMENT CONTESTE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom et le numéro de compte du client",
+      "Authentifier le client",
+      "constater le/les prélèvement (s) occasionné (s) dans D365 ou BO",
+      "Expliquer les détails au client Si le client conteste toujours les prélèvements",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "COMPTE – SUCCESSION",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client",
+      "Inviter le client à se rendre au siège , au service juridique, avec la documentation requise attestant du lien de parenté au Service JURIDIQUE",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "COMPTE – DEMANDE / SUPRESSION DE PROCURATION SU COMPTE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client",
+      "Inviter le client à se rendre en agence afin de faire sa demande",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "COMPTE-DEMANDE CLOTURE DE COMPTE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Demander la raison de la clôture du compte et l’assister en fonction",
+      "Inviter le client à se rendre en agence afin de rencontrer un responsable clientèle",
+      "Au cas où le client persiste L’inviter à rédiger le courrier de clôture et le soumettre à son agence",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "COMPTE – DEMANDE DE CLÔTURE DE COMPTE NON EFFECTUE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Demander l’agence et la date à laquelle il fait sa demande de clôture",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "COMPTE – DEMANDE / SUPRESSION DE PROCURATION SU COMPTE NON PRISE EN COMPTE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Demander la date et l’agence à laquelle il a fait sa demande",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "DEMANDE D’ANNULATION DE TRANSFERT",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Demander le nom et prénom du bénéficiaire ainsi que son numéro de compte et coordonnées",
+      "prendre le nom de la banque expéditrice et réceptrice, le montant du transfert et la date du transfert",
+      "Demander le canal utilisé pour le transfert et la référence du transfert",
+      "Demander le motif de l’annulation Transmettre la requête au niveau 2",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "TRANSFERT-DEMANDE DE TRANSFERT DE FONDS",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Inviter le client à utiliser nos plateformes digitales ou l’inviter a se rendre en agence pour son opération",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "TRANSFERT-DEMANDE DE TRANSFERT DE FONDS RESTEE SANS SUITE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Prendre les informations suivantes pour sa relance : l’agence à laquelle la demande a été effectuée en tenant compte de la filiale où le client se trouve, la date de demande, le montant de l’appel de fonds",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "TRANSFERT CARTE A CARTE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Assister pour le P2P",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "TRANSFERT CARTE A CARTE NON EFFECTUE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "confirmer de l’identité du client à partir du numéro de compte ou de sa carte",
+      "Demander le nom et prénom de l’expéditeur, coordonnées numéro de carte et ID si nécessaire de celui-ci à obtenir",
+      "Demander le nom et prénom du bénéficiaire, numéro de carte à obtenir (ID si nécessaire et coordonnées de celui-ci à obtenir)",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "TRANSFERT- CORRECTION DES INFORMATIONS DU BENEFICIAIRE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "confirmer l’identité du client à partir du numéro de compte ou de sa carte",
+      "Demander le nom et prénom de l’expéditeur et coordonnées de celui- ci",
+      "Demander le nom et prénom du bénéficiaire correct et incorrect, numéro de compte et coordonnées",
+      "Prendre le nom de la banque expéditrice et réceptrice, le montant du transfert et la date du transfert",
+      "Demander le canal utilisé pour le transfert et la référence du transfert",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "TRANSFERT- CORRECTION DES INFORMATIONS DU BENEFICIAIRE NON PRIS EN COMPTE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "communiquer le statut de sa réclamation à partir du CAS.",
+      "Enrichir l’incident de réclamation à partir du contenu du mail de la relance"
+    ]
+  },
+  {
+    "title": "TRANSFERT DE FONDS EN DEVISE NON EFFECTUE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Confirmer l’identité du client à partir de son numéro de compte",
+      "Confirmer l’identité du client à partir de son numéro de compte",
+      "Demander le nom et prénom du bénéficiaire correct et incorrect, numéro de compte et coordonnées",
+      "Prendre le nom de la banque expéditrice et réceptrice, le montant du transfert et la date du transfert et la devise",
+      "Demander le canal utilisé pour le transfert et la référence du transfert",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "TRANSFERT FRAIS ET CHARGES",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "communiquer les frais en fonction du type de transfert",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "TRANSFERT FRAIS ET CHARGES INJUSTIFIES",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Demander le Nom et prénom de l’expéditeur et coordonnées",
+      "Demander le nom et prénom du bénéficiaire et numéro de compte et coordonnées",
+      "Demander le nom de la banque expéditrice et réceptrice, le montant du transfert et la date du transfert ainsi que le canal utilisé pour le transfert",
+      "Demander la référence du transfert frais dus normalement et frais prélevés injustement",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "TRANSFERT- NON RECEPTION DE CODE RAPIDTRANSFER",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Demander le Nom et prénom de l’expéditeur et coordonnées",
+      "Demander le nom et prénom du bénéficiaire et numéro de compte et coordonnées",
+      "Demander le nom de la banque expéditrice et réceptrice, le montant du transfert et la date du transfert ainsi que le canal utilisé pour le transfert",
+      "Demander la référence du transfert frais dus normalement et frais prélevés injustement",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "TRANSFERT- ORDRE DE VIREMENT",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Proposer au client l’option sur mobile app en l’assistant afin de définir l’ordre de virement , Si le client préfère le faire en agence lui indiquer l’agence la plus proche",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "TRANSFERT- ORDRE DE VIREMENT NON EXECUTE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Demander le Nom et prénom de l’expéditeur et ses coordonnées",
+      "Demander le nom et prénom du bénéficiaire, le numéro de compte et ses coordonnées",
+      "Demander le nom de la banque expéditrice et réceptrice, le montant, la date et le canal utilisé pour le transfert",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "TRANSFERT-DEMANDE DE STATUT DE TRANSACTION (CAS TRANSACTION ABOUTIE)",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "indiquer le statut de la transaction en vérifiant dans CRM ou BO",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "TRANSFERT-DEMANDE DE STATUT DE TRANSACTION (CAS TRANSACTION NON ABOUTIE)",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Demander le Nom et prénom de l’expéditeur et coordonnées",
+      "Demander le nom et prénom du bénéficiaire ainsi que le numéro de compte et coordonnées",
+      "Demander le nom de la banque expéditrice et réceptrice, le montant, la date, le canal utilisé et la référence du transfert",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "DEMANDE D’ATTESTATION BANCAIRE (redevance et non redevance, etc.) RESTEE SANS SUITE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentification du client",
+      "Demander le document souhaité, l’agence ayant reçu la demande, la date de la demande, le contact du client et préciser la filiale du client",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet",
+      "Communiquer le délai de traitement si le client souhaite le savoir (5 jours ouvrés)"
+    ]
+  },
+  {
+    "title": "DEMANDE D’ATTESTATION BANCAIRE (demande de relevé bancaire et demande RIB au RCC)",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client et Vérifier si l’adresse du client est renseignée",
+      "• Prendre la période souhaitée ✓ Pour client autre filiale Ecobank (délai 48) o Transmettre le mail au niveau 2 et leur affecter l’incident",
+      "• Prendre la période souhaitée ✓ Pour client ECI Tirer le relevé et transmettre par mail à l’équipe DIGITAL SOLLICITATION pour l’envoi du relevé (délai 24h) o Créer l’incident puis le refermer après envoie du mail"
+    ]
+  },
+  {
+    "title": "DEMANDE D’ATTESTATION BANCAIRE (Attestation de redevance et non redevance)",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Demander au client de se rendre dans une agence Ecobank pour la demande",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "DEMANDE DE RACHAT D’ASSURANCE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Demander l’agence de souscription de l’assurance",
+      "Demander au client le type d’assurance et le numéro de police",
+      "Demander au client de rédiger un courrier de demande de rachat adresser à son agence de souscription ( si le client ne se rappelle pas du type d’assurance, l’inviter à se rendre a son agence de souscription pour une meilleure assistance)",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "DEMANDE DE RESILIATION D’ASSURANCE RESTEE SANS SUITE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client en lui posant les questions de sécurité suivantes : . la date de naissance du client . l'agence d'ouverture de compte . les deux dernières transactions",
+      "Demander les détails suivants : le numéro de police d’assurance, le type de produit, l’agence ayant reçu la demande, la date de dépôt du courrier, le contact du client.",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet",
+      "Communiquer le délai de traitement si le client souhaite le savoir (5 jours ouvrés)"
+    ]
+  },
+  {
+    "title": "CARTE-DEBIT A TORT (GIM UEMOA) ET (HORS GIM UEMOA)",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client en lui posant les questions de sécurité suivantes: . la date de naissance du client . l'agence d'ouverture de compte . les deux dernières transactions",
+      "Demander les 6 premiers et les 4 derniers chiffres de la carte utilisée pour le retrait Prendre les références de débit dans D365, la date, le montant, le contact du client, le lieu de retrait (la banque et GAB)",
+      "Prendre les références de débit dans D365, la date, le montant, le contact du client, le lieu de retrait (la banque et le lieu)",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet en précisant la filiale du client",
+      "Communiquer le délai de traitement si le client souhaite le savoir (30 jours ouvrés)"
+    ]
+  },
+  {
+    "title": "CARTE- DEBIT A TORT DAB ECOBANK (AUTRE FILIALE)",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client en lui posant les questions de sécurité suivantes : . la date de naissance du client . l'agence d'ouverture de compte . les deux dernières transactions",
+      "Demander les 6 premiers et les 4 derniers chiffres de la carte utilisée pour le retrait",
+      "Prendre les références de débit dans D365, la date, le montant, le contact du client, le lieu de retrait (la ville et l’agence)",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet en précisant la filiale du client",
+      "Communiquer le délai de traitement si le client souhaite le savoir (5 jours ouvrés)"
+    ]
+  },
+  {
+    "title": "CARTE- DEBIT A TORT DAB ECOBANK (FILIALE)",
+    "isNew": false,
+    "steps": [
+      "Si DSD enregistré en moins de 24h Si reverse non demander au client effectuée de patienter pour la après 24h reverse automatique dans les 24h",
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client en lui posant les questions de sécurité suivantes : . la date de naissance du client . l'agence d'ouverture de compte . les deux dernières transactions",
+      "Demander les 6 premiers et les 4 derniers chiffres de la carte utilisée pour le retrait",
+      "Créer l’incident de niveau 1 et le fermer",
+      "Prendre les références de débit dans D365, la date, le montant, le contact du client, le lieu de retrait",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet en précisant la filiale du client",
+      "Communiquer le délai de traitement si le client souhaite le savoir (2 jours ouvrés)"
+    ]
+  },
+  {
+    "title": "CARTE- DEBIT A TORT ETOKEN",
+    "isNew": false,
+    "steps": [
+      "Si DSD enregistré en moins de 72h demander au client Si reverse non de patienter pour effectuée la reverse après 72h automatique dans les 72h.",
+      "Demander le nom et le prénom du client",
+      "Demander le numéro de téléphone de l’application ou le numéro de compte",
+      "Authentifier le client en lui posant les questions de sécurité suivantes : . la date de naissance du client . l'agence d'ouverture de compte . les deux dernières transactions",
+      "Prendre les références de débit dans CRM, la date, le montant, le contact du client, le lieu de retrait",
+      "Créer l’incident de niveau 1 et le fermer",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet en précisant la filiale du client",
+      "Communiquer le délai de traitement si le client souhaite le savoir (5 jours ouvrés)"
+    ]
+  },
+  {
+    "title": "CARTE- DELIVRANCE PARTIELLE DE BILLET",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client en lui posant les questions de sécurité suivantes : . la date de naissance du client . l'agence d'ouverture de compte . les deux dernières transactions",
+      "Demander les 6 premiers et les 4 derniers chiffres de la carte utilisée pour le retrait",
+      "Prendre les références de débit dans D365, la date, le montant du retrait, le montant reçu (préciser les coupures de billets reçues), le contact du client, le lieu de retrait (la ville et l’agence)",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet en précisant la filiale du client",
+      "Communiquer le délai de traitement si le client souhaite le savoir (5 jours ouvrés)"
+    ]
+  },
+  {
+    "title": "CARTE- PLAINTE LIEE AU GUICHET AUTOMATIQUE (GAB INDISPONIBLE, MANQUE DE LIQUIDITE, NON DELIVRANCE DE RECU…)",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client en lui posant les questions de sécurité suivantes : . la date de naissance du client . l'agence d'ouverture de compte . les deux dernières transactions",
+      "Demander les 6 premiers et les 4 derniers chiffres de la carte utilisée pour le retrait",
+      "Prendre le message d’erreur indiqué au GAB, le contact du client, le lieu de retrait (la ville et l’agence)",
+      "Préciser la panne constatée au DAB",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet en précisant la filiale du client"
+    ]
+  },
+  {
+    "title": "CARTE – AUGMENTATION DE LIMITE (LIMIT CHANGE)",
+    "isNew": false,
+    "steps": [
+      "Inviter le client à se rendre en agence afin de remplir le formulaire Si le client est à l’étranger, lui communiquer l’adresse mail Pour toutes les filiales ecobankenquiries@ecobank.com",
+      "Demander le nom et le prénom du client",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "CARTE – AUGMENTATION DE LIMITE NON EFFECTUEE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Demander l’agence à laquelle la demande a été effectuée",
+      "Demander la date de la demande",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "CARTE - CARTE CAPTUREE",
+    "isNew": false,
+    "steps": [
+      "➢ Si client ECI – RETRAIT SUR NOS GAB • Demander le nom et le prénom du client • Demander le numéro de compte du client • Demander au client de se rendre à l’agence concernée pour le retrait de sa carte muni de son numéro de compte et sa pièce d’identité • Informer le client qu’il a la possibilité d’effectuer toutes ses opérations de retrait via l’application mobile (Xpress cash) • Créer l’incident et le refermer",
+      "➢ Si client ECI – RETRAIT SUR GAB AUTRES BANQUES • Demander le nom et le prénom du client • Demander le numéro de compte du client • Informer le client du blocage permanent de la carte • Effectuer le blocage via l’application POSTCARD pour les inputer (les agents n’ayant pas le profil envoient un mail de blocage aux inputer) • Demander au client de faire une déclaration de perte pour le renouvellement de sa carte • Informer le client qu’il a la possibilité d’effectuer toutes ses opérations de retrait via l’application mobile (Xpress cash) • Créer l’incident et le refermer",
+      "➢ Si client autre filiale ECOBANK – RETRAIT SUR GAB AUTRES BANQUES • Demander le nom et le prénom du client • Demander le numéro de compte du client • Informer le client du blocage permanent de la carte • Effectuer le blocage via l’application POSTCARD pour les inputer (les agents n’ayant pas le profil envoient un mail de blocage aux inputer) • Demander au client de faire une déclaration de perte pour le renouvellement de sa carte dans sa filiale • Informer le client qu’il a la possibilité d’effectuer toutes ses opérations de retrait via l’application mobile (Xpress cash) • Possibilité d’effectuer des appels de fonds • Créer l’incident et le refermer",
+      "➢ Si client autre filiale ECOBANK – RETRAIT SUR NOS GAB • Demander le nom et le prénom du client • Demander le numéro de compte du client • Demander au client de se rendre à l’agence concernée pour le retrait de sa carte muni de son numéro de compte et sa pièce d’identité • Informer le client qu’il a la possibilité d’effectuer toutes ses opérations de retrait via l’application mobile (Xpress cash) • Créer l’incident et le refermer"
+    ]
+  },
+  {
+    "title": "CARTE - CARD COMPLAINT",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier du client",
+      "Demander le numéro de la carte (visa ou Mastercard)",
+      "Demander le message d’erreur",
+      "Créer l’incident, le refermer et Envoyer le mail au service de carte"
+    ]
+  },
+  {
+    "title": "CARTE – CARTE NON FONCTIONNELLE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier du client",
+      "Demander le numéro de la carte (visa ou Mastercard)",
+      "Demander le message d’erreur",
+      "Créer l’incident, le refermer Envoyer le mail au service de carte"
+    ]
+  },
+  {
+    "title": "CARTE – CARTE SUPPLEMENTAIRE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Rediriger le client vers une agence pour l’édition de la carte",
+      "Créer l’incident et le refermer"
+    ]
+  },
+  {
+    "title": "CARTE – CODE PIN NON DELIVRE",
+    "isNew": false,
+    "steps": [
+      "➢ Cas du client résident n’ayant pas reçu son code • Rediriger le client vers une agence pour l’édition du code munit de sa CNI • Créer l’incident et le refermer",
+      "➢ Cas du client non-résident n’ayant pas reçu son code (procédure de transmission suspendue actuellement) • Demander le nom et le prénom du client • Demander le numéro de compte • Vérifier dans les mails s’il n’y a pas de retour afin d’effectuer une relance dans cas contraire lui demander de nous envoyer un mail",
+      "• Créer la DA et la refermer"
+    ]
+  },
+  {
+    "title": "CARTE - COMMANDE (VISA, MASTERCARD, CASHXPRESS, ETC.)",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Rediriger le client vers une agence pour l’édition de la carte munit de sa CNI",
+      "➢ Si le client est non-résident il devra envoyer un mail de commande de carte via ecobankenquiries@ecobank.com",
+      "Créer l’incident et le refermer"
+    ]
+  },
+  {
+    "title": "CARTE – COMMANDE RESTEE SANS SUITE (VISA/ MASTERCARD GOLD ET PLATINIUM)",
+    "isNew": false,
+    "steps": [
+      "➢ Cas du client résident n’ayant pas reçu sa carte • Demander le nom et le prénom du client • Demander le numéro de compte • Vérifier dans les mails s’il n’y a pas de retour afin d’effectuer une relance dans cas contraire faire un mail • Créer l’incident de niveau 2 et l’assigner • Envoyer un mail au service résolution à cet effet",
+      "➢ Cas du client non-résident n’ayant pas reçu sa carte • Demander le nom et le prénom du client • Demander le numéro de compte • Vérifier dans les mails s’il n’y a pas de retour afin d’effectuer une relance dans cas contraire lui demander de nous envoyer un mail à ecobankenquiries@ecobank.com • Créer l’incident et le refermer"
+    ]
+  },
+  {
+    "title": "CARTE – CONTESTATION DU MONTANT PERCU AU DAB",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Demander la date et le lieu de la transaction",
+      "Demander le montant souhaité et le montant reçu",
+      "Créer la DA de niveau 2, l’assigner et Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "CARTE - CONTESTATION FRAIS DE TRANSACTIONS",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Demander les informations suivantes : - Numéro de la carte (les 6 premiers chiffres **** les 4 derniers chiffres) - Date des prélèvements - Montant des prélèvements - Référence des prélèvements",
+      "Créer l’incident de niveau 2 et l’assigner Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "CARTE – DEBLOCAGE VBV / REINITIALISATION PASS OU WEB CODE CASH XPRESS",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client",
+      "Demander l’identifiant de la carte du client",
+      "Authentifier le client avec le GTP",
+      "Créer l’incident de niveau 2 et l’assigner Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "CARTE - DEBLOCAGE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier du client",
+      "Demander le numéro de la carte (visa ou Mastercard)",
+      "Effectuer le déblocage via l’application POSTCARD pour les inputers (les agents n’ayant pas le profil envoient un mail de déblocage aux inputers)",
+      "Créer l’incident et la refermer"
+    ]
+  },
+  {
+    "title": "CARTE- DEBLOCAGE NON EFFECTUE",
+    "isNew": false,
+    "steps": [
+      "➢ Cas du client résident • Demander le nom et le prénom du client • Demander le numéro de compte • Vérifier dans les mails s’il n’y a pas de retour afin d’effectuer une relance dans cas contraire faire un mail • Créer l’incident de niveau 2 et l’assigner • Envoyer un mail au service résolution à cet effet",
+      "➢ Cas du client non-résident • Demander le nom et le prénom du client • Demander le numéro de compte • Vérifier dans les mails s’il n’y a pas de retour afin d’effectuer une relance dans cas contraire lui demander de nous envoyer un mail • Créer l’incident et la refermer"
+    ]
+  },
+  {
+    "title": "CARTE – DEMANDE DE LINKAGE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Inviter le client à se rendre en agence afin de remplir le formulaire",
+      "Créer l’incident puis le refermer"
+    ]
+  },
+  {
+    "title": "CARTE - DEMANDE DE LINKAGE RESTEE SANS SUITE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Demander l’agence de la demande",
+      "Vérifier dans les mails s’il n’y a pas de retour afin d’effectuer une relance dans cas contraire faire un mail",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "CARTE – DEMANDE DE TRAVELS NOTICE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Demander la destination et la période du séjour",
+      "Créer l’incident et le refermer enfin envoyer le mail à FRAUDRISK"
+    ]
+  },
+  {
+    "title": "CARTE – PRELEVEMENT DES FRAIS / CHARGES INJUSTIFIE",
+    "isNew": false,
+    "steps": [
+      "Demander les nom et prénom du client puis son numéro de compte",
+      "Authentifier le client",
+      "Demander les informations suivantes : - Numéro de la carte (les 6 premiers chiffres **** les 4 derniers chiffres) - Date des prélèvements - Montant des prélèvements - Référence des prélèvements",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "CARTE -RECHARGEMENT NON EFFECTUE (EN AGENCE OU VIA ECOBANK MOBILE)",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Demander l’agence de rechargement ou le numéro de téléphone rattaché à l’application",
+      "Demander le montant et la date",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "CARTE- REEDITION CODE PIN",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Rediriger le client en agence pour la réédition munit de sa carte magnétique de sa CNI",
+      "Créer l’incident et le refermer"
+    ]
+  },
+  {
+    "title": "CHEQUE – DEMANDE DE CHEQUIER",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Rediriger le client en agence pour la demande munit de sa CNI et son numéro de compte",
+      "Créer l’incident et le refermer"
+    ]
+  },
+  {
+    "title": "CARTE - ACHAT NON ABOUTI/TROP PERCU/REMBOURSEMENT NON EFFECTIF TPE / EN LIGNE",
+    "isNew": false,
+    "steps": [
+      "Demander les nom et prénom du client puis son numéro de compte",
+      "Authentifier le client",
+      "Demander les informations suivantes : - Numéro de la carte (les 6 premiers chiffres **** les 4 derniers chiffres) - Date des prélèvements - Montant des prélèvements - Référence des prélèvements",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "ECOBANK ONLINE-ACTIVATION NON EFFECTUEE",
+    "isNew": false,
+    "steps": [
+      "Demander les nom et prénom du client puis son numéro de compte",
+      "Authentifier le client, confirmer son adresse E-mail enregistrée.",
+      "Vérification du statut de son compte.",
+      "✓ Si le client n’a pas de carte magnétique et ne peut pas s’enregistrer avec son numéro de compte directement sur Ecobank online. Transmettre ses informations (numéro de compte, Id, adresse E-mail, tél) Pour input dans l’option création sur Ecobank online et autorisation ensuite. ✓ Si le client a sa carte magnétique rattachée à son compte ou peut s’auto-créer Avec son numéro de compte l’assister à le faire sur l’option (s’enregistrer via la plate-forme online)",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "ECOBANK ONLINE-ACTIVATION OPTION VIREMENT EN LIGNE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom et aussi le numéro de compte du client",
+      "Authentifier le client, confirmer son adresse e-mail enregistrée",
+      "Vérification du statut de son compte",
+      "Le client doit nous fournir la copie scannée de sa pièce d’identité ou son passeport en cours de validité par e-mail ecobankenquiries@ecobank.com",
+      "Transmettre ses informations (numéro de compte, Id, adresse E-mail, tél) au niveau 2 pour transmission à son agence pour l’activation de l’option virement",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet",
+      "NB : Le client peut activer l’option virement s’il n’est pas encore créé avec sa carte magnétique rattachée à son compte"
+    ]
+  },
+  {
+    "title": "ECOBANK ONLINE-ACCES AUX INFORMATIONS IMPOSSIBLE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom et aussi le numéro de compte du client",
+      "Authentifier le client, confirmer son adresse E-mail enregistrée",
+      "Vérification du statut de son compte",
+      "Assister le client à se connecter et identifier la difficulté si nécessaire Transmettre au niveau 2",
+      "Créer l’incident de niveau 1 et le fermer ou l’affecter au niveau 2 si nécessaire"
+    ]
+  },
+  {
+    "title": "ECOBANK ONLINE-DEVEROUILLAGE ET REINITIALISATION DE MOT DE PASSE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom et aussi le numéro de compte du client",
+      "Authentifier le client, confirmer son adresse E-mail enregistrée",
+      "Vérification du statut de son compte",
+      "Transmettre ses informations (numéro de compte, Id, adresse E-mail, tél) Pour input dans le système et autorisation ensuite",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "ECOBANK ONLINE-DIFFICULTE A EFFECTUER DES TRANSACTIONS/TRANSFERT IMPOSSIBLE/NON RECEPTION OTP",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom et aussi le numéro de compte du client",
+      "Authentifier le client, confirmer son adresse E-mail enregistrée",
+      "Vérification du statut de son compte et les informations de son profil online (E-mail, Id, tél, profil verrouillé ou pas, question de sécurité déjà définies ou pas, option transfert existent ou pas)",
+      "Assister le client en fonction de sa difficulté et transmettre au niveau 2 si nécessaire",
+      "Créer l’incident de niveau 1 et le fermer ou l’affecter au niveau 2 si nécessaire"
+    ]
+  },
+  {
+    "title": "ECOBANK ONLINE-VERROUILLAGE UTILISATEUR NON EFFECTUE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom et aussi le numéro de compte du client",
+      "Authentifier le client, confirmer son adresse E-mail enregistrée",
+      "Vérification du statut de son compte",
+      "Transmettre ses informations (numéro de compte, Id, adresse E-mail, tél) pour input dans le système et autorisation ensuite",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "ECOBANK PAY-INSTALLATION NON EFFECTUEE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom et aussi le numéro de compte du client",
+      "Obtenir l’identité du client, confirmer son contact et E-mail (si client Ecobank l’authentifier à partir du numéro de compte)",
+      "Confirmer la date et l’agence qui l’a reçu pour sa souscription",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet",
+      "Pour l’installation inviter le client à se rendre en agence"
+    ]
+  },
+  {
+    "title": "ACCES IMPOSSIBLE AUX INFORMATIONS -ECOBANK MOBILE APP",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom et aussi le numéro de compte du client",
+      "Demander le message d’erreur",
+      "Demander le numéro de téléphone rattaché à l’application",
+      "Vérifier sur la plateforme mobile app si le compte n’est pas bloqué",
+      "➢ Si le compte est bloqué : • Authentifier le client • Créer l’incident et procéder à la réinitialisation du profil",
+      "➢ Si le compte n’est pas bloqué : • Authentifier le client • Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) • Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "ACCES IMPOSSIBLE AUX INFORMATIONS -ECOBANK ONLINE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom et aussi le numéro de compte du client",
+      "Demander le message d’erreur",
+      "Demander le nom d’utilisateur, l’adresse mail",
+      "Vérifier sur la plateforme Online si le compte n’est pas bloqué",
+      "➢ Si le compte est bloqué : • Authentifier le client • Créer l’incident de niveau 1 et le fermer • Procéder à la réinitialisation du password et/ou le déblocage du profil",
+      "➢ Si le compte n’est pas bloqué : • Authentifier le client • Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) • Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "ECOBANK MOBILE APP – AJOUT DE COMPTE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client",
+      "Donner la procédure d’ajout compte au client",
+      "o Ou l’agent devra transmettre un mail de demande d’ajout de compte au service resolver après authentification du client à partir de son numéro de compte",
+      "o Il pourra le faire soit par : ➢ L’option « AFFICHER TOUT » ensuite « AJOUTER UN NOUVEAU COMPTE » puis « AJOUTER UN COMPTE ECOBANK EXISTANT » Ou ➢ L’option « CARTE » ensuite « GESTION DES CARTES » puis « AJOUTER UNE CARTE » • Informer le client que s’il a un compte Ecobank dans une autre filiale, il a la possibilité de la rattacher aussi à l’application mobile : Etape 1 : Cliquer sur le drapeau Etape 2 : Choisir l’option « Ajouter un autre profil » Etape 3 : Cliquer sur « Oui j’ai un compte Ecobank » Etape 4 : Choisir le pays et insérer le numéro de téléphone",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "VIREMENT BANCAIRE VIA ECOBANK ONLINE / ECOBANK MOBILE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom et aussi le numéro de compte du client",
+      "Authentifier le client en lui posant les questions de sécurité suivantes : . la date de naissance du client . l'agence d'ouverture de compte . les deux dernières transactions",
+      "Si transfert via Ecobank Mobile App . Demander au client de cliquer sur l’onglet « transfert de fond » . Sélectionner le typer de transfert (local, Ecobank Africa, international) . Renseigner le montant, le compte à débiter et renseigner le compte à créditer et le motif de transfert . Valider avec le mot de pass de l’application",
+      "Si transfert via Ecobank Online . Demander si le profil est actif (le ID et le mot de pass) . Demander si le client a l’option virement . Confirmation avec le client s’il a défini les questions de sécurité . Assister le client en fonction du type de transfert (local, Africa ou international)",
+      "Confirmer le type de produit utilisé pour le transfert ( Ecobank Online ou Mobile App)",
+      "Créer et refermer l’incident si applicable au niveau 1 ou l’affecter au niveau 2 dans le cas échéant."
+    ]
+  },
+  {
+    "title": "ACHAT DE CREDIT TELEPHONIQUE NON ABOUTI (MOBILE APP)",
+    "isNew": false,
+    "steps": [
+      "Demander les nom et prénom du client puis son numéro de compte",
+      "Demander le numéro de téléphone rattaché à l’application",
+      "Authentifier le client",
+      "Demander les informations suivantes : - Numéro de la carte (les 6 premiers chiffres **** les 4 derniers chiffres) - Date des transactions - Montant des transactions - Référence des transactions",
+      "Créer l’incident de niveau 2 et l’assigner (Envoyer un mail au service résolution à cet effet)"
+    ]
+  },
+  {
+    "title": "ECOBANK MOBILE APP – DEMANDE DE REINITIALISATON DE MOT DE PASSE/ DEMANDE DE SUPPRESSION DE PROFIL",
+    "isNew": false,
+    "steps": [
+      "Demander les nom et prénom du client puis son numéro de compte",
+      "Demander le numéro de téléphone rattaché à l’application",
+      "Authentifier le client",
+      "Procéder à la réinitialisation ou la suppression du profil",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "ECOBANK MOBILE APP – DIFFICULTE A EFFECTUER DES TRANSACTIONS / DIFFICULTE A GENERER UN E-TOKEN/NON RECEPTION OTP/TRANSFERT IMPOSSIBLE",
+    "isNew": false,
+    "steps": [
+      "Demander les nom et prénom du client puis son numéro de compte",
+      "Authentifier le client",
+      "Demander le numéro de téléphone rattaché à l’application",
+      "Demander le message d’erreur",
+      "Vérifier sur la plateforme mobile app",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "B2W/W2B – ASSISTANCE (PROCEDURE DE TRANSFERT)",
+    "isNew": false,
+    "steps": [
+      "Communiquer la procédure au client ✓ Client orange #144# puis option 1 ; ensuite option 4 ; puis l’option 5 pour finir Choisir l’option 1 si c’est une transaction de son compte Ecobank vers son compte OM Ou L’option 2 si c’est une transaction OM vers son compte Ecobank Préciser au client la grille tarifaire pour les deux types de transfert ✓ Client MTN *133# puis option 7 ; ensuite option 1 ; puis l’option 1 ; puis l’option 6 pour finir",
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Créer l’incident et le refermer"
+    ]
+  },
+  {
+    "title": "B2W/W2B – DEMANDE SOUSCRIPTION",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Demander le numéro de téléphone à rattacher",
+      "Authentifier le client",
+      "Vérifier que le numéro de téléphone est renseigné sur le compte",
+      "Demander le numéro de la CNI du client",
+      "Demander au client de générer la clé d’activation et nous la communiquer sinon nous rappeler et nous la fournir",
+      "Créer l’incident et le refermer ✓ S’il y a une restriction sur le compte, inviter le client à se rendre en agence pour la levée de restriction ✓ Si le numéro concerné n’est pas enregistré sur le compte, inviter le client de se rendre en agence pour la mise à jour 88"
+    ]
+  },
+  {
+    "title": "B2W/W2B – TRANSFERT MOBILE MONEY NON ABOUTI",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Demander le numéro de téléphone concerné",
+      "Authentifier le client",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "PIN RESET/ PASS RESET CARTE CASHXPRESS",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client",
+      "Demander le numéro de la carte (6 premiers et les 4 derniers chiffres) + Le numéro de téléphone fournit à l’achat de la carte",
+      "Demander l’identifiant du client (le numéro oblique au verso de la carte)",
+      "Faire la demande de relevé de la carte (GTP)",
+      "Authentifier le client en lui posant les questions de sécurité suivantes : . Numéro de téléphone fournit à l’achat de la carte . Numéro de la pièce d’identité fournit à l’achat de la carte . 2 dernières transactions",
+      "Créer l’incident et le fermer"
+    ]
+  },
+  {
+    "title": "DEBLOCAGE VBV CASHXPRESS",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client",
+      "Demander le numéro de la carte (6 premiers et les 4 derniers chiffres) + Le numéro de téléphone fournit à l’achat de la carte",
+      "Demander l’identifiant du client (le numéro oblique au verso de la carte)",
+      "Faire la demande de relevé de la carte (GTP)",
+      "Authentifier le client en lui posant les questions de sécurité suivantes : . Numéro de téléphone fournit à l’achat de la carte . Numéro de la pièce d’identité fournit à l’achat de la carte . 2 dernières transactions",
+      "Création de l’incident et transmission de mail à GTPLIMITED"
+    ]
+  },
+  {
+    "title": "CASHXPRESS – ACHAT DE LA CARTE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom du client",
+      "Communiquer les informations de la carte CASHXPRESS au client selon sa filiale",
+      "Demander au client de se rendre en agence pour l’achat",
+      "Créer l’incident et le refermer"
+    ]
+  },
+  {
+    "title": "CASHXPRESS-TRANSACTION NON ABOUTIE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client",
+      "Demander le numéro de la carte (6 premiers et les 4 derniers chiffres) + Le numéro de téléphone fournit à l’achat de la carte",
+      "Demander l’identifiant du client (le numéro oblique au verso de la carte)",
+      "Faire la demande de relevé de la carte (GTP)",
+      "Authentifier le client en lui posant les questions de sécurité suivantes : . Numéro de téléphone fournit à l’achat de la carte . Numéro de la pièce d’identité fournit à l’achat de la carte . 2 dernières transactions",
+      "Demander le montant de la transaction, la date, le site ou le lieu, et la référence de la transaction",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet SLA 45 jours ouvrés"
+    ]
+  },
+  {
+    "title": "CASHXPRESS-BLOCAGE DE CARTE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client",
+      "Demander le numéro de la carte (6 premiers et les 4 derniers chiffres) + Le numéro de téléphone fournit à l’achat de la carte",
+      "Demander l’identifiant du client (le numéro oblique au verso de la carte)",
+      "Faire la demande de relevé de la carte (GTP)",
+      "Vérifier les informations suivantes : . Numéro de téléphone fournit à l’achat de la carte . Numéro de la pièce d’identité fournit à l’achat de la carte",
+      "Mail de demande de blocage de carte à un agent inputer Créer l’incident et le refermer"
+    ]
+  },
+  {
+    "title": "CASHXPRESS-RECHARGEMENT NON EFFECTUE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client",
+      "Demander le numéro de la carte (6 premiers et les 4 derniers chiffres) + Le numéro de téléphone fournit à l’achat de la carte",
+      "Demander l’identifiant du client (le numéro oblique au verso de la carte)",
+      "Faire la demande de relevé de la carte (GTP)",
+      "Vérifier les informations suivantes: . Numéro de téléphone fournit à l’achat de la carte . Numéro de la pièce communiquée à l’achat de la carte • Adresse mail • Les deux dernières transactions",
+      "Mail à l’agence de rechargement (Montant, date, agence)",
+      "Création de l’incident"
+    ]
+  },
+  {
+    "title": "DEMANDE DE PRET RESTEE SANS SUITE- FILIALE SENEGAL",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Vérifier si sa demande est enregistrée dans CRM (faire ensuite un copier-coller Des informations pour remplir le support crédit de la filiale afin de leur faire une relance)",
+      "Dans le cas échéant reprendre les informations du prêt pour la relance"
+    ]
+  },
+  {
+    "title": "DEMANDE DE PRET- AUTRE FILIALE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Communiquer la documentation nécessaire pour sa demande en agence",
+      "Créer l’incident et le clôturer"
+    ]
+  },
+  {
+    "title": "DEMANDE DE PRET RESTEE SANS SUITE- AUTRE FILIALE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Prendre les informations suivantes pour sa relance : l’agence à laquelle la demande a été effectuée, la date de la demande, le montant du prêt sollicité, le type de prêt souhaité",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "PRET-DEMANDE DE RACHAT DE PRET",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Lui communiquer la documentation nécessaire pour sa demande en agence",
+      "Créer l’incident et le clôturer"
+    ]
+  },
+  {
+    "title": "PRET-DEMANDE DE RACHAT DE PRET RESTEE SANS SUITE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Prendre les informations suivantes pour sa relance : l’agence à laquelle la demande a été effectuée, la date de la demande, le montant du prêt à racheter, le type de prêt obtenu",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "PRET-DEMANDE DE REVERSE DE CASH COLL",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "L’inviter à se rendre en agence pour le dépôt du courrier de la reverse",
+      "Créer l’incident et le clôturer"
+    ]
+  },
+  {
+    "title": "PRET-DEMANDE DE REVERSE DE CASH COLL RESTEE SANS SUITE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Prendre les informations suivantes pour sa relance : l’agence à laquelle la demande a été effectuée, la date de la demande, le montant du cash coll",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "CHEQUE- DEMANDE DE CHEQUIER RESTEE SANS SUITE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Demander l’agence de la demande",
+      "Vérifier dans les mails s’il n’y a pas de retour afin d’effectuer une relance dans cas contraire faire un mail",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "CHEQUE – DEMANDE DE DISPONIBILITE DE CHEQUIER",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Demander l’agence de la demande",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "CHEQUE - DEMANDE D'OPPOSITION",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Demander le numéro du chèque",
+      "Demande le motif d’opposition",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) ET Envoyer un mail au service résolution à cet effet NB : le client devra se rendre à l’agence avec une déclaration de perte du chèque concerné"
+    ]
+  },
+  {
+    "title": "CHEQUE - LEVEE D'OPPOSITION",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Demander la raison de la levée d’opposition",
+      "Inviter le client à se rendre en agence pour la levée d’opposition",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "CHEQUE – MOTIF DE REJET",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Communiquer la raison du rejet en fonction du code de rejet disponible dans D365",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "CHEQUE – REJETE NON REMIS",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Demander l’agence du client et l’agence où il a effectué la de remise du chèque",
+      "Demander le numéro du chèque",
+      "demander la date à laquelle il a fait sa demande et demander le numéro de compte",
+      "Authentifier le client",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "CHEQUE – REMISE CHEQUE NON EFFECTUEE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client",
+      "Demander l’agence où il a effectué la demande de remise du chèque et la date à laquelle il a fait sa demande",
+      "Demander le numéro du chèque et le numéro de compte",
+      "Authentifier le client",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "CHEQUE – RENOUVELLEMENT DE CHEQUIER",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client",
+      "Inviter le client à se rendre en agence afin d’effectuer sa demande munie de son numéro de compte et de sa pièce d’identité",
+      "Créer l’incident de niveau 1 et le fermer"
+    ]
+  },
+  {
+    "title": "CHEQUE – STATUT DEMANDE CHEQUIER",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client",
+      "Demander l’agence et la date à laquelle il fait sa demande",
+      "Demander le numéro de compte",
+      "Authentifier le client",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "AUTRE-HOMMAGE",
+    "isNew": false,
+    "steps": [
+      "Remerciement du client /retour d’expérience /salutation du client et sondage",
+      "Obtenir l’identité du client à partir du numéro de compte (récupérer son contact et adresse e-mail)",
+      "Prendre les détails de sa requête (nom du staff l’ayant reçu, l’agence, date, le type d’assistance souhaité à cette date, satisfait ou pas, raison du mécontentement, notation, le récit de sa plainte etc…)",
+      "Transmettre au niveau 2 si nécessaire",
+      "Créer l’incident et le clôturer ou l’affecter au niveau 2"
+    ]
+  },
+  {
+    "title": "PAIEMENT DE TIMBRE DE PASSEPORT",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et le prénom du client et son contact",
+      "Obtenir la situation géographique du client afin de lui communiquer l’agence Ecobank disponible pour sa prise en charge.",
+      "Créer l’incident et le clôturer"
+    ]
+  },
+  {
+    "title": "AUTRE-SUIVI DE RECLAMATION",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Demander le numéro de la DA au client",
+      "communiquer le statut de sa réclamation en vérifiant la Da et son mail de réclamation",
+      "Enrichir la DA avec le contenu du mail de la relance ou créer un incident enfant."
+    ]
+  },
+  {
+    "title": "AUTRE-SUIVI DE TRANSACTION SUSPECTE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client",
+      "Distinguer les transactions suspectes et les confirmer avec le client",
+      "En cas de non-confirmation des transactions suspectes : • Bloquer la carte du client définitivement en accord avec celui-ci • Ou mettre le compte sous restriction de no débit (transmettre la requête au niveau 2 en créant l’incident.)",
+      "En cas de confirmation des transactions suspectes Transmettre la requête du déblocage de sa carte /créer l’incident et le clôturer"
+    ]
+  },
+  {
+    "title": "AUTRE-PAIEMENT DE FACTURE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Confirmation de l’identité du client à partir de son numéro de compte",
+      "Assister le client en fonction du canal utilisé pour le paiement",
+      "Créer l’incident et le clôturer"
+    ]
+  },
+  {
+    "title": "AUTRE-VIREMENT-NON RECEPTION DE LA BOURSE FILIALE SENEGAL",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Prendre le nom et les coordonnées du client",
+      "Diriger le client sur le site https://ecobankdirect.ecobank.com/ecostudent en s’assurant que toutes les étapes pour sa prise en charge sur le site est compris par le client",
+      "Créer l’incident et le clôturer NB : Il s’agit des clients ESN uniquement pour lesquels nous avons reçu cette procédure"
+    ]
+  },
+  {
+    "title": "AUTRE-VIREMENT SALAIRE/PENSION",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Confirmation de l’identité du client à partir de son numéro de compte",
+      "Communiquer l’information de la disponibilité du salaire ou virement en vérifiant dans D365 ou BO",
+      "Créer l’incident et le clôturer"
+    ]
+  },
+  {
+    "title": "ATTITUDE STAFF – ABUS DE CONFIANCE, DISCOURTOISIE DE L’AGENT, PLAINTE LIEE A UNE AGENCE",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom",
+      "Demander le numéro de compte et le contact du client",
+      "Demander les détails de la plainte",
+      "Créer l’incident et l’affecter au niveau 2"
+    ]
+  },
+  {
+    "title": "AUTRE – DOCUMENTS EGARES (CARTE MAGNETIQUE)",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Demander le type de la carte (visa ou Mastercard)",
+      "Authentification du client",
+      "Informe le client du blocage permanent de la carte",
+      "Effectuer le blocage via l’application POSTCARD pour les inputers (les agents n’ayant pas le profil envoient un mail de blocage aux inputers)",
+      "Demander au client de faire une déclaration de perte pour le renouvellement de sa carte",
+      "Informer le client qu’il a la possibilité d’effectuer toutes ses opérations de retrait via l’application mobile (Xpress cash) 124",
+      "Créer l’incident et le refermer"
+    ]
+  },
+  {
+    "title": "AUTRE – DOCUMENTS EGARES (CNI EGAREE)",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Informer le client que pour toute opération il devra se rendre en agence soit avec son passeport, son permis de conduire ou de son attestation d’identité plus le récépissé d’enrôlement",
+      "Créer l’incident et le refermer"
+    ]
+  },
+  {
+    "title": "AUTRE-AVANCE SUR SALAIRE – SOUSCRIPTION / RENOUVELLMENT",
+    "isNew": false,
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Demander au client de se rendre en agence munit de sa CNI et de son dernier bulletin de salaire",
+      "Créer l’incident et le refermer"
+    ]
+  },
+  {
+    "title": "AUTRE-E-ALERT / E-STATEMENT-DEMANDE DE SOUSCRIPTION",
+    "isNew": false,
+    "steps": [
+      "- Demander le nom et le prénom du client",
+      "➢ Si le contact /adresse mail concerné ne figure pas dans le système • Inviter le client à se rendre en agence afin de remplir le formulaire pour sa demande de souscription • Créer l’incident de niveau 1 et le fermer",
+      "➢ Si le contact /adresse mail concerné figure dans le système • Demander le numéro de compte du client • Authentifier le client • Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) • Envoyer un mail au service résolution à cet effet"
+    ]
+  },
+  {
+    "title": "AUTRE-E-ALERT / E-STATEMENT-DEMANDE DE SOUSCRIPTION RESTEE SANS SUITE",
+    "isNew": false,
+    "steps": [
+      "- Demander le nom et le prénom du client",
+      "Demander la date à laquelle il a effectué sa demande",
+      "Demander l’agence à laquelle il fait sa demande",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet",
+      "Authentifier le client",
+      "Demander le numéro de compte"
+    ]
+  },
+  {
+    "title": "ASSURANCE - SOUSCRIPTION CONTESTEE",
+    "isNew": true,
+    "zoneHint": "ASSURANCE_CREDIT",
+    "steps": [
+      "Demander le nom et prénom et aussi le numéro de compte du client",
+      "Authentifier le client en lui posant les questions de sécurité suivantes : . la date de naissance du client . l'agence d'ouverture de compte . les deux dernières transactions",
+      "Prendre les références de débit dans D365, la date, le montant, le contact du client",
+      "Créer l’incident de niveau 2 et l’assigner (Voir cartographie RCC RESOLUTION) Envoyer un mail au service résolution à cet effet"
+    ]
+  }
+]

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<th:block th:fragment="sidebar">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <img th:src="@{/images/ecobank-logo.png}"
+                 alt="Ecobank"
+                 class="logo">
+            <h4>RCC Portal</h4>
+        </div>
+        <nav class="sidebar-menu">
+            <a th:href="@{/dashboard}" data-roles="AGENT,QA,ADMIN">
+                <i class="bi bi-grid-fill"></i>
+                <span data-i18n="nav.dashboard">Accueil</span>
+            </a>
+            <a th:href="@{/performance}" data-roles="AGENT,QA,ADMIN">
+                <i class="bi bi-speedometer2"></i>
+                <span data-i18n="nav.performance">Ma Performance</span>
+            </a>
+            <a th:href="@{/rh}" data-roles="ADMIN,RH">
+                <i class="bi bi-person-badge"></i>
+                <span data-i18n="nav.hrParcours">Portail RH</span>
+            </a>
+            <a th:href="@{/excelliam}" data-roles="ADMIN,EXCELLIAM">
+                <i class="bi bi-calendar2-week"></i>
+                <span data-i18n="nav.excelliam">Portail Excelliam</span>
+            </a>
+            <a th:href="@{/mon-rcc}" data-roles="AGENT,QA,ADMIN,RH,SUPERVISOR,TEAM_LEADER">
+                <i class="bi bi-chat-square-heart-fill"></i>
+                <span data-i18n="nav.monrcc">MON RCC</span>
+            </a>
+            <a th:href="@{/translator}" data-roles="AGENT,QA,QA_SUPERVISOR,ADMIN,RH,SUPERVISOR,TEAM_LEADER,FORMATEUR">
+                <i class="bi bi-translate"></i>
+                <span data-i18n="nav.translator">Traducteur &amp; correcteur</span>
+            </a>
+            <a th:href="@{/procedures}" data-roles="AGENT,QA,ADMIN">
+                <i class="bi bi-list-check"></i>
+                <span data-i18n="nav.procedures">Procédure de traitement</span>
+            </a>
+            <a th:href="@{/mail-templates}" data-roles="AGENT,QA,ADMIN">
+                <i class="bi bi-envelope-fill"></i>
+                <span data-i18n="nav.mailTemplates">Masques de mail</span>
+            </a>
+            <a th:href="@{/knowledge}" data-roles="AGENT,QA,ADMIN">
+                <i class="bi bi-book-fill"></i>
+                <span data-i18n="nav.knowledge">Knowledge Base</span>
+            </a>
+            <a th:href="@{/training}" data-roles="AGENT,QA,ADMIN,FORMATEUR">
+                <i class="bi bi-mortarboard-fill"></i>
+                <span data-i18n="nav.training">Formation</span>
+            </a>
+            <a th:href="@{/games}" data-roles="AGENT,QA,ADMIN">
+                <i class="bi bi-clipboard-check"></i>
+                <span data-i18n="nav.games">Évaluation</span>
+            </a>
+            <a th:href="@{/workflow}" data-roles="AGENT,QA,ADMIN">
+                <i class="bi bi-diagram-3-fill"></i>
+                <span data-i18n="nav.workflow">Workflow</span>
+            </a>
+            <a th:href="@{/qa}" data-roles="QA,ADMIN">
+                <i class="bi bi-patch-check-fill"></i>
+                <span data-i18n="nav.qa">Quality Assurance</span>
+            </a>
+            <a th:href="@{/qa-supervisor}" data-roles="QA_SUPERVISOR,ADMIN">
+                <i class="bi bi-clipboard2-data-fill"></i>
+                <span data-i18n="nav.qaSupervisor">Superviseur QA</span>
+            </a>
+            <a th:href="@{/reports}" data-roles="QA,ADMIN,RH">
+                <i class="bi bi-bar-chart-fill"></i>
+                <span data-i18n="nav.reports">Reporting</span>
+            </a>
+            <a th:href="@{/supervisor}" data-roles="SUPERVISOR,ADMIN">
+                <i class="bi bi-binoculars-fill"></i>
+                <span data-i18n="nav.supervisor">Portail Superviseur</span>
+            </a>
+            <a th:href="@{/team-leader}" data-roles="TEAM_LEADER,ADMIN">
+                <i class="bi bi-people-fill"></i>
+                <span data-i18n="nav.teamLeader">Portail Team Leader</span>
+            </a>
+            <a th:href="@{/outbound-dashboard}" data-roles="AGENT">
+                <i class="bi bi-telephone-outbound-fill"></i>
+                <span data-i18n="nav.outboundDashboard">Ventes &amp; RDV</span>
+            </a>
+            <a th:href="@{/shift}" data-roles="AGENT,QA,ADMIN,RH,TEAM_LEADER,SUPERVISOR,EXCELLIAM">
+                <i class="bi bi-clock-history"></i>
+                <span data-i18n="nav.shift">Suivi de shift</span>
+            </a>
+            <a th:href="@{/audit}" data-roles="ADMIN">
+                <i class="bi bi-clipboard-check-fill"></i>
+                <span data-i18n="nav.audit">Audit</span>
+            </a>
+            <a th:href="@{/administration}" data-roles="ADMIN">
+                <i class="bi bi-gear-fill"></i>
+                <span data-i18n="nav.administration">Administration</span>
+            </a>
+            <a th:href="@{/data-analysis}" data-roles="ADMIN,TEAM_LEADER,RH,SUPERVISOR,QA">
+                <i class="bi bi-graph-up-arrow"></i>
+                <span data-i18n="nav.dataAnalysis">Analyse de données</span>
+            </a>
+        </nav>
+        <!-- Suivi de shift — rempli dynamiquement par session.js -->
+        <div class="sidebar-footer">
+            <div id="shiftStatusBadge" class="small text-white-50 mb-1 text-center">…</div>
+            <div id="shiftTimer" class="text-center mb-2 fw-bold" style="font-size:1.1rem; letter-spacing:.05em;">--:--:--</div>
+            <div class="d-grid gap-1">
+                <button id="shiftPauseBtn" type="button" class="btn btn-sm btn-outline-light" style="display:none;">
+                    <i class="bi bi-pause-circle"></i> <span data-i18n="shift.pause">Pause</span>
+                </button>
+                <button id="shiftLunchBtn" type="button" class="btn btn-sm btn-outline-light" style="display:none;">
+                    <i class="bi bi-cup-hot"></i> <span data-i18n="shift.lunch">Pause déjeuner</span>
+                </button>
+                <button id="shiftTrainingBtn" type="button" class="btn btn-sm btn-outline-light" style="display:none;">
+                    <i class="bi bi-mortarboard"></i> <span data-i18n="shift.training">Formation</span>
+                </button>
+                <button id="shiftMeetingBtn" type="button" class="btn btn-sm btn-outline-light" style="display:none;">
+                    <i class="bi bi-people"></i> <span data-i18n="shift.meeting">Réunion</span>
+                </button>
+                <button id="shiftResumeBtn" type="button" class="btn btn-sm btn-outline-success" style="display:none;">
+                    <i class="bi bi-play-circle"></i> <span data-i18n="shift.resume">Reprendre</span>
+                </button>
+                <button id="shiftEndBtn" type="button" class="btn btn-sm btn-outline-danger" style="display:none;">
+                    <i class="bi bi-box-arrow-right"></i> <span data-i18n="shift.end">Fin de shift</span>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- RAF (Ralph) — assistant flottant, présent sur tout le site, synchronisé Procédures + Base de connaissances -->
+    <button type="button" id="ralphFab" class="ralph-fab" title="Demander à RAF">
+        <i class="bi bi-rocket-takeoff-fill"></i>
+    </button>
+
+    <div id="ralphPanel" class="ralph-panel d-none">
+        <div class="ralph-panel-header">
+            <span><i class="bi bi-rocket-takeoff-fill"></i> RAF</span>
+            <button type="button" id="ralphResetBtn" class="btn btn-sm btn-link text-white p-0 me-2" title="Nouvelle conversation" style="text-decoration:none;">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+            <button type="button" id="ralphExpandBtn" class="btn btn-sm btn-link text-white p-0 me-2" title="Agrandir la fenêtre" style="text-decoration:none;">
+                <i class="bi bi-arrows-angle-expand"></i>
+            </button>
+            <div class="dropdown me-2">
+                <button type="button" id="ralphSettingsBtn" class="btn btn-sm btn-link text-white p-0" title="Langue de RAF" data-bs-toggle="dropdown" style="text-decoration:none;">
+                    <i class="bi bi-gear-fill"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" id="ralphLanguageMenu">
+                    <li><h6 class="dropdown-header">Langue de réponse</h6></li>
+                    <li><button type="button" class="dropdown-item ralph-lang-option" data-lang="fr">🇫🇷 Français</button></li>
+                    <li><button type="button" class="dropdown-item ralph-lang-option" data-lang="en">🇬🇧 English</button></li>
+                    <li><button type="button" class="dropdown-item ralph-lang-option" data-lang="pt">🇵🇹 Português</button></li>
+                    <li><button type="button" class="dropdown-item ralph-lang-option" data-lang="es">🇪🇸 Español</button></li>
+                </ul>
+            </div>
+            <button type="button" id="ralphCloseBtn" class="btn-close btn-close-white"></button>
+        </div>
+        <div id="ralphThread" class="ralph-thread">
+            <div class="ralph-msg ralph-msg-bot">Bonjour ! Posez-moi une question sur une procédure ou un article — je cherche directement dans les deux.</div>
+        </div>
+        <form id="ralphFabForm" class="ralph-panel-input">
+            <input type="file" id="ralphFileInput" class="d-none" accept=".xlsx,.xls,.pdf,.docx,.csv,.txt">
+            <button type="button" class="btn btn-outline-secondary" id="ralphFileBtn" title="Importer un fichier à analyser">
+                <i class="bi bi-paperclip"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary" id="ralphTranslateBtn" title="Traduire le texte saisi">
+                <i class="bi bi-translate"></i>
+            </button>
+            <input type="text" id="ralphFabInput" class="form-control" placeholder="Votre question…" autocomplete="off">
+            <button type="button" class="btn btn-outline-secondary" id="ralphMicBtn" title="Parler à RAF">
+                <i class="bi bi-mic-fill"></i>
+            </button>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-send-fill"></i></button>
+        </form>
+    </div>
+
+    <!-- Modale de traduction — texte à coller, langue cible, résultat -->
+    <div class="modal fade" id="ralphTranslateModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-translate"></i> Traduire un texte</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label small">Texte à traduire</label>
+                    <textarea class="form-control mb-3" id="ralphTranslateSource" rows="5" placeholder="Collez ou tapez le texte ici…"></textarea>
+
+                    <label class="form-label small">Traduire vers</label>
+                    <select class="form-select mb-3" id="ralphTranslateTargetLang" style="max-width:220px;">
+                        <option value="fr">🇫🇷 Français</option>
+                        <option value="en">🇬🇧 English</option>
+                        <option value="pt">🇵🇹 Português</option>
+                        <option value="es">🇪🇸 Español</option>
+                    </select>
+
+                    <button type="button" class="btn btn-primary mb-3" id="ralphTranslateSubmitBtn">
+                        <i class="bi bi-translate"></i> Traduire
+                    </button>
+
+                    <label class="form-label small">Traduction</label>
+                    <div class="d-flex gap-2 align-items-start">
+                        <textarea class="form-control" id="ralphTranslateResult" rows="5" readonly></textarea>
+                        <button type="button" class="btn btn-outline-secondary" id="ralphTranslateCopyBtn" title="Copier">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .ralph-fab {
+            position: fixed; bottom: 24px; right: 24px; width: 58px; height: 58px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--eco-blue), #0F9D6C); color: #fff; border: none;
+            font-size: 1.5rem; box-shadow: 0 6px 18px rgba(0,0,0,.25); z-index: 1050;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+            transition: transform .18s ease;
+        }
+        .ralph-fab:hover { transform: scale(1.08); }
+        .ralph-fab.launching { animation: ralph-launch .55s ease-in forwards; }
+        @keyframes ralph-launch {
+            0% { transform: translateY(0) rotate(0deg); }
+            40% { transform: translateY(-18px) rotate(-8deg); }
+            100% { transform: translateY(-500px) rotate(-4deg); opacity: 0; }
+        }
+        .ralph-panel {
+            position: fixed; bottom: 24px; right: 24px; width: 360px; max-width: 92vw; height: 480px;
+            max-height: 78vh; background: #fff; border-radius: 1rem; box-shadow: 0 10px 40px rgba(0,0,0,.22);
+            z-index: 1060; display: flex; flex-direction: column; overflow: hidden;
+            animation: ralph-panel-in .25s ease-out;
+            transition: width .2s ease, height .2s ease, max-width .2s ease, max-height .2s ease;
+        }
+        .ralph-panel.ralph-panel-expanded {
+            width: 640px; height: 82vh; max-width: 94vw; max-height: 90vh;
+        }
+        @keyframes ralph-panel-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .ralph-panel-header {
+            background: linear-gradient(135deg, var(--eco-blue), #0F9D6C); color: #fff; padding: .85rem 1rem;
+            display: flex; justify-content: space-between; align-items: center; font-weight: 700;
+        }
+        .ralph-thread { flex-grow: 1; overflow-y: auto; padding: 1rem; background: #f4f6fb; }
+        .ralph-msg { max-width: 85%; padding: .55rem .8rem; border-radius: .9rem; margin-bottom: .6rem; font-size: .88rem; white-space: pre-wrap; }
+        .ralph-msg-bot { background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.08); border-bottom-left-radius: .25rem; }
+        .ralph-msg-user { background: var(--eco-blue); color: #fff; margin-left: auto; border-bottom-right-radius: .25rem; }
+        .ralph-result-card { background: #fff; border: 1px solid #e4e8f0; border-radius: .6rem; padding: .5rem .7rem; margin-top: .4rem; font-size: .82rem; }
+        .ralph-panel-input { display: flex; gap: .5rem; padding: .65rem; border-top: 1px solid #eee; }
+    </style>
+
+    <script th:src="@{/js/ralph-widget.js}"></script>
+
+</th:block>
+</html>

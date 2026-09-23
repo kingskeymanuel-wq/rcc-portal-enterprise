@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RCC Portal Enterprise — Workflow</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <style>
+        .wf-tab-nav .btn.nav-link { border: none; border-bottom: 3px solid transparent; border-radius: 0; color: #6b7280; font-weight: 600; padding: .75rem 1.1rem; }
+        .wf-tab-nav .btn.nav-link.active { color: #0057B8; border-bottom-color: #0057B8; background: transparent; }
+        .wf-tab-nav .btn.nav-link .badge { font-size: .68rem; vertical-align: 1px; }
+        .wf-stat-card { border: none; border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,.05); overflow: hidden; position: relative; }
+        .wf-stat-card .wf-stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
+        .wf-stat-value { font-size: 2rem; font-weight: 700; }
+        .wf-calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+        .wf-calendar-cell { min-height: 90px; border: 1px solid #eef1f5; border-radius: 10px; padding: 6px; font-size: .78rem; background: #fafbfc; }
+        .wf-calendar-cell.wf-today { border-color: #0057B8; box-shadow: 0 0 0 1px #0057B8 inset; }
+        .wf-calendar-cell .wf-day-num { font-weight: 700; color: #6b7280; font-size: .72rem; }
+        .wf-calendar-cell.wf-empty { background: transparent; border: none; }
+        .wf-leave-chip { display: block; font-size: .68rem; background: #eaf2ff; color: #0057B8; border-radius: 6px; padding: 1px 5px; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .wf-calendar-weekday { text-align: center; font-size: .72rem; font-weight: 700; color: #9aa4b2; text-transform: uppercase; padding-bottom: 4px; }
+        .wf-tab-pane { animation: wfFadeIn .25s ease; }
+        @keyframes wfFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+        .wf-task-stat { text-align: center; padding: .6rem .5rem; border-radius: 12px; background: #fafbfc; }
+        .wf-task-stat .num { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+        .wf-task-stat .lbl { font-size: .7rem; color: #9aa4b2; text-transform: uppercase; letter-spacing: .03em; }
+        .wf-task-group-title { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #9aa4b2; margin: 1.1rem 0 .5rem; display: flex; align-items: center; gap: .4rem; }
+        .wf-task-group-title:first-child { margin-top: 0; }
+        .wf-task-card { display: flex; align-items: flex-start; gap: .65rem; background: #fff; border: 1px solid #eef1f5; border-left: 4px solid #d9dee6; border-radius: 12px; padding: .7rem .85rem; margin-bottom: .55rem; transition: box-shadow .15s ease, transform .15s ease; }
+        .wf-task-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.06); transform: translateY(-1px); }
+        .wf-task-card.wf-prio-high { border-left-color: #d93025; }
+        .wf-task-card.wf-prio-normal { border-left-color: #0057B8; }
+        .wf-task-card.wf-prio-low { border-left-color: #9aa4b2; }
+        .wf-task-card.wf-overdue { background: #fff8f7; }
+        .wf-task-card.wf-done { opacity: .6; border-left-color: #00A651; }
+        .wf-task-check { flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; border: 2px solid #d9dee6; background: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s ease; margin-top: 1px; }
+        .wf-task-check:hover { border-color: #00A651; }
+        .wf-task-card.wf-done .wf-task-check { background: #00A651; border-color: #00A651; color: #fff; }
+        .wf-task-title { font-weight: 600; font-size: .92rem; color: #1f2937; }
+        .wf-task-card.wf-done .wf-task-title { text-decoration: line-through; color: #9aa4b2; }
+        .wf-task-desc { font-size: .8rem; color: #6b7280; margin-top: 2px; }
+        .wf-task-meta { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .4rem; }
+        .wf-task-chip { font-size: .68rem; font-weight: 600; padding: 2px 8px; border-radius: 20px; display: inline-flex; align-items: center; gap: 3px; }
+        .wf-chip-due { background: #eaf2ff; color: #0057B8; }
+        .wf-chip-overdue { background: #fdeaea; color: #d93025; }
+        .wf-chip-origin { background: #f3eaff; color: #7b2ff7; }
+        .wf-chip-team { background: #eef1f5; color: #6b7280; }
+        .wf-chip-prio-high { background: #fdeaea; color: #d93025; }
+        .wf-chip-prio-low { background: #eef1f5; color: #9aa4b2; }
+        .wf-task-actions { display: flex; gap: .25rem; margin-left: auto; flex-shrink: 0; }
+        .wf-task-actions .btn { padding: .2rem .45rem; }
+        .wf-empty-state { text-align: center; padding: 2rem 1rem; color: #9aa4b2; }
+        .wf-empty-state i { font-size: 2.2rem; display: block; margin-bottom: .5rem; opacity: .5; }
+        #wfDoneGroup { display: none; }
+        #wfDoneGroup.wf-show { display: block; }
+
+        .wf-pole-card { border: 1px solid #eef1f5; border-radius: 14px; padding: 1rem 1.1rem; cursor: pointer; transition: box-shadow .15s ease, transform .15s ease; height: 100%; background: #fff; }
+        .wf-pole-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,.07); transform: translateY(-2px); }
+        .wf-pole-card .wf-pole-name { font-weight: 700; color: #1f2937; font-size: 1rem; }
+        .wf-pole-card .wf-pole-manager { font-size: .82rem; color: #0057B8; font-weight: 600; margin-top: .25rem; }
+        .wf-pole-card .wf-pole-no-manager { font-size: .8rem; color: #d93025; margin-top: .25rem; }
+        .wf-pole-card .wf-pole-count { font-size: .72rem; color: #9aa4b2; margin-top: .5rem; }
+
+        /* Activités & délais — accordéon par catégorie (remplace la longue liste plate) */
+        .wf-activity-search { position: relative; margin-bottom: 1rem; }
+        .wf-activity-search i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #9aa4b2; }
+        .wf-activity-search input { padding-left: 38px; border-radius: 10px; border: 1px solid #e5e9f0; background: #fafbfc; }
+        .wf-activity-search input:focus { background: #fff; box-shadow: 0 0 0 3px rgba(0,87,184,.1); border-color: #0057B8; }
+
+        .wf-pole-category { border: 1px solid #eef1f5; border-radius: 12px; margin-bottom: .6rem; overflow: hidden; background: #fff; }
+        .wf-pole-category-header { display: flex; align-items: center; gap: .7rem; padding: .7rem .9rem; cursor: pointer; user-select: none; transition: background .12s ease; }
+        .wf-pole-category-header:hover { background: #fafbfc; }
+        .wf-pole-category-icon { width: 34px; height: 34px; border-radius: 9px; background: #eaf2ff; color: #0057B8; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+        .wf-pole-category-title { font-weight: 700; font-size: .86rem; color: #1f2937; flex-grow: 1; }
+        .wf-pole-category-badge { font-size: .72rem; font-weight: 600; color: #6b7684; background: #f2f4f7; padding: 2px 9px; border-radius: 20px; flex-shrink: 0; }
+        .wf-pole-category-chevron { color: #9aa4b2; transition: transform .2s ease; flex-shrink: 0; }
+        .wf-pole-category.wf-open .wf-pole-category-chevron { transform: rotate(180deg); }
+        .wf-pole-category-body { max-height: 0; overflow: hidden; transition: max-height .25s ease; }
+        .wf-pole-category.wf-open .wf-pole-category-body { max-height: 2000px; }
+        .wf-pole-category-body-inner { padding: .2rem 1rem .6rem 3.55rem; }
+
+        .wf-pole-activity-row { display: flex; justify-content: space-between; align-items: center; padding: .5rem .1rem; border-bottom: 1px solid #f5f5f7; gap: .75rem; cursor: default; }
+        .wf-pole-activity-row:last-child { border-bottom: none; }
+        .wf-pole-activity-motif { font-size: .88rem; color: #1f2937; }
+        .wf-pole-activity-sla { font-size: .74rem; font-weight: 700; padding: 3px 11px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+        .wf-pole-activity-sla.sla-instant { color: #0a8a3e; background: #e6f7ec; }
+        .wf-pole-activity-sla.sla-fast    { color: #0057B8; background: #eaf2ff; }
+        .wf-pole-activity-sla.sla-medium  { color: #b06a00; background: #fff3e0; }
+        .wf-pole-activity-sla.sla-slow    { color: #6b7684; background: #f2f4f7; }
+        .wf-pole-activity-row.qa-editable { cursor: pointer; }
+        .wf-pole-activity-row.qa-editable:hover { background: #fafbfc; }
+        .wf-pole-no-match { text-align: center; color: #9aa4b2; padding: .5rem; font-size: .85rem; }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+    <div class="content">
+        <div th:replace="~{fragments/header :: header}"></div>
+        <main id="page-content">
+            <div class="container-fluid">
+
+                <div class="welcome-banner">
+                    <div>
+                        <h2>Workflow</h2>
+                        <p class="text-muted">Congé/absence, changement de procédure, matériel/accès — vue d'ensemble, validation et suivi d'équipe</p>
+                    </div>
+                </div>
+
+                <!-- ===================== NAVIGATION PAR ONGLETS ===================== -->
+                <ul class="nav wf-tab-nav mb-4 flex-nowrap overflow-auto" id="wfMainTabs">
+                    <li class="nav-item"><button type="button" class="btn nav-link active" id="wfTabOverviewBtn"><i class="bi bi-speedometer2"></i> Vue d'ensemble</button></li>
+                    <li class="nav-item"><button type="button" class="btn nav-link" id="wfTabMineBtn"><i class="bi bi-send"></i> Mes demandes</button></li>
+                    <li class="nav-item qa-only" style="display:none;"><button type="button" class="btn nav-link" id="wfTabPendingBtn"><i class="bi bi-hourglass-split"></i> À valider <span class="badge bg-warning text-dark" id="wfBadgePending" style="display:none;"></span></button></li>
+                    <li class="nav-item"><button type="button" class="btn nav-link" id="wfTabSlaBtn"><i class="bi bi-diagram-3"></i> SLA &amp; délais</button></li>
+                    <li class="nav-item qa-only" style="display:none;"><button type="button" class="btn nav-link" id="wfTabHistoryBtn"><i class="bi bi-archive"></i> Historique</button></li>
+                    <li class="nav-item qa-only" style="display:none;"><button type="button" class="btn nav-link" id="wfTabTemplatesBtn"><i class="bi bi-file-earmark-text"></i> Modèles</button></li>
+                    <li class="nav-item"><button type="button" class="btn nav-link" id="wfTabTasksBtn"><i class="bi bi-journal-text"></i> Tâches &amp; notes <span class="badge bg-primary" id="wfBadgeTasks" style="display:none;"></span></button></li>
+                </ul>
+
+                <!-- ===================== VUE D'ENSEMBLE ===================== -->
+                <div id="wfPaneOverview" class="wf-tab-pane">
+                    <div class="row g-3 mb-4">
+                        <div class="col-6 col-lg-3">
+                            <div class="card wf-stat-card h-100">
+                                <div class="card-body d-flex align-items-center gap-3">
+                                    <div class="wf-stat-icon" style="background:#eaf2ff;color:#0057B8;"><i class="bi bi-send"></i></div>
+                                    <div>
+                                        <div class="wf-stat-value" id="wfStatMineOpen">0</div>
+                                        <div class="text-muted small">Mes demandes en attente</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-3 qa-only" style="display:none;">
+                            <div class="card wf-stat-card h-100">
+                                <div class="card-body d-flex align-items-center gap-3">
+                                    <div class="wf-stat-icon" style="background:#fff3e0;color:#e08a00;"><i class="bi bi-hourglass-split"></i></div>
+                                    <div>
+                                        <div class="wf-stat-value" id="wfStatPendingCount">0</div>
+                                        <div class="text-muted small">Demandes à valider</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-3 qa-only" style="display:none;">
+                            <div class="card wf-stat-card h-100">
+                                <div class="card-body d-flex align-items-center gap-3">
+                                    <div class="wf-stat-icon" style="background:#e8f9ee;color:#0f9d58;"><i class="bi bi-graph-up-arrow"></i></div>
+                                    <div>
+                                        <div class="wf-stat-value" id="wfStatApprovalRate">—</div>
+                                        <div class="text-muted small">Taux d'approbation</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="card wf-stat-card h-100">
+                                <div class="card-body d-flex align-items-center gap-3">
+                                    <div class="wf-stat-icon" style="background:#f3eaff;color:#7b2ff7;"><i class="bi bi-journal-check"></i></div>
+                                    <div>
+                                        <div class="wf-stat-value" id="wfStatTasksOpen">0</div>
+                                        <div class="text-muted small">Tâches ouvertes</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-4">
+                        <div class="col-lg-6">
+                            <div class="card dashboard-card shadow-sm h-100">
+                                <div class="card-header"><i class="bi bi-clock-history"></i> Mes dernières demandes</div>
+                                <div class="card-body" id="wfOverviewMineList">
+                                    <p class="text-muted text-center mb-0">Chargement…</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 qa-only" style="display:none;">
+                            <div class="card dashboard-card shadow-sm h-100">
+                                <div class="card-header"><i class="bi bi-hourglass-split"></i> À traiter en priorité</div>
+                                <div class="card-body" id="wfOverviewPendingList">
+                                    <p class="text-muted text-center mb-0">Chargement…</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="card dashboard-card shadow-sm h-100">
+                                <div class="card-header"><i class="bi bi-journal-text"></i> Mes tâches en cours</div>
+                                <div class="card-body" id="wfOverviewTasksList">
+                                    <p class="text-muted text-center mb-0">Chargement…</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===================== MES DEMANDES ===================== -->
+                <div id="wfPaneMine" class="wf-tab-pane" style="display:none;">
+                    <div class="row g-4">
+                        <div class="col-lg-5">
+                            <div class="card dashboard-card shadow-sm h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title mb-3"><i class="bi bi-plus-circle"></i> Nouvelle demande</h5>
+                                    <form id="newRequestForm">
+                                        <div class="mb-3" id="templateSelectGroup" style="display:none;">
+                                            <label class="form-label small"><i class="bi bi-file-earmark-text"></i> Utiliser un modèle (optionnel)</label>
+                                            <select id="templateSelectInput" class="form-select form-select-sm">
+                                                <option value="">— Saisie libre —</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label class="form-label small">Type</label>
+                                            <select id="typeInput" class="form-select" required>
+                                                <option value="PROCEDURE_CHANGE">Changement de procédure</option>
+                                                <option value="ACCESS">Matériel / accès</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label class="form-label small">Titre</label>
+                                            <input id="titleInput" type="text" class="form-control" maxlength="200" required>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label class="form-label small">Détails</label>
+                                            <textarea id="detailsInput" class="form-control" rows="3" maxlength="2000"></textarea>
+                                        </div>
+
+                                        <div class="mb-2">
+                                            <label class="form-label small">Service concerné</label>
+                                            <select id="serviceCodeInput" class="form-select">
+                                                <option value="">— Choisir —</option>
+                                            </select>
+                                        </div>
+
+                                        <!-- periodTypeInput reste nécessaire côté backend (WorkflowService.submit exige une valeur
+                                             valide même hors congé) mais n'a plus de sens à choisir depuis que LEAVE (le seul type
+                                             qui en avait besoin) est parti vers Shift — figé sur DAY, caché à l'agent. -->
+                                        <input type="hidden" id="periodTypeInput" value="DAY">
+
+                                        <div class="mb-3">
+                                            <label class="form-label small">Assigner à</label>
+                                            <select id="assignedTeamInput" class="form-select" required>
+                                                <option value="ADMIN">Équipe Administration</option>
+                                                <option value="QA">Équipe Quality Assurance</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label small">Responsable désigné (optionnel — reçoit une priorité)</label>
+                                            <select id="assignedToInput" class="form-select">
+                                                <option value="">— Aucun en particulier —</option>
+                                            </select>
+                                        </div>
+
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="bi bi-send"></i> Soumettre
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-7">
+                            <div class="card dashboard-card shadow-sm h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title mb-3"><i class="bi bi-list-check"></i> Mes demandes</h5>
+                                    <div class="table-responsive">
+                                        <table class="table table-hover align-middle">
+                                            <thead>
+                                            <tr>
+                                                <th>Type</th><th>Titre</th><th>Période</th><th>Assignée à</th>
+                                                <th>Statut</th><th>Soumise le</th><th></th>
+                                            </tr>
+                                            </thead>
+                                            <tbody id="mineBody">
+                                            <tr><td colspan="7" class="text-center text-muted">Chargement…</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===================== À VALIDER (QA/ADMIN) ===================== -->
+                <div id="wfPanePending" class="wf-tab-pane qa-only" style="display:none;">
+                    <div class="card dashboard-card shadow-sm mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title mb-3"><i class="bi bi-hourglass-split"></i> À valider <span id="teamBadge" class="badge bg-secondary"></span></h5>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead>
+                                    <tr>
+                                        <th>Type</th><th>Titre</th><th>Période</th><th>Détails</th>
+                                        <th>Demandeur</th><th>Soumise le</th><th class="text-end">Action</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="pendingBody">
+                                    <tr><td colspan="7" class="text-center text-muted">Chargement…</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===================== HISTORIQUE (QA/ADMIN) ===================== -->
+                <div id="wfPaneHistory" class="wf-tab-pane qa-only" style="display:none;">
+                    <div class="card dashboard-card shadow-sm mb-4">
+                        <div class="card-header"><i class="bi bi-archive"></i> Historique &amp; archives</div>
+                        <div class="card-body">
+                            <div class="row g-2 mb-3">
+                                <div class="col-md-3">
+                                    <input type="text" class="form-control form-control-sm" id="wfHistSearch" placeholder="Rechercher (titre, demandeur)...">
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-select form-select-sm" id="wfHistStatus">
+                                        <option value="">Tous les statuts</option>
+                                        <option value="PENDING">En attente</option>
+                                        <option value="APPROVED">Approuvée</option>
+                                        <option value="REJECTED">Rejetée</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-select form-select-sm" id="wfHistType">
+                                        <option value="">Tous les types</option>
+                                        <option value="PROCEDURE_CHANGE">Changement de procédure</option>
+                                        <option value="ACCESS">Matériel / accès</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead>
+                                    <tr>
+                                        <th>Type</th><th>Titre</th><th>Période</th><th>Demandeur</th>
+                                        <th>Statut</th><th>Décidée par</th><th>Le</th><th></th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="wfHistoryBody">
+                                    <tr><td colspan="8" class="text-center text-muted">Chargement…</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===================== SLA & DÉLAIS — fiches pôle (Inbound, Outbound, Résolution,
+                     Opérations, Business, Agences), leur manager/contact et leurs activités/délais. ===================== -->
+                <div id="wfPaneSla" class="wf-tab-pane" style="display:none;">
+
+                    <!-- Vue liste : cartes pôle cliquables -->
+                    <div id="wfPolesListView">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <p class="text-muted small mb-0">Cliquez sur un pôle pour voir ses activités et délais de traitement.</p>
+                            <button class="btn btn-sm btn-primary qa-only" id="wfPoleNewBtn" style="display:none;"><i class="bi bi-plus-lg"></i> Nouveau pôle</button>
+                        </div>
+                        <div class="row g-3" id="wfPolesGrid">
+                            <div class="col-12 text-center text-muted">Chargement…</div>
+                        </div>
+                    </div>
+
+                    <!-- Vue détail d'un pôle : fiche + tableau activités/délais -->
+                    <div id="wfPoleDetailView" style="display:none;">
+                        <button type="button" class="btn btn-sm btn-outline-secondary mb-3" id="wfPoleBackBtn">
+                            <i class="bi bi-arrow-left"></i> Retour aux pôles
+                        </button>
+
+                        <div class="card dashboard-card shadow-sm mb-4">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+                                    <div>
+                                        <h5 class="mb-1" id="wfPoleDetailName">—</h5>
+                                        <p class="text-muted small mb-2" id="wfPoleDetailWho"></p>
+                                        <p class="small mb-0" id="wfPoleDetailWhat"></p>
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="fw-semibold" id="wfPoleDetailManager">—</div>
+                                        <div class="small text-muted" id="wfPoleDetailContact"></div>
+                                        <div class="small text-muted" id="wfPoleDetailTeamContact"></div>
+                                        <div class="mt-2 d-flex gap-2 justify-content-end flex-wrap">
+                                            <button class="btn btn-sm btn-outline-primary qa-only" id="wfPoleAlertBtn" style="display:none;">
+                                                <i class="bi bi-bell"></i> Assigner / Alerter le manager
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary qa-only" id="wfPoleEditBtn" style="display:none;">
+                                                <i class="bi bi-pencil"></i> Modifier la fiche
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card dashboard-card shadow-sm">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-list-check"></i> Activités &amp; délais de traitement</span>
+                                <button class="btn btn-sm btn-primary qa-only" id="wfPoleActivityNewBtn" style="display:none;"><i class="bi bi-plus-lg"></i> Ajouter une activité</button>
+                            </div>
+                            <div class="card-body">
+                                <div class="wf-activity-search">
+                                    <i class="bi bi-search"></i>
+                                    <input type="text" class="form-control form-control-sm" id="wfPoleActivitySearch"
+                                           placeholder="Rechercher une activité (ex. reset code, RIB, blocage carte…)">
+                                </div>
+                                <div id="wfPoleActivitiesContainer"><p class="text-center text-muted">Chargement…</p></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===================== MODÈLES DE DEMANDE (QA/ADMIN) ===================== -->
+                <div id="wfPaneTemplates" class="wf-tab-pane qa-only" style="display:none;">
+                    <div class="card dashboard-card shadow-sm mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-file-earmark-text"></i> Modèles de demande</span>
+                            <button class="btn btn-sm btn-primary" id="wfTemplateNewBtn"><i class="bi bi-plus-lg"></i> Nouveau modèle</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead><tr><th>Nom</th><th>Type</th><th>Titre par défaut</th><th>Équipe</th><th>Statut</th><th></th></tr></thead>
+                                    <tbody id="wfTemplatesBody"><tr><td colspan="6" class="text-center text-muted">Chargement…</td></tr></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===================== TÂCHES & NOTES ===================== -->
+                <div id="wfPaneTasks" class="wf-tab-pane" style="display:none;">
+                    <div class="row g-4">
+                        <div class="col-lg-5 qa-only" style="display:none;">
+                            <div id="taskAssignCard" class="card dashboard-card shadow-sm mb-4">
+                                <div class="card-body">
+                                    <h5 class="card-title mb-3"><i class="bi bi-calendar-plus text-primary"></i> Programmer une tâche</h5>
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label small">Équipe</label>
+                                            <select class="form-select form-select-sm" id="taskAssignTeam">
+                                                <option value="">— Moi-même —</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small">Individu (optionnel — sinon toute l'équipe)</label>
+                                            <select class="form-select form-select-sm" id="taskAssignIndividual">
+                                                <option value="">— Toute l'équipe —</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <input type="text" class="form-control form-control-sm mb-2" id="taskAssignTitle" placeholder="Titre de la tâche">
+                                    <textarea class="form-control form-control-sm mb-2" id="taskAssignDescription" rows="2" placeholder="Description (optionnel)"></textarea>
+                                    <div class="row g-2 align-items-end mb-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label small">Échéance (optionnel)</label>
+                                            <input type="date" class="form-control form-control-sm" id="taskAssignDueDate">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small">Priorité</label>
+                                            <select class="form-select form-select-sm" id="taskAssignPriority">
+                                                <option value="LOW">Basse</option>
+                                                <option value="NORMAL" selected>Normale</option>
+                                                <option value="HIGH">Haute</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-sm btn-primary w-100" id="taskAssignSubmitBtn"><i class="bi bi-send"></i> Assigner (notifie par e-mail + en app)</button>
+                                    <div id="taskAssignResult" class="small mt-2"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-7">
+                            <div class="card dashboard-card shadow-sm mb-4">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h5 class="card-title mb-0"><i class="bi bi-journal-text text-primary"></i> Mes tâches &amp; notes</h5>
+                                    </div>
+
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-4"><div class="wf-task-stat"><div class="num text-primary" id="wfTaskStatOpen">0</div><div class="lbl">Ouvertes</div></div></div>
+                                        <div class="col-4"><div class="wf-task-stat"><div class="num text-danger" id="wfTaskStatOverdue">0</div><div class="lbl">En retard</div></div></div>
+                                        <div class="col-4"><div class="wf-task-stat"><div class="num text-success" id="wfTaskStatDone">0</div><div class="lbl">Terminées</div></div></div>
+                                    </div>
+
+                                    <div class="border rounded-3 p-2 mb-3">
+                                        <div class="d-flex gap-2 flex-wrap">
+                                            <input type="text" class="form-control form-control-sm flex-grow-1" id="noteTitle" placeholder="Nouvelle note / tâche..." style="min-width:160px;">
+                                            <input type="date" class="form-control form-control-sm" id="noteDueDate" style="max-width:150px;">
+                                            <select class="form-select form-select-sm" id="notePriority" style="max-width:120px;">
+                                                <option value="LOW">Basse</option>
+                                                <option value="NORMAL" selected>Normale</option>
+                                                <option value="HIGH">Haute</option>
+                                            </select>
+                                            <button class="btn btn-sm btn-primary" id="noteAddBtn"><i class="bi bi-plus-lg"></i> Ajouter</button>
+                                        </div>
+                                    </div>
+
+                                    <div id="notesList"><p class="text-muted text-center">Chargement…</p></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/preferences.js}"></script>
+<script th:src="@{/js/rcc-api.js}"></script>
+<script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/workflow.js}"></script>
+<!-- Modale détail d'une demande à valider -->
+<div class="modal fade" id="wfPendingDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title"><i class="bi bi-hourglass-split"></i> <span id="wfPendingDetailTitle">Détail de la demande</span></h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <dl class="row mb-0 small">
+                    <dt class="col-4">Type</dt><dd class="col-8" id="wfPdType"></dd>
+                    <dt class="col-4">Période</dt><dd class="col-8" id="wfPdPeriod"></dd>
+                    <dt class="col-4">Demandeur</dt><dd class="col-8" id="wfPdRequester"></dd>
+                    <dt class="col-4">Filiale / Service / Équipe</dt><dd class="col-8" id="wfPdOrg"></dd>
+                    <dt class="col-4">Assignée à</dt><dd class="col-8" id="wfPdAssignee"></dd>
+                    <dt class="col-4">Soumise le</dt><dd class="col-8" id="wfPdSubmitted"></dd>
+                    <dt class="col-4">Délai en cours</dt><dd class="col-8" id="wfPdSla"></dd>
+                </dl>
+                <hr>
+                <div class="fw-semibold small mb-1">Détails</div>
+                <div id="wfPdDetails" class="small" style="white-space: pre-wrap;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button class="btn btn-outline-danger" id="wfPdRejectBtn">Rejeter</button>
+                <button class="btn btn-success" id="wfPdApproveBtn">Approuver</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Modale modèle de demande -->
+<div class="modal fade" id="wfTemplateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" id="wfTemplateModalTitle">Nouveau modèle</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="wfTemplateEditId">
+                <label class="form-label small mb-1">Nom du modèle</label>
+                <input type="text" class="form-control mb-2" id="wfTemplateName" placeholder="ex. Nouveau badge d'accès">
+                <label class="form-label small mb-1">Type</label>
+                <select class="form-select mb-2" id="wfTemplateType">
+                    <option value="PROCEDURE_CHANGE">Changement de procédure</option>
+                    <option value="ACCESS">Matériel / accès</option>
+                </select>
+                <label class="form-label small mb-1">Titre par défaut</label>
+                <input type="text" class="form-control mb-2" id="wfTemplateDefaultTitle" placeholder="ex. Demande de badge d'accès">
+                <label class="form-label small mb-1">Détails par défaut</label>
+                <textarea class="form-control mb-2" id="wfTemplateDefaultDetails" rows="3"></textarea>
+                <label class="form-label small mb-1">Équipe assignée par défaut</label>
+                <select class="form-select mb-2" id="wfTemplateDefaultTeam">
+                    <option value="ADMIN">Équipe Administration</option>
+                    <option value="QA">Équipe Quality Assurance</option>
+                </select>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="wfTemplateActive" checked>
+                    <label class="form-check-label" for="wfTemplateActive">Actif (proposé aux agents)</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button class="btn btn-primary" id="wfTemplateSaveBtn">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== Modal : Fiche pôle (créer/modifier) ===================== -->
+<div class="modal fade" id="wfPoleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" id="wfPoleModalTitle">Nouveau pôle</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="wfPoleEditId">
+                <label class="form-label small mb-1">Nom du pôle</label>
+                <input type="text" class="form-control mb-2" id="wfPoleName" placeholder="ex. Pôle Inbound">
+                <label class="form-label small mb-1">Manager (identifiant du compte portail)</label>
+                <input type="text" class="form-control mb-2" id="wfPoleManagerUsername" placeholder="ex. lagboton">
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <label class="form-label small mb-1">Téléphone de contact</label>
+                        <input type="text" class="form-control mb-2" id="wfPoleContactPhone">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small mb-1">E-mail de contact affiché</label>
+                        <input type="text" class="form-control mb-2" id="wfPoleContactEmail">
+                    </div>
+                </div>
+                <label class="form-label small mb-1">Numéro(s)/boîte d'équipe (optionnel)</label>
+                <input type="text" class="form-control mb-2" id="wfPoleTeamContactLabel" placeholder="ex. Numéro vert : 9955">
+                <label class="form-label small mb-1">Qui sommes-nous ?</label>
+                <textarea class="form-control mb-2" id="wfPoleWhoWeAre" rows="2"></textarea>
+                <label class="form-label small mb-1">Que faisons-nous ?</label>
+                <textarea class="form-control mb-2" id="wfPoleWhatWeDo" rows="2"></textarea>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="wfPoleActive" checked>
+                    <label class="form-check-label" for="wfPoleActive">Actif (visible dans la liste des pôles)</label>
+                </div>
+                <div id="wfPoleModalResult" class="small mt-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button class="btn btn-primary" id="wfPoleSaveBtn">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== Modal : Activité/délai (créer/modifier) ===================== -->
+<div class="modal fade" id="wfPoleActivityModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" id="wfPoleActivityModalTitle">Nouvelle activité</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="wfPoleActivityEditId">
+                <input type="hidden" id="wfPoleActivityPoleId">
+                <label class="form-label small mb-1">Produit ou service</label>
+                <input type="text" class="form-control mb-2" id="wfPoleActivityCategory" placeholder="ex. Mobile app, Carte, Compte...">
+                <label class="form-label small mb-1">Activité</label>
+                <input type="text" class="form-control mb-2" id="wfPoleActivityMotif" placeholder="ex. Reset code, Blocage de carte...">
+                <label class="form-label small mb-1">Délai de traitement (tel qu'affiché)</label>
+                <input type="text" class="form-control mb-2" id="wfPoleActivitySlaLabel" placeholder="ex. 24H, Instantanée, 5 jours...">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="wfPoleActivityActive" checked>
+                    <label class="form-check-label" for="wfPoleActivityActive">Actif (visible dans la fiche)</label>
+                </div>
+                <div id="wfPoleActivityModalResult" class="small mt-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button class="btn btn-danger me-auto qa-only" id="wfPoleActivityDeleteBtn" style="display:none;"><i class="bi bi-trash"></i> Supprimer</button>
+                <button class="btn btn-primary" id="wfPoleActivitySaveBtn">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== Modal : Assigner / Alerter le manager du pôle ===================== -->
+<div class="modal fade" id="wfPoleAlertModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title">Alerter <span id="wfPoleAlertManagerName">le manager</span></h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">Envoie une notification dans le portail, un message Teams et un e-mail au manager du pôle.</p>
+                <label class="form-label small mb-1">Message</label>
+                <textarea class="form-control mb-2" id="wfPoleAlertMessage" rows="3" placeholder="ex. Réclamations en attente à traiter sur ce pôle."></textarea>
+                <div id="wfPoleAlertResult" class="small mt-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button class="btn btn-primary" id="wfPoleAlertSendBtn"><i class="bi bi-send"></i> Envoyer l'alerte</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

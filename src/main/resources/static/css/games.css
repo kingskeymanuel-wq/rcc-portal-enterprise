@@ -1,0 +1,160 @@
+.gm-hero { align-items: center; justify-content: space-between; display: flex; flex-wrap: wrap; gap: 1rem; }
+
+.gm-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 18px;
+}
+
+.gm-card {
+    border-radius: 18px;
+    padding: 22px;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    cursor: pointer;
+    box-shadow: 0 14px 30px rgba(0,0,0,.12);
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+.gm-card:hover { transform: translateY(-6px) scale(1.015); box-shadow: 0 20px 40px rgba(0,0,0,.2); }
+.gm-card::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 90% -10%, rgba(255,255,255,.25), transparent 55%);
+    pointer-events: none;
+}
+.gm-card .gm-icon { font-size: 2.4rem; opacity: .95; filter: drop-shadow(0 4px 6px rgba(0,0,0,.2)); }
+.gm-card h5 { font-weight: 700; margin: 10px 0 4px; }
+.gm-card p { font-size: .85rem; opacity: .92; margin-bottom: 14px; }
+.gm-card .gm-play-btn {
+    align-self: flex-start;
+    background: rgba(255,255,255,.22);
+    border: 1px solid rgba(255,255,255,.5);
+    color: #fff;
+    border-radius: 30px;
+    padding: 6px 18px;
+    font-weight: 600;
+    font-size: .85rem;
+    backdrop-filter: blur(4px);
+}
+.gm-card .gm-play-btn:hover { background: rgba(255,255,255,.35); }
+.gm-card .gm-best {
+    position: absolute; top: 16px; right: 16px;
+    background: rgba(0,0,0,.25);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: .72rem;
+    font-weight: 700;
+}
+.gm-card.gm-inactive { opacity: .45; filter: grayscale(.5); cursor: not-allowed; }
+
+/* ===== Scène plein écran ===== */
+.gm-stage {
+    position: fixed; inset: 0; z-index: 2000;
+    background: linear-gradient(160deg, #0b1220, #101a30 60%, #0b1220);
+    display: flex; align-items: stretch; justify-content: center;
+    animation: gmStageIn .25s ease;
+}
+@keyframes gmStageIn { from { opacity: 0; } to { opacity: 1; } }
+.gm-stage-inner { width: 100%; max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; padding: 18px 16px; }
+.gm-stage-header {
+    display: flex; align-items: center; justify-content: space-between;
+    color: #fff; padding: 8px 4px 16px;
+}
+.gm-stage-icon { font-size: 1.6rem; }
+.gm-score-badge {
+    background: linear-gradient(90deg,#F5A623,#F72585);
+    color: #fff; font-weight: 700; border-radius: 20px; padding: 6px 16px; font-size: .95rem;
+    box-shadow: 0 4px 12px rgba(247,37,133,.4);
+}
+.gm-stage-body {
+    flex: 1; background: #fff; border-radius: 20px; padding: 28px;
+    overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.4);
+}
+
+/* ===== Éléments génériques de jeu ===== */
+.gm-option-btn {
+    display: block; width: 100%; text-align: left;
+    border: 2px solid #e9ecef; background: #fafbfc; border-radius: 12px;
+    padding: 14px 18px; margin-bottom: 10px; font-weight: 600; color: #1f2937;
+    transition: all .15s ease;
+}
+.gm-option-btn:hover:not(:disabled) { border-color: #0057B8; background: #eaf2ff; transform: translateX(4px); }
+.gm-option-btn.gm-correct { border-color: #00A651; background: #e8f9ee; color: #0f9d58; animation: gmPulseGreen .5s ease; }
+.gm-option-btn.gm-wrong { border-color: #d93025; background: #fdeaea; color: #d93025; animation: gmShake .4s ease; }
+.gm-option-btn:disabled { cursor: default; }
+@keyframes gmPulseGreen { 0%{transform:scale(1);} 50%{transform:scale(1.03);} 100%{transform:scale(1);} }
+@keyframes gmShake { 0%,100%{transform:translateX(0);} 25%{transform:translateX(-6px);} 75%{transform:translateX(6px);} }
+
+.gm-progress-track { height: 8px; background: #eef1f5; border-radius: 6px; overflow: hidden; margin-bottom: 18px; }
+.gm-progress-fill { height: 100%; background: linear-gradient(90deg,#0057B8,#00A651); transition: width .3s ease; }
+
+.gm-timer-ring { width: 56px; height: 56px; }
+.gm-feedback-banner {
+    display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-radius: 12px;
+    font-weight: 700; margin-bottom: 16px; animation: gmSlideDown .25s ease;
+}
+.gm-feedback-banner.ok { background: #e8f9ee; color: #0f9d58; }
+.gm-feedback-banner.ko { background: #fdeaea; color: #d93025; }
+@keyframes gmSlideDown { from { opacity:0; transform: translateY(-8px);} to { opacity:1; transform: translateY(0);} }
+
+.gm-result-screen { text-align: center; padding: 30px 10px; }
+.gm-result-score { font-size: 3rem; font-weight: 800; background: linear-gradient(90deg,#0057B8,#00A651); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* ===== Détail de correction (2e tentative d'évaluation) ===== */
+.gm-eval-detail { max-height: 340px; overflow-y: auto; border: 1px solid #eef1f5; border-radius: 12px; padding: 4px; }
+.gm-eval-row { padding: 10px 14px; border-radius: 10px; margin: 4px; }
+.gm-eval-row.gm-eval-ok { background: #f2fbf6; }
+.gm-eval-row.gm-eval-ko { background: #fdf3f2; }
+.gm-eval-q { font-weight: 600; font-size: .9rem; color: #1f2a44; margin-bottom: 4px; }
+.gm-eval-a { font-size: .86rem; }
+
+/* ===== Roue de la fortune ===== */
+.gm-wheel-wrap { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.gm-wheel { width: 280px; height: 280px; border-radius: 50%; position: relative; transition: transform 3.5s cubic-bezier(.17,.67,.12,.99); box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+.gm-wheel-pointer { font-size: 2rem; color: #d93025; margin-bottom: -14px; z-index: 2; }
+
+/* ===== Pendu ===== */
+.gm-hangman-word { font-size: 2rem; letter-spacing: 8px; font-family: monospace; font-weight: 700; text-align: center; margin: 20px 0; }
+.gm-hangman-keyboard { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 480px; margin: 0 auto; }
+.gm-hangman-keyboard button { width: 38px; height: 38px; border-radius: 8px; border: 2px solid #e9ecef; background: #fff; font-weight: 700; }
+.gm-hangman-keyboard button:disabled.gm-key-correct { background: #e8f9ee; border-color: #00A651; color: #0f9d58; }
+.gm-hangman-keyboard button:disabled.gm-key-wrong { background: #fdeaea; border-color: #d93025; color: #d93025; }
+
+/* ===== Memory ===== */
+.gm-memory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.gm-memory-card {
+    aspect-ratio: 1; border-radius: 12px; background: linear-gradient(135deg,#0057B8,#00A651);
+    display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: .78rem;
+    text-align: center; padding: 8px; cursor: pointer; transition: transform .3s ease;
+    user-select: none;
+}
+.gm-memory-card.gm-flipped { background: #fff; color: #1f2937; border: 2px solid #0057B8; }
+.gm-memory-card.gm-matched { background: #e8f9ee; color: #0f9d58; border: 2px solid #00A651; cursor: default; }
+
+/* ===== Puzzle parcours ===== */
+.gm-puzzle-list { display: flex; flex-direction: column; gap: 10px; }
+.gm-puzzle-step {
+    display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px;
+    background: #fafbfc; border: 2px solid #e9ecef; cursor: grab; font-weight: 600;
+}
+.gm-puzzle-step .gm-puzzle-num { width: 28px; height: 28px; border-radius: 50%; background: #0057B8; color: #fff; display: flex; align-items: center; justify-content: center; font-size: .8rem; flex-shrink: 0; }
+.gm-puzzle-step.gm-dragging { opacity: .4; }
+.gm-puzzle-step.gm-drag-over { border-color: #0057B8; background: #eaf2ff; }
+
+/* ===== JoliGo ===== */
+.gm-joligo-letters { display: flex; gap: 8px; justify-content: center; margin: 20px 0; flex-wrap: wrap; }
+.gm-joligo-letter { width: 42px; height: 52px; border: 2px solid #0057B8; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.4rem; text-transform: uppercase; background: #eaf2ff; }
+.gm-joligo-letter.gm-empty { background: #fafbfc; color: transparent; }
+
+/* Confetti canvas overlay */
+#gmConfettiCanvas { position: fixed; inset: 0; pointer-events: none; z-index: 3000; }
+
+@media (max-width: 576px) {
+    .gm-stage-body { padding: 18px; border-radius: 14px; }
+    .gm-memory-grid { grid-template-columns: repeat(3, 1fr); }
+}

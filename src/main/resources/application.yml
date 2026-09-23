@@ -1,0 +1,260 @@
+server:
+  port: 8081
+spring:
+  application:
+    name: rcc-portal
+  # Fichier local, jamais commité (.gitignore) — permet de renseigner les clés (Anthropic...)
+  # sans dépendre d'une variable d'environnement système que IntelliJ doit hériter (source
+  # récurrente de blocage : setx + redémarrage IntelliJ ne suffit pas toujours). Si le fichier
+  # n'existe pas ("optional:"), rien ne change — les ${ANTHROPIC_API_KEY:} etc. restent actifs.
+  config:
+    import: "optional:file:./application-secrets.yml"
+  datasource:
+    url: jdbc:sqlserver://10.16.1.16:1433;databaseName=SAGED;encrypt=false;trustServerCertificate=true
+    username: eciappuser
+    password: ${RCC_DB_PASSWORD:C@ntg3tme1n$}
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 15000
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        physical_naming_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+  thymeleaf:
+    cache: false
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  mail:
+    host: ${RCC_MAIL_HOST:localhost}
+    port: ${RCC_MAIL_PORT:25}
+    username: ${RCC_MAIL_USERNAME:}
+    password: ${RCC_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${RCC_MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${RCC_MAIL_STARTTLS:false}
+    test-connection: false
+logging:
+  level:
+    root: INFO
+    com.ecobank.rccportal: INFO
+quality:
+  audio:
+    storage-dir: "C:/rcc-portal-audio"
+  ai:
+    # Azure AI Speech — transcription (Fast Transcription API). Créer une ressource
+    # "Speech" dans le portail Azure, région + clé disponibles dans "Keys and Endpoint".
+    azure-speech-key: ${AZURE_SPEECH_KEY:}
+    azure-speech-region: ${AZURE_SPEECH_REGION:francecentral}
+    azure-speech-language: ${AZURE_SPEECH_LANGUAGE:fr-FR}
+    # Azure OpenAI Service — analyse. Nécessite une ressource Azure OpenAI déployée
+    # avec un modèle (ex. gpt-4o) ; le nom du déploiement est choisi à la création,
+    # pas forcément identique au nom du modèle.
+    azure-openai-endpoint: ${AZURE_OPENAI_ENDPOINT:}
+    azure-openai-key: ${AZURE_OPENAI_KEY:}
+    azure-openai-deployment: ${AZURE_OPENAI_DEPLOYMENT:gpt-4o}
+    # Anthropic — conservé pour l'analyse de fichiers RAF (analyzeFile, réservé à l'IT).
+    anthropic-key: ${ANTHROPIC_API_KEY:}
+    anthropic-model: ${ANTHROPIC_MODEL:claude-sonnet-4-5}
+# Copilot Studio — utilisé par RAF (assistant conversationnel), service IA autorisé par Ecobank.
+# Secret Direct Line : Copilot Studio > Paramètres de l'agent > Canaux > Application web/mobile personnalisée.
+copilot:
+  enabled: ${COPILOT_ENABLED:false}
+  directline:
+    secret: ${COPILOT_DIRECTLINE_SECRET:}
+    endpoint: ${COPILOT_DIRECTLINE_ENDPOINT:https://directline.botframework.com}
+    timeout-seconds: ${COPILOT_DIRECTLINE_TIMEOUT_SECONDS:60}
+# Microsoft Graph — intégration réelle Teams/Outlook (voir docs/GRAPH_SETUP.md pour la
+# procédure complète d'inscription de l'application dans Azure AD / Entra ID).
+graph:
+  tenant-id: ${AZURE_TENANT_ID:}
+  client-id: ${AZURE_CLIENT_ID:}
+  client-secret: ${AZURE_CLIENT_SECRET:}
+# Recherche web (Bing Web Search API, Azure Cognitive Services) — utilisée par RAF
+# UNIQUEMENT en repli, quand la Base de connaissances / procédures internes ne
+# donnent pas assez de résultats pertinents. Clé disponible en créant une ressource
+# "Bing Search" ou "Bing Custom Search" dans le portail Azure (Keys and Endpoint).
+websearch:
+  enabled: ${WEBSEARCH_ENABLED:false}
+  bing:
+    endpoint: ${WEBSEARCH_BING_ENDPOINT:https://api.bing.microsoft.com/v7.0/search}
+    key: ${WEBSEARCH_BING_KEY:}
+    market: ${WEBSEARCH_BING_MARKET:fr-FR}
+    result-count: ${WEBSEARCH_BING_RESULT_COUNT:5}
+    timeout-seconds: ${WEBSEARCH_BING_TIMEOUT_SECONDS:15}
+rcc:
+  uploads:
+    photos-dir: ${RCC_PHOTOS_DIR:C:/rcc-portal-photos}
+    kb-files-dir: ${RCC_KB_FILES_DIR:C:/rcc-portal-kb-files}
+  translation:
+    # Service de traduction interne éventuellement hébergé par l'IT Ecobank sur le réseau
+    # interne (contourne un blocage de pare-feu vers l'extérieur — MyMemory/Google restent
+    # utilisés en repli si non configuré). Voir RalphSearchService pour le contrat attendu.
+    custom-url: "${RCC_TRANSLATION_CUSTOM_URL:}"
+    offline:
+      # Traduction locale hors-ligne (Argos Translate via scripts/translate.py) — SEULE source
+      # qui ne dépend d'aucun accès internet au moment de traduire (contrairement à Google/
+      # MyMemory ci-dessus, bloqués sur ce réseau). Essayée EN PREMIER quand configurée — voir
+      # RalphSearchService.translateDetailed(). Vide par défaut : tant que ces 2 valeurs ne
+      # sont pas renseignées, le Traducteur se rabat sur les sources réseau (qui échoueront
+      # tant que l'IT n'aura pas ouvert l'accès aux domaines externes).
+      # Prérequis à installer manuellement (voir l'en-tête de scripts/translate.py pour la
+      # procédure complète, y compris le téléchargement — une seule fois — des paquets de
+      # langue nécessaires) :
+      #   pip install argostranslate langdetect --break-system-packages
+      python-executable: "${RCC_TRANSLATION_OFFLINE_PYTHON_EXECUTABLE:}"
+      script-path: "${RCC_TRANSLATION_OFFLINE_SCRIPT_PATH:}"
+      timeout-seconds: 20
+  ocr:
+    # OCR local (PaddleOCR via scripts/ocr.py) pour l'import KPI par capture d'écran — gratuit,
+    # sans cloud, fonctionne même si le crédit Anthropic est épuisé. Vide par défaut : tant que
+    # ces 2 valeurs ne sont pas renseignées, le système se rabat sur Claude vision (si configuré).
+    # Prérequis à installer manuellement : Python + `pip install paddleocr paddlepaddle --break-system-packages`.
+    python-executable: "${RCC_OCR_PYTHON_EXECUTABLE:}"
+    script-path: "${RCC_OCR_SCRIPT_PATH:}"
+    timeout-seconds: 60
+  auth:
+    jwt-secret: ${RCC_JWT_SECRET:ChangeThisSecretKeyForProduction123456789}
+    jwt-access-expires-in-minutes: 60
+    jwt-refresh-expires-in-days: 30
+    bcrypt-rounds: 12
+    max-failed-attempts: 5
+    lockout-duration-minutes: 15
+    two-factor-code-ttl-minutes: 10
+    bootstrap-admin-username: "edoudou"
+    test-bypass:
+      enabled: ${RCC_TEST_BYPASS_ENABLED:true}
+      otp-code: "000000"
+      accounts:
+        - username: "agent.conseiller"
+          password: "Test@2026"
+          name: "Awa Koffi"
+          email: "awa.koffi@test.local"
+          role: "AGENT"
+          activity: "INBOUND_VOICE"
+        - username: "agent.conseiller2"
+          password: "Test@2026"
+          name: "Moussa Camara"
+          email: "moussa.camara@test.local"
+          role: "AGENT"
+          activity: "INBOUND_VOICE"
+        - username: "agent.qa"
+          password: "Test@2026"
+          name: "Ibrahim Toure"
+          email: "ibrahim.toure@test.local"
+          role: "AGENT"
+          service: "Quality Assurance"
+        - username: "agent.admin"
+          password: "Test@2026"
+          name: "Fatou Diallo"
+          email: "fatou.diallo@test.local"
+          role: "ADMIN"
+        - username: "it.admin"
+          password: "ItAdmin@2026"
+          name: "Administrateur IT Ecobank"
+          email: "it.admin@test.local"
+          role: "ADMIN"
+        - username: "rh.test"
+          password: "Rh@2026"
+          name: "Espace RH Ecobank"
+          email: "rh.test@test.local"
+          role: "RH"
+        - username: "supervisor.test"
+          password: "Supervisor@2026"
+          name: "Portail Superviseur Ecobank"
+          email: "supervisor.test@test.local"
+          role: "SUPERVISOR"
+        - username: "teamleader.outbound"
+          password: "TeamLeader@2026"
+          name: "Kouassi Yao — Team Leader Outbound"
+          email: "teamleader.outbound@test.local"
+          role: "TEAM_LEADER"
+          ledTeam: "OUTBOUND"
+        - username: "teamleader.inboundvoice"
+          password: "TeamLeader@2026"
+          name: "Aïssatou Koné — Team Leader Inbound Voix"
+          email: "teamleader.inboundvoice@test.local"
+          role: "TEAM_LEADER"
+          ledTeam: "INBOUND_VOICE"
+        - username: "teamleader.inboundmail"
+          password: "TeamLeader@2026"
+          name: "Bakary Traoré — Team Leader Inbound Mail"
+          email: "teamleader.inboundmail@test.local"
+          role: "TEAM_LEADER"
+          ledTeam: "INBOUND_MAIL"
+        - username: "teamleader.cib"
+          password: "TeamLeader@2026"
+          name: "Fatoumata Diabaté — Team Leader CIB"
+          email: "teamleader.cib@test.local"
+          role: "TEAM_LEADER"
+          ledTeam: "CIB"
+        - username: "agent.outbound"
+          password: "Test@2026"
+          name: "Adjoua Kouadio"
+          email: "adjoua.kouadio@test.local"
+          role: "AGENT"
+          activity: "OUTBOUND"
+        - username: "agent.televente"
+          password: "Test@2026"
+          name: "Aya Bamba — Télévente"
+          email: "aya.bamba@test.local"
+          role: "AGENT"
+          activity: "TELEVENTE"
+        - username: "agent.digital"
+          password: "Test@2026"
+          name: "Nassira Ouattara — Service Digital"
+          email: "nassira.ouattara@test.local"
+          role: "AGENT"
+          activity: "DIGITAL"
+        - username: "qa.supervisor"
+          password: "QaSupervisor@2026"
+          name: "Superviseur Qualité Assurance Ecobank"
+          email: "qa.supervisor@test.local"
+          role: "AGENT"
+          service: "Superviseur Qualité Assurance"
+        - username: "excelliam.test"
+          password: "Excelliam@2026"
+          name: "Portail Excelliam — Prestataire Planning"
+          email: "excelliam.test@test.local"
+          role: "EXCELLIAM"
+    ad:
+      url: "https://epg-eci-apps01/RIB_DELIVERY/RIB_DELIVRY.asmx"
+      success-status: "OK"
+      timeout-ms: 5000
+      insecure-ssl: ${RCC_AD_INSECURE_SSL:true}
+    mfa:
+      base-url: "https://10.16.1.16"
+      activation-path: "/ecimfa/authentification/activation"
+      source: "RccPortal"
+      timeout-ms: 30000
+      insecure-ssl: ${RCC_MFA_INSECURE_SSL:true}
+    gateway:
+      # ⚠ Gateway d'authentification SAGED centralisée — remplace ad/mfa ci-dessus
+      # pour le flux de connexion réel (voir AuthGatewayClient). Valeurs de test
+      # fournies par l'IT Ecobank (environnement local SAGED, cf. collection
+      # Postman "Saged") — à écraser via variable d'environnement dès qu'un
+      # environnement de production distinct est fourni.
+      login-url: "${RCC_AUTH_GATEWAY_LOGIN_URL:http://10.16.1.16:8086/api/v1/auth/login}"
+      logout-url: "${RCC_AUTH_GATEWAY_LOGOUT_URL:http://10.16.1.16:8086/api/v1/auth/logout}"
+      refresh-url: "${RCC_AUTH_GATEWAY_REFRESH_URL:http://10.16.1.16:8086/api/v1/auth/refresh}"
+      hmac-secret: "${RCC_AUTH_GATEWAY_HMAC_SECRET:C@ntg3tme1n$HMAC}"
+      aes-password: "${RCC_AUTH_GATEWAY_AES_PASSWORD:C@ntg3tme1n$AES}"
+      timeout-ms: 15000
+      insecure-ssl: ${RCC_AUTH_GATEWAY_INSECURE_SSL:true}
+  cors:
+    allowed-origins: ${RCC_CORS_ALLOWED_ORIGINS:http://localhost:8081}
+  mail:
+    from: ${RCC_MAIL_FROM:}
+    qmail:
+      from: ${RCC_MAIL_FROM:}

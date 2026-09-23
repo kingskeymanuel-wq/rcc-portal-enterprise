@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RCC Portal Enterprise — Superviseur Qualité Assurance</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/hr-portal.css}">
+    <style>
+        .qas-kpi{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:.75rem;padding:1rem 1.25rem;display:flex;gap:12px;align-items:center}
+        .qas-kpi i{font-size:1.4rem;color:#0057b8}
+        .qas-kpi span{display:block;font-size:.68rem;color:#8090a3}
+        .qas-kpi strong{display:block;font-size:1.3rem}
+        .qas-card{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:.75rem;padding:1.25rem 1.5rem}
+        html[data-theme="dark"] .qas-kpi,html[data-theme="dark"] .qas-card{background:#1a2233;border-color:#2a3448;color:#edf3fb}
+    </style>
+</head>
+<body>
+<div class="layout">
+    <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+    <div class="content">
+        <div th:replace="~{fragments/header :: header}"></div>
+        <main id="page-content">
+            <div class="container-fluid py-3">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h1 class="h4 mb-1">Superviseur Qualité Assurance</h1>
+                        <p class="text-muted mb-0">Vue d'ensemble des écoutes, des évaluations et des formations de toute la Quality Assurance.</p>
+                    </div>
+                    <button id="refreshBtn" class="btn btn-light border"><i class="bi bi-arrow-clockwise"></i> Actualiser</button>
+                </div>
+
+                <div id="qasError" class="alert alert-danger d-none"></div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-xl-3 col-md-6"><div class="qas-kpi"><i class="bi bi-headset"></i><div><span>Écoutes réalisées</span><strong id="kpiEvalCount">—</strong></div></div></div>
+                    <div class="col-xl-3 col-md-6"><div class="qas-kpi"><i class="bi bi-people-fill"></i><div><span>Agents évalués</span><strong id="kpiAgentsEvaluated">—</strong></div></div></div>
+                    <div class="col-xl-3 col-md-6"><div class="qas-kpi"><i class="bi bi-graph-up-arrow"></i><div><span>Taux de réussite moyen</span><strong id="kpiPassRate">—</strong></div></div></div>
+                    <div class="col-xl-3 col-md-6"><div class="qas-kpi"><i class="bi bi-mortarboard-fill"></i><div><span>Formations actives</span><strong id="kpiFormationsActive">—</strong></div></div></div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-12">
+                        <div class="qas-card">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div><h3 class="h6 mb-1">Écoutes & évaluations</h3><p class="text-muted small mb-0">Qui a évalué quel agent, quand, et avec quel résultat.</p></div>
+                                <input id="evalSearch" class="form-control form-control-sm" style="max-width:280px" placeholder="Rechercher agent ou évaluateur…">
+                            </div>
+                            <div class="table-responsive"><table class="table table-hover align-middle hr-table">
+                                <thead><tr><th>Agent évalué</th><th>Évaluateur</th><th>Date</th><th>Motif</th><th>Score</th><th>Résultat</th></tr></thead>
+                                <tbody id="evalBody"></tbody>
+                            </table></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-12">
+                        <div class="qas-card">
+                            <div class="mb-3"><h3 class="h6 mb-1">Formations</h3><p class="text-muted small mb-0">Cliquez une formation pour voir les agents formés et non formés.</p></div>
+                            <div id="formationsGrid" class="team-tile-grid"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal fade" id="formationDetailModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="formationDetailTitle"></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs mb-3">
+                        <li class="nav-item"><button class="nav-link active" id="tabTrainedBtn" data-target="trained">Formés</button></li>
+                        <li class="nav-item"><button class="nav-link" id="tabNotTrainedBtn" data-target="not-trained">Non formés</button></li>
+                    </ul>
+                    <div class="table-responsive"><table class="table table-hover align-middle hr-table">
+                        <thead><tr><th>Agent</th><th>Équipe</th><th>Progression</th><th>Statut</th></tr></thead>
+                        <tbody id="formationDetailBody"></tbody>
+                    </table></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/preferences.js}"></script>
+<script th:src="@{/js/rcc-api.js}"></script>
+<script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/qa-supervisor.js}"></script>
+</body>
+</html>

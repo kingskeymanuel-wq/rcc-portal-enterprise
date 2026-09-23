@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RCC Portal Enterprise — Portail RH</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/hr-portal.css}">
+</head>
+<body>
+<div class="layout">
+    <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+    <div class="content">
+        <div th:replace="~{fragments/header :: header}"></div>
+        <main id="page-content" class="hr-page">
+            <div class="container-fluid py-3">
+                <div class="hr-hero mb-3">
+                    <div>
+                        <div class="eyebrow"><i class="bi bi-buildings"></i> RCC PORTAL ENTERPRISE · RESSOURCES HUMAINES</div>
+                        <h1>Portail RH</h1>
+                        <p>Une vue consolidée des collaborateurs, de la présence, des congés, de la formation et de la performance — directement synchronisée avec les données RCC.</p>
+                    </div>
+                    <div class="hr-hero-actions">
+                        <button id="refreshHrBtn" class="btn btn-light"><i class="bi bi-arrow-clockwise"></i> Actualiser</button>
+                        <span id="lastRefresh" class="small text-white-50"></span>
+                    </div>
+                </div>
+
+                <div id="hrError" class="alert alert-danger d-none"></div>
+                <div id="hrLoading" class="hr-loading"><span class="spinner-border spinner-border-sm"></span> Chargement des données RH…</div>
+
+                <section id="hrApp" class="d-none">
+                    <div class="row g-3 mb-3">
+                        <div class="col-xl-4 col-md-6"><div class="hr-kpi"><div class="kpi-icon blue"><i class="bi bi-people-fill"></i></div><div><span>Total collaborateurs</span><strong id="kpiEmployees">—</strong><small id="kpiEmployeesTrend">Base RCC</small></div></div></div>
+                        <div class="col-xl-4 col-md-6"><div class="hr-kpi"><div class="kpi-icon orange"><i class="bi bi-calendar2-x-fill"></i></div><div><span>Congés / absences</span><strong id="kpiLeave">—</strong><small id="kpiPending">— demandes en attente</small></div></div></div>
+                        <div class="col-xl-4 col-md-6"><div class="hr-kpi"><div class="kpi-icon purple"><i class="bi bi-mortarboard-fill"></i></div><div><span>Formations actives</span><strong id="kpiTraining">—</strong><small id="kpiTrainingProgress">—</small></div></div></div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-xl-12">
+                            <div class="hr-card h-100">
+                                <div class="hr-card-head"><div><h3>Évolution & performance RH</h3><p>Indicateurs réels issus du Reporting RCC</p></div><div class="period-control"><input type="month" id="hrMonth" class="form-control form-control-sm"></div></div>
+                                <div class="chart-wrap"><canvas id="performanceChart"></canvas></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-xl-5">
+                            <div class="hr-card h-100">
+                                <div class="hr-card-head"><div><h3>Effectif par équipe</h3><p>Répartition de la base RH</p></div></div>
+                                <div id="teamBars" class="team-bars"></div>
+                            </div>
+                        </div>
+                        <div class="col-xl-4">
+                            <div class="hr-card h-100">
+                                <div class="hr-card-head"><div><h3>Congés</h3><p>Demandes et soldes de l’année</p></div></div>
+                                <div class="leave-summary">
+                                    <div class="leave-box"><span>En attente</span><strong id="leavePending">—</strong></div>
+                                    <div class="leave-box"><span>Approuvés</span><strong id="leaveApproved">—</strong></div>
+                                    <div class="leave-box"><span>Refusés</span><strong id="leaveRejected">—</strong></div>
+                                </div>
+                                <div class="mini-table" id="leaveTable"></div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3">
+                            <div class="hr-card h-100">
+                                <div class="hr-card-head"><div><h3>Synchronisation RCC</h3><p>Fraîcheur des données</p></div></div>
+                                <div id="syncStatus" class="sync-panel"></div>
+                                <hr>
+                                <div class="quick-actions">
+                                    <a href="#employees" class="quick"><i class="bi bi-person-plus"></i><span>Collaborateurs</span></a>
+                                    <a href="#leave" class="quick"><i class="bi bi-calendar-check"></i><span>Congés</span></a>
+                                    <a href="#followup" class="quick"><i class="bi bi-clipboard2-check"></i><span>Suivi RH</span></a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3" id="employees">
+                        <div class="col-xl-7">
+                            <div class="hr-card">
+                                <div class="hr-card-head">
+                                    <div><h3>Collaborateurs</h3><p>Par équipe — cliquez une équipe pour voir ses agents et leur dossier</p></div>
+                                    <div class="d-flex gap-2">
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button type="button" class="btn btn-outline-primary active" id="viewByTeamBtn"><i class="bi bi-diagram-3"></i> Par équipe</button>
+                                            <button type="button" class="btn btn-outline-primary" id="viewListBtn"><i class="bi bi-list-ul"></i> Liste complète</button>
+                                        </div>
+                                        <button id="exportEmployeesBtn" class="btn btn-sm btn-outline-primary"><i class="bi bi-download"></i> Export CSV</button>
+                                    </div>
+                                </div>
+
+                                <div id="teamGridView">
+                                    <div id="employeeTeamGrid" class="team-tile-grid"></div>
+                                </div>
+
+                                <div id="employeeListView" class="d-none">
+                                    <div class="toolbar"><input id="employeeSearch" class="form-control form-control-sm" placeholder="Rechercher nom, matricule, équipe, filiale…"><select id="employeeStatus" class="form-select form-select-sm"><option value="">Tous les statuts</option><option value="ACTIF">Actifs</option><option value="INACTIF">Inactifs</option></select></div>
+                                    <div class="table-responsive"><table class="table table-hover align-middle hr-table"><thead><tr><th>Collaborateur</th><th>Équipe</th><th>Contrat</th><th>Statut</th><th>Fin contrat</th></tr></thead><tbody id="employeesBody"></tbody></table></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-5">
+                            <div class="hr-card" id="training">
+                                <div class="hr-card-head"><div><h3>Formation</h3><p>Parcours disponibles dans RCC</p></div></div>
+                                <div id="trainingList" class="training-list"></div>
+                            </div>
+                            <div class="hr-card mt-3" id="followup">
+                                <div class="hr-card-head"><div><h3>Suivi RH</h3><p>Indicateurs clés & dernières actions</p></div></div>
+                                <div class="hr-followup-kpis">
+                                    <div class="followup-kpi"><span>Taux de rotation</span><b id="kpiTurnover">—</b><small>comptes inactifs / effectif</small></div>
+                                    <div class="followup-kpi"><span>Taux d'absentéisme</span><b id="kpiAbsenteeism">—</b><small>en congé / effectif actif, ce jour</small></div>
+                                    <div class="followup-kpi"><span>Taux de formation</span><b id="kpiFormationRate">—</b><small>progression moyenne des formations actives</small></div>
+                                </div>
+                                <hr>
+                                <div id="followupList" class="activity-list"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3" id="leave">
+                        <div class="col-12">
+                            <div class="hr-card">
+                                <div class="hr-card-head"><div><h3>Centre de contrôle RH</h3><p>Congés et parcours contractuel — sans dupliquer les données RCC</p></div><div class="d-flex gap-2"><button class="btn btn-sm btn-outline-secondary" id="openLegacyBtn"><i class="bi bi-layout-text-window-reverse"></i> Vue détaillée</button><a href="/reports" class="btn btn-sm btn-primary"><i class="bi bi-bar-chart"></i> Reporting RCC</a></div></div>
+                                <div class="control-grid">
+                                    <div class="control-card clickable" data-kind="contracts" role="button" tabindex="0"><i class="bi bi-file-earmark-person"></i><div><b>Contrats & dossiers</b><span>Filiale, équipe, genre, type et statut de contrat.</span><span class="control-badge" id="badgeContracts">—</span></div></div>
+                                    <div class="control-card clickable" data-kind="leave" role="button" tabindex="0"><i class="bi bi-calendar2-check"></i><div><b>Congés</b><span>Demandes et soldes utilisent les workflows et balances existants.</span><span class="control-badge" id="badgeLeave">—</span></div></div>
+                                    <div class="control-card clickable" data-kind="performance" role="button" tabindex="0"><i class="bi bi-graph-up-arrow"></i><div><b>Performance</b><span>Les indicateurs restent ceux du reporting opérationnel RCC.</span><span class="control-badge" id="badgePerformance">—</span></div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <!-- Modale : roster d'une équipe (agents + dossier documentaire) -->
+        <div class="modal fade" id="teamRosterModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-people"></i> Équipe <span id="teamRosterName"></span></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle hr-table">
+                                <thead><tr><th>Collaborateur</th><th>Statut</th><th>Rôle</th><th>Contrat</th><th>Lieu d'habitation</th><th>Dossier</th></tr></thead>
+                                <tbody id="teamRosterBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modale : dossier documentaire d'un collaborateur -->
+        <div class="modal fade" id="dossierModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-folder2-open"></i> Dossier — <span id="dossierUserName"></span></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="dossierList" class="dossier-list"></div>
+                        <hr>
+                        <form id="dossierUploadForm" class="d-flex gap-2">
+                            <input type="file" id="dossierFileInput" class="form-control form-control-sm" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" required>
+                            <button type="submit" class="btn btn-sm btn-primary text-nowrap"><i class="bi bi-upload"></i> Charger</button>
+                        </form>
+                        <div id="dossierError" class="text-danger small mt-2 d-none"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modale : détail des tuiles du Centre de contrôle RH — navigation Équipe → Service → Agent -->
+        <div class="modal fade" id="controlDetailModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div>
+                            <h5 class="modal-title mb-1" id="controlDetailTitle"></h5>
+                            <nav id="controlDetailBreadcrumb" class="small"></nav>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" id="controlDetailContent"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modale : détail d'un agent (photo + infos propres à la tuile d'origine) -->
+        <div class="modal fade" id="agentDetailModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-person-vcard"></i> Fiche collaborateur</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="d-flex gap-3 align-items-center mb-3">
+                            <img id="agentDetailPhoto" src="" alt="" style="width:64px;height:64px;border-radius:50%;object-fit:cover;background:#eef1f6;display:none;">
+                            <i id="agentDetailPhotoPlaceholder" class="bi bi-person-circle" style="font-size:64px;color:#c7ceda;"></i>
+                            <div>
+                                <div id="agentDetailName" class="fw-bold"></div>
+                                <div id="agentDetailMeta" class="text-muted small"></div>
+                            </div>
+                        </div>
+                        <div id="agentDetailBody"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script th:src="@{/js/preferences.js}"></script>
+<script th:src="@{/js/rcc-api.js}"></script>
+<script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/hr-parcours.js}"></script>
+</body>
+</html>

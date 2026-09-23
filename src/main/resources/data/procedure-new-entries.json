@@ -1,0 +1,208 @@
+[
+  {
+    "zoneCode": "RECLAMATION_ESCALADE",
+    "countryCode": null,
+    "title": "RETRAIT NON SERVI AU GAB (DEBIT DU COMPTE)",
+    "slaDelay": "30 jours ouvrés",
+    "level": "N2",
+    "responsibleTeam": "Monétique, Contestation",
+    "steps": [
+      "Authentifier le client.",
+      "Collecter : nom, prénom, numéro de compte, référence de la transaction, date, montant, lieu du retrait.",
+      "Créer un incident.",
+      "Affecter à l'équipe Monétique.",
+      "Communiquer au client le délai de traitement : 30 jours ouvrés."
+    ]
+  },
+  {
+    "zoneCode": "CARTE",
+    "countryCode": null,
+    "title": "RETRAIT PARTIELLEMENT SERVI AU GAB",
+    "slaDelay": "5 jours ouvrés",
+    "level": "N2",
+    "responsibleTeam": "Monétique",
+    "steps": [
+      "Authentifier le client.",
+      "Collecter : numéro de compte, référence de la transaction, date, montant réellement délivré vs montant demandé.",
+      "Créer un incident et l'affecter à l'équipe Monétique.",
+      "Communiquer au client le délai de traitement : 5 jours ouvrés."
+    ]
+  },
+  {
+    "zoneCode": "CARTE",
+    "countryCode": null,
+    "title": "COMPTE DEBITE SANS DISPENSE AU DAB",
+    "slaDelay": "2 jours ouvrés",
+    "level": "N2",
+    "responsibleTeam": "Monétique, Card Operations",
+    "steps": [
+      "Authentifier le client.",
+      "Vérifier si le délai de reverse automatique (24h) est encore en cours — dans ce cas, orienter le client vers ce délai avant de créer un incident.",
+      "Si le délai de reverse automatique est expiré : collecter numéro de compte, référence, date, montant, puis créer un incident affecté à Monétique / Card Operations.",
+      "Communiquer au client le délai de traitement : 2 jours ouvrés."
+    ]
+  },
+  {
+    "zoneCode": "RECLAMATION_ESCALADE",
+    "countryCode": null,
+    "title": "TRANSACTION FRAUDULEUSE SUR LE COMPTE",
+    "slaDelay": "Priorité P1 — traitement immédiat",
+    "level": "Critique (P1)",
+    "responsibleTeam": "Fraud Risk, Sécurité",
+    "steps": [
+      "Authentifier le client avec une vigilance renforcée (risque de compte compromis).",
+      "Collecter : numéro de compte, transactions contestées (date, montant, libellé), moyen utilisé.",
+      "Bloquer immédiatement la carte ou le moyen de paiement concerné si le client le confirme.",
+      "Créer un incident de priorité P1 et l'affecter à Fraud Risk / Sécurité sans délai.",
+      "Ne jamais confirmer au client par téléphone des informations qui pourraient aider un fraudeur."
+    ]
+  },
+  {
+    "zoneCode": "CARTE",
+    "countryCode": null,
+    "title": "CARTE VOLEE",
+    "slaDelay": null,
+    "level": "N1",
+    "responsibleTeam": "Fraud Risk, Card Services",
+    "steps": [
+      "Authentifier le client.",
+      "Bloquer immédiatement la carte.",
+      "Collecter les circonstances du vol si le client souhaite les partager (facultatif, pour le dossier).",
+      "Affecter le dossier à Fraud Risk et Card Services pour suivi.",
+      "Informer le client de la marche à suivre pour la commande d'une nouvelle carte."
+    ]
+  },
+  {
+    "zoneCode": "CARTE",
+    "countryCode": null,
+    "title": "CARTE PERDUE",
+    "slaDelay": null,
+    "level": "N1",
+    "responsibleTeam": "Card Services, Fraud Risk",
+    "steps": [
+      "Authentifier le client.",
+      "Bloquer immédiatement la carte.",
+      "Affecter le dossier à Card Services et Fraud Risk.",
+      "Informer le client de la marche à suivre pour la commande d'une nouvelle carte."
+    ]
+  },
+  {
+    "zoneCode": "CARTE",
+    "countryCode": null,
+    "title": "CARTE AVALEE AU GAB ECOBANK",
+    "slaDelay": null,
+    "level": "N1",
+    "responsibleTeam": "Agence",
+    "steps": [
+      "Authentifier le client.",
+      "Identifier le GAB Ecobank concerné (agence, localisation).",
+      "Orienter le client vers l'agence rattachée au GAB pour récupération de la carte."
+    ]
+  },
+  {
+    "zoneCode": "CARTE",
+    "countryCode": null,
+    "title": "CARTE AVALEE AU GAB D'UNE AUTRE BANQUE",
+    "slaDelay": null,
+    "level": "N1",
+    "responsibleTeam": "Card Services",
+    "steps": [
+      "Authentifier le client.",
+      "Bloquer la carte à titre préventif.",
+      "Affecter à Card Services pour lancer le renouvellement de la carte."
+    ]
+  },
+  {
+    "zoneCode": "CARTE",
+    "countryCode": null,
+    "title": "NON RECEPTION DE CARTE",
+    "slaDelay": null,
+    "level": "N2",
+    "responsibleTeam": "Card Services, RCC Résolution",
+    "steps": [
+      "Authentifier le client.",
+      "Vérifier la date et l'agence de commande de la carte.",
+      "Créer un incident et l'affecter à Card Services / RCC Résolution."
+    ]
+  },
+  {
+    "zoneCode": "CARTE",
+    "countryCode": null,
+    "title": "NON RECEPTION DU CODE PIN",
+    "slaDelay": null,
+    "level": "N1 ou N2",
+    "responsibleTeam": "Card Services",
+    "steps": [
+      "Authentifier le client.",
+      "Vérifier la date et le mode de commande de la carte.",
+      "Si le délai normal n'est pas dépassé, réorienter le client vers l'agence.",
+      "Si le délai est dépassé, créer un incident N2 et l'affecter à Card Services."
+    ]
+  },
+  {
+    "zoneCode": "TRANSFERT",
+    "countryCode": null,
+    "title": "APPEL DE FONDS",
+    "slaDelay": null,
+    "level": "N2",
+    "responsibleTeam": "International Operations",
+    "steps": [
+      "Authentifier le client.",
+      "Collecter les références du transfert concerné (date, montant, bénéficiaire, référence).",
+      "Créer un incident et l'affecter à International Operations."
+    ]
+  },
+  {
+    "zoneCode": "TRANSFERT",
+    "countryCode": null,
+    "title": "MODIFICATION DES INFORMATIONS DU BENEFICIAIRE D'UN TRANSFERT",
+    "slaDelay": null,
+    "level": "N2",
+    "responsibleTeam": "Paiements, Opérations",
+    "steps": [
+      "Authentifier le client.",
+      "Collecter les informations actuelles et les informations corrigées du bénéficiaire.",
+      "Créer un incident et l'affecter à Paiements / Opérations."
+    ]
+  },
+  {
+    "zoneCode": "SERVICES_DIGITAUX",
+    "countryCode": null,
+    "title": "REVERSE AUTOMATIQUE MOBILE MONEY",
+    "slaDelay": "72h (SLA automatique)",
+    "level": null,
+    "responsibleTeam": "Mobile Money Operations",
+    "steps": [
+      "Authentifier le client.",
+      "Vérifier que la transaction Mobile Money concernée est bien en échec (non aboutie).",
+      "Informer le client que le reverse est automatique sous 72h — aucune action manuelle nécessaire de sa part.",
+      "Si le délai de 72h est dépassé sans reverse effectif, créer un incident et l'affecter à Mobile Money Operations."
+    ]
+  },
+  {
+    "zoneCode": "RECLAMATION_ESCALADE",
+    "countryCode": null,
+    "title": "RECLAMATION QUALITE DE SERVICE",
+    "slaDelay": null,
+    "level": "N2",
+    "responsibleTeam": "Quality Assurance, RCC Management",
+    "steps": [
+      "Authentifier le client.",
+      "Recueillir précisément la nature de la réclamation (agent, agence, produit, délai...).",
+      "Créer un incident et l'affecter à Quality Assurance / RCC Management pour investigation."
+    ]
+  },
+  {
+    "zoneCode": "RECLAMATION_ESCALADE",
+    "countryCode": null,
+    "title": "ESCALADE VERS LA DIRECTION",
+    "slaDelay": "Priorité P1",
+    "level": "Critique (P1)",
+    "responsibleTeam": "RCC Manager, Customer Experience",
+    "steps": [
+      "Authentifier le client.",
+      "Recueillir l'historique de la demande initiale et la raison de l'insatisfaction persistante.",
+      "Créer un incident de priorité P1 et l'affecter au RCC Manager / Customer Experience sans délai."
+    ]
+  }
+]

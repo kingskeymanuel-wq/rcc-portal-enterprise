@@ -1,0 +1,22 @@
+[
+  {"code":"CI","label":"Côte d'Ivoire","flagEmoji":"🇨🇮","currency":"Franc CFA (XOF)","zone":"UEMOA","sortOrder":1},
+  {"code":"BF","label":"Burkina Faso","flagEmoji":"🇧🇫","currency":"Franc CFA (XOF)","zone":"UEMOA","sortOrder":2},
+  {"code":"BJ","label":"Bénin","flagEmoji":"🇧🇯","currency":"Franc CFA (XOF)","zone":"UEMOA","sortOrder":3},
+  {"code":"BI","label":"Burundi","flagEmoji":"🇧🇮","currency":"Franc burundais (BIF)","zone":null,"sortOrder":4},
+  {"code":"CD","label":"République Démocratique du Congo","flagEmoji":"🇨🇩","currency":"Franc congolais (CDF)","zone":null,"sortOrder":5},
+  {"code":"CF","label":"Centrafrique","flagEmoji":"🇨🇫","currency":"Franc CFA (XAF)","zone":"CEMAC","sortOrder":6},
+  {"code":"CG","label":"Congo Brazzaville","flagEmoji":"🇨🇬","currency":"Franc CFA (XAF)","zone":"CEMAC","sortOrder":7},
+  {"code":"CM","label":"Cameroun","flagEmoji":"🇨🇲","currency":"Franc CFA (XAF)","zone":"CEMAC","sortOrder":8},
+  {"code":"CV","label":"Cap-Vert","flagEmoji":"🇨🇻","currency":"Escudo cap-verdien (CVE)","zone":null,"sortOrder":9},
+  {"code":"GA","label":"Gabon","flagEmoji":"🇬🇦","currency":"Franc CFA (XAF)","zone":"CEMAC","sortOrder":10},
+  {"code":"GN","label":"Guinée Conakry","flagEmoji":"🇬🇳","currency":"Franc guinéen (GNF)","zone":null,"sortOrder":11},
+  {"code":"GQ","label":"Guinée Équatoriale","flagEmoji":"🇬🇶","currency":"Franc CFA (XAF)","zone":"CEMAC","sortOrder":12},
+  {"code":"GW","label":"Guinée Bissau","flagEmoji":"🇬🇼","currency":"Franc CFA (XOF)","zone":"UEMOA","sortOrder":13},
+  {"code":"ML","label":"Mali","flagEmoji":"🇲🇱","currency":"Franc CFA (XOF)","zone":"UEMOA","sortOrder":14},
+  {"code":"MZ","label":"Mozambique","flagEmoji":"🇲🇿","currency":"Metical (MZN)","zone":null,"sortOrder":15},
+  {"code":"NE","label":"Niger","flagEmoji":"🇳🇪","currency":"Franc CFA (XOF)","zone":"UEMOA","sortOrder":16},
+  {"code":"SN","label":"Sénégal","flagEmoji":"🇸🇳","currency":"Franc CFA (XOF)","zone":"UEMOA","sortOrder":17},
+  {"code":"ST","label":"Sao Tomé-et-Principe","flagEmoji":"🇸🇹","currency":"Dobra (STN)","zone":null,"sortOrder":18},
+  {"code":"TD","label":"Tchad","flagEmoji":"🇹🇩","currency":"Franc CFA (XAF)","zone":"CEMAC","sortOrder":19},
+  {"code":"TG","label":"Togo","flagEmoji":"🇹🇬","currency":"Franc CFA (XOF)","zone":"UEMOA","sortOrder":20}
+]

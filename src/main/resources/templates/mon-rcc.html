@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RCC Portal Enterprise — MON RCC</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <style>
+        /* ===== MON RCC — refonte visuelle, palette Ecobank (pas du vert WhatsApp générique) ===== */
+        :root {
+            --mrcc-accent: #0F9D6C;       /* déjà utilisé ailleurs sur le site (cartes Catégories) — sert ici pour "mes messages" */
+            --mrcc-accent-dark: #0B7A54;
+            --mrcc-surface: #ffffff;
+            --mrcc-border: rgba(0,0,0,.07);
+        }
+
+        /* ---------- Fil d'actualité ---------- */
+        .ig-post { width: 100%; margin: 0 0 1.5rem; background: var(--mrcc-surface); border: 1px solid var(--mrcc-border); border-radius: 1rem; overflow: hidden; box-shadow: 0 4px 18px rgba(0,20,60,.05); transition: box-shadow .2s ease; }
+        .ig-post:hover { box-shadow: 0 6px 24px rgba(0,20,60,.09); }
+        .ig-post-header { display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; }
+        .ig-post-header .ig-avatar { width:44px; height:44px; border-radius:50%; background: linear-gradient(135deg, var(--eco-blue), var(--mrcc-accent)); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:1rem; flex-shrink:0; }
+        .ig-avatar { width:44px; height:44px; border-radius:50%; background: linear-gradient(135deg, var(--eco-blue), var(--mrcc-accent)); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:1rem; flex-shrink:0; margin-right:.6rem; }
+        .ig-avatar-sm { width:28px; height:28px; font-size:.7rem; margin-right:.4rem; }
+        .ig-post-header .ig-name { font-weight:600; font-size:1rem; margin-left:.75rem; color:#122240; }
+        .ig-post-image { width:100%; min-height: 420px; max-height: 600px; background: linear-gradient(135deg, var(--eco-blue), var(--eco-blue-dark)); display:flex; align-items:center; justify-content:center; overflow:hidden; }
+        .ig-post-image img, .ig-post-image video { width:100%; height:100%; object-fit:cover; }
+        .ig-post-image .ig-placeholder-icon { color:rgba(255,255,255,.85); font-size:4.5rem; }
+        .ig-post-actions { display:flex; align-items:center; gap:1.1rem; padding:.85rem 1.25rem .3rem; font-size:1.5rem; }
+        .ig-post-actions button { background:none; border:none; padding:0; color:#41506e; transition: transform .12s ease, color .12s ease; }
+        .ig-post-actions button:hover { transform: scale(1.08); }
+        .ig-post-actions button.liked { color:#e0435b; }
+        .ig-post-actions .ig-bookmark { margin-left:auto; }
+        .ig-post-likes { padding:0 1.25rem; font-size:.92rem; font-weight:600; color:#122240; }
+        .ig-post-caption { padding:.4rem 1.25rem 0; font-size:.95rem; color:#2c374d; }
+        .ig-post-caption .ig-name { font-weight:600; color:#122240; }
+        .ig-post-comments-link { padding:.3rem 1.25rem 0; font-size:.88rem; color:#8792a3; cursor:pointer; }
+        .ig-post-comments { padding:.4rem 1.25rem; }
+        .ig-post-add-comment { display:flex; gap:.5rem; padding:.7rem 1.25rem; border-top:1px solid var(--mrcc-border); }
+        .ig-post-add-comment input { flex-grow:1; border:none; font-size:.9rem; outline:none; background: transparent; }
+        .ig-post-time { padding:.25rem 1.25rem .9rem; font-size:.72rem; color:#8792a3; text-transform:uppercase; letter-spacing:.03em; }
+        .ig-composer { max-width:720px; margin:0 auto 1.5rem; }
+
+        /* Format agrandi demandé : le fil et le composeur remplissent toute la largeur
+         * disponible (au lieu d'un format resserré), et la zone de saisie/d'affichage du
+         * texte est nettement plus grande et plus lisible. */
+        #feedPane, #historyPane { max-width: 1600px; width: 100%; margin: 0 auto; }
+        #createPostCard .rcc-richtext-editable { min-height: 320px; max-height: 720px; font-size: 1.15rem; }
+        .ig-post-caption { font-size: 1.15rem; line-height: 1.6; }
+        .ig-post-image { min-height: 620px; max-height: 900px; }
+        #feedPane { width: 100%; }
+        .ig-composer { max-width: 100%; }
+        .ig-post { max-width: 100%; }
+
+        /* ---------- Stories ---------- */
+        .mrcc-story-ring { width:64px; height:64px; border-radius:50%; padding:3px; background: conic-gradient(from 180deg, var(--eco-blue), var(--mrcc-accent), var(--eco-blue)); display:flex; align-items:center; justify-content:center; transition: transform .15s ease; }
+        .mrcc-story-item:hover .mrcc-story-ring { transform: scale(1.06); }
+        .mrcc-story-ring-inner { width:100%; height:100%; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+        .mrcc-story-add-ring { width:64px; height:64px; border-radius:50%; border:2px dashed var(--eco-blue); display:flex; align-items:center; justify-content:center; transition: background .15s ease; }
+        .mrcc-story-add-ring:hover { background: rgba(0,87,184,.06); }
+
+        /* ---------- Messagerie — fond personnalisable ---------- */
+        .mon-rcc-chat-list { max-height: 65vh; overflow-y: auto; }
+        .mon-rcc-messages {
+            height: 48vh; overflow-y: auto; padding: 1rem; border-radius: .75rem;
+            background-color: #EAF1FB; /* repli si aucun motif choisi */
+            transition: background .25s ease;
+        }
+        .mon-rcc-msg-mine { text-align: right; margin-bottom: .5rem; }
+        .mon-rcc-msg-theirs { text-align: left; margin-bottom: .5rem; }
+        .mon-rcc-msg-bubble { display: inline-block; padding: .5rem .85rem; border-radius: 1rem; max-width: 75%; font-size: .92rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); text-align: left; }
+        .mon-rcc-msg-mine .mon-rcc-msg-bubble { background: var(--mrcc-accent); color: #fff; border-bottom-right-radius: .25rem; }
+        .mon-rcc-msg-theirs .mon-rcc-msg-bubble { background: #fff; color: #1b2436; border-bottom-left-radius: .25rem; }
+        .mon-rcc-group-header { cursor: pointer; }
+
+        /* Fonds de discussion — motifs générés en CSS pur, aucune image externe */
+        .mrcc-wp-solid-blue { background-color: #EAF1FB; }
+        .mrcc-wp-solid-cream { background-color: #F6F2EA; }
+        .mrcc-wp-dots {
+            background-color: #EAF1FB;
+            background-image: radial-gradient(rgba(0,87,184,.14) 1.4px, transparent 1.4px);
+            background-size: 22px 22px;
+        }
+        .mrcc-wp-diagonal {
+            background-color: #F6F2EA;
+            background-image: repeating-linear-gradient(135deg, rgba(15,157,108,.08) 0 2px, transparent 2px 26px);
+        }
+        .mrcc-wp-dark {
+            background-color: #16233A;
+            background-image: radial-gradient(rgba(255,255,255,.05) 1.4px, transparent 1.4px);
+            background-size: 22px 22px;
+        }
+        .mrcc-wp-dark .mon-rcc-msg-theirs .mon-rcc-msg-bubble { background:#26344f; color:#eef2f8; }
+
+        .mrcc-wallpaper-swatch { width: 34px; height: 34px; border-radius: .5rem; cursor: pointer; border: 2px solid transparent; transition: transform .12s ease, border-color .12s ease; }
+        .mrcc-wallpaper-swatch:hover { transform: scale(1.08); }
+        .mrcc-wallpaper-swatch.active { border-color: var(--eco-blue); }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+    <div class="content">
+        <div th:replace="~{fragments/header :: header}"></div>
+        <main id="page-content">
+            <div class="container-fluid">
+
+                <div id="monRccHeroBanner" class="mb-4" style="display:none;height:220px;border-radius:1rem;background-size:cover;background-position:center;"></div>
+
+                <div class="welcome-banner">
+                    <div>
+                        <h2>MON RCC</h2>
+                        <p class="text-muted">Fil d'actualité et messagerie interne</p>
+                    </div>
+                </div>
+
+                <ul class="nav nav-tabs mb-4" id="monRccTabs">
+                    <li class="nav-item">
+                        <button class="nav-link active" data-tab="feed" type="button">
+                            <i class="bi bi-images"></i> Fil d'actualité
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-tab="chat" type="button">
+                            <i class="bi bi-chat-dots"></i> Messagerie
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-tab="history" type="button">
+                            <i class="bi bi-archive"></i> Historique
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- ===== Fil d'actualité ===== -->
+                <div id="feedPane">
+                    <div class="card dashboard-card shadow-sm mb-4">
+                        <div class="card-body">
+                            <h6 class="card-title mb-2"><i class="bi bi-people"></i> Communautés</h6>
+                            <div id="communitiesList" class="d-flex flex-wrap gap-2"></div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-3 mb-4 pb-2" id="storiesBar" style="overflow-x:auto;"></div>
+
+                    <!-- Création de story — vrai fichier, pas un lien -->
+                    <div class="modal fade" id="storyModal" tabindex="-1">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Nouvelle story</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <textarea class="form-control mb-2" id="storyContentInput" rows="2" maxlength="300" placeholder="Un mot pour accompagner la story (optionnel)"></textarea>
+                                    <label class="btn btn-outline-primary w-100" style="cursor:pointer;">
+                                        <i class="bi bi-upload"></i> Choisir une photo ou une vidéo
+                                        <input type="file" id="storyFileInput" class="d-none" accept="image/*,.mp4,.mov">
+                                    </label>
+                                    <div id="storyFilePreviewWrap" class="mt-2 text-center" style="display:none;">
+                                        <img id="storyFilePreview" src="" alt="" style="max-height:220px;border-radius:.5rem;">
+                                    </div>
+                                    <div id="storyUploadStatus" class="small mt-2"></div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                                    <button type="button" class="btn btn-primary" id="publishStoryBtn">Publier la story</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actualités Ecobank — synchronisées avec la page d'accueil (même source /api/news) -->
+                    <div id="monRccNewsSection" class="mb-4"></div>
+
+                    <div id="createPostCard" class="ig-post mb-4" style="display:none;">
+                        <div class="p-3">
+                            <div class="d-flex align-items-start gap-3">
+                                <div class="ig-avatar" id="composerAvatar" style="width:44px;height:44px;flex-shrink:0;">?</div>
+                                <form id="postForm" class="flex-grow-1">
+                                    <div id="postContentEditor"></div>
+
+                                    <div id="postImagePreviewWrap" style="display:none;" class="position-relative mt-2 mb-2">
+                                        <img id="postImagePreview" src="" alt="Aperçu" class="img-fluid rounded" style="max-height:280px;">
+                                        <button type="button" id="removePostImageBtn" class="btn btn-sm btn-dark position-absolute top-0 end-0 m-2" style="opacity:.85;">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </div>
+
+                                    <div class="d-flex justify-content-between align-items-center border-top pt-2 mt-2 flex-wrap gap-2">
+                                        <label class="btn btn-sm btn-outline-secondary mb-0" style="cursor:pointer;">
+                                            <i class="bi bi-upload"></i> Photo / vidéo depuis l'ordinateur
+                                            <input type="file" id="postImageFileInput" class="d-none" accept="image/*,.mp4,.mov">
+                                        </label>
+                                        <button type="button" class="btn btn-sm btn-link" id="addPostImageBtn">
+                                            <i class="bi bi-link-45deg"></i> ou coller un lien
+                                        </button>
+                                        <select id="postVisibilitySelect" class="form-select form-select-sm" style="width:auto;" title="Durée d'affichage dans le fil">
+                                            <option value="7">Visible 1 semaine</option>
+                                            <option value="14" selected>Visible 2 semaines</option>
+                                            <option value="30">Visible 1 mois</option>
+                                            <option value="60">Visible 2 mois (maximum)</option>
+                                        </select>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" id="schedulePostBtn" title="Programmer la publication">
+                                            <i class="bi bi-clock"></i> Programmer
+                                        </button>
+                                        <input id="postScheduleInput" type="datetime-local" class="form-control form-control-sm" style="display:none;max-width:220px;">
+                                        <button type="submit" class="btn btn-primary px-4 ms-auto" id="submitPostBtn">Publier</button>
+                                    </div>
+                                    <div id="postImageUploadStatus" class="small mt-1"></div>
+                                    <input id="postImageInput" type="url" class="form-control form-control-sm mt-2"
+                                           placeholder="Coller l'URL d'une photo/vidéo..." style="display:none;">
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="postsContainer">
+                        <p class="text-muted text-center">Chargement…</p>
+                    </div>
+                </div>
+
+                <!-- ===== Messagerie ===== -->
+                <div id="chatPane" style="display:none;">
+                    <div class="row g-4">
+                        <div class="col-lg-4">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body">
+                                    <h6 class="card-title mb-2"><i class="bi bi-search"></i> Rechercher un correspondant</h6>
+                                    <input id="correspondentSearch" type="text" class="form-control form-control-sm mb-2"
+                                           placeholder="Nom ou identifiant (ID) — utilisez l'identifiant en cas d'homonymes...">
+                                    <div id="correspondentResults" class="mon-rcc-chat-list"></div>
+                                </div>
+                            </div>
+                            <div class="card shadow-sm">
+                                <div class="card-body">
+                                    <h6 class="card-title mb-2"><i class="bi bi-chat-square-text"></i> Conversations</h6>
+                                    <div id="conversationsList" class="mon-rcc-chat-list"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-8">
+                            <div class="card shadow-sm h-100">
+                                <div class="card-body d-flex flex-column">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="card-title mb-0" id="activeConversationTitle">Sélectionnez une conversation</h6>
+                                        <div class="position-relative">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" id="wallpaperToggleBtn" title="Changer le fond de discussion">
+                                                <i class="bi bi-palette"></i>
+                                            </button>
+                                            <div id="wallpaperPicker" class="position-absolute end-0 mt-1 p-2 bg-white border rounded shadow-sm d-none" style="z-index:20; width:220px;">
+                                                <div class="d-flex gap-2 mb-2">
+                                                    <div class="mrcc-wallpaper-swatch mrcc-wp-solid-blue" data-wp="mrcc-wp-solid-blue" title="Bleu uni"></div>
+                                                    <div class="mrcc-wallpaper-swatch mrcc-wp-solid-cream" data-wp="mrcc-wp-solid-cream" title="Crème uni"></div>
+                                                    <div class="mrcc-wallpaper-swatch mrcc-wp-dots" data-wp="mrcc-wp-dots" title="Pointillés"></div>
+                                                    <div class="mrcc-wallpaper-swatch mrcc-wp-diagonal" data-wp="mrcc-wp-diagonal" title="Diagonales"></div>
+                                                    <div class="mrcc-wallpaper-swatch mrcc-wp-dark" data-wp="mrcc-wp-dark" title="Sombre"></div>
+                                                </div>
+                                                <hr class="my-1">
+                                                <label class="form-label small mb-1">Ou une image perso</label>
+                                                <input type="file" id="chatBackgroundInput" accept=".jpg,.jpeg,.png,.webp" class="form-control form-control-sm mb-1">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary w-100" id="resetChatBackgroundBtn">Réinitialiser</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div id="messagesContainer" class="mon-rcc-messages flex-grow-1 mb-2 mrcc-wp-solid-blue"></div>
+                                    <div id="chatMediaPreviewWrap" class="mb-2" style="display:none;">
+                                        <img id="chatMediaPreview" src="" alt="" style="max-height:120px;border-radius:.5rem;">
+                                        <button type="button" id="removeChatMediaBtn" class="btn btn-sm btn-outline-danger ms-2">✕</button>
+                                    </div>
+                                    <form id="messageForm" class="d-flex flex-column gap-2" style="display:none;">
+                                        <div class="d-flex gap-2 align-items-center position-relative">
+                                            <label class="btn btn-outline-secondary btn-sm mb-0" title="Envoyer une photo ou une vidéo">
+                                                <i class="bi bi-paperclip"></i>
+                                                <input type="file" id="chatMediaInput" class="d-none" accept="image/*,.mp4,.mov">
+                                            </label>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm mb-0" id="emojiToggleBtn" title="Emojis et stickers">
+                                                <i class="bi bi-emoji-smile"></i>
+                                            </button>
+                                            <div id="emojiPicker" class="d-none bg-white border rounded shadow-sm" style="position:absolute; bottom:100%; left:0; z-index:30; width:280px; max-height:260px; overflow-y:auto;">
+                                                <ul class="nav nav-tabs nav-fill" style="font-size:.8rem;">
+                                                    <li class="nav-item"><button type="button" class="nav-link active" data-bs-toggle="tab" data-bs-target="#emojiGridPane">Emojis</button></li>
+                                                    <li class="nav-item"><button type="button" class="nav-link" data-bs-toggle="tab" data-bs-target="#stickerGridPane">Stickers</button></li>
+                                                </ul>
+                                                <div class="tab-content p-2">
+                                                    <div class="tab-pane fade show active" id="emojiGridPane">
+                                                        <div id="emojiGrid" class="d-flex flex-wrap"></div>
+                                                    </div>
+                                                    <div class="tab-pane fade" id="stickerGridPane">
+                                                        <div id="stickerGrid" class="d-flex flex-wrap"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button type="button" class="btn btn-sm mb-0" id="ephemeralToggleBtn" title="Message éphémère (disparaît après un délai)">
+                                                <i class="bi bi-stopwatch"></i>
+                                            </button>
+                                            <input id="messageInput" type="text" class="form-control" placeholder="Votre message..." maxlength="2000">
+                                            <button type="submit" class="btn btn-primary"><i class="bi bi-send"></i></button>
+                                        </div>
+                                        <select id="ephemeralDurationSelect" class="form-select form-select-sm" style="max-width:220px;display:none;">
+                                            <option value="1">Disparaît après 1 minute</option>
+                                            <option value="60" selected>Disparaît après 1 heure</option>
+                                            <option value="1440">Disparaît après 24 heures</option>
+                                        </select>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== Historique ===== -->
+                <div id="historyPane" style="display:none;">
+                    <p class="text-muted mb-3">Publications sorties du fil principal (au-delà de leur durée de visibilité) — ouvert à tout le monde.</p>
+                    <div id="historyContainer">
+                        <p class="text-muted text-center">Chargement…</p>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/preferences.js}"></script>
+<!-- Choix du canal de contact -->
+<div class="modal fade" id="channelChoiceModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Contacter <span id="channelChoiceName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body d-flex flex-column gap-2">
+                <textarea class="form-control mb-2 d-none" id="channelChoiceMessage" rows="3" placeholder="Votre message..."></textarea>
+                <button type="button" class="btn btn-outline-primary d-flex align-items-center gap-2" id="channelChoiceTeamsBtn">
+                    <i class="bi bi-chat-dots-fill"></i> Microsoft Teams
+                </button>
+                <button type="button" class="btn btn-outline-primary d-flex align-items-center gap-2" id="channelChoiceOutlookBtn">
+                    <i class="bi bi-envelope"></i> Outlook (e-mail)
+                </button>
+                <button type="button" class="btn btn-primary d-flex align-items-center gap-2" id="channelChoiceMonRccBtn">
+                    <i class="bi bi-rocket-takeoff-fill"></i> MON RCC (messagerie interne)
+                </button>
+                <div id="channelChoiceResult" class="small mt-1"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Édition rapide d'une actualité MON RCC (titre + photo) — QA/Admin uniquement -->
+<div class="modal fade" id="monRccNewsEditModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Modifier l'actualité</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="monRccNewsEditId">
+                <label class="form-label small">Titre</label>
+                <input type="text" class="form-control mb-3" id="monRccNewsEditTitle">
+                <label class="form-label small">Photo</label>
+                <img id="monRccNewsEditPreview" src="" alt="" style="max-width:100%;max-height:160px;border-radius:.5rem;display:none;" class="d-block mb-2">
+                <input type="file" class="form-control form-control-sm" id="monRccNewsEditFile" accept=".jpg,.jpeg,.png,.webp">
+                <div id="monRccNewsEditResult" class="small mt-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-primary" id="monRccNewsEditSaveBtn">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script th:src="@{/js/rcc-api.js}"></script>
+<script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/image-editor.js}"></script>
+<script th:src="@{/js/richtext-editor.js}"></script>
+<script th:src="@{/js/mon-rcc.js}"></script>
+</body>
+</html>

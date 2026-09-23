@@ -1,0 +1,1102 @@
+[
+  {
+    "zoneCode": "COMPTE",
+    "countryCode": "CI",
+    "title": "COMPTE – GUIDE D'OUVERTURE PAR TYPE DE COMPTE (ECI)",
+    "nodes": [
+      {
+        "id": "start",
+        "text": "Quel type de compte le client souhaite-t-il ouvrir ?",
+        "options": [
+          {
+            "label": "Compte Épargne",
+            "next": "epargne"
+          },
+          {
+            "label": "Compte Épargne Privilège",
+            "next": "privilege"
+          },
+          {
+            "label": "Compte Courant (particulier salarié/fonctionnaire)",
+            "next": "courant"
+          },
+          {
+            "label": "Compte Courant (entreprise individuelle/commerçant)",
+            "next": "entreprise_indiv"
+          },
+          {
+            "label": "Compte Courant (SA/SARL/SNC/SUARL)",
+            "next": "societe"
+          },
+          {
+            "label": "Compte Xpress (100% mobile, sans agence)",
+            "next": "xpress"
+          },
+          {
+            "label": "Compte Évolution (petit commerçant, faible revenu)",
+            "next": "evolution"
+          },
+          {
+            "label": "Client non-résident / diaspora",
+            "next": "diaspora"
+          }
+        ]
+      },
+      {
+        "id": "epargne",
+        "text": "Compte Épargne — indiquer au client les pièces à réunir : 2 photos d'identité, CNI ou attestation d'identité + récépissé d'enrôlement (original + copie), CNI/carte consulaire (CEDEAO) ou carte de résident (hors CEDEAO > 3 mois), facture SODECI/CIE < 3 mois (ou certificat de résidence). Dépôt initial : 25 000 FCFA — taux 3,5%.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          },
+          {
+            "label": "Client hésite entre plusieurs comptes",
+            "next": "start"
+          }
+        ]
+      },
+      {
+        "id": "privilege",
+        "text": "Compte Épargne Privilège — pièces à réunir : 2 photos d'identité, passeport/CNI/attestation d'identité + récépissé d'enrôlement (original + copie), justificatif de résidence < 3 mois. Dépôt initial : 5 000 000 FCFA — taux négociable.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "courant",
+        "text": "Compte Courant particulier — pièces à réunir : 2 photos d'identité, pièce d'identité valide, justificatif de revenus (attestation de travail/présence selon le statut), facture SODECI/CIE < 3 mois, attestation de redevance/non-redevance ou de clôture. Dépôt initial : 0 FCFA si domiciliation de salaire, sinon 50 000 FCFA.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "entreprise_indiv",
+        "text": "Compte Courant entreprise individuelle/commerçant — pièces à réunir : 2 photos + pièce d'identité de chaque signataire, facture SODECI/CIE ou contrat de bail au nom de l'entreprise, cachet de l'entreprise, références bancaires, registre de commerce ou justificatif d'agrément. Dépôt initial : 150 000 FCFA.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "societe",
+        "text": "Compte Courant SA/SARL/SNC/SUARL — pièces à réunir : statuts et règlement intérieur, registre de commerce + PV de constitution (AG ou Conseil d'Administration selon le cas), journal d'annonces légales, identité de chaque signataire, facture/bail au nom de la société, références bancaires, cachet social. Pour une SA : ajouter le PV de nomination des dirigeants. Dépôt initial : 2 500 000 FCFA.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "xpress",
+        "text": "Compte Xpress — expliquer au client : c'est un compte 100% mobile (application Ecobank Mobile ou *158# depuis un numéro MTN), pas de dépôt initial, solde maximum 200 000 XOF, frais de retrait 1% du montant. Le numéro de compte est le numéro de téléphone précédé du préfixe pays (225).",
+        "options": [
+          {
+            "label": "Client convaincu — l'orienter vers l'application mobile",
+            "outcome": "CLOTURE"
+          },
+          {
+            "label": "Client préfère un compte physique",
+            "next": "start"
+          }
+        ]
+      },
+      {
+        "id": "evolution",
+        "text": "Compte Évolution — expliquer : compte hybride sans frais de tenue (comme un compte épargne) mais avec les avantages d'un compte courant (carte, virement, Mobile App). Pièces : 2 photos, CNI/attestation + récépissé d'enrôlement, justificatif de résidence. Dépôt minimum 5 000 FCFA (restitué à la clôture). Préciser : pas de chéquier, pas de crédit ni facilité.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "diaspora",
+        "text": "Client non-résident ou diaspora — demander : réside-t-il hors de Côte d'Ivoire (Diaspora Non-Résident) ou en Côte d'Ivoire sans être ivoirien (Diaspora Résident) ? Dans les deux cas : 2 photos d'identité, passeport valide (ou CNI/carte consulaire pour CEDEAO), carte de résident ou facture d'abonnement justifiant la résidence. Dépôt initial : 50 000 FCFA.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          },
+          {
+            "label": "Client non-résident souhaite ouvrir en ligne",
+            "next": "aop"
+          }
+        ]
+      },
+      {
+        "id": "aop",
+        "text": "Compte en ligne AOP — orienter le client vers aop.ecobank.com (ou www.ecobank.com) pour suivre les instructions d'ouverture en ligne.",
+        "options": [
+          {
+            "label": "Client orienté vers le site AOP",
+            "outcome": "CLOTURE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "zoneCode": "PRETS_BANCAIRES",
+    "countryCode": "CI",
+    "title": "PRET – ORIENTER LE CLIENT VERS LE PRET ADAPTE (ECI)",
+    "nodes": [
+      {
+        "id": "start",
+        "text": "Vérifier d'abord l'éligibilité générale : le client est-il fonctionnaire ou salarié du privé avec son compte domicilié chez Ecobank ?",
+        "options": [
+          {
+            "label": "Oui, éligible — continuer",
+            "next": "besoin"
+          },
+          {
+            "label": "Non — expliquer que la domiciliation de salaire est un prérequis",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "besoin",
+        "text": "Quel est le besoin du client ?",
+        "options": [
+          {
+            "label": "Frais de scolarité des enfants",
+            "next": "scolaire"
+          },
+          {
+            "label": "Projet personnel / consommation",
+            "next": "conso"
+          },
+          {
+            "label": "Achat ou construction d'un bien immobilier",
+            "next": "immobilier"
+          },
+          {
+            "label": "Achat d'un véhicule neuf",
+            "next": "auto"
+          },
+          {
+            "label": "Avance rapide sur salaire (ligne de crédit carte)",
+            "next": "avance"
+          }
+        ]
+      },
+      {
+        "id": "scolaire",
+        "text": "Prêt Scolaire — montant maximum 5 000 000 FCFA, durée de remboursement 12 mois, taux défini au lancement du prêt. Rassembler le dossier commun (voir étape suivante).",
+        "options": [
+          {
+            "label": "Passer au dossier à constituer",
+            "next": "dossier"
+          }
+        ]
+      },
+      {
+        "id": "conso",
+        "text": "Prêt à la Consommation — montant maximum 20 000 000 FCFA, durée maximum 60 mois, taux actuel 6,99% HT. Montant final fonction de la quotité cessible du client.",
+        "options": [
+          {
+            "label": "Passer au dossier à constituer",
+            "next": "dossier"
+          }
+        ]
+      },
+      {
+        "id": "immobilier",
+        "text": "Prêt Immobilier — montant maximum 100 000 000 FCFA, durée maximum 20 ans, taux actuel 6,99% HT. Préciser au client qu'un complément de dossier est requis selon le cas (promotion immobilière, construction, ou rachat de bien bâti).",
+        "options": [
+          {
+            "label": "Passer au dossier à constituer",
+            "next": "dossier"
+          }
+        ]
+      },
+      {
+        "id": "auto",
+        "text": "Prêt Auto — montant maximum 25 000 000 FCFA, durée maximum 60 mois, taux actuel 6,99% HT. Rappeler que le véhicule doit provenir d'un concessionnaire partenaire (RIMCO MOTORS, TRACTAFRIC MOTORS, SETACI, ATC COMAFRIC).",
+        "options": [
+          {
+            "label": "Passer au dossier à constituer",
+            "next": "dossier"
+          }
+        ]
+      },
+      {
+        "id": "avance",
+        "text": "Avance sur Salaire (EAA) — ligne de crédit sur carte magnétique, utilisable dans toute l'Afrique Ecobank. Frais mensuels de mise en place 1 100 F TTC dès utilisation ; pas de taux de 13% si la ligne n'est pas utilisée un mois donné. Durée : 5 ans dans la limite du départ à la retraite. Le client se présente en agence avec CNI/attestation + dernier bulletin de salaire pour remplir la fiche de souscription. Retrait uniquement sur GAB Ecobank.",
+        "options": [
+          {
+            "label": "Client orienté vers l'agence pour la fiche de souscription",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "dossier",
+        "text": "Dossier commun à réunir : demande manuscrite, copie de la pièce d'identité (+ conjoint si marié), livret de famille + acte de mariage si marié, attestation de travail ou de présence (< 3 mois), domiciliation de salaire, certificat de santé (taille/poids/tension), 3 derniers bulletins de salaire originaux.",
+        "options": [
+          {
+            "label": "Dossier expliqué — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "zoneCode": "COMPTE",
+    "countryCode": "BF",
+    "title": "COMPTE – GUIDE D'OUVERTURE PAR TYPE DE COMPTE (EBF)",
+    "nodes": [
+      {
+        "id": "start",
+        "text": "Quel type de compte le client souhaite-t-il ouvrir ?",
+        "options": [
+          {
+            "label": "Compte Épargne Particulier",
+            "next": "epargne"
+          },
+          {
+            "label": "Compte Épargne Mineur",
+            "next": "mineur"
+          },
+          {
+            "label": "Compte Particulier Retraités",
+            "next": "retraite"
+          },
+          {
+            "label": "Compte Particulier Chèque",
+            "next": "cheque"
+          },
+          {
+            "label": "Compte Xpress (100% mobile)",
+            "next": "xpress"
+          },
+          {
+            "label": "Compte société (SA/SARL/EPA/Association/ONG...)",
+            "next": "societe"
+          }
+        ]
+      },
+      {
+        "id": "epargne",
+        "text": "Compte Épargne Particulier — pièces à réunir : pièce d'identité valide, 2 photos, adresse postale/géographique, références bancaires, justificatif de revenus (ou domiciliation salaire chez Ecobank), justificatif de résidence. Frais de tenue : franco — taux d'intérêt 3,5% jusqu'à 10 000 000 FCFA.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "mineur",
+        "text": "Compte Épargne Mineur — pièces du parent (identité, 2 photos, adresse, revenus, références bancaires) + 2 photos et extrait de naissance du mineur.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "retraite",
+        "text": "Compte Particulier Retraités — pièces : identité valide, 2 photos, adresse, références bancaires, certificat de départ à la retraite ou bulletin de pension, justificatif de résidence.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "cheque",
+        "text": "Compte Particulier Chèque — pièces : identité valide, 2 photos, adresse, références bancaires, justificatif de revenus, justificatif de résidence.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "xpress",
+        "text": "Compte Xpress — 100% mobile via Ecobank Mobile ou *158# (numéro MTN sans internet), préfixe pays 226. Pas de dépôt initial, solde maximum 200 000 XOF, frais de retrait 1% du montant.",
+        "options": [
+          {
+            "label": "Client orienté vers l'application mobile",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "societe",
+        "text": "Compte société — demander la structure exacte (SA, SARL, EPA, Association, ONG, École...) : chaque forme a des pièces complémentaires spécifiques en plus du socle commun (statuts légalisés, registre de commerce ou agrément, identité + 2 photos de chaque signataire, adresse, références bancaires, justificatifs d'autorisations administratives).",
+        "options": [
+          {
+            "label": "Structure identifiée — orienter vers le dossier correspondant en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "zoneCode": "COMPTE",
+    "countryCode": "CG",
+    "title": "COMPTE – GUIDE D'OUVERTURE PAR TYPE DE COMPTE (ECG)",
+    "nodes": [
+      {
+        "id": "start",
+        "text": "Quel type de compte le client souhaite-t-il ouvrir ?",
+        "options": [
+          {
+            "label": "Compte Épargne",
+            "next": "epargne"
+          },
+          {
+            "label": "Compte Épargne Mineur",
+            "next": "mineur"
+          },
+          {
+            "label": "Compte Courant Ordinaire",
+            "next": "courant"
+          }
+        ]
+      },
+      {
+        "id": "epargne",
+        "text": "Compte Épargne — pièces : 2 photos, CNI/passeport valide, justificatif de domicile, justificatif de revenu. Dépôt initial 20 000 FCFA, pas de frais de tenue, taux 2,45%/an, 4 retraits autorisés/mois.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "mineur",
+        "text": "Compte Épargne Mineur — pièces : 2 photos du tuteur et du mineur, acte de naissance, identité et justificatifs (domicile, revenu) du tuteur. Mêmes conditions que le compte épargne standard.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "courant",
+        "text": "Compte Courant Ordinaire — pièces : 2 photos, identité valide, justificatif de domicile et de revenu. Dépôt initial 20 000 FCFA, pas de taux d'intérêt. Préciser : possibilité de prêt si domiciliation de salaire/pension.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "zoneCode": "COMPTE",
+    "countryCode": "GA",
+    "title": "COMPTE – GUIDE D'OUVERTURE PAR TYPE DE COMPTE (EGA)",
+    "nodes": [
+      {
+        "id": "start",
+        "text": "Le client est-il salarié du secteur privé ou du secteur public ?",
+        "options": [
+          {
+            "label": "Secteur privé",
+            "next": "prive"
+          },
+          {
+            "label": "Secteur public",
+            "next": "public"
+          }
+        ]
+      },
+      {
+        "id": "prive",
+        "text": "Compte Chèque Personne Physique (secteur privé) — dépôt initial néant si domiciliation immédiate de salaire, sinon 100 000 XAF. Revenu mensuel minimum 100 000 XAF. Pièces : identité valide, 4 photos, quittance SEEG ou attestation de logement, plan de localisation, attestation d'emploi (<15 jours) + dernier bulletin de salaire, lettre de domiciliation, références bancaires, situation matrimoniale/patrimoniale, formulaires d'ouverture et KYC.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "public",
+        "text": "Compte Chèque Personne Physique (secteur public) — mêmes conditions financières. Pièces : identité valide, 4 photos, quittance SEEG ou attestation de logement, plan de localisation, attestation d'emploi/présence (<1 mois) ou 3 derniers bulletins (dont un bulletin bleu), lettre de domiciliation, références bancaires, formulaires d'ouverture et KYC.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "zoneCode": "COMPTE",
+    "countryCode": "ML",
+    "title": "COMPTE – GUIDE D'OUVERTURE PAR TYPE DE COMPTE (EML)",
+    "nodes": [
+      {
+        "id": "start",
+        "text": "Quel type de compte le client souhaite-t-il ouvrir ?",
+        "options": [
+          {
+            "label": "Compte d'Épargne (résident)",
+            "next": "epargne"
+          },
+          {
+            "label": "Compte d'Épargne Mineur",
+            "next": "mineur"
+          },
+          {
+            "label": "Compte Chèque",
+            "next": "cheque"
+          },
+          {
+            "label": "Compte d'Épargne (non-résident)",
+            "next": "nonresident"
+          }
+        ]
+      },
+      {
+        "id": "epargne",
+        "text": "Compte d'Épargne résident — pièces : identité valide (CNI, passeport ou carte NINA), 2 photos, justificatif de domicile, justificatif d'activité/revenu si emploi, référence bancaire. Dépôt initial et solde minimum : 25 000 FCFA.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "mineur",
+        "text": "Compte d'Épargne Mineur (< 18 ans) — pièces : acte de naissance, 2 photos de l'enfant, identité + 2 photos du parent, justificatifs du parent (domicile, activité), référence bancaire du parent. Dépôt initial et solde minimum : 10 000 FCFA. Préciser : compte bloqué la première année.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "cheque",
+        "text": "Compte Chèque pour Particuliers — pièces : identité valide, 2 photos (+2 du second signataire si compte joint), justificatif de domicile, justificatif d'activité/revenu, références bancaires. Dépôt initial : 50 000 FCFA.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "nonresident",
+        "text": "Compte d'Épargne non-résident — pièces : identité valide, 2 photos, justificatif de domicile et de revenu (à renouveler tous les 2 ans), références bancaires.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "zoneCode": "COMPTE",
+    "countryCode": "TG",
+    "title": "COMPTE – GUIDE D'OUVERTURE PAR TYPE DE COMPTE (ETG)",
+    "nodes": [
+      {
+        "id": "start",
+        "text": "Quel type de compte épargne le client souhaite-t-il ouvrir ?",
+        "options": [
+          {
+            "label": "Compte Épargne Ordinaire",
+            "next": "ordinaire"
+          },
+          {
+            "label": "Compte Épargne Ecovision",
+            "next": "ecovision"
+          },
+          {
+            "label": "Compte Épargne Étudiant",
+            "next": "etudiant"
+          }
+        ]
+      },
+      {
+        "id": "ordinaire",
+        "text": "Compte Épargne Ordinaire — pièces : 2 photos, CNI/passeport valide, références de maison (facture eau/électricité/téléphone). Dépôt initial et frais de tenue : 0. Taux 3,5%/an, 4 retraits autorisés/mois.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "ecovision",
+        "text": "Compte Épargne Ecovision — mêmes pièces (+ acte de naissance si mineur). Attention : compte bloqué pendant un an sans retrait dès l'ouverture — bien informer le client de cette condition avant de continuer.",
+        "options": [
+          {
+            "label": "Client informé du blocage — inviter en agence",
+            "outcome": "CLOTURE"
+          },
+          {
+            "label": "Client préfère un compte sans blocage",
+            "next": "ordinaire"
+          }
+        ]
+      },
+      {
+        "id": "etudiant",
+        "text": "Compte Épargne Étudiant — pièces : 2 photos, CNI/passeport valide, carte d'étudiant valide. Frais de tenue : 0.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "zoneCode": "COMPTE",
+    "countryCode": "SN",
+    "title": "COMPTE – GUIDE D'OUVERTURE PAR TYPE DE COMPTE (ESN)",
+    "nodes": [
+      {
+        "id": "start",
+        "text": "Quel type de compte le client souhaite-t-il ouvrir ?",
+        "options": [
+          {
+            "label": "Compte Épargne (particulier/étudiant/mineur)",
+            "next": "epargne"
+          },
+          {
+            "label": "Compte Entreprise Individuelle",
+            "next": "entreprise"
+          },
+          {
+            "label": "Compte Association / Amicale",
+            "next": "association"
+          }
+        ]
+      },
+      {
+        "id": "epargne",
+        "text": "Compte Épargne — pièces : 2 photos, justificatif d'adresse, identité valide. Si étudiant : carte d'étudiant originale. Si mineur : 2 photos de l'enfant + extrait de naissance. Dépôt initial : franco.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "entreprise",
+        "text": "Compte Entreprise Individuelle — pièces : registre de commerce harmonisé original, NINEA, 2 photos, cachet, CNI originale.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "association",
+        "text": "Compte Association / Amicale — orienter le client vers le dossier spécifique (statuts, PV, identité des responsables) à constituer en agence.",
+        "options": [
+          {
+            "label": "Client orienté vers l'agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "zoneCode": "COMPTE",
+    "countryCode": "TD",
+    "title": "COMPTE – GUIDE D'OUVERTURE PAR TYPE DE COMPTE (ETD)",
+    "nodes": [
+      {
+        "id": "start",
+        "text": "Le client souhaite-t-il un compte épargne ou un sous-compte chèque ?",
+        "options": [
+          {
+            "label": "Compte Épargne",
+            "next": "epargne"
+          },
+          {
+            "label": "Sous-Compte Chèque (personne physique)",
+            "next": "cheque"
+          }
+        ]
+      },
+      {
+        "id": "epargne",
+        "text": "Compte Épargne — pièces : convention d'ouverture signée, copie passeport/pièce d'identité valide, 2 photos 4x4 couleur récentes, contact (téléphone, boîte postale, quittance STE/SNE ou adresse complète, email). Dépôt initial : 50 000 FCFA.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "cheque",
+        "text": "Sous-Compte Chèque — pièces : convention d'ouverture signée, justificatif de revenu. Pas de dépôt minimum requis.",
+        "options": [
+          {
+            "label": "Documents réunis — inviter le client en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "zoneCode": "RECLAMATION_ESCALADE",
+    "countryCode": "CM",
+    "title": "RECLAMATION – GUIDE DE PRISE EN CHARGE PAR TYPE DE REQUETE (ECM)",
+    "nodes": [
+      {
+        "id": "start",
+        "text": "Quel type de requête le client formule-t-il ?",
+        "options": [
+          {
+            "label": "Ouverture de compte pour personne vivant à l'étranger",
+            "next": "aop"
+          },
+          {
+            "label": "Réactivation de compte",
+            "next": "reactivation"
+          },
+          {
+            "label": "Demande de relevé de compte",
+            "next": "releve"
+          },
+          {
+            "label": "Demande de RIB / attestation de domiciliation",
+            "next": "rib"
+          },
+          {
+            "label": "Demande de carte magnétique / code PIN papier",
+            "next": "carte_demande"
+          },
+          {
+            "label": "Virement entrant introuvable / sortant en échec",
+            "next": "virement"
+          },
+          {
+            "label": "Carte prépayée CashXpress (crédit, retrait, transfert, remboursement)",
+            "next": "cashxpress"
+          },
+          {
+            "label": "Carte de débit Visa/MasterCard (retrait/paiement infructueux)",
+            "next": "carte_debit"
+          },
+          {
+            "label": "Mobile App (B2W/W2B, virement, recharge, dépôt ATM)",
+            "next": "mobile_app"
+          }
+        ]
+      },
+      {
+        "id": "aop",
+        "text": "Communiquer au client l'adresse aop.ecobank.com pour l'ouverture de compte à distance.",
+        "options": [
+          {
+            "label": "Client orienté",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "reactivation",
+        "text": "Requérir du client de renseigner la fiche de réactivation et le formulaire KYC, joindre son passeport ou sa CNI valide, identifier son agence et transmettre le dossier en agence.",
+        "options": [
+          {
+            "label": "Dossier transmis en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "releve",
+        "text": "Requérir du client de renseigner la fiche de demande de services divers, joindre son passeport ou sa CNI valide, identifier son agence et transmettre en agence.",
+        "options": [
+          {
+            "label": "Dossier transmis en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "rib",
+        "text": "Requérir du client son passeport ou sa CNI valide, identifier son agence, transmettre en agence (pour un RIB) ou requérir une demande signée avec ses coordonnées bancaires (pour une attestation de domiciliation).",
+        "options": [
+          {
+            "label": "Dossier transmis en agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "carte_demande",
+        "text": "Requérir du client de renseigner le formulaire d'activation des produits électroniques (carte) ou le formulaire pin-reissue (code PIN), rédiger un courrier d'engagement de prise en charge des frais, joindre le passeport/CNI, transmettre en agence en copie au service Cartes.",
+        "options": [
+          {
+            "label": "Dossier transmis",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "virement",
+        "text": "Requérir du client la preuve du transfert (Swift, ordre de virement) pour un virement entrant introuvable, ou la date/montant/référence/moyen utilisé pour un virement sortant en échec, puis transmettre au service Cash Management.",
+        "options": [
+          {
+            "label": "Dossier transmis au Cash Management",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "cashxpress",
+        "text": "Requérir du client la date, le montant, la référence de la transaction, l'identifiant de la carte et le numéro de carte (6 premiers + 4 derniers chiffres), puis transmettre au service Card Operations.",
+        "options": [
+          {
+            "label": "Dossier transmis au Card Operations",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "carte_debit",
+        "text": "Requérir du client la date, le montant, la référence de la transaction et le numéro de carte (6 premiers + 4 derniers chiffres) — que le terminal soit chez Ecobank, une autre banque de la zone ou à l'international, puis transmettre au service Card Operations.",
+        "options": [
+          {
+            "label": "Dossier transmis au Card Operations",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "mobile_app",
+        "text": "Requérir du client la date, le montant, la référence de la transaction et le moyen utilisé (Mobile App, Ecobank Online, Omnilite) — pour B2W/W2B préciser aussi le numéro de téléphone à l'origine, puis transmettre au service Card Operations.",
+        "options": [
+          {
+            "label": "Dossier transmis au Card Operations",
+            "outcome": "CLOTURE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "zoneCode": "COMPTE",
+    "countryCode": "CM",
+    "title": "COMPTE – PROCEDURE DE TRAITEMENT DES SUCCESSIONS (ECM)",
+    "nodes": [
+      {
+        "id": "start",
+        "text": "L'agence a connaissance du décès d'un client (acte de décès, publication, information de l'employeur). Première action : mettre immédiatement une restriction sur le(s) compte(s) du client, et informer le jour même — par tout moyen laissant trace écrite — le gestionnaire de compte et le service Legal, en transmettant la pièce justificative de décès si disponible.",
+        "options": [
+          {
+            "label": "Restriction posée et Legal informé — passer à la réception des pièces",
+            "next": "pieces"
+          }
+        ]
+      },
+      {
+        "id": "pieces",
+        "text": "Réceptionner les pièces dévolutives (notifiées par voie d'huissier) : copie-grosse du jugement d'hérédité, certificat de non-appel/non-pourvoi le cas échéant, copie certifiée conforme de l'acte de décès, certificat de genre de mort le cas échéant, acte de mariage le cas échéant, CNI de l'administrateur des biens. Toute agence peut recevoir ces pièces, même si le compte n'y est pas domicilié.",
+        "options": [
+          {
+            "label": "Dossier complet — accuser réception et ouvrir le dossier",
+            "next": "reception"
+          },
+          {
+            "label": "Dossier incomplet — indiquer au client les pièces manquantes",
+            "next": "reception"
+          }
+        ]
+      },
+      {
+        "id": "reception",
+        "text": "Accuser réception sur le champ (en indiquant les pièces manquantes si incomplet), ouvrir un dossier et y classer les pièces reçues, puis transmettre au service Legal pour appréciation et traitement.",
+        "options": [
+          {
+            "label": "Dossier transmis au Legal",
+            "next": "legal"
+          }
+        ]
+      },
+      {
+        "id": "legal",
+        "text": "Le Legal instruit le CSU de : mettre le compte sous restriction débit pour cause de décès (avec pièce justificative si disponible), désactiver tous les moyens de paiement et produits souscrits par le défunt, et désactiver les procurations existantes.",
+        "options": [
+          {
+            "label": "Instructions données au CSU",
+            "next": "verification"
+          }
+        ]
+      },
+      {
+        "id": "verification",
+        "text": "Le Legal s'assure que les pièces reçues correspondent bien à la succession concernée et vérifie la concordance des dates. Si le solde du compte est égal ou supérieur à 1 000 000 FCFA, un contrôle d'authenticité de la décision de justice est obligatoire (courrier au greffier du tribunal, ou via un avocat partenaire pour les tribunaux hors zone).",
+        "options": [
+          {
+            "label": "Authenticité vérifiée — préparer le règlement",
+            "next": "reglement"
+          }
+        ]
+      },
+      {
+        "id": "reglement",
+        "text": "Préparer un mémo de règlement de la succession invitant les Opérations à : prélever les frais de succession et de clôture de compte selon les conditions générales, puis payer le reliquat — par Mise à Disposition (MAD) si le montant est inférieur à 1 000 000 FCFA, par chèque de banque si supérieur et sans compte succession chez Ecobank, ou par virement si la succession a un compte ouvert chez Ecobank.",
+        "options": [
+          {
+            "label": "Règlement effectué entre les mains de l'administrateur des biens dûment identifié",
+            "outcome": "CLOTURE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "zoneCode": "COMPTE",
+    "countryCode": "CD",
+    "title": "COMPTE – PROCEDURE DE TRAITEMENT DES SUCCESSIONS (ECD)",
+    "nodes": [
+      {
+        "id": "start",
+        "text": "Le décès d'un client doit être porté à la connaissance de la banque par un écrit émanant de ses proches (parents, avocats) — ou formalisé par écrit si l'information arrive par voie de presse ou déclaration verbale. Les pièces nécessaires pour accéder au compte sont communiquées aux héritiers désignés par le Département Juridique.",
+        "options": [
+          {
+            "label": "Décès porté à la connaissance de la banque — passer aux dispositions opérationnelles",
+            "next": "operationnel"
+          }
+        ]
+      },
+      {
+        "id": "operationnel",
+        "text": "Le Département Juridique informe l'agence concernée et le service clientèle, qui placent immédiatement une restriction sur le(s) compte(s) du client. Si le client avait des engagements de crédit en cours, une lettre d'information est adressée à l'assurance par le département des Crédits.",
+        "options": [
+          {
+            "label": "Restriction posée — recueillir les documents du liquidateur",
+            "next": "documents_liquidateur"
+          }
+        ]
+      },
+      {
+        "id": "documents_liquidateur",
+        "text": "La personne chargée de liquider le compte doit produire : une procuration légalisée des héritiers, une copie du jugement d'hérédité, une copie certifiée conforme du certificat de décès, et une copie de sa pièce d'identité en cours de validité.",
+        "options": [
+          {
+            "label": "Documents réunis — transmettre au Juridique pour mise en état du dossier",
+            "next": "juridique"
+          }
+        ]
+      },
+      {
+        "id": "juridique",
+        "text": "La Direction Juridique met le dossier en état : identifie la catégorie de succession (avec ou sans testament), vérifie que la documentation est complète, fait vérifier le degré d'engagement du client par la Gestion des Risques, puis classe le dossier.",
+        "options": [
+          {
+            "label": "Succession sans testament (ab intestat)",
+            "next": "sans_testament"
+          },
+          {
+            "label": "Succession avec testament",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "sans_testament",
+        "text": "Pièces à réunir : PV de conseil de famille légalisé, acte de décès (copie certifiée conforme), attestation du curateur aux successions, pièce d'identité du liquidateur, attestation de composition familiale (commune de résidence du défunt). Si un ou plusieurs enfants mineurs sont concernés : ajouter le jugement de confirmation du liquidateur et le certificat de non-appel (30 jours après signification).",
+        "options": [
+          {
+            "label": "Aucun mineur ni bien immeuble dans le patrimoine — le PV de conseil de famille seul suffit à donner accès au compte",
+            "outcome": "CLOTURE"
+          },
+          {
+            "label": "Mineur(s) ou bien(s) immeuble(s) présents — dossier complet requis avant déblocage",
+            "outcome": "CLOTURE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "zoneCode": "ATTESTATION_DOCUMENTS",
+    "countryCode": "CD",
+    "title": "ATTESTATION BANCAIRE – GUIDE DES TYPES D'ATTESTATIONS (ECD)",
+    "nodes": [
+      {
+        "id": "start",
+        "text": "Quel type d'attestation le client demande-t-il ?",
+        "options": [
+          {
+            "label": "Attestation de solvabilité",
+            "next": "solvabilite"
+          },
+          {
+            "label": "Attestation de non-redevance",
+            "next": "non_redevance"
+          },
+          {
+            "label": "Attestation de domiciliation bancaire",
+            "next": "domiciliation"
+          },
+          {
+            "label": "Attestation de capacité financière",
+            "next": "capacite"
+          },
+          {
+            "label": "Lettre de recommandation",
+            "next": "recommandation"
+          }
+        ]
+      },
+      {
+        "id": "solvabilite",
+        "text": "Attestation de solvabilité — coût 100 USD.",
+        "options": [
+          {
+            "label": "Client informé du coût — orienter vers l'agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "non_redevance",
+        "text": "Attestation de non-redevance — coût 100 USD.",
+        "options": [
+          {
+            "label": "Client informé du coût — orienter vers l'agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "domiciliation",
+        "text": "Attestation de domiciliation bancaire — coût 100 USD.",
+        "options": [
+          {
+            "label": "Client informé du coût — orienter vers l'agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "capacite",
+        "text": "Attestation de capacité financière — coût 100 USD.",
+        "options": [
+          {
+            "label": "Client informé du coût — orienter vers l'agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      },
+      {
+        "id": "recommandation",
+        "text": "Lettre de recommandation — coût 100 USD.",
+        "options": [
+          {
+            "label": "Client informé du coût — orienter vers l'agence",
+            "outcome": "CLOTURE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "zoneCode": "COMPTE",
+    "countryCode": "GA",
+    "title": "COMPTE – PROCEDURE DE TRAITEMENT DES SUCCESSIONS (EGA)",
+    "nodes": [
+      {
+        "id": "start",
+        "text": "À la réception de l'information de décès d'un client, informer immédiatement le Département Juridique et le Gestionnaire du Compte, puis diriger le contact vers le Département Juridique.",
+        "options": [
+          {
+            "label": "Département Juridique et Gestionnaire informés — confirmer l'identité",
+            "next": "identite"
+          }
+        ]
+      },
+      {
+        "id": "identite",
+        "text": "Le Département Juridique s'assure d'abord de l'identité de la personne décédée (confirmer qu'il s'agit bien du client visé), recherche tous les comptes ouverts à son nom (application REQUETES + CLIENTS + REQUETES INFORMATION) et vérifie les éventuels produits d'assurance vie souscrits.",
+        "options": [
+          {
+            "label": "Comptes débiteurs identifiés",
+            "next": "debiteur"
+          },
+          {
+            "label": "Comptes créditeurs identifiés",
+            "next": "crediteur"
+          }
+        ]
+      },
+      {
+        "id": "debiteur",
+        "text": "Pour un compte débiteur, demander au Service Clientèle de : cocher NO DEBIT et NO CREDIT, décocher COMPTABILISATION PERMISE, arrêter le décompte des frais (tenue de compte, IBK, prime assurance...), puis mettre AVISE LEGAL via MAINTENANCE COMPTE > COMPTE CLIENT > DETAILS > IM.",
+        "options": [
+          {
+            "label": "Modifications effectuées — passer aux crédits en cours",
+            "next": "credits_encours"
+          }
+        ]
+      },
+      {
+        "id": "crediteur",
+        "text": "Pour un compte créditeur, demander aux Opérations et au Service Clientèle de niveler le compte par le crédit du Compte interne Clients Décédés, puis de clôturer le(s) compte(s) après nivellement.",
+        "options": [
+          {
+            "label": "Compte nivelé et clôturé — passer aux crédits en cours",
+            "next": "credits_encours"
+          }
+        ]
+      },
+      {
+        "id": "credits_encours",
+        "text": "Rechercher les éventuels crédits en cours du client. Le cas échéant : éditer immédiatement l'échéancier booké dans le système (avant la tombée de la LD, sinon il ne sera plus extractible), puis demander au CAD de faire tomber la LD en cours rapidement pour éviter tout décompte de frais postérieur.",
+        "options": [
+          {
+            "label": "Crédits en cours traités — communiquer la liste des pièces au client",
+            "next": "pieces"
+          }
+        ]
+      },
+      {
+        "id": "pieces",
+        "text": "Communiquer au client/héritiers la liste des pièces à fournir : acte de décès, procès-verbal du Conseil de Famille, jugement d'homologation du procès-verbal. Les actes notariés délivrés à l'étranger doivent faire l'objet d'un exéquatur.",
+        "options": [
+          {
+            "label": "Pièces communiquées — dossier en attente de complétude",
+            "outcome": "CLOTURE"
+          }
+        ]
+      }
+    ]
+  }
+]

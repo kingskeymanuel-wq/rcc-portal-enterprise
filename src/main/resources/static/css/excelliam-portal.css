@@ -1,0 +1,63 @@
+/* Portail Excelliam — même système que hr-portal.css (.hr-card, .hr-kpi, .team-tile, etc.),
+   teinte violette distinctive (cohérente avec .badge-level.excelliam déjà utilisé ailleurs
+   dans le portail, #A78BFA) pour que le prestataire distingue son espace au premier coup d'œil
+   sans jamais douter d'être dans le bon portail. */
+:root{--exc-purple:#7C3AED;--exc-purple-light:#A78BFA}
+
+.exc-hero{background:linear-gradient(120deg,#2b1054,#5b21b6 55%,#7c3aed)}
+
+.exc-shift-picker{display:flex;flex-direction:column;gap:10px;max-height:420px;overflow:auto;padding-right:4px}
+.exc-agent-row{display:flex;align-items:center;gap:12px;border:1px solid var(--hr-border);border-radius:12px;padding:10px 12px;transition:border-color .15s,background .15s}
+.exc-agent-row.checked{border-color:var(--exc-purple-light);background:#faf8ff}
+.exc-agent-row .form-check-input{width:1.15em;height:1.15em;flex:0 0 auto}
+.exc-agent-row .exc-agent-name{font-weight:700;font-size:.82rem;color:var(--hr-text);flex:1 1 auto;min-width:0}
+.exc-agent-row .exc-agent-name small{display:block;font-weight:400;font-size:.65rem;color:var(--hr-muted)}
+.exc-shift-select{width:190px;flex:0 0 auto}
+.exc-shift-select:disabled{opacity:.45}
+
+.exc-shift-legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.exc-shift-chip{display:flex;align-items:center;gap:6px;font-size:.7rem;font-weight:700;padding:5px 10px;border-radius:20px;background:#f4f0ff;color:var(--exc-purple)}
+.exc-shift-chip .dot{width:7px;height:7px;border-radius:50%;background:var(--exc-purple)}
+
+.exc-period-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.exc-period-bar .form-control{max-width:160px}
+
+.exc-summary-bar{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#faf8ff;border:1px dashed var(--exc-purple-light);border-radius:12px;font-size:.76rem;margin-top:12px}
+.exc-summary-bar b{color:var(--exc-purple)}
+
+/* Onglet Planning — équipe planifiée sélectionnée + agents groupés par shift pour le mois */
+.team-tile.team-tile-active{border-color:var(--exc-purple);background:#faf8ff}
+.exc-shift-group{border:1px solid var(--hr-border);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.exc-shift-group:last-child{margin-bottom:0}
+.exc-shift-group-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.exc-shift-agent-list{display:flex;flex-wrap:wrap;gap:8px}
+.exc-shift-agent-chip{font-size:.74rem;font-weight:600;padding:6px 11px;border-radius:20px;background:#f4f0ff;color:var(--hr-text)}
+.exc-shift-agent-chip.mixed{background:#fff3d7;color:#946400}
+.exc-shift-agent-chip.mixed i{font-size:.65rem;margin-left:2px}
+
+/* Graphiques — hauteur fixe pour que Chart.js (responsive:true, maintainAspectRatio:false)
+   reste stable quelle que soit la largeur de colonne Bootstrap. */
+.exc-chart-card .hr-card-head{margin-bottom:4px}
+.exc-chart-wrap{position:relative;height:230px;padding:4px 6px 0}
+
+/* ── Animations sobres — fondu + léger glissement, jamais de rebond ni d'effet appuyé ── */
+@keyframes excFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+#excApp.exc-fade-in,#excPlanningPane.exc-fade-in{animation:excFadeIn .28s ease-out}
+
+/* Changement d'onglet Vue d'ensemble / Planning — remplace le fade Bootstrap par défaut (trop
+   long / saccadé sur certains navigateurs) par une transition plus courte et régulière. */
+.tab-pane{transition:opacity .18s ease-out}
+.tab-pane:not(.show){opacity:0}
+.tab-pane.show{opacity:1}
+
+/* Cartes KPI et tuiles équipe — légère élévation au survol, signal d'interactivité discret
+   plutôt qu'un effet marqué (pas de scale/rebond). */
+.hr-kpi,.team-tile{transition:box-shadow .15s ease-out,transform .15s ease-out}
+.team-tile:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(124,58,237,.12)}
+
+/* Modale Planifier — ouverture légèrement plus douce que le zoom Bootstrap par défaut. */
+#planifyModal .modal-dialog{transition:transform .22s ease-out,opacity .22s ease-out}
+
+/* Ligne de congé / tuile équipe qui vient d'être ajoutée après un refresh — évite l'apparition
+   brute d'une liste entièrement réécrite (innerHTML) à chaque rafraîchissement automatique. */
+.activity-item{animation:excFadeIn .22s ease-out}

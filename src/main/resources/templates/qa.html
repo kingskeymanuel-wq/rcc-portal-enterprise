@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>RCC Portal Enterprise — Quality Assurance</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
+          rel="stylesheet">
+
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+
+    <style>
+        .qa-card { background:#fff; border:1px solid rgba(0,0,0,.06); border-radius:.75rem; padding:1.25rem 1.5rem; }
+        .qa-card-title { font-size:1rem; font-weight:700; color:#1f2a44; margin-bottom:1rem; }
+        .qa-section-title { font-size:.78rem; font-weight:700; letter-spacing:.06em; color:#0f9d8c; text-transform:uppercase; margin:1.5rem 0 .5rem; }
+        .qa-section-title:first-child { margin-top:0; }
+        .qa-criterion { padding:.85rem 0; border-bottom:1px solid #eef0f3; display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap; }
+        .qa-criterion:last-child { border-bottom:none; }
+        .qa-criterion-code { font-size:.72rem; font-weight:700; color:#8a93a3; text-transform:uppercase; letter-spacing:.03em; }
+        .qa-criterion-code .ko-tag { color:#dc3545; margin-left:.35rem; }
+        .qa-criterion-name { font-weight:600; color:#1f2a44; margin:.15rem 0 .2rem; }
+        .qa-criterion-desc { font-size:.82rem; color:#6c757d; }
+        .qa-score-group { display:inline-flex; border:1px solid #dee2e6; border-radius:.5rem; overflow:hidden; flex-shrink:0; }
+        .qa-score-btn {
+            border:none; background:#fff; padding:.4rem .75rem; font-weight:600; font-size:.85rem;
+            color:#495057; cursor:pointer; border-right:1px solid #dee2e6; min-width:42px;
+        }
+        .qa-score-btn:last-child { border-right:none; }
+        .qa-score-btn.active-2 { background:#198754; color:#fff; }
+        .qa-score-btn.active-1 { background:#fd7e14; color:#fff; }
+        .qa-score-btn.active-0 { background:#dc3545; color:#fff; }
+        .qa-score-btn.active-na { background:#6c757d; color:#fff; }
+        .qa-gauge-wrap { display:flex; justify-content:center; margin:.5rem 0 1rem; }
+        .qa-gauge {
+            width:150px; height:150px; border-radius:50%;
+            background:conic-gradient(#e9ecef 0deg 360deg);
+            display:flex; align-items:center; justify-content:center;
+            transition:background .35s ease;
+        }
+        .qa-gauge-inner {
+            width:114px; height:114px; border-radius:50%; background:#fff;
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+        }
+        .qa-gauge-value { font-size:1.6rem; font-weight:800; color:#1f2a44; line-height:1; }
+        .qa-gauge-label { font-size:.7rem; color:#adb5bd; margin-top:.2rem; }
+        .qa-status-badge { font-size:.8rem; padding:.4rem .8rem; border-radius:2rem; font-weight:600; }
+        .qa-status-eval { background:#e9ecef; color:#495057; }
+        .qa-status-conforme { background:#d1f5e6; color:#0f9d6c; }
+        .qa-status-non-conforme { background:#fbe1e3; color:#c53040; }
+    </style>
+</head>
+
+<body>
+
+<div class="layout">
+
+    <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+
+    <div class="content">
+
+        <div th:replace="~{fragments/header :: header}"></div>
+
+        <main id="page-content">
+
+            <div class="container-fluid">
+
+                <div class="welcome-banner d-flex justify-content-between align-items-end flex-wrap gap-3">
+                    <div>
+                        <h2>Quality Assurance</h2>
+                        <p class="text-muted">Vue d'ensemble de la qualité des appels</p>
+                    </div>
+                    <div class="btn-group" role="group" id="periodFilter">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-period="30">30 j</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-period="90">90 j</button>
+                        <button type="button" class="btn btn-secondary btn-sm active" data-period="all">Tout</button>
+                    </div>
+                </div>
+
+                <div class="card dashboard-card shadow-sm mb-4">
+                    <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div>
+                            <strong><i class="bi bi-calendar-check text-primary"></i> Suivi des formations programmées</strong>
+                            <p class="text-muted small mb-0">Programmation (jour/semaine/mois) et pourcentage de parcours par équipe et par agent, de A à Z.</p>
+                        </div>
+                        <a href="/training" class="btn btn-outline-primary btn-sm">Ouvrir le suivi <i class="bi bi-arrow-right"></i></a>
+                    </div>
+                </div>
+
+                <ul class="nav nav-tabs mb-4" id="qaMainTabs">
+                    <li class="nav-item">
+                        <button type="button" class="btn nav-link active" id="qaOverviewTabBtn">
+                            <i class="bi bi-speedometer2"></i> Vue d'ensemble
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button type="button" class="btn nav-link" id="qaPerformanceTabBtn">
+                            <i class="bi bi-bar-chart-line"></i> Performance
+                        </button>
+                    </li>
+                </ul>
+
+                <div id="qaOverviewPane">
+
+                <!-- KPI -->
+                <div class="row g-4 mb-4">
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card kpi"><div class="card-body">
+                            <small>Écoutes réalisées</small><h2 id="kpiCount">—</h2>
+                            <i class="bi bi-headset text-primary fs-2"></i>
+                        </div></div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card kpi"><div class="card-body">
+                            <small>Score moyen</small><h2 id="kpiAvgScore">—</h2>
+                            <i class="bi bi-graph-up text-success fs-2"></i>
+                        </div></div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card kpi"><div class="card-body">
+                            <small>Taux de conformité</small><h2 id="kpiPassRate">—</h2>
+                            <i class="bi bi-check-circle text-info fs-2"></i>
+                        </div></div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card kpi"><div class="card-body">
+                            <small>Échecs (KO)</small><h2 id="kpiFailCount">—</h2>
+                            <i class="bi bi-x-circle text-danger fs-2"></i>
+                        </div></div>
+                    </div>
+                </div>
+
+                <!-- Graphiques -->
+                <div class="row g-4 mb-4">
+                    <div class="col-lg-8">
+                        <div class="card dashboard-card shadow-sm">
+                            <div class="card-header">Évolution du score moyen</div>
+                            <div class="card-body" style="height:280px;"><canvas id="scoreEvolutionChart"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card dashboard-card shadow-sm">
+                            <div class="card-header">Répartition des statuts</div>
+                            <div class="card-body" style="height:280px;"><canvas id="statusChart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-lg-6">
+                        <div class="card dashboard-card shadow-sm">
+                            <div class="card-header">Score moyen par équipe</div>
+                            <div class="card-body" style="height:280px;"><canvas id="teamChart"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="card dashboard-card shadow-sm">
+                            <div class="card-header">Score moyen par critère</div>
+                            <div class="card-body" style="height:280px;"><canvas id="criteriaChart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Liste des écoutes -->
+                <div class="card dashboard-card shadow-sm mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Écoutes</span>
+                        <button class="btn btn-primary btn-sm" id="newEvaluationBtn">+ Évaluer un appel</button>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-hover">
+                            <thead>
+                            <tr><th>Date</th><th>Agent</th><th>Score</th><th>Statut</th><th>Motif</th><th>Audio</th><th>IA</th><th></th></tr>
+                            </thead>
+                            <tbody id="evaluationsTable">
+                            <tr><td colspan="8" class="text-muted text-center">Chargement...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Coaching & Dossiers agents -->
+                <div class="row g-4 mb-4">
+                    <div class="col-lg-6">
+                        <div class="card dashboard-card shadow-sm h-100">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                Plans de coaching
+                                <button class="btn btn-sm btn-outline-primary" id="newCoachingBtn"><i class="bi bi-plus-lg"></i></button>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-none row g-2 mb-3" id="coachingForm">
+                                    <div class="col-md-4"><input type="text" class="form-control form-control-sm" id="coachingAgent" placeholder="Matricule agent"></div>
+                                    <div class="col-md-4"><input type="text" class="form-control form-control-sm" id="coachingAxis" placeholder="Axe de progrès"></div>
+                                    <div class="col-md-2"><input type="date" class="form-control form-control-sm" id="coachingDueDate"></div>
+                                    <div class="col-md-2"><button class="btn btn-primary btn-sm w-100" id="saveCoachingBtn">Créer</button></div>
+                                    <div class="col-12"><textarea class="form-control form-control-sm" id="coachingNote" rows="2" placeholder="Note (optionnel)"></textarea></div>
+                                </div>
+                                <div id="coachingList" class="d-flex flex-column gap-2"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="card dashboard-card shadow-sm h-100">
+                            <div class="card-header">Dossiers agents</div>
+                            <div class="card-body">
+                                <div class="row g-2 mb-3">
+                                    <div class="col-md-3"><input type="text" class="form-control form-control-sm" id="dossierAgent" placeholder="Matricule (optionnel)"></div>
+                                    <div class="col-md-3"><input type="text" class="form-control form-control-sm" id="dossierSource" placeholder="Source"></div>
+                                    <div class="col-md-4"><input type="text" class="form-control form-control-sm" id="dossierPayload" placeholder="Contenu / notes"></div>
+                                    <div class="col-md-2"><button class="btn btn-primary btn-sm w-100" id="saveDossierBtn">Ajouter</button></div>
+                                </div>
+                                <div id="dossierList" class="d-flex flex-column gap-2" style="max-height:300px;overflow-y:auto;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Formulaire d'évaluation -->
+                <div class="card dashboard-card shadow-sm" id="evaluationFormCard" style="display:none;">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+                            <div>
+                                <h4 class="mb-1">Nouvelle écoute</h4>
+                                <p class="text-muted mb-0">Évaluer un appel selon le référentiel</p>
+                            </div>
+                            <button class="btn btn-outline-secondary btn-sm" id="cancelEvaluationBtn">
+                                <i class="bi bi-x-lg"></i> Fermer
+                            </button>
+                        </div>
+
+                        <div class="row g-4">
+                            <div class="col-lg-8">
+                                <div class="qa-card mb-4">
+                                    <h6 class="qa-card-title">Contexte de l'appel</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label small text-muted">Conseiller</label>
+                                            <input type="text" class="form-control" id="formAgentMatricule" placeholder="Matricule de l'agent" autocomplete="off">
+                                            <div class="form-text" id="formAgentNamePreview"></div>
+                                            <div class="small mt-1" id="formAgentTeamInfo"></div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label small text-muted">Évaluateur</label>
+                                            <input type="text" class="form-control" id="formEvaluatorDisplay" readonly>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label small text-muted">Motif</label>
+                                            <select class="form-select" id="formMotif"></select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label small text-muted">Enregistrement audio</label>
+                                            <input type="file" class="form-control" id="formAudioFile" accept=".mp3,.wav,.m4a,.ogg">
+                                            <audio id="formAudioPreview" controls style="display:none;width:100%;margin-top:.5rem;"></audio>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label small text-muted">Date de l'écoute</label>
+                                            <input type="date" class="form-control" id="formCallDate">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label small text-muted">Durée (min)</label>
+                                            <input type="number" class="form-control" id="formDuration" min="0">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
+                                    <h6 class="mb-0">Grille d'évaluation</h6>
+                                    <div class="small text-muted" id="tallySummary">0 conforme · 0 partiel · 0 non conforme · 0 N/A</div>
+                                </div>
+                                <div class="qa-card">
+                                    <div id="criteriaFormList"></div>
+                                </div>
+
+                                <div class="qa-card mt-4">
+                                    <h6 class="qa-card-title">Restitution</h6>
+                                    <div class="mb-3">
+                                        <label class="form-label small text-muted">Points forts</label>
+                                        <textarea class="form-control" id="formStrengths" rows="2" placeholder="Ce qui a bien fonctionné..."></textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small text-muted">Axes d'amélioration</label>
+                                        <textarea class="form-control" id="formImprovements" rows="2" placeholder="Sur quels moments précis progresser..."></textarea>
+                                    </div>
+                                    <div>
+                                        <label class="form-label small text-muted">Commentaire</label>
+                                        <textarea class="form-control" id="formComment" rows="2" placeholder="Notes complémentaires (optionnel)"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-4">
+                                <div class="qa-card" style="position:sticky; top:1rem;">
+                                    <h6 class="qa-card-title">Score en direct</h6>
+                                    <div class="qa-gauge-wrap">
+                                        <div class="qa-gauge" id="qaGauge">
+                                            <div class="qa-gauge-inner">
+                                                <span class="qa-gauge-value" id="qaGaugeValue">—</span>
+                                                <span class="qa-gauge-label">score</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="text-center mb-3">
+                                        <span class="qa-status-badge qa-status-eval" id="qaStatusBadge">● À évaluer</span>
+                                    </div>
+                                    <div class="alert alert-danger py-2 px-3 small" id="qaKoWarning" style="display:none;">
+                                        <i class="bi bi-exclamation-triangle-fill"></i> Critère éliminatoire non conforme
+                                    </div>
+                                    <div class="d-flex justify-content-between small mb-1">
+                                        <span class="text-muted">Critères notés</span>
+                                        <strong id="qaCriteriaCounted">0 / 0</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between small mb-3">
+                                        <span class="text-muted">Seuil de conformité</span>
+                                        <strong>80%</strong>
+                                    </div>
+                                    <div class="d-grid gap-2">
+                                        <button class="btn btn-outline-secondary" id="resetEvaluationBtn">Réinitialiser</button>
+                                        <button class="btn text-white" id="submitEvaluationBtn" style="background:#0f9d8c;">Enregistrer</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+
+    </div>
+
+</div>
+
+<!-- Modale IA — transcription et analyse (serveurs auto-hébergés Ecobank uniquement) -->
+<div class="modal fade" id="aiModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Transcription &amp; analyse <span class="badge bg-secondary">Azure AI Speech + Azure OpenAI</span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex gap-2 mb-3">
+                    <button class="btn btn-outline-primary btn-sm" id="transcribeBtn"><i class="bi bi-mic"></i> Transcrire l'appel</button>
+                    <button class="btn btn-outline-primary btn-sm" id="analyzeBtn"><i class="bi bi-magic"></i> Analyser</button>
+                </div>
+                <div id="aiStatus" class="alert alert-info" style="display:none;"></div>
+                <h6>Transcription</h6>
+                <div id="aiTranscript" class="border rounded p-2 mb-3 small" style="max-height:200px;overflow-y:auto;white-space:pre-wrap;">—</div>
+                <h6>Analyse</h6>
+                <div id="aiAnalysis" class="border rounded p-2 small" style="max-height:200px;overflow-y:auto;white-space:pre-wrap;">—</div>
+            </div>
+        </div>
+
+        </div><!-- /qaOverviewPane -->
+
+        <!-- Performance — réutilise les mêmes données que Reporting, réorganisées pour la QA -->
+        <div id="qaPerformancePane" style="display:none;">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-sm btn-secondary active" id="qaPerfByServiceBtn">Par service</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="qaPerfByTeamBtn">Par équipe</button>
+                </div>
+                <input type="month" class="form-control form-control-sm" id="qaPerfMonth" style="max-width:160px;">
+            </div>
+
+            <!-- Par service : moyenne agrégée pour chaque service, y compris Quality Assurance -->
+            <div id="qaPerfByServiceView">
+                <div class="card dashboard-card shadow-sm">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                <tr><th>Service</th><th>Agents</th><th>Présence moy.</th><th>Score qualité moy.</th><th>Performance globale moy.</th></tr>
+                                </thead>
+                                <tbody id="qaPerfByServiceBody">
+                                <tr><td colspan="5" class="text-center text-muted">Chargement…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Par équipe : sélection d'une équipe précise, détail agent par agent -->
+            <div id="qaPerfByTeamView" style="display:none;">
+                <div class="mb-3">
+                    <label class="form-label small">Équipe</label>
+                    <select class="form-select form-select-sm" id="qaPerfTeamSelect" style="max-width:320px;">
+                        <option value="">— Choisir une équipe —</option>
+                    </select>
+                </div>
+                <div class="card dashboard-card shadow-sm">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                <tr><th>Agent</th><th>Présence</th><th>Score qualité</th><th>Nb évaluations</th><th>Performance globale</th></tr>
+                                </thead>
+                                <tbody id="qaPerfByTeamBody">
+                                <tr><td colspan="5" class="text-center text-muted">Choisissez une équipe.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div><!-- /qaPerformancePane -->
+
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script th:src="@{/js/preferences.js}"></script>
+<script th:src="@{/js/rcc-api.js}"></script>
+<script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/qa.js}"></script>
+
+</body>
+</html>

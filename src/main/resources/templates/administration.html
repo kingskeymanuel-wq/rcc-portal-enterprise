@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>RCC Portal Enterprise — Administration</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
+          rel="stylesheet">
+
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+
+    <style>
+        .directory-branch { border: 1px solid rgba(0,0,0,.08); border-radius: .5rem; margin-bottom: .75rem; overflow: hidden; }
+        .directory-branch-header {
+            cursor: pointer; padding: .85rem 1rem; background: #f8f9fc;
+            display: flex; align-items: center; justify-content: space-between;
+            font-weight: 600; color: #1f2a44;
+        }
+        .directory-branch-header:hover { background: #eef1f8; }
+        .directory-branch-header .chevron { transition: transform .18s ease; }
+        .directory-branch.open .directory-branch-header .chevron { transform: rotate(90deg); }
+        .directory-branch-body { display: none; padding: .5rem 1rem 1rem; }
+        .directory-branch.open .directory-branch-body { display: block; }
+        .directory-service { border-left: 3px solid #0d6efd22; margin: .5rem 0 .5rem .25rem; padding-left: .75rem; }
+        .directory-service-header {
+            cursor: pointer; padding: .5rem .25rem; display: flex; align-items: center;
+            justify-content: space-between; font-weight: 600; color: #344; font-size: .95rem;
+        }
+        .directory-service-header .chevron { transition: transform .18s ease; font-size: .8rem; }
+        .directory-service.open .directory-service-header .chevron { transform: rotate(90deg); }
+        .directory-service-body { display: none; }
+        .directory-service.open .directory-service-body { display: block; }
+        .directory-team { border-left: 2px solid #0d6efd11; margin: .35rem 0 .35rem .75rem; padding-left: .75rem; }
+        .directory-team-header {
+            display: flex; justify-content: space-between; align-items: center;
+            cursor: pointer; padding: .25rem 0; font-size: .85rem; color: #495057;
+        }
+        .directory-team-header .chevron { transition: transform .18s ease; font-size: .75rem; }
+        .directory-team.open .directory-team-header .chevron { transform: rotate(90deg); }
+        .directory-team-body { display: none; padding-left: .5rem; }
+        .directory-team.open .directory-team-body { display: block; }
+        .directory-user-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: .4rem .5rem; border-radius: .35rem;
+        }
+        .directory-user-row:hover { background: #f5f7fb; }
+    </style>
+
+</head>
+
+<body>
+
+<div class="layout">
+
+    <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+
+    <div class="content">
+
+        <div th:replace="~{fragments/header :: header}"></div>
+
+        <main id="page-content">
+
+            <div class="container-fluid">
+
+                <div class="welcome-banner d-flex justify-content-between align-items-end flex-wrap gap-2">
+                    <div>
+                        <h2>Administration</h2>
+                        <p class="text-muted">Utilisateurs, rôles, services du portail, équipes et permissions</p>
+                    </div>
+                    <button class="btn btn-primary btn-sm" id="createUserBtn" style="display:none;">
+                        <i class="bi bi-person-plus-fill"></i> Ajouter un utilisateur
+                    </button>
+                </div>
+
+                <!-- Création directe — admin uniquement, compte actif immédiatement -->
+                <div id="createUserSection" class="card dashboard-card shadow-sm mb-4" style="display:none;">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3"><i class="bi bi-person-plus"></i> Ajouter un utilisateur</h5>
+                        <p class="text-muted small">Le compte est créé actif immédiatement — la personne peut se connecter dès que son compte AD existe, sans passer par la base de données.</p>
+                        <form id="createUserForm" class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label small">Identifiant (username AD)</label>
+                                <input type="text" class="form-control" id="newUserUsername" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Nom complet</label>
+                                <input type="text" class="form-control" id="newUserName">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Email</label>
+                                <input type="email" class="form-control" id="newUserEmail">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Filiale (code)</label>
+                                <input type="text" class="form-control" id="newUserAffiliate" placeholder="CI, SN, CM...">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Rôle (optionnel — laisser vide pour un agent ou QA normal)</label>
+                                <input type="text" class="form-control" id="newUserRole" placeholder="ADMIN, RH, EXCELLIAM, SUPERVISOR, TEAM_LEADER (laisser vide sinon)">
+                                <p class="text-muted" style="font-size:.75rem;">Le profil QA vient du <strong>Service</strong> ci-dessous, pas de ce champ — n'y mettez jamais « QA ».</p>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Service</label>
+                                <select class="form-select" id="newUserService">
+                                    <option value="">— Aucun —</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary btn-sm">Créer le compte</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="cancelCreateUserBtn">Annuler</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Réclamations — alertes remontées depuis la page de connexion (admin uniquement) -->
+                <div id="loginAlertsSection" class="card dashboard-card shadow-sm mb-4" style="display:none;">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3">
+                            <i class="bi bi-flag"></i>
+                            Réclamations <span class="badge bg-danger" id="loginAlertsCount" style="display:none;"></span>
+                        </h5>
+                        <p class="text-muted small mb-3">Mots de passe oubliés, demandes d'assistance et comptes verrouillés signalés depuis la page de connexion.</p>
+                        <div id="loginAlertsList"><p class="text-muted text-center">Chargement…</p></div>
+                    </div>
+                </div>
+
+                <!-- Comptes en attente — admin uniquement -->
+                <div id="pendingSection" class="card dashboard-card shadow-sm mb-4" style="display:none;">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3">
+                            <i class="bi bi-hourglass-split"></i>
+                            Comptes en attente
+                        </h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                <tr>
+                                    <th>Nom</th>
+                                    <th>Identifiant</th>
+                                    <th>Email</th>
+                                    <th>Demandé le</th>
+                                    <th class="text-end">Action</th>
+                                </tr>
+                                </thead>
+                                <tbody id="pendingBody">
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">Chargement…</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Nettoyage ponctuel des rôles — supprime tout sauf les rôles métier définis
+                     (Team Leader X, Head X, Formateur, Quality Assurance...) et les 5 rôles
+                     vitaux au système de connexion, toujours protégés. Jamais automatique. -->
+                <div class="card dashboard-card shadow-sm mb-4">
+                    <div class="card-body">
+                        <h6 class="card-title"><i class="bi bi-shield-exclamation"></i> Nettoyage des rôles</h6>
+                        <p class="text-muted small mb-2">Supprime tous les rôles de la base sauf les rôles métier RCC
+                            (Team Leader, Head, Formateur, Quality Assurance...) — les 5 rôles vitaux au système de
+                            connexion (Admin, RH, Superviseur, Team Leader, Agent) sont toujours protégés, même si
+                            demandé. <strong>Irréversible.</strong></p>
+                        <button class="btn btn-sm btn-outline-danger" id="cleanupRolesBtn">
+                            <i class="bi bi-trash3"></i> Nettoyer les rôles maintenant
+                        </button>
+                        <div id="cleanupRolesResult" class="small mt-2"></div>
+                    </div>
+                </div>
+
+                <!-- Rattrapage équipe — sort de "Non classée" tout compte ayant déjà un service
+                     opérationnel reconnu (Agent/Team Leader Inbound Voice/Mail/CIB/Outbound),
+                     sans jamais écraser une équipe déjà renseignée. Jamais automatique. -->
+                <div class="card dashboard-card shadow-sm mb-4">
+                    <div class="card-body">
+                        <h6 class="card-title"><i class="bi bi-diagram-3"></i> Rattrapage équipe (comptes "Non classée")</h6>
+                        <p class="text-muted small mb-2">Attribue automatiquement l'équipe (Inbound Voix, Inbound Mail,
+                            CIB, Outbound) à tout compte actuellement "Non classée" dans le reporting, mais qui a déjà
+                            un service opérationnel attribué — sans jamais écraser une équipe déjà renseignée.</p>
+                        <button class="btn btn-sm btn-outline-primary" id="reclassifyTeamsBtn">
+                            <i class="bi bi-arrow-repeat"></i> Rattraper les équipes maintenant
+                        </button>
+                        <div id="reclassifyTeamsResult" class="small mt-2"></div>
+                    </div>
+                </div>
+
+                <!-- Renommage en masse des identifiants de connexion (USERNAME) depuis la liste
+                     de référence RH — 2 colonnes : Nom complet, Nouvel ID. Ne crée jamais de
+                     compte (voir UsernameRemapService) : un nom sans correspondance en base est
+                     simplement listé, jamais créé. -->
+                <div class="card dashboard-card shadow-sm mb-4">
+                    <div class="card-body">
+                        <h6 class="card-title"><i class="bi bi-person-badge"></i> Renommer les identifiants (USERNAME) — liste RH</h6>
+                        <p class="text-muted small mb-2">Fichier Excel ou CSV, 2 colonnes : <strong>Nom complet</strong> et
+                            <strong>Nouvel ID</strong>. Change l'identifiant de connexion des comptes déjà existants pour
+                            les faire correspondre à la nomenclature RH officielle. Une ligne sans nouvel ID est laissée
+                            inchangée ; un nom sans compte correspondant n'est jamais créé ; un nouvel ID déjà pris par
+                            un autre agent est bloqué (jamais de suffixe automatique) et remonté ci-dessous pour arbitrage.
+                            <strong class="text-danger">Chaque agent renommé devra utiliser son nouvel identifiant pour se
+                            reconnecter.</strong></p>
+                        <div class="d-flex gap-2">
+                            <input type="file" class="form-control form-control-sm" id="usernameRemapFile" accept=".xlsx,.csv" style="max-width:320px;">
+                            <button class="btn btn-sm btn-primary text-nowrap" id="usernameRemapBtn">
+                                <i class="bi bi-upload"></i> Importer et renommer
+                            </button>
+                        </div>
+                        <div id="usernameRemapResult" class="small mt-2"></div>
+                    </div>
+                </div>
+
+                <!-- Détection de doublons — même nom complet. Ne supprime rien automatiquement :
+                     l'admin choisit lequel garder, via le bouton Supprimer de la fiche détaillée. -->
+                <div class="card dashboard-card shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="card-title mb-0"><i class="bi bi-people"></i> Doublons probables (même nom complet)</h6>
+                            <button class="btn btn-sm btn-outline-secondary" id="findDuplicatesBtn">
+                                <i class="bi bi-search"></i> Rechercher les doublons
+                            </button>
+                        </div>
+                        <p class="text-muted small mb-2">Ouvrez la fiche du compte à retirer et utilisez son bouton
+                            "Supprimer" — jamais de suppression automatique.</p>
+                        <div id="duplicatesResult"></div>
+                    </div>
+                </div>
+
+                <!-- Fusion des comptes en doublon par IDENTIFIANT (USERNAME) — distinct du bloc
+                     ci-dessus (qui regroupe par nom complet et n'aide pas quand deux fiches du
+                     même identifiant ont un nom orthographié différemment). Ici : aperçu sans
+                     effet, fusion complète de l'historique (shifts, évaluations, congés...)
+                     vers la fiche la plus complète avant suppression des autres — jamais de
+                     perte silencieuse. -->
+                <div class="card dashboard-card shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="card-title mb-0"><i class="bi bi-person-fill-gear"></i> Fusion des comptes en doublon (même identifiant)</h6>
+                            <button class="btn btn-sm btn-outline-secondary" id="findUsernameDuplicatesBtn">
+                                <i class="bi bi-search"></i> Rechercher les doublons
+                            </button>
+                        </div>
+                        <p class="text-muted small mb-2">Détecte les fiches partageant le même identifiant de
+                            connexion (USERNAME). La fusion réassigne tout l'historique (shifts, évaluations,
+                            congés, notifications...) de chaque doublon vers la fiche la plus complète, puis
+                            supprime les fiches devenues vides — rien n'est perdu, action irréversible.</p>
+                        <div id="usernameDuplicatesResult"></div>
+                    </div>
+                </div>
+
+                <!-- Annuaire complet, organisé par filiale puis service/équipe — c'est ici la
+                     vraie "gestion des utilisateurs" (featureCode "users") : pas de portail
+                     séparé depuis la fusion dans /administration, donc masqué via
+                     data-feature-code plutôt qu'un lien de sidebar (voir session.js
+                     applyFeatureElementVisibility). -->
+                <div class="card dashboard-card shadow-sm mb-4" data-feature-code="users">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-diagram-3-fill"></i>
+                                Annuaire — par filiale et service
+                            </h5>
+                            <input type="text" id="directoryFilter" class="form-control form-control-sm"
+                                   style="max-width: 260px;" placeholder="Filtrer un nom, un identifiant...">
+                        </div>
+                        <div id="directoryTree">
+                            <p class="text-muted text-center">Chargement…</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4 mb-4">
+
+                    <!-- Rôles -->
+                    <div class="col-lg-6">
+                        <div class="card dashboard-card shadow-sm">
+                            <div class="card-header">Rôles</div>
+                            <div class="card-body">
+
+                                <table class="table table-hover">
+                                    <thead>
+                                    <tr>
+                                        <th>Nom</th>
+                                        <th>Description</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="rolesTable"></tbody>
+                                </table>
+
+                                <hr>
+
+                                <h6>Créer un rôle</h6>
+                                <div class="row g-2">
+                                    <div class="col-5">
+                                        <input type="text" class="form-control" id="newRoleName" placeholder="Nom (ex. QA)">
+                                    </div>
+                                    <div class="col-5">
+                                        <input type="text" class="form-control" id="newRoleDescription" placeholder="Description">
+                                    </div>
+                                    <div class="col-2">
+                                        <button class="btn btn-primary w-100" id="createRoleBtn">Créer</button>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Services -->
+                    <div class="col-lg-6">
+                        <div class="card dashboard-card shadow-sm">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span>Services du portail</span>
+                                <button class="btn btn-sm btn-outline-danger" id="consolidateServicesBtn">
+                                    <i class="bi bi-arrow-down-up"></i> Tout regrouper vers RCC
+                                </button>
+                            </div>
+                            <div class="card-body">
+
+                                <p class="text-muted small">Cible : un seul service « RCC », avec les équipes (Inbound, Outbound, Digital...) gérées séparément dans l'onglet Équipes.</p>
+
+                                <table class="table table-hover">
+                                    <thead>
+                                    <tr>
+                                        <th>Code</th>
+                                        <th>Nom</th>
+                                        <th>Articles</th>
+                                        <th>Procédures</th>
+                                        <th>Formations</th>
+                                        <th>Workflow</th>
+                                        <th>Utilisateurs</th>
+                                        <th></th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="servicesTable"></tbody>
+                                </table>
+                                <div id="consolidateResult" class="small mt-2"></div>
+
+                                <hr>
+
+                                <h6>Créer un service</h6>
+                                <div class="row g-2">
+                                    <div class="col-3">
+                                        <input type="text" class="form-control" id="newServiceCode" placeholder="Code">
+                                    </div>
+                                    <div class="col-4">
+                                        <input type="text" class="form-control" id="newServiceName" placeholder="Nom">
+                                    </div>
+                                    <div class="col-3">
+                                        <input type="text" class="form-control" id="newServiceDescription" placeholder="Description">
+                                    </div>
+                                    <div class="col-2">
+                                        <button class="btn btn-primary w-100" id="createServiceBtn">Créer</button>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+
+                <div class="row g-4 mb-4">
+                    <!-- Apparence du site -->
+                    <div class="col-lg-6">
+                        <div class="card dashboard-card shadow-sm">
+                            <div class="card-header">Apparence du site</div>
+                            <div class="card-body">
+                                <p class="text-muted small mb-2">Photo de la page de connexion — visible par tout le monde avant même de se connecter.</p>
+                                <div class="d-flex gap-2 align-items-center mb-2">
+                                    <input type="file" class="form-control form-control-sm" id="loginHeroFile" accept=".jpg,.jpeg,.png,.webp">
+                                    <button class="btn btn-sm btn-primary" id="loginHeroUploadBtn">Changer la photo</button>
+                                </div>
+                                <label class="form-label small mb-1">Opacité (transparence) : <span id="loginHeroOpacityValue">0.14</span></label>
+                                <input type="range" class="form-range" id="loginHeroOpacityRange" min="0" max="1" step="0.01" value="0.14">
+                                <div id="loginHeroResult" class="small mt-2"></div>
+                                <div class="mt-2">
+                                    <img id="loginHeroPreview" src="" alt="" style="max-width:100%;max-height:160px;border-radius:.5rem;display:none;">
+                                </div>
+
+                                <hr class="my-3">
+                                <p class="text-muted small mb-1">Carousel de photos (optionnel) — si vous ajoutez au moins 2 images ici, elles défilent automatiquement l'une après l'autre à la place de la photo unique ci-dessus.</p>
+                                <div id="loginHeroCarouselList" class="d-flex flex-wrap gap-2 mb-2"></div>
+                                <div class="d-flex gap-2 align-items-center">
+                                    <input type="file" class="form-control form-control-sm" id="loginHeroCarouselFile" accept=".jpg,.jpeg,.png,.webp">
+                                    <button class="btn btn-sm btn-outline-primary" id="loginHeroCarouselAddBtn">Ajouter au carousel</button>
+                                </div>
+                                <div id="loginHeroCarouselResult" class="small mt-2"></div>
+
+                                <hr class="my-3">
+                                <p class="text-muted small mb-2">Cartes "fonctionnalité" affichées sur la page de connexion (Sécurité Enterprise, Knowledge Base...).</p>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label small mb-1">Police (toutes les cartes)</label>
+                                        <select class="form-select form-select-sm" id="loginFeaturesFontSelect">
+                                            <option value="">Système (par défaut)</option>
+                                            <option value="Arial, sans-serif">Classique (Arial)</option>
+                                            <option value="Georgia, serif">Serif (Georgia)</option>
+                                            <option value="'Trebuchet MS', sans-serif">Arrondie (Trebuchet)</option>
+                                            <option value="'Courier New', monospace">Monospace</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small mb-1">Interligne</label>
+                                        <select class="form-select form-select-sm" id="loginFeaturesLineHeightSelect">
+                                            <option value="1.2">Serré</option>
+                                            <option value="1.5" selected>Normal</option>
+                                            <option value="1.8">Aéré</option>
+                                            <option value="2.2">Très aéré</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <button class="btn btn-sm btn-primary" id="loginFeaturesStyleSaveBtn">Enregistrer le style</button>
+                                        <span id="loginFeaturesStyleResult" class="small ms-2"></span>
+                                    </div>
+                                </div>
+
+                                <div class="table-responsive mb-2">
+                                    <table class="table table-sm table-hover align-middle">
+                                        <thead><tr><th>Icône</th><th>Titre</th><th>Sous-titre</th><th>Actif</th><th></th></tr></thead>
+                                        <tbody id="loginFeatureCardsBody"><tr><td colspan="5" class="text-center text-muted">Chargement…</td></tr></tbody>
+                                    </table>
+                                </div>
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-2">
+                                        <label class="form-label small mb-1">Icône</label>
+                                        <input type="text" class="form-control form-control-sm" id="loginFeatureCardIconInput" placeholder="bi-shield-lock-fill">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small mb-1">Titre</label>
+                                        <input type="text" class="form-control form-control-sm" id="loginFeatureCardTitleInput" placeholder="Sécurité Enterprise">
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label small mb-1">Sous-titre</label>
+                                        <input type="text" class="form-control form-control-sm" id="loginFeatureCardSubtitleInput" placeholder="Active Directory • MFA • JWT">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button class="btn btn-sm btn-primary w-100" id="loginFeatureCardAddBtn">Ajouter</button>
+                                    </div>
+                                </div>
+                                <p class="text-muted small mt-1 mb-0"><i class="bi bi-info-circle"></i> Icônes disponibles : <a href="https://icons.getbootstrap.com/" target="_blank">icons.getbootstrap.com</a> (copier le nom, ex. "bi-shield-lock-fill").</p>
+
+                                <hr class="my-3">
+                                <p class="text-muted small mb-2">Grande bannière en haut de la page MON RCC — visible par tous les agents connectés.</p>
+                                <div class="d-flex gap-2 align-items-center mb-2">
+                                    <input type="file" class="form-control form-control-sm" id="monRccBannerFile" accept=".jpg,.jpeg,.png,.webp">
+                                    <button class="btn btn-sm btn-primary" id="monRccBannerUploadBtn">Changer la bannière</button>
+                                </div>
+                                <div id="monRccBannerResult" class="small mt-2"></div>
+                                <img id="monRccBannerPreview" src="" alt="" style="max-width:100%;max-height:160px;border-radius:.5rem;display:none;">
+
+                                <hr class="my-3">
+                                <p class="text-muted small mb-2">Bannière en haut de la page Formation.</p>
+                                <div class="d-flex gap-2 align-items-center mb-2">
+                                    <input type="file" class="form-control form-control-sm" id="formationBannerFile" accept=".jpg,.jpeg,.png,.webp">
+                                    <button class="btn btn-sm btn-primary" id="formationBannerUploadBtn">Changer la bannière</button>
+                                </div>
+                                <div id="formationBannerResult" class="small mt-2"></div>
+                                <img id="formationBannerPreview" src="" alt="" style="max-width:100%;max-height:160px;border-radius:.5rem;display:none;">
+
+                                <div class="row g-2 mt-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label small mb-1">Titre</label>
+                                        <input type="text" class="form-control form-control-sm" id="formationBannerTitleInput" placeholder="Centre de Formation">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small mb-1">Sous-titre</label>
+                                        <input type="text" class="form-control form-control-sm" id="formationBannerSubtitleInput" placeholder="Développez vos compétences avec nos modules interactifs et évaluations.">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small mb-1">Police</label>
+                                        <select class="form-select form-select-sm" id="formationBannerFontSelect">
+                                            <option value="system">Système (par défaut)</option>
+                                            <option value="classic">Classique (Arial)</option>
+                                            <option value="serif">Serif (Georgia)</option>
+                                            <option value="rounded">Arrondie (Trebuchet)</option>
+                                            <option value="mono">Monospace</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small mb-1">Taille du titre</label>
+                                        <select class="form-select form-select-sm" id="formationBannerSizeSelect">
+                                            <option value="1.5rem">Petit</option>
+                                            <option value="1.75rem" selected>Normal</option>
+                                            <option value="2.25rem">Grand</option>
+                                            <option value="2.75rem">Très grand</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small mb-1">Couleur titre</label>
+                                        <input type="color" class="form-control form-control-sm form-control-color w-100" id="formationBannerTitleColorInput" value="#ffffff">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small mb-1">Couleur sous-titre</label>
+                                        <input type="color" class="form-control form-control-sm form-control-color w-100" id="formationBannerSubtitleColorInput" value="#ffffff">
+                                    </div>
+                                    <div class="col-12">
+                                        <button class="btn btn-sm btn-primary mt-1" id="formationBannerTextSaveBtn">Enregistrer le texte</button>
+                                        <span id="formationBannerTextResult" class="small ms-2"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div class="row g-4 mb-4">
+                    <!-- Équipes -->
+                    <div class="col-lg-5">
+                        <div class="card dashboard-card shadow-sm">
+                            <div class="card-header">Équipes</div>
+                            <div class="card-body">
+                                <table class="table table-hover">
+                                    <thead><tr><th>Code</th><th>Libellé</th><th>Agents</th><th></th></tr></thead>
+                                    <tbody id="teamsTable"></tbody>
+                                </table>
+                                <hr>
+                                <div class="row g-2">
+                                    <div class="col-4"><input type="text" class="form-control form-control-sm" id="newTeamCode" placeholder="Code"></div>
+                                    <div class="col-5"><input type="text" class="form-control form-control-sm" id="newTeamLabel" placeholder="Libellé"></div>
+                                    <div class="col-3"><button class="btn btn-primary btn-sm w-100" id="createTeamBtn">Créer</button></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Permissions par équipe / rôle -->
+                    <div class="col-lg-7">
+                        <div class="card dashboard-card shadow-sm">
+                            <div class="card-header">Onglets interdits — par équipe ou par rôle</div>
+                            <div class="card-body">
+                                <p class="text-muted small">Tout onglet non listé ici reste autorisé par défaut. Une règle s'applique soit à une équipe, soit à un rôle (pas les deux).</p>
+                                <table class="table table-hover table-sm">
+                                    <thead><tr><th>Équipe</th><th>Rôle</th><th>Onglet</th><th></th></tr></thead>
+                                    <tbody id="tabPermissionsTable"></tbody>
+                                </table>
+                                <hr>
+                                <div class="row g-2">
+                                    <div class="col-3">
+                                        <select class="form-select form-select-sm" id="tpTeamSelect"><option value="">— Équipe —</option></select>
+                                    </div>
+                                    <div class="col-3">
+                                        <select class="form-select form-select-sm" id="tpRoleSelect"><option value="">— Rôle —</option></select>
+                                    </div>
+                                    <div class="col-4">
+                                        <select class="form-select form-select-sm" id="tpTabSelect">
+                                            <option value="users">Utilisateurs</option>
+                                            <option value="performance">Ma Performance</option>
+                                            <option value="mon-rcc">MON RCC</option>
+                                            <option value="procedures">Procédures</option>
+                                            <option value="mail-templates">Masques de mail</option>
+                                            <option value="knowledge">Knowledge Base</option>
+                                            <option value="training">Formation</option>
+                                            <option value="workflow">Workflow</option>
+                                            <option value="qa">Quality Assurance</option>
+                                            <option value="reports">Reporting</option>
+                                            <option value="audit">Audit</option>
+                                            <option value="administration">Administration</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-2"><button class="btn btn-danger btn-sm w-100" id="addDenyBtn">Interdire</button></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Référentiel SLA RCC — délais de traitement communiqués au client par motif -->
+                <div class="card dashboard-card shadow-sm mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-stopwatch"></i> Référentiel SLA RCC</span>
+                        <span class="text-muted small">Utilisé par RAF pour répondre avec les vrais délais</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">
+                            Délais de traitement communiqués au client, par motif de réclamation/demande. RAF (l'assistant IA)
+                            s'appuie exclusivement sur ce tableau pour annoncer un délai — toute modification ici est reflétée
+                            immédiatement dans ses réponses.
+                        </p>
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm align-middle">
+                                <thead>
+                                <tr>
+                                    <th>Motif</th>
+                                    <th>Catégorie</th>
+                                    <th>Niveau</th>
+                                    <th>SLA</th>
+                                    <th>Service</th>
+                                    <th>Priorité</th>
+                                    <th>Auto</th>
+                                    <th>Actif</th>
+                                    <th></th>
+                                </tr>
+                                </thead>
+                                <tbody id="slaRulesTable">
+                                <tr><td colspan="9" class="text-center text-muted">Chargement…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <hr>
+
+                        <h6>Ajouter une règle SLA</h6>
+                        <div class="row g-2">
+                            <div class="col-lg-3">
+                                <input type="text" class="form-control form-control-sm" id="newSlaMotif" placeholder="Motif (ex. Réclamation Mobile Money)">
+                            </div>
+                            <div class="col-lg-2">
+                                <input type="text" class="form-control form-control-sm" id="newSlaCategory" placeholder="Catégorie">
+                            </div>
+                            <div class="col-lg-1">
+                                <input type="text" class="form-control form-control-sm" id="newSlaLevel" placeholder="N1/N2">
+                            </div>
+                            <div class="col-lg-1">
+                                <input type="number" class="form-control form-control-sm" id="newSlaHours" placeholder="Heures" min="1">
+                            </div>
+                            <div class="col-lg-2">
+                                <input type="text" class="form-control form-control-sm" id="newSlaLabel" placeholder="Libellé (ex. 5 jours ouvrés)">
+                            </div>
+                            <div class="col-lg-2">
+                                <input type="text" class="form-control form-control-sm" id="newSlaService" placeholder="Service destinataire">
+                            </div>
+                            <div class="col-lg-1">
+                                <button class="btn btn-primary btn-sm w-100" id="createSlaRuleBtn">Ajouter</button>
+                            </div>
+                        </div>
+                        <div class="row g-2 mt-1">
+                            <div class="col-lg-3">
+                                <select class="form-select form-select-sm" id="newSlaPriority">
+                                    <option value="">Priorité —</option>
+                                    <option value="HAUTE">Haute</option>
+                                    <option value="MOYENNE">Moyenne</option>
+                                    <option value="BASSE">Basse</option>
+                                </select>
+                            </div>
+                            <div class="col-lg-2">
+                                <div class="form-check mt-1">
+                                    <input class="form-check-input" type="checkbox" id="newSlaAutoEscalation">
+                                    <label class="form-check-label small" for="newSlaAutoEscalation">Reverse/traitement auto avant dossier manuel</label>
+                                </div>
+                            </div>
+                            <div class="col-lg-7">
+                                <input type="text" class="form-control form-control-sm" id="newSlaNotes" placeholder="Notes (précisions de calcul, cas particuliers...)">
+                            </div>
+                        </div>
+                        <div id="slaRuleResult" class="small mt-2"></div>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+
+    </div>
+
+</div>
+
+<!-- Modale fiche utilisateur -->
+<div class="modal fade" id="userDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="userDetailName">—</h5>
+                <button type="button" class="btn btn-sm btn-outline-danger me-2" id="deleteUserBtn"><i class="bi bi-trash"></i> Supprimer</button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex gap-3 align-items-center mb-3">
+                    <img id="userDetailAvatar" src="/images/avatar.png" alt="Photo"
+                         class="rounded-circle" style="width:64px;height:64px;object-fit:cover;cursor:pointer;"
+                         title="Cliquer pour agrandir">
+                    <div>
+                        <p class="mb-0"><strong>Identifiant :</strong> <span id="userDetailUsername">—</span></p>
+                        <p class="mb-0"><strong>Statut :</strong> <span id="userDetailActive">—</span></p>
+                        <button type="button" class="btn btn-sm btn-outline-warning mt-2" id="excelliamResetPasswordBtn" style="display:none;">
+                            <i class="bi bi-key"></i> Réinitialiser le mot de passe Excelliam
+                        </button>
+                    </div>
+                </div>
+
+                <form id="userEditForm" class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small">Nom d'utilisateur (identifiant de connexion AD)</label>
+                        <input type="text" class="form-control form-control-sm" id="editUsername">
+                        <div class="form-text text-warning small">⚠️ Doit correspondre exactement à l'identifiant Active Directory réel de la personne, sinon elle ne pourra plus se connecter.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small">Nom complet</label>
+                        <input type="text" class="form-control form-control-sm" id="editName">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small">Email</label>
+                        <input type="email" class="form-control form-control-sm" id="editEmail">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Genre</label>
+                        <select class="form-select form-select-sm" id="editGender">
+                            <option value="">—</option>
+                            <option value="F">Femme</option>
+                            <option value="M">Homme</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Filiale</label>
+                        <input type="text" class="form-control form-control-sm" id="editAffiliate" placeholder="CI, SN, CM...">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Équipe</label>
+                        <select class="form-select form-select-sm" id="editActivity">
+                            <option value="">— Aucune —</option>
+                            <option value="INBOUND">Inbound</option>
+                            <option value="OUTBOUND">Outbound</option>
+                            <option value="OPERATION">Operation</option>
+                            <option value="QA">QA</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Équipe dirigée (si Team Leader)</label>
+                        <select class="form-select form-select-sm" id="editLedTeam">
+                            <option value="">— Aucune —</option>
+                            <option value="INBOUND_VOICE">Inbound Voix</option>
+                            <option value="INBOUND_MAIL">Inbound Mail / Rafiki</option>
+                            <option value="CIB">CIB</option>
+                            <option value="OUTBOUND">Outbound</option>
+                        </select>
+                        <div class="form-text small">Requis pour que ce Team Leader reçoive les demandes de congé de son équipe (voir Portail Excelliam / RH).</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Nature du contrat</label>
+                        <select class="form-select form-select-sm" id="editContractType">
+                            <option value="">—</option>
+                            <option value="Ecobank">Ecobank</option>
+                            <option value="Outsource">Outsource</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Statut du contrat</label>
+                        <select class="form-select form-select-sm" id="editContractStatus">
+                            <option value="">—</option>
+                            <option value="CDI">CDI</option>
+                            <option value="CDD">CDD</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Début du contrat</label>
+                        <input type="date" class="form-control form-control-sm" id="editContractStartDate">
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary btn-sm">Enregistrer les modifications</button>
+                    </div>
+                </form>
+
+                <h6>Rôles</h6>
+                <div id="userDetailRoles" class="d-flex flex-wrap gap-2 mb-2"></div>
+                <div id="userDetailAddRole" class="input-group input-group-sm mb-3" style="max-width: 320px; display:none;">
+                    <select id="roleSelect" class="form-select"></select>
+                    <button class="btn btn-outline-primary" id="addRoleBtn" type="button">Attribuer</button>
+                </div>
+
+                <h6>Services</h6>
+                <div id="userDetailServices" class="d-flex flex-wrap gap-2 mb-2"></div>
+                <div id="userDetailAddService" class="input-group input-group-sm mb-3" style="max-width: 320px; display:none;">
+                    <select id="serviceSelect" class="form-select"></select>
+                    <button class="btn btn-outline-primary" id="addServiceBtn" type="button">Attribuer</button>
+                </div>
+
+                <h6>Fonctionnalités <span class="text-muted small fw-normal">(remplace le rôle pour cet utilisateur — IT/Admin uniquement)</span></h6>
+                <div id="userDetailPermissions" class="d-flex flex-column gap-1"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast de confirmation générique — voir wireEditForm() dans users.js -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:1080;">
+    <div id="userSavedToast" class="toast align-items-center text-bg-success border-0" role="status" aria-live="polite">
+        <div class="d-flex">
+            <div class="toast-body" id="userSavedToastBody"><i class="bi bi-check-circle-fill"></i> Modifications enregistrées.</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+
+<!-- Photo en grand -->
+<div class="modal fade" id="photoLightbox" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark">
+            <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-2" data-bs-dismiss="modal"></button>
+            <img id="photoLightboxImg" src="" alt="Photo" style="width:100%;max-height:80vh;object-fit:contain;">
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/preferences.js}"></script>
+<script th:src="@{/js/rcc-api.js}"></script>
+<script th:src="@{/js/image-editor.js}"></script>
+<script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/users.js}"></script>
+<script th:src="@{/js/administration.js}"></script>
+
+</body>
+</html>

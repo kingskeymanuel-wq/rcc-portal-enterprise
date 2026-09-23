@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RCC Portal Enterprise — Analyse de données</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <style>
+        .da-narrative { background: #f4f6fb; border-left: 4px solid var(--eco-blue); border-radius: .4rem; padding: 1.25rem; white-space: pre-wrap; line-height: 1.6; }
+        .da-stat-card { background: #f8f9fc; border-radius: .6rem; padding: 1rem; text-align: center; }
+        .da-stat-card .value { font-size: 1.7rem; font-weight: 700; color: #1f2a44; }
+        .da-stat-card .label { font-size: .78rem; color: #6b7280; }
+        .da-gauge { border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .da-gauge-hole { border-radius: 50%; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .da-gauge-hole .val { font-weight: 700; font-size: 1.1rem; }
+        .da-gauge-hole .lbl { font-size: .65rem; color: #6b7280; text-align: center; }
+        .da-team-row { cursor: pointer; }
+        .da-team-row:hover { background: #f4f6fb; }
+        .da-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .da-bar-label { width: 140px; font-size: .82rem; flex-shrink: 0; }
+        .da-bar-track { flex-grow: 1; height: 14px; background: #eef0f4; border-radius: 7px; overflow: hidden; }
+        .da-bar-fill { height: 100%; border-radius: 7px; }
+        .da-bar-value { width: 48px; font-size: .8rem; text-align: right; flex-shrink: 0; }
+        .da-timeline { display: flex; align-items: flex-end; gap: 10px; height: 140px; padding-top: 10px; }
+        .da-timeline-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+        .da-timeline-bar { width: 60%; border-radius: 4px 4px 0 0; background: var(--eco-blue); min-height: 2px; }
+        .da-timeline-label { font-size: .68rem; color: #6b7280; margin-top: 4px; text-align: center; }
+        .da-timeline-value { font-size: .72rem; font-weight: 600; margin-bottom: 2px; }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+    <div class="content">
+        <div th:replace="~{fragments/header :: header}"></div>
+        <main id="page-content">
+            <div class="container-fluid">
+
+                <div class="welcome-banner d-flex justify-content-between align-items-end flex-wrap gap-2">
+                    <div>
+                        <h2>Analyse de données</h2>
+                        <p class="text-muted">Synthèse IA sur les statistiques réelles du call center — par équipe (service unique : RCC)</p>
+                    </div>
+                    <div class="d-flex gap-2 align-items-center flex-wrap">
+                        <select class="form-select form-select-sm" id="daTeamSelect" style="max-width:200px;">
+                            <option value="">— Toutes équipes —</option>
+                        </select>
+                        <div class="btn-group btn-group-sm" role="group" id="daGranularity">
+                            <button type="button" class="btn btn-primary" data-gran="MONTH">Mois</button>
+                            <button type="button" class="btn btn-outline-primary" data-gran="WEEK">Semaine</button>
+                            <button type="button" class="btn btn-outline-primary" data-gran="DAY">Jour</button>
+                        </div>
+                        <input type="month" class="form-control form-control-sm" id="daMonth" style="max-width:160px;">
+                        <input type="week" class="form-control form-control-sm" id="daWeek" style="max-width:160px;display:none;">
+                        <input type="date" class="form-control form-control-sm" id="daDay" style="max-width:160px;display:none;">
+                        <button type="button" class="btn btn-primary" id="daGenerateBtn">
+                            <i class="bi bi-magic"></i> Générer l'analyse
+                        </button>
+                    </div>
+                </div>
+
+                <div class="alert alert-info small mb-3">
+                    <i class="bi bi-info-circle"></i>
+                    Causes d'impact analysées à partir de vraies données : absences (congés approuvés), dépassements de
+                    pause/pause déjeuner (pointage), écart Interactions vs Target. <strong>La durée des appels n'est pas
+                    analysée</strong> — aucune donnée de durée d'appel n'est actuellement importée dans le portail.
+                </div>
+
+                <div class="row g-3 mb-4" id="daSummaryCards"></div>
+
+                <div class="card dashboard-card shadow-sm mb-4">
+                    <div class="card-body d-flex align-items-center gap-4 flex-wrap">
+                        <div>
+                            <h6 class="card-title mb-2"><i class="bi bi-pie-chart-fill"></i> Vue globale RCC — toutes équipes confondues</h6>
+                            <p class="text-muted small mb-0">Composition de l'effectif par équipe pour la période sélectionnée.</p>
+                        </div>
+                        <div class="flex-grow-1 d-flex align-items-center gap-4 flex-wrap" id="daGlobalDonutRow"></div>
+                    </div>
+                </div>
+
+                <div class="card dashboard-card shadow-sm mb-4">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3"><i class="bi bi-robot"></i> Synthèse</h6>
+                        <div class="da-narrative" id="daNarrative">Cliquez sur « Générer l'analyse » pour lancer le calcul.</div>
+                    </div>
+                </div>
+
+                <div class="card dashboard-card shadow-sm mb-4">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3"><i class="bi bi-diagram-3"></i> Détail par équipe</h6>
+                        <p class="text-muted small">Cliquez sur une équipe pour recentrer l'analyse dessus.</p>
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm align-middle">
+                                <thead>
+                                <tr><th>Équipe</th><th>Agents</th><th>Présence moy.</th><th>Score qualité moy.</th>
+                                    <th>Performance moy.</th><th>Interactions moy.</th><th>Absences (jours)</th>
+                                    <th>Pauses dépassées</th><th>% sous target</th></tr>
+                                </thead>
+                                <tbody id="daServiceBody">
+                                <tr><td colspan="9" class="text-center text-muted">Aucune analyse générée pour le moment.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card dashboard-card shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="card-title mb-0"><i class="bi bi-exclamation-triangle"></i> Alertes de performance — par équipe</h6>
+                            <button class="btn btn-sm btn-outline-primary" id="daRunAlertsBtn"><i class="bi bi-arrow-repeat"></i> Lancer la détection</button>
+                        </div>
+                        <p class="text-muted small">Détection automatique chaque nuit à 23h (présence, score QA, score d'évaluation, performance globale, chutes vs mois précédent) — seuils fixes, sans IA externe. Cliquez sur une équipe pour voir les agents concernés.</p>
+                        <div class="row g-3" id="daAlertsTeamCards"><p class="text-muted text-center">Chargement…</p></div>
+
+                        <div id="daAlertsAgentsSection" style="display:none;" class="mt-4">
+                            <h6 class="mb-2" id="daAlertsAgentsTitle"></h6>
+                            <div class="table-responsive">
+                                <table class="table table-hover table-sm align-middle">
+                                    <thead><tr><th>Agent</th><th>Type</th><th>Sévérité</th><th>Message</th><th>Statut</th><th></th></tr></thead>
+                                    <tbody id="daAlertsBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- ===================== MODALE — DÉTAIL ÉQUIPE ===================== -->
+<div class="modal fade" id="daTeamDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="daTeamDetailTitle"><i class="bi bi-diagram-3"></i></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <h6 class="mb-3">Indicateurs</h6>
+                <div class="d-flex justify-content-around flex-wrap gap-3 mb-4" id="daTeamGauges"></div>
+
+                <h6 class="mb-2">Comparaison à la moyenne RCC</h6>
+                <div id="daTeamBars" class="mb-4"></div>
+
+                <h6 class="mb-2">Frise chronologique — performance globale (6 derniers mois)</h6>
+                <div class="da-timeline" id="daTeamTimeline"></div>
+
+                <h6 class="mb-2 mt-4">Détail par agent — ce qui a marché ou pas</h6>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm align-middle">
+                        <thead><tr><th>Agent</th><th>Présence</th><th>Score qualité</th><th>Performance</th><th>Résultat</th></tr></thead>
+                        <tbody id="daAgentsBody"><tr><td colspan="5" class="text-center text-muted">Chargement…</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== MODALE — DÉTAIL AGENT ===================== -->
+<div class="modal fade" id="daAgentDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="daAgentDetailTitle"><i class="bi bi-person-fill"></i></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="daAgentDetailBody"></div>
+                <h6 class="mt-4 mb-2">Historique des alertes — évolution depuis son arrivée</h6>
+                <div id="daAgentAlertHistory"><p class="text-muted small">Chargement…</p></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/preferences.js}"></script>
+<script th:src="@{/js/rcc-api.js}"></script>
+<script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/data-analysis.js}"></script>
+</body>
+</html>

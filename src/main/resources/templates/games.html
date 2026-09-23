@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RCC Portal Enterprise — Évaluation</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/games.css}">
+</head>
+<body>
+<div class="layout">
+    <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+    <div class="content">
+        <div th:replace="~{fragments/header :: header}"></div>
+        <main id="page-content">
+            <div class="container-fluid">
+
+                <div class="welcome-banner gm-hero">
+                    <div>
+                        <h2><i class="bi bi-controller"></i> Centre d'Évaluation Ecobank</h2>
+                        <p class="text-muted mb-0">Révisez vos connaissances en vous amusant — 10 jeux, un seul objectif : maîtriser vos parcours de traitement.</p>
+                    </div>
+                    <button class="btn btn-outline-primary qa-only" id="gmAdminToggleBtn" style="display:none;">
+                        <i class="bi bi-clipboard-check"></i> Administration
+                    </button>
+                </div>
+
+                <!-- ===================== MES COMPÉTITIONS ===================== -->
+                <div id="gmMyCompetitions" style="display:none;" class="mb-4"></div>
+
+                <!-- ===================== GALERIE DE JEUX ===================== -->
+                <div id="gmGallery" class="gm-grid">
+                    <p class="text-muted text-center">Chargement des jeux…</p>
+                </div>
+
+                <!-- ===================== ADMINISTRATION (QA/ADMIN) ===================== -->
+                <div id="gmAdminPanel" class="card dashboard-card shadow-sm mt-4" style="display:none;">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <span><i class="bi bi-clipboard-check"></i> Administration de l'évaluation</span>
+                        <ul class="nav nav-tabs card-header-tabs" style="border:none;">
+                            <li class="nav-item"><button class="btn btn-sm nav-link active" id="gmAdminTabGamesBtn">Les 10 jeux</button></li>
+                            <li class="nav-item"><button class="btn btn-sm nav-link" id="gmAdminTabTermsBtn">Vocabulaire</button></li>
+                            <li class="nav-item"><button class="btn btn-sm nav-link" id="gmAdminTabQuestionsBtn">Banque de questions</button></li>
+                            <li class="nav-item"><button class="btn btn-sm nav-link" id="gmAdminTabResultsBtn">Résultats des évaluations</button></li>
+                            <li class="nav-item"><button class="btn btn-sm nav-link" id="gmAdminTabCompetitionsBtn">Compétitions</button></li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <div id="gmAdminGamesPane">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead><tr><th>Jeu</th><th>Titre</th><th>Description</th><th>Équipe</th><th>Statut</th><th>Évaluation</th><th></th></tr></thead>
+                                    <tbody id="gmAdminGamesBody"><tr><td colspan="7" class="text-center text-muted">Chargement…</td></tr></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div id="gmAdminTermsPane" style="display:none;">
+                            <div class="d-flex gap-2 mb-3 flex-wrap">
+                                <input type="text" class="form-control form-control-sm" id="gmTermInput" placeholder="Terme (ex. RIB)" style="max-width:180px;">
+                                <input type="text" class="form-control form-control-sm" id="gmTermDefInput" placeholder="Définition" style="max-width:400px;">
+                                <input type="text" class="form-control form-control-sm" id="gmTermCatInput" placeholder="Catégorie (optionnel)" style="max-width:180px;">
+                                <button class="btn btn-sm btn-primary" id="gmTermAddBtn"><i class="bi bi-plus-lg"></i> Ajouter</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead><tr><th>Terme</th><th>Définition</th><th>Catégorie</th><th>Statut</th><th></th></tr></thead>
+                                    <tbody id="gmTermsBody"><tr><td colspan="5" class="text-center text-muted">Chargement…</td></tr></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div id="gmAdminResultsPane" style="display:none;">
+                            <div class="d-flex gap-2 mb-3 align-items-end flex-wrap">
+                                <div>
+                                    <label class="form-label small mb-1">Jeu d'évaluation</label>
+                                    <select class="form-select form-select-sm" id="gmResultsGameSelect" style="min-width:260px;"></select>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 mb-3 flex-wrap" id="gmResultsTeamTabs">
+                                <span class="text-muted small"><i class="bi bi-people-fill"></i> Équipe :</span>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead><tr><th>Agent</th><th>Équipe</th><th>Statut</th><th>Score</th><th>Bonnes réponses</th><th>Le</th><th></th></tr></thead>
+                                    <tbody id="gmResultsBody"><tr><td colspan="7" class="text-center text-muted">Choisissez un jeu ci-dessus.</td></tr></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div id="gmAdminCompetitionsPane" style="display:none;">
+                            <div class="border rounded p-3 mb-4">
+                                <h6 class="mb-3">Nouvelle compétition</h6>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-md-4">
+                                        <label class="form-label small mb-1">Jeu d'évaluation</label>
+                                        <select class="form-select form-select-sm" id="compGameSelect"></select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small mb-1">Titre</label>
+                                        <input type="text" class="form-control form-control-sm" id="compTitle" placeholder="Ex. Défi Inbound vs Outbound — Sept.">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small mb-1">Date &amp; heure programmée</label>
+                                        <input type="datetime-local" class="form-control form-control-sm" id="compScheduledAt">
+                                    </div>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="compTraineeOnly">
+                                    <label class="form-check-label small" for="compTraineeOnly">Réservée aux stagiaires (je choisis moi-même les participants, pas de validation Team Leader)</label>
+                                </div>
+                                <div id="compTeamsPicker" class="mb-2">
+                                    <label class="form-label small mb-1 d-block">Équipes en compétition (au moins deux)</label>
+                                    <div class="form-check form-check-inline"><input class="form-check-input comp-team-check" type="checkbox" value="INBOUND_VOICE" id="compTeamIV"><label class="form-check-label" for="compTeamIV">Inbound Voix</label></div>
+                                    <div class="form-check form-check-inline"><input class="form-check-input comp-team-check" type="checkbox" value="INBOUND_MAIL" id="compTeamIM"><label class="form-check-label" for="compTeamIM">Inbound Mail / Rafiki</label></div>
+                                    <div class="form-check form-check-inline"><input class="form-check-input comp-team-check" type="checkbox" value="CIB" id="compTeamCIB"><label class="form-check-label" for="compTeamCIB">CIB</label></div>
+                                    <div class="form-check form-check-inline"><input class="form-check-input comp-team-check" type="checkbox" value="OUTBOUND" id="compTeamOB"><label class="form-check-label" for="compTeamOB">Outbound</label></div>
+                                </div>
+                                <button class="btn btn-sm btn-primary" id="compCreateBtn"><i class="bi bi-plus-lg"></i> Créer la compétition</button>
+                            </div>
+                            <h6 class="mb-2">Compétitions existantes</h6>
+                            <div id="compList"></div>
+                        </div>
+                        <div id="gmAdminQuestionsPane" style="display:none;">
+                            <div class="d-flex justify-content-end mb-3">
+                                <button class="btn btn-sm btn-primary" id="qbNewQuestionBtn"><i class="bi bi-plus-lg"></i> Nouvelle question</button>
+                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-md-3">
+                                    <input type="text" class="form-control form-control-sm" id="qbSearch" placeholder="Rechercher (texte, tags)...">
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-select form-select-sm" id="qbFilterCategory">
+                                        <option value="">Tous les thèmes</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-select form-select-sm" id="qbFilterDifficulty">
+                                        <option value="">Toutes difficultés</option>
+                                        <option value="EASY">Facile</option>
+                                        <option value="MEDIUM">Moyen</option>
+                                        <option value="HARD">Difficile</option>
+                                        <option value="EXPERT">Expert</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-select form-select-sm" id="qbFilterType">
+                                        <option value="">Tous types</option>
+                                        <option value="MCQ">Choix unique</option>
+                                        <option value="TRUE_FALSE">Vrai / Faux</option>
+                                        <option value="MULTI_SELECT">Choix multiples</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead>
+                                    <tr>
+                                        <th>Question</th><th>Thème</th><th>Difficulté</th><th>Type</th>
+                                        <th>Points</th><th>Utilisée</th><th>Réussite</th><th></th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="qbTable">
+                                    <tr><td colspan="8" class="text-muted text-center">Chargement…</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- ===================== SCÈNE DE JEU PLEIN ÉCRAN ===================== -->
+<div id="gmStage" class="gm-stage" style="display:none;">
+    <div class="gm-stage-inner">
+        <div class="gm-stage-header">
+            <div class="d-flex align-items-center gap-2">
+                <span id="gmStageIcon" class="gm-stage-icon"><i class="bi bi-controller"></i></span>
+                <h4 class="mb-0" id="gmStageTitle">Jeu</h4>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <span class="gm-score-badge" id="gmStageScore" style="display:none;">0 pts</span>
+                <button class="btn btn-sm btn-outline-light" id="gmStageCloseBtn"><i class="bi bi-x-lg"></i> Quitter</button>
+            </div>
+        </div>
+        <div class="gm-stage-body" id="gmStageBody"></div>
+    </div>
+</div>
+
+<!-- Modale banque de questions enrichie -->
+<div class="modal fade" id="qbModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" id="qbModalTitle">Nouvelle question</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="qbEditId">
+                <label class="form-label small mb-1">Question</label>
+                <textarea class="form-control mb-3" id="qbQuestionText" rows="2" placeholder="Texte de la question"></textarea>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">Type</label>
+                        <select class="form-select" id="qbType">
+                            <option value="MCQ">Choix unique</option>
+                            <option value="TRUE_FALSE">Vrai / Faux</option>
+                            <option value="MULTI_SELECT">Choix multiples</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">Difficulté</label>
+                        <select class="form-select" id="qbDifficulty">
+                            <option value="EASY">Facile</option>
+                            <option value="MEDIUM" selected>Moyen</option>
+                            <option value="HARD">Difficile</option>
+                            <option value="EXPERT">Expert</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">Thème</label>
+                        <input type="text" class="form-control" id="qbCategory" placeholder="ex. CARTE ATM" list="qbCategoryList">
+                        <datalist id="qbCategoryList"></datalist>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">Points</label>
+                        <input type="number" class="form-control" id="qbPoints" value="10" min="1">
+                    </div>
+                </div>
+
+                <label class="form-label small mb-1">Options de réponse</label>
+                <div id="qbOptionsContainer" class="d-flex flex-column gap-2 mb-2"></div>
+                <button class="btn btn-sm btn-outline-secondary mb-3" id="qbAddOptionBtn"><i class="bi bi-plus"></i> Ajouter une option</button>
+
+                <label class="form-label small mb-1">Explication (affichée après la réponse)</label>
+                <textarea class="form-control mb-3" id="qbExplanation" rows="2" placeholder="Pourquoi cette réponse est correcte..."></textarea>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small mb-1">Image — URL ou import de fichier (optionnel)</label>
+                        <input type="text" class="form-control mb-2" id="qbImageUrl" placeholder="https://...">
+                        <div class="d-flex gap-2 align-items-center flex-wrap">
+                            <input type="file" class="form-control" id="qbImageFile" accept="image/png,image/jpeg,image/webp,image/gif" style="max-width:260px;">
+                            <span class="small text-muted" id="qbImageStatus"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">Tags</label>
+                        <input type="text" class="form-control" id="qbTags" placeholder="mmh, cashxpress">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">Temps limite (s)</label>
+                        <input type="number" class="form-control" id="qbTimeLimit" placeholder="ex. 30">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small mb-1">Vidéo (optionnel)</label>
+                    <div class="d-flex gap-2 align-items-center flex-wrap">
+                        <input type="file" class="form-control" id="qbVideoFile" accept="video/mp4,video/quicktime" style="max-width:260px;">
+                        <span class="small text-muted" id="qbVideoStatus"></span>
+                    </div>
+                    <input type="hidden" id="qbVideoUrl">
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="qbActive" checked>
+                    <label class="form-check-label" for="qbActive">Active (utilisable dans les quiz/jeux)</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button class="btn btn-primary" id="qbSaveBtn">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== MODALE — CHOIX DES PARTICIPANTS ===================== -->
+<div class="modal fade" id="compParticipantsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="compParticipantsTitle"><i class="bi bi-people-fill"></i> Choisir les participants</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="compParticipantsList"><p class="text-muted small">Chargement…</p></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button class="btn btn-primary" id="compValidateParticipantsBtn">Valider</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/rcc-api.js}"></script>
+<script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/games.js}"></script>
+<script th:src="@{/js/games-engines.js}"></script>
+<script th:src="@{/js/quiz-bank.js}"></script>
+</body>
+</html>

@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RCC Portal Enterprise — Suivi de shift</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <style>
+        .shift-branch { border:1px solid rgba(0,0,0,.06); border-radius:.6rem; margin-bottom:.75rem; overflow:hidden; }
+        .shift-branch-header, .shift-service-header {
+            cursor:pointer; padding:.7rem 1rem; background:#f8f9fc; font-weight:600; color:#1f2a44;
+            display:flex; justify-content:space-between; align-items:center;
+        }
+        .shift-service-header { background:#fff; padding-left:1.5rem; font-size:.9rem; border-top:1px solid #f0f1f4; }
+        .shift-branch-body, .shift-service-body { display:none; padding:.5rem 1rem 1rem; }
+        .shift-branch.open > .shift-branch-body, .shift-service.open > .shift-service-body { display:block; }
+        .chevron { transition:transform .15s ease; display:inline-block; }
+        .open > .shift-branch-header .chevron, .open > .shift-service-header .chevron { transform:rotate(90deg); }
+        .shift-timeline-row { display:flex; align-items:center; gap:.75rem; padding:.5rem 0; border-bottom:1px solid #f5f5f7; }
+        .shift-timeline-row:last-child { border-bottom:none; }
+        .shift-agent-label { width:220px; flex-shrink:0; font-size:.85rem; }
+        .shift-bar-wrap { flex-grow:1; position:relative; height:22px; background:#eef0f4; border-radius:.3rem; overflow:hidden; }
+        .shift-bar-segment { position:absolute; top:0; bottom:0; }
+        .shift-bar-seg-work { background:#22c55e; }
+        .shift-bar-seg-pause { background:#ef4444; }
+        .shift-bar-ruler { display:flex; justify-content:space-between; font-size:.68rem; color:#9aa2b1; margin-left:220px; margin-top:2px; }
+        .shift-legend { display:flex; gap:1.25rem; font-size:.82rem; color:#495057; align-items:center; }
+        .shift-legend .dot { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:.35rem; }
+        .shift-row-empty { opacity: .55; }
+        .shift-bar-empty { background: repeating-linear-gradient(45deg, #eef0f4, #eef0f4 6px, #e4e6ec 6px, #e4e6ec 12px); display:flex; align-items:center; justify-content:center; }
+        .shift-bar-empty-label { font-size:.72rem; color:#9aa2b1; font-style:italic; }
+        .shift-bar-leave { background:#eaf2ff; display:flex; align-items:center; justify-content:center; }
+        .shift-bar-leave-label { font-size:.72rem; color:#0057B8; font-weight:600; }
+        .shift-pct-cell { display:flex; align-items:center; justify-content:center; height:100%; cursor:pointer; font-weight:600; font-size:.8rem; border-radius:.3rem; }
+        .shift-pct-cell:hover { outline:2px solid #0057B8; outline-offset:-2px; }
+        .shift-pct-high { background:#dcfce7; color:#15803d; }
+        .shift-pct-mid { background:#fef9c3; color:#854d0e; }
+        .shift-pct-low { background:#fee2e2; color:#b91c1c; }
+        .shift-pct-none { background:transparent; color:#9aa2b1; font-weight:400; font-style:italic; font-size:.72rem; cursor:default; }
+        .shift-pct-none:hover { outline:none; }
+        .planning-chip { display:inline-flex; flex-direction:column; align-items:center; justify-content:center; min-width:56px; padding:.25rem .4rem; border-radius:.4rem; font-weight:700; font-size:.74rem; cursor:default; line-height:1.25; }
+        .planning-chip-hours { font-size:.62rem; font-weight:600; opacity:.85; white-space:nowrap; }
+        .planning-chip-work { background:#dbeafe; color:#1d4ed8; }
+        .planning-chip-off { background:#f1f3f5; color:#6b7280; }
+        .planning-chip-leave { background:#dcfce7; color:#15803d; }
+        .planning-chip-absence { background:#fee2e2; color:#b91c1c; }
+        .planning-chip-other { background:#fef9c3; color:#854d0e; }
+        .planning-chip-empty { background:transparent; color:#c7ceda; font-weight:400; font-style:italic; }
+        .planning-chip-pending { outline:2px dashed #f59e0b; outline-offset:1px; }
+        .planning-chip-rejected { outline:2px dashed #dc2626; outline-offset:1px; }
+        .status-pill { padding:3px 8px; border-radius:15px; font-size:.62rem; font-weight:700; }
+        .status-pending { background:#fff3d7; color:#946400; }
+        .status-approved { background:#e7f8f0; color:#08764f; }
+        .status-rejected { background:#ffe8eb; color:#b42333; }
+        .shift-chart-wrap { position:relative; height:220px; padding:4px 6px 0; }
+
+        /* ── Animations sobres — cohérentes avec le portail Excelliam : fondu léger,
+           jamais de rebond ni d'effet appuyé. ── */
+        @keyframes shiftFadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+        #shiftTree.shift-fade-in, #shiftLiveSection.shift-fade-in { animation: shiftFadeIn .28s ease-out; }
+        .dashboard-card { transition: box-shadow .15s ease-out; }
+        .planning-chip { transition: outline-color .15s ease-out; }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+    <div class="content">
+        <div th:replace="~{fragments/header :: header}"></div>
+        <main id="page-content">
+            <div class="container-fluid">
+
+                <div class="welcome-banner d-flex justify-content-between align-items-end flex-wrap gap-3">
+                    <div>
+                        <h2>Suivi de shift</h2>
+                        <p class="text-muted">Ma bande personnelle, ou celle de mon équipe — par jour, semaine ou mois</p>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-secondary" id="modeRealBtn">
+                            <i class="bi bi-clock-history"></i> Suivi réel
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="modePlanningBtn">
+                            <i class="bi bi-calendar3"></i> Planning
+                        </button>
+                    </div>
+
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-primary" id="whoMeBtn">
+                            <i class="bi bi-person"></i> Moi-même
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" id="whoTeamBtn">
+                            <i class="bi bi-people"></i> Équipe
+                        </button>
+                    </div>
+
+                    <select class="form-select form-select-sm" id="teamSelect" style="width:220px; display:none;">
+                        <option value="">— Mon équipe —</option>
+                    </select>
+
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary" id="whenDayBtn">Jour</button>
+                        <button type="button" class="btn btn-outline-secondary" id="whenWeekBtn">Semaine</button>
+                        <button type="button" class="btn btn-outline-secondary" id="whenMonthBtn">Mois</button>
+                        <button type="button" class="btn btn-outline-secondary" id="whenYearBtn">Année</button>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-outline-secondary btn-sm" id="prevPeriodBtn"><i class="bi bi-chevron-left"></i></button>
+                        <input type="date" class="form-control form-control-sm" id="shiftDate" style="width:160px;">
+                        <button class="btn btn-outline-secondary btn-sm" id="nextPeriodBtn"><i class="bi bi-chevron-right"></i></button>
+                        <span class="small text-muted" id="periodLabel"></span>
+                    </div>
+
+                    <button type="button" class="btn btn-sm btn-outline-success" id="exportExcelBtn" style="display:none;">
+                        <i class="bi bi-file-earmark-excel"></i> Exporter Excel
+                    </button>
+
+                    <button type="button" class="btn btn-sm btn-outline-danger" id="shiftLiveBtn">
+                        <i class="bi bi-broadcast"></i> En direct
+                    </button>
+
+                    <button type="button" class="btn btn-sm btn-outline-primary position-relative" id="shiftSwapBtn">
+                        <i class="bi bi-arrow-left-right"></i> Permutations
+                        <span class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle" id="swapBadge" style="display:none; font-size:.6rem;">0</span>
+                    </button>
+
+                    <button type="button" class="btn btn-sm btn-outline-primary position-relative" id="leaveToggleBtn">
+                        <i class="bi bi-calendar-plus"></i> Congés
+                        <span class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle" id="leaveBadge" style="display:none; font-size:.6rem;">0</span>
+                    </button>
+                </div>
+
+                <div id="shiftLiveSection" style="display:none;" class="mb-4">
+                    <p class="text-muted small mb-2"><i class="bi bi-info-circle"></i> Présence en direct de votre équipe — la barre verte avance jusqu'à l'heure actuelle.</p>
+                    <div id="shiftLiveTree"><p class="text-center text-muted">Chargement…</p></div>
+                </div>
+
+                <!-- Permutations de shift — demander à un pair, décider en tant que pair, valider
+                     en tant que Team Leader. Visible à la demande (bouton Permutations), pas
+                     imposé dans le flux normal de consultation du planning. -->
+                <div id="shiftSwapSection" style="display:none;" class="mb-4">
+                    <div class="card dashboard-card shadow-sm mb-3">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="card-title mb-0"><i class="bi bi-arrow-left-right"></i> Proposer une permutation de shift</h6>
+                            </div>
+                            <p class="text-muted small mb-2">Échangez votre shift d'un jour avec celui d'un collègue de votre équipe — l'agent visé doit accepter, puis votre Team Leader doit valider avant que l'échange ne soit appliqué.</p>
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-3">
+                                    <label class="form-label small">Mon shift du</label>
+                                    <input type="date" class="form-control form-control-sm" id="swapRequesterDate">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small">Échanger avec</label>
+                                    <select class="form-select form-select-sm" id="swapTargetUser"><option value="">— Choisir un collègue —</option></select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small">Son shift du</label>
+                                    <input type="date" class="form-control form-control-sm" id="swapTargetDate">
+                                </div>
+                                <div class="col-md-2">
+                                    <button class="btn btn-sm btn-primary w-100" id="swapSubmitBtn">Proposer</button>
+                                </div>
+                            </div>
+                            <textarea class="form-control form-control-sm mt-2" id="swapMessage" rows="2" placeholder="Message optionnel pour votre collègue"></textarea>
+                            <div id="swapSubmitResult" class="small mt-2"></div>
+                        </div>
+                    </div>
+
+                    <div class="card dashboard-card shadow-sm mb-3" id="swapPeerCard" style="display:none;">
+                        <div class="card-body">
+                            <h6 class="card-title mb-2"><i class="bi bi-person-check"></i> Demandes qui vous sont adressées</h6>
+                            <div id="swapPeerList"></div>
+                        </div>
+                    </div>
+
+                    <div class="card dashboard-card shadow-sm mb-3" id="swapTeamLeaderCard" style="display:none;">
+                        <div class="card-body">
+                            <h6 class="card-title mb-2"><i class="bi bi-clipboard-check"></i> Permutations à valider (Team Leader)</h6>
+                            <div id="swapTeamLeaderList"></div>
+                        </div>
+                    </div>
+
+                    <div class="card dashboard-card shadow-sm">
+                        <div class="card-body">
+                            <h6 class="card-title mb-2"><i class="bi bi-clock-history"></i> Mes permutations</h6>
+                            <div id="swapMineList"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Congés & absences — demande de l'agent, validée uniquement par son Team Leader.
+                     Stockées comme WorkflowRequest(type=LEAVE) : ShiftService les lit déjà pour
+                     griser le planning une fois approuvées (voir approvedLeaveDates/usersOnApprovedLeave). -->
+                <div id="leaveSection" style="display:none;" class="mb-4">
+                    <div class="card dashboard-card shadow-sm mb-3">
+                        <div class="card-body">
+                            <h6 class="card-title mb-2"><i class="bi bi-calendar-plus"></i> Demander un congé / une absence</h6>
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-3">
+                                    <label class="form-label small">Du</label>
+                                    <input type="date" class="form-control form-control-sm" id="leaveFromDate">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small">Au</label>
+                                    <input type="date" class="form-control form-control-sm" id="leaveToDate">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small">Motif</label>
+                                    <input type="text" class="form-control form-control-sm" id="leaveTitle" placeholder="ex. Congé annuel, rendez-vous médical...">
+                                </div>
+                                <div class="col-md-2">
+                                    <button class="btn btn-sm btn-primary w-100" id="leaveSubmitBtn">Envoyer</button>
+                                </div>
+                            </div>
+                            <textarea class="form-control form-control-sm mt-2" id="leaveDetails" rows="2" placeholder="Détails complémentaires (optionnel)"></textarea>
+                            <div id="leaveSubmitResult" class="small mt-2"></div>
+                        </div>
+                    </div>
+
+                    <div class="card dashboard-card shadow-sm mb-3" id="leaveTeamLeaderCard" style="display:none;">
+                        <div class="card-body">
+                            <h6 class="card-title mb-2"><i class="bi bi-clipboard-check"></i> Congés à valider</h6>
+                            <div id="leaveTeamLeaderList"></div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-lg-5">
+                            <div class="card dashboard-card shadow-sm h-100">
+                                <div class="card-header"><i class="bi bi-calendar-check"></i> Mon solde <span id="wfLeaveYearLabel"></span></div>
+                                <div class="card-body text-center" id="wfMyLeaveBalance">
+                                    <p class="text-muted mb-0">Chargement…</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-7">
+                            <div class="card dashboard-card shadow-sm h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title mb-2"><i class="bi bi-clock-history"></i> Mes demandes</h6>
+                                    <div id="leaveMineList"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card dashboard-card shadow-sm mt-3" id="leaveTeamBalanceCard" style="display:none;">
+                        <div class="card-body">
+                            <h6 class="card-title mb-3"><i class="bi bi-people"></i> Soldes de l'équipe</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle mb-0">
+                                    <thead><tr><th>Agent</th><th>Alloués</th><th>Utilisés</th><th>Restants</th></tr></thead>
+                                    <tbody id="leaveTeamBalanceBody"><tr><td colspan="4" class="text-center text-muted">Chargement…</td></tr></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="shift-legend mb-3">
+                    <span><span class="dot" style="background:#22c55e;"></span>Temps de travail</span>
+                    <span><span class="dot" style="background:#ef4444;"></span>Pause / pause déjeuner</span>
+                    <span><span class="dot" style="background:#eef0f4;border:1px solid #dee2e6;"></span>Hors shift</span>
+                </div>
+
+                <div class="card dashboard-card shadow-sm mb-3" id="latenessCard" style="display:none;">
+                    <div class="card-body">
+                        <h6 class="card-title mb-2"><i class="bi bi-alarm"></i> Retards du jour</h6>
+                        <div id="latenessList"></div>
+                    </div>
+                </div>
+
+                <div class="card dashboard-card shadow-sm mb-3" id="attendanceCard" style="display:none;">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="card-title mb-0"><i class="bi bi-person-check"></i> Présence du jour</h6>
+                            <div class="d-flex align-items-center gap-2">
+                                <input type="file" class="form-control form-control-sm" id="attendanceImportFile" accept=".xlsx" style="max-width:220px;">
+                                <button class="btn btn-sm btn-primary" id="attendanceImportBtn">Importer</button>
+                            </div>
+                        </div>
+                        <div id="attendanceImportResult" class="small mb-2"></div>
+                        <table class="table table-sm table-hover mb-0">
+                            <thead><tr><th>Agent</th><th>Équipe</th><th>Statut</th><th>Arrivée</th><th>Départ</th></tr></thead>
+                            <tbody id="attendanceTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Import du planning — visible uniquement en mode Planning + vue Équipe, et
+                     seulement pour QA/RH/Superviseur/Admin/Excelliam (voir wireScheduleImport() dans shift.js) -->
+                <div id="scheduleImportPanel" class="card dashboard-card shadow-sm mb-3" style="display:none;">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="card-title mb-0"><i class="bi bi-upload"></i> Charger le planning — <span id="scheduleImportTeamLabel">équipe sélectionnée</span></h6>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="scheduleImportToggleBtn">Charger un fichier</button>
+                        </div>
+                        <div id="scheduleImportForm" style="display:none;">
+                            <p class="text-muted small mb-2">Fichier tel qu'exporté par l'outil de planning — une ligne par agent, une colonne par jour du mois, avec sa légende de codes. Excel (.xlsx) ou CSV.</p>
+                            <div class="d-flex gap-2 mb-2 flex-wrap">
+                                <select class="form-select form-select-sm" id="scheduleImportCountry" style="max-width:160px;">
+                                    <option value="">— Filiale —</option>
+                                </select>
+                                <select class="form-select form-select-sm" id="scheduleImportService" style="max-width:200px;">
+                                    <option value="">— Service —</option>
+                                </select>
+                                <input type="month" class="form-control form-control-sm" id="scheduleImportMonth" style="max-width:160px;">
+                            </div>
+                            <div class="d-flex gap-2">
+                                <input type="file" class="form-control form-control-sm" id="scheduleImportFile" accept=".xlsx,.csv">
+                                <button class="btn btn-sm btn-primary text-nowrap" id="scheduleImportBtn">Importer</button>
+                            </div>
+                            <div id="scheduleImportResult" class="small mt-2"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Validation du planning par le Team Leader — visible uniquement pour le rôle
+                     TEAM_LEADER, en mode Planning + vue Équipe, et seulement s'il existe des
+                     entrées PENDING pour son équipe sur la période affichée (voir
+                     updateTeamLeaderApprovalVisibility() dans shift.js). -->
+                <div id="tlApprovalPanel" class="card dashboard-card shadow-sm mb-3 border-warning" style="display:none;">
+                    <div class="card-body">
+                        <h6 class="card-title mb-2"><i class="bi bi-hourglass-split text-warning"></i> Planning à valider — <span id="tlApprovalCount">0</span> entrée(s) en attente</h6>
+                        <p class="text-muted small mb-2">Excelliam a planifié votre équipe pour cette période. Vérifiez le planning ci-dessous puis validez, ou refusez en expliquant le motif.</p>
+                        <div class="d-flex gap-2 align-items-start">
+                            <button class="btn btn-sm btn-success" id="tlApproveBtn"><i class="bi bi-check2-circle"></i> Valider le planning</button>
+                            <button class="btn btn-sm btn-outline-danger" id="tlRejectToggleBtn"><i class="bi bi-x-circle"></i> Refuser</button>
+                        </div>
+                        <div id="tlRejectForm" style="display:none;" class="mt-2">
+                            <textarea class="form-control form-control-sm" id="tlRejectReason" rows="2" placeholder="Motif du refus — ce que le prestataire doit corriger (visible par Excelliam)"></textarea>
+                            <button class="btn btn-sm btn-danger mt-2" id="tlRejectConfirmBtn">Confirmer le refus</button>
+                        </div>
+                        <div id="tlApprovalResult" class="small mt-2"></div>
+                    </div>
+                </div>
+
+                <!-- Répartition des shifts de l'équipe affichée — visible uniquement en mode
+                     Planning + vue Équipe (voir updateShiftChartVisibility() dans shift.js),
+                     jamais en vue "Moi-même" où un graphique n'aurait pas de sens (un seul agent). -->
+                <div class="card dashboard-card shadow-sm mb-3" id="shiftDistributionCard" style="display:none;">
+                    <div class="card-body">
+                        <h6 class="card-title mb-2"><i class="bi bi-pie-chart-fill"></i> Répartition des shifts — <span id="shiftDistributionPeriod"></span></h6>
+                        <div class="shift-chart-wrap"><canvas id="shiftDistributionChart"></canvas></div>
+                    </div>
+                </div>
+
+                <div id="shiftTree">
+                    <p class="text-muted text-center">Chargement…</p>
+                </div>
+
+
+
+            </div>
+        </main>
+    </div>
+
+    <div class="modal fade" id="shiftDayDetailModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="shiftDayDetailTitle"></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="shiftDayDetailBody"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:1080;">
+        <div id="scheduleImportToast" class="toast align-items-center text-bg-success border-0" role="status" aria-live="polite">
+            <div class="d-flex">
+                <div class="toast-body" id="scheduleImportToastBody"><i class="bi bi-check-circle-fill"></i> Planning importé.</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/preferences.js}"></script>
+<script th:src="@{/js/rcc-api.js}"></script>
+<script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/shift.js}"></script>
+</body>
+</html>

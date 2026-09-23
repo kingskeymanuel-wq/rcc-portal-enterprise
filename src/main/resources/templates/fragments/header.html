@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<th:block th:fragment="header">
+    <header class="topbar">
+        <!-- Recherche -->
+        <form class="search" id="globalSearchForm">
+            <input
+                    type="text"
+                    id="globalSearchInput"
+                    class="form-control"
+                    data-i18n-placeholder="header.search"
+                    placeholder="Rechercher une procédure, un article, un cours...">
+        </form>
+        <!-- Partie droite -->
+        <div class="right">
+            <a class="icon position-relative" title="Notifications" th:href="@{/notifications}">
+                <i class="bi bi-bell-fill"></i>
+                <span id="notifBadge" class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle" style="font-size:.6rem;display:none;">0</span>
+            </a>
+            <a class="icon" title="Messages" th:href="@{/mon-rcc}">
+                <i class="bi bi-chat-dots-fill"></i>
+            </a>
+            <a class="icon" title="Paramètres" th:href="@{/settings}">
+                <i class="bi bi-gear-fill"></i>
+            </a>
+            <a class="user text-decoration-none text-reset" th:href="@{/settings}" title="Mon profil et mes paramètres">
+                <img th:src="@{/images/avatar.png}" id="headerUserAvatar"
+                     alt="Utilisateur">
+                <div>
+                    <strong id="headerUserName">…</strong>
+                    <br>
+                    <small id="headerUserRole">…</small>
+                </div>
+            </a>
+        </div>
+    </header>
+
+    <!-- ===================== MODALE — RECHERCHE UNIVERSELLE ===================== -->
+    <div class="modal fade" id="globalSearchModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="globalSearchModalTitle"><i class="bi bi-search"></i> Recherche</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="globalSearchResults">
+                    <p class="text-muted text-center">Tapez au moins 2 caractères pour lancer la recherche.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</th:block>
+</html>

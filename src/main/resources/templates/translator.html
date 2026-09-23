@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RCC Portal Enterprise — Traducteur</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <style>
+        .tr-wrap { max-width: 980px; margin: 0 auto; }
+        .tr-card { background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:1rem; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.04); }
+        .tr-langbar { display:flex; align-items:center; padding:.6rem 1rem; border-bottom:1px solid rgba(0,0,0,.06); gap:.5rem; }
+        .tr-lang-select { border:none; background:transparent; font-weight:500; color:#5f6368; font-size:.95rem; padding:.3rem .5rem; border-radius:.4rem; cursor:pointer; }
+        .tr-lang-select:hover { background:#f1f3f4; }
+        .tr-swap-btn { width:36px; height:36px; border-radius:50%; border:1px solid rgba(0,0,0,.1); background:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
+        .tr-swap-btn:hover { background:#f1f3f4; }
+        .tr-panes { display:flex; min-height:260px; }
+        .tr-pane { flex:1; padding:1.25rem; position:relative; display:flex; flex-direction:column; }
+        .tr-pane-right { background:#f8f9fc; border-left:1px solid rgba(0,0,0,.06); }
+        .tr-textarea { border:none; outline:none; resize:none; font-size:1.5rem; font-weight:600; width:100%; flex:1; background:transparent; color:#202124; }
+        .tr-textarea::placeholder { color:#9aa0a6; font-weight:400; }
+        .tr-output { font-size:1.5rem; font-weight:600; color:#0057B8; flex:1; white-space:pre-wrap; }
+        .tr-clear-btn { position:absolute; top:1rem; right:1rem; border:none; background:transparent; color:#9aa0a6; font-size:1.2rem; cursor:pointer; }
+        .tr-clear-btn:hover { color:#5f6368; }
+        .tr-toolbar { display:flex; align-items:center; justify-content:space-between; margin-top:.75rem; }
+        .tr-icon-group { display:flex; align-items:center; gap:.4rem; }
+        .tr-icon-btn { width:34px; height:34px; border-radius:50%; border:none; background:transparent; color:#5f6368; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+        .tr-icon-btn:hover { background:#f1f3f4; }
+        .tr-icon-btn.active-rec { background:#fce8e6; color:#c5221f; }
+        .tr-icon-btn-fill { width:36px; height:36px; border-radius:50%; background:#0057B8; color:#fff; }
+        .tr-icon-btn-fill:hover { background:#00489a; }
+        .tr-icon-btn:disabled { opacity:.35; cursor:not-allowed; }
+        .tr-charcount { font-size:.72rem; color:#9aa0a6; }
+        .tr-status { font-size:.78rem; color:#9aa0a6; margin-top:.4rem; min-height:1.1rem; }
+        html[data-theme="dark"] .tr-card { background:#1a2233; border-color:#2a3448; }
+        html[data-theme="dark"] .tr-pane-right { background:#141b29; border-color:#2a3448; }
+        html[data-theme="dark"] .tr-langbar { border-color:#2a3448; }
+        html[data-theme="dark"] .tr-textarea { color:#edf3fb; }
+        html[data-theme="dark"] .tr-swap-btn { background:#1a2233; border-color:#2a3448; color:#edf3fb; }
+        @media (max-width: 700px) { .tr-panes { flex-direction:column; } .tr-pane-right { border-left:none; border-top:1px solid rgba(0,0,0,.06); } }
+        #scEditor:empty:before { content: attr(data-placeholder); color:#9aa0a6; }
+        #scEditor mark.sc-issue { background: rgba(220,53,69,.18); border-bottom: 2px solid #dc3545; cursor: pointer; }
+        .sc-issue-card { border:1px solid rgba(0,0,0,.08); border-radius:.5rem; padding:.6rem .75rem; margin-bottom:.5rem; }
+        .sc-issue-card .sc-msg { color:#495057; }
+        .sc-suggestion-btn { margin:.2rem .3rem 0 0; }
+        #trTopTabs .nav-link { cursor:pointer; }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+    <div class="content">
+        <div th:replace="~{fragments/header :: header}"></div>
+        <main id="page-content">
+            <div class="container-fluid py-3">
+                <div class="tr-wrap">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h1 class="h4 mb-1"><i class="bi bi-translate"></i> Traducteur &amp; correcteur</h1>
+                            <p class="text-muted mb-0" id="trSubtitle">Traduction instantanée entre n'importe quelle paire de langues — sans IA, avec une source locale hors-ligne en priorité (voir <code>docs/TRANSLATION_OFFLINE_SETUP.md</code>).</p>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="diagnoseBtn"><i class="bi bi-heart-pulse"></i> Diagnostiquer la connexion</button>
+                    </div>
+
+                    <ul class="nav nav-tabs mb-3" id="trTopTabs">
+                        <li class="nav-item"><button type="button" class="nav-link active" id="trTabTranslateBtn"><i class="bi bi-translate"></i> Traduction</button></li>
+                        <li class="nav-item"><button type="button" class="nav-link" id="trTabSpellcheckBtn"><i class="bi bi-spellcheck"></i> Correcteur</button></li>
+                    </ul>
+
+                    <div id="diagnoseResult" class="mb-3" style="display:none;"></div>
+
+                    <!-- ===================== Onglet Traduction ===================== -->
+                    <div id="trPaneTranslate">
+                    <div class="tr-card">
+                        <div class="tr-langbar">
+                            <select class="tr-lang-select" id="sourceLangSelect"></select>
+                            <div style="flex:1"></div>
+                            <button type="button" class="tr-swap-btn" id="swapLangBtn" title="Inverser les langues"><i class="bi bi-arrow-left-right"></i></button>
+                            <div style="flex:1"></div>
+                            <select class="tr-lang-select" id="targetLangSelect"></select>
+                        </div>
+
+                        <div class="tr-panes">
+                            <div class="tr-pane">
+                                <textarea class="tr-textarea" id="sourceText" placeholder="Saisissez du texte…" maxlength="4000"></textarea>
+                                <button type="button" class="tr-clear-btn" id="clearBtn" style="display:none;" title="Effacer"><i class="bi bi-x-lg"></i></button>
+                                <div class="tr-toolbar">
+                                    <div class="tr-icon-group">
+                                        <button type="button" class="tr-icon-btn tr-icon-btn-fill" id="micBtn" title="Dicter"><i class="bi bi-mic-fill"></i></button>
+                                    </div>
+                                    <div class="tr-icon-group">
+                                        <span class="tr-charcount" id="charCount">0 / 4000</span>
+                                        <button type="button" class="tr-icon-btn" id="speakSourceBtn" title="Écouter"><i class="bi bi-volume-up"></i></button>
+                                        <button type="button" class="tr-icon-btn" id="copySourceBtn" title="Copier"><i class="bi bi-copy"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="tr-pane tr-pane-right">
+                                <div class="tr-output" id="targetText"></div>
+                                <button type="button" class="tr-clear-btn" id="retryBtn" style="display:none;" title="Retraduire"><i class="bi bi-arrow-clockwise"></i></button>
+                                <div class="tr-toolbar">
+                                    <span class="text-muted small" id="detectedLangLabel"></span>
+                                    <div class="tr-icon-group">
+                                        <button type="button" class="tr-icon-btn" id="speakTargetBtn" title="Écouter"><i class="bi bi-volume-up"></i></button>
+                                        <button type="button" class="tr-icon-btn" id="copyTargetBtn" title="Copier"><i class="bi bi-copy"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tr-status" id="trStatus"></div>
+                    </div>
+
+                    <!-- ===================== Onglet Correcteur ===================== -->
+                    <div id="trPaneSpellcheck" style="display:none;">
+                        <div class="tr-card">
+                            <div class="tr-langbar">
+                                <select class="tr-lang-select" id="scLangSelect">
+                                    <option value="fr">Français</option>
+                                    <option value="en">Anglais</option>
+                                </select>
+                                <div style="flex:1"></div>
+                                <span class="text-muted small"><i class="bi bi-shield-check"></i> Correction locale — aucune donnée envoyée hors du portail</span>
+                            </div>
+                            <div class="tr-panes">
+                                <div class="tr-pane">
+                                    <div id="scEditor" class="tr-textarea" contenteditable="true" style="font-size:1.05rem; font-weight:400; overflow-y:auto;" data-placeholder="Saisissez ou collez votre texte…"></div>
+                                    <div class="tr-toolbar">
+                                        <span class="tr-charcount" id="scCharCount">0 caractère(s)</span>
+                                        <button type="button" class="btn btn-sm btn-primary" id="scCheckBtn"><i class="bi bi-check2-circle"></i> Vérifier</button>
+                                    </div>
+                                </div>
+                                <div class="tr-pane tr-pane-right">
+                                    <div class="fw-semibold small mb-2">Corrections suggérées</div>
+                                    <div id="scIssuesList" class="small flex-grow-1" style="overflow-y:auto;">
+                                        <div class="text-muted">Cliquez sur « Vérifier » pour analyser votre texte.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tr-status" id="scStatus"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/preferences.js}"></script>
+<script th:src="@{/js/rcc-api.js}"></script>
+<script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/translator.js}"></script>
+<script th:src="@{/js/spellcheck.js}"></script>
+</body>
+</html>
