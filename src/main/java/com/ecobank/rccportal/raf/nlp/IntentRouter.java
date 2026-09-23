@@ -99,8 +99,9 @@ public class IntentRouter {
         Map<RafIntent, Double> raw = new EnumMap<>(RafIntent.class);
         Map<RafIntent, List<String>> evidence = new EnumMap<>(RafIntent.class);
 
-        if (GREETINGS.contains(request.normalized())) {
-            add(raw, evidence, RafIntent.SMALL_TALK, 3.0, "formule de politesse");
+        SmallTalk.Kind talk = SmallTalk.detect(request.normalized());
+        if (GREETINGS.contains(request.normalized()) || talk != null) {
+            add(raw, evidence, RafIntent.SMALL_TALK, 3.0, "dialogue" + (talk != null ? " (" + talk.name().toLowerCase() + ")" : ""));
         }
         LEXICON.forEach((intent, list) -> {
             for (Trigger t : list) {

@@ -109,7 +109,10 @@ public class RafOrchestrator {
             if (commanded != null) return commanded;
         }
 
-        String expanded = followUps.expandEllipsis(request);
+        // Une phrase de conversation (« comment vas-tu », « ok », « merci ») n'est jamais la suite
+        // elliptique de la question précédente.
+        String expanded = com.ecobank.rccportal.raf.nlp.SmallTalk.isConversational(request.normalized())
+                ? null : followUps.expandEllipsis(request);
         if (expanded != null) {
             RafEntities previous = state.lastEntities();
             if (entities.countryCode() != null && previous != null) {

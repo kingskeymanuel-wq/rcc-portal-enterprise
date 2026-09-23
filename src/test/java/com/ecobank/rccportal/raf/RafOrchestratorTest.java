@@ -258,4 +258,29 @@ class RafOrchestratorTest {
         assertFalse(r.agentsConsulted().isEmpty());
         assertTrue(r.confidencePercent() > 0);
     }
+
+    @Test
+    void rafHoldsARealConversation() {
+        for (String q : List.of("comment vas tu", "Comment tu vas ?", "ça va raf ?", "bonjour, tu vas bien ?")) {
+            var r = ask(q);
+            assertFalse(r.explanation().contains("rien trouvé"), q);
+            assertTrue(r.explanation().contains("Et toi") || r.explanation().contains("et toi")
+                    || r.explanation().contains("Et de ton côté"), q + " → " + r.explanation());
+        }
+        var tired = ask("je suis fatigué"); assertEquals("LOCAL", tired.source()); assertFalse(tired.explanation().contains("rien trouvé"));
+        assertTrue(ask("qui es-tu ?").explanation().contains("RAF"));
+        assertTrue(ask("raconte moi une blague").explanation().length() > 20);
+        assertTrue(ask("quelle heure est-il ?").explanation().contains("14:30"));
+        assertTrue(ask("c'est pas normal").explanation().contains("Désolé"));
+        assertEquals(0, gapLog.recent().size(), "la conversation n'est pas un trou de connaissance");
+    }
+
+    @Test
+    void businessQuestionsAreNotMistakenForChat() {
+        for (String q : List.of("à quelle heure ouvre l'agence", "bonjour procédure opposition carte",
+                "ça va prendre combien de temps le remboursement GAB", "merci de me donner le délai SLA retrait GAB")) {
+            assertNull(com.ecobank.rccportal.raf.nlp.SmallTalk.detect(com.ecobank.rccportal.util.SearchText.normalize(q)), q);
+        }
+        assertTrue(ask("bonjour procédure opposition carte").explanation().toLowerCase().contains("opposition"));
+    }
 }
