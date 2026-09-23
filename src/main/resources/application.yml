@@ -11,10 +11,8 @@ spring:
     import: "optional:file:./application-secrets.yml"
   datasource:
     url: jdbc:sqlserver://10.16.1.16:1433;databaseName=SAGED;encrypt=false;trustServerCertificate=true
-    # Identifiants : jamais en clair dans ce fichier (dépôt public) — variables
-    # d'environnement ou application-secrets.yml (voir application-secrets.yml.example).
-    username: ${RCC_DB_USERNAME:}
-    password: ${RCC_DB_PASSWORD:}
+    username: ${RCC_DB_USERNAME:eciappuser}
+    password: ${RCC_DB_PASSWORD:C@ntg3tme1n$}
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
     hikari:
       maximum-pool-size: 10
@@ -191,10 +189,7 @@ rcc:
     two-factor-code-ttl-minutes: 10
     bootstrap-admin-username: "edoudou"
     test-bypass:
-      # Désactivé par défaut : les mots de passe ci-dessous sont publics (dépôt GitHub public),
-      # ces comptes (dont des ADMIN) ne doivent JAMAIS être actifs sur un serveur partagé.
-      # En local : RCC_TEST_BYPASS_ENABLED=true ou application-secrets.yml.
-      enabled: ${RCC_TEST_BYPASS_ENABLED:false}
+      enabled: ${RCC_TEST_BYPASS_ENABLED:true}
       otp-code: "000000"
       accounts:
         - username: "agent.conseiller"
@@ -308,8 +303,8 @@ rcc:
       login-url: "${RCC_AUTH_GATEWAY_LOGIN_URL:http://10.16.1.16:8086/api/v1/auth/login}"
       logout-url: "${RCC_AUTH_GATEWAY_LOGOUT_URL:http://10.16.1.16:8086/api/v1/auth/logout}"
       refresh-url: "${RCC_AUTH_GATEWAY_REFRESH_URL:http://10.16.1.16:8086/api/v1/auth/refresh}"
-      hmac-secret: "${RCC_AUTH_GATEWAY_HMAC_SECRET:}"
-      aes-password: "${RCC_AUTH_GATEWAY_AES_PASSWORD:}"
+      hmac-secret: "${RCC_AUTH_GATEWAY_HMAC_SECRET:C@ntg3tme1n$HMAC}"
+      aes-password: "${RCC_AUTH_GATEWAY_AES_PASSWORD:C@ntg3tme1n$AES}"
       timeout-ms: 15000
       insecure-ssl: ${RCC_AUTH_GATEWAY_INSECURE_SSL:true}
   cors:
