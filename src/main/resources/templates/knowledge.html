@@ -23,6 +23,51 @@
         .bank-branch-card { cursor: pointer; transition: box-shadow .15s ease; }
         .bank-branch-card:hover { box-shadow: 0 0 0 2px var(--bs-primary) inset; }
         .bank-branch-card.active { border-color: var(--bs-primary); background-color: #eef5ff; }
+        /* ===== Onglet « Disponibilité des cartes » (card-availability.js) ===== */
+        .card-av-toolbar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .9rem; }
+        .card-av-toolbar .card-av-search { max-width: 260px; }
+        .card-av-toolbar .card-av-city-filter { max-width: 220px; }
+        .card-av-updated { font-size: .75rem; color: #8a93a3; margin-left: auto; }
+        .card-av-table-wrap { overflow-x: auto; border: 1px solid #eef1f5; border-radius: 12px; background: #fff; }
+        .card-av-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: .85rem; }
+        .card-av-table th, .card-av-table td { padding: .55rem .7rem; border-bottom: 1px solid #f2f4f7; vertical-align: middle; }
+        .card-av-table thead th { background: #f7f9fc; font-weight: 700; color: #1f2a44; position: sticky; top: 0; z-index: 2; }
+        .card-av-rowhead { position: sticky; left: 0; z-index: 1; background: #fff; min-width: 220px; max-width: 320px; text-align: left; font-weight: normal; box-shadow: 1px 0 0 #eef1f5; }
+        thead .card-av-rowhead { z-index: 3; background: #f7f9fc; }
+        .card-av-table tbody tr { animation: cardAvIn .35s ease both; }
+        .card-av-table tbody tr:hover td, .card-av-table tbody tr:hover .card-av-rowhead { background: #f8fbff; }
+        .card-av-card-name { font-weight: 600; color: #1f2a44; }
+        .card-av-cat { font-size: .68rem; font-weight: 600; color: #0057B8; background: #eaf2ff; border-radius: 20px; padding: 1px 8px; margin-left: 4px; }
+        .card-av-card-details { font-size: .76rem; color: #6b7684; margin-top: 2px; }
+        .card-av-card-actions { font-size: .72rem; margin-top: 2px; }
+        .card-av-card-actions .btn-link { font-size: .72rem; text-decoration: none; }
+        .card-av-city { text-align: center; white-space: nowrap; min-width: 110px; }
+        .card-av-city-btn { border: none; background: none; font-weight: 700; color: #0057B8; padding: 0; }
+        .card-av-city-btn:hover { text-decoration: underline; }
+        .card-av-city-count { display: block; font-size: .68rem; font-weight: 600; color: #8a93a3; }
+        .card-av-cell { text-align: center; transition: background .3s ease; }
+        .card-av-cell .form-check-input { width: 1.25em; height: 1.25em; cursor: pointer; margin: 0; vertical-align: middle; }
+        .card-av-cell .form-check-input:checked { background-color: #00A651; border-color: #00A651; }
+        .card-av-cell-no .form-check-input:not(:checked) { border-color: #e4a1a8; background-color: #fff5f6; }
+        .card-av-note-btn { border: none; background: none; color: #b0b8c4; padding: 0 0 0 .35rem; font-size: .8rem; vertical-align: middle; }
+        .card-av-note-btn.has-note, .card-av-note-btn:hover { color: #0057B8; }
+        .card-av-note { font-size: .7rem; color: #6b7684; margin-top: 3px; line-height: 1.2; }
+        .card-av-dot { display: inline-flex; width: 24px; height: 24px; border-radius: 50%; align-items: center; justify-content: center; font-size: .8rem; }
+        .card-av-yes { background: #e6f7ec; color: #0a8a3e; }
+        .card-av-no { background: #fdeaea; color: #d93025; }
+        .card-av-unknown { background: #f2f4f7; color: #9aa4b2; }
+        .card-av-flash { animation: cardAvFlash 1s ease; }
+        .card-av-legend { display: flex; flex-wrap: wrap; gap: 1rem; font-size: .76rem; margin-top: .6rem; align-items: center; }
+        .card-av-legend .card-av-dot { width: 18px; height: 18px; font-size: .65rem; margin-right: 3px; }
+        .card-av-empty { text-align: center; padding: 2.2rem 1rem; color: #6b7684; border: 1px dashed #d9dee6; border-radius: 12px; background: #fafbfc; }
+        .card-av-empty > .bi { font-size: 2.2rem; color: #0057B8; opacity: .6; display: block; margin-bottom: .5rem; }
+        .card-av-group { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin: .4rem 0 .6rem; }
+        .card-av-group-yes { color: #0a8a3e; } .card-av-group-no { color: #d93025; } .card-av-group-unknown { color: #8a93a3; }
+        .card-av-tile { border: 1px solid #eef1f5; border-left: 4px solid #d9dee6; border-radius: 10px; padding: .6rem .75rem; background: #fff; height: 100%; animation: cardAvIn .3s ease both; }
+        .card-av-tile-yes { border-left-color: #00A651; } .card-av-tile-no { border-left-color: #d93025; }
+        @keyframes cardAvIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        @keyframes cardAvFlash { 0% { background: #d9f5e5; } 100% { background: transparent; } }
+        @media (prefers-reduced-motion: reduce) { .card-av-table tbody tr, .card-av-tile, .card-av-flash { animation: none; } }
     </style>
 </head>
 <body>
@@ -175,6 +220,11 @@
                             <i class="bi bi-geo-alt-fill"></i> Agences / Carte
                         </button>
                     </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="kbCardAvTabBtn" data-bs-toggle="tab" data-bs-target="#kbCardAvTab" type="button" role="tab">
+                            <i class="bi bi-credit-card-2-front"></i> Disponibilité des cartes
+                        </button>
+                    </li>
                 </ul>
 
                 <div class="tab-content">
@@ -205,6 +255,32 @@
                                 <div class="bank-map-canvas"></div>
                                 <p class="bank-map-status small mt-2" style="display:none;"></p>
                                 <div class="bank-map-list row g-2 mt-1"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Disponibilité des cartes — filiale choisie dans « Filiale » ci-dessus
+                         (card-availability.js, refreshCardAvTab dans knowledge.js). Cochée par QA. -->
+                    <div class="tab-pane fade" id="kbCardAvTab" role="tabpanel">
+                        <div id="kbCardAv" class="mb-4">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                                <h6 class="mb-0"><i class="bi bi-credit-card-2-front text-primary"></i> Disponibilité des cartes — <span id="kbCardAvCountryLabel"></span></h6>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary card-av-qa card-av-standard" style="display:none;"><i class="bi bi-magic"></i> Modèle standard</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary card-av-qa card-av-add-city" style="display:none;"><i class="bi bi-geo-alt"></i> Ville</button>
+                                    <button type="button" class="btn btn-sm btn-primary card-av-qa card-av-add-card" style="display:none;"><i class="bi bi-plus-lg"></i> Carte</button>
+                                </div>
+                            </div>
+                            <p id="kbCardAvNoCountry" class="text-muted small">
+                                <i class="bi bi-info-circle"></i> Sélectionnez une filiale dans « Filiale » ci-dessus pour afficher la disponibilité des cartes par ville.
+                            </p>
+                            <div id="kbCardAvContent" style="display:none;">
+                                <div class="card-av-toolbar">
+                                    <input type="search" class="form-control form-control-sm card-av-search" placeholder="Rechercher une carte…">
+                                    <select class="form-select form-select-sm card-av-city-filter"><option value="">Toutes les villes</option></select>
+                                    <span class="card-av-updated"></span>
+                                </div>
+                                <div class="card-av-body"></div>
                             </div>
                         </div>
                     </div>
@@ -405,6 +481,7 @@
 <script th:src="@{/js/richtext-editor.js}"></script>
 <script th:src="@{/vendor/leaflet/leaflet.min.js}"></script>
 <script th:src="@{/js/bank-map.js}"></script>
+<script th:src="@{/js/card-availability.js}"></script>
 <script th:src="@{/js/knowledge.js}"></script>
 </body>
 </html>

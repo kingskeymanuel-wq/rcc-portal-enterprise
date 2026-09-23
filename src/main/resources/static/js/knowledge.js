@@ -476,7 +476,10 @@
             select.addEventListener("change", function () {
                 currentCountryCode = select.value;
                 bankMapStale = true;
-                if (isBankMapTabActive()) {
+                cardAvStale = true;
+                if (isCardAvTabActive()) {
+                    refreshCardAvTab(); // onglet « Disponibilité des cartes » ouvert : suit la filiale
+                } else if (isBankMapTabActive()) {
                     refreshBankMapTab(); // onglet « Agences / Carte » ouvert : on suit la filiale, sans modale
                 } else if (currentCountryCode) {
                     openCountryModal(currentCountryCode);
@@ -567,6 +570,39 @@
             var countryModalInstance = bootstrap.Modal.getInstance($("countryModal"));
             if (countryModalInstance) countryModalInstance.hide();
             bootstrap.Tab.getOrCreateInstance($("kbBankMapTabBtn")).show();
+        });
+    }
+
+    // ===== Onglet « Disponibilité des cartes » =====
+
+    var cardAv = null;        // instance CardAvailability.mount (card-availability.js)
+    var cardAvStale = true;
+
+    function isCardAvTabActive() {
+        var btn = $("kbCardAvTabBtn");
+        return !!btn && btn.classList.contains("active");
+    }
+
+    function refreshCardAvTab() {
+        if (!cardAv) return;
+        cardAvStale = false;
+        var country = countriesCache.filter(function (c) { return c.countryCode === currentCountryCode; })[0];
+        $("kbCardAvCountryLabel").textContent = currentCountryCode
+            ? (country ? country.label : currentCountryCode)
+            : "choisissez une filiale";
+        $("kbCardAvNoCountry").style.display = currentCountryCode ? "none" : "";
+        $("kbCardAvContent").style.display = currentCountryCode ? "" : "none";
+        Array.prototype.forEach.call(document.querySelectorAll("#kbCardAv .card-av-qa"), function (el) {
+            el.style.display = currentCountryCode && isQaOrAdmin() ? "" : "none";
+        });
+        if (currentCountryCode) cardAv.load(currentCountryCode, isQaOrAdmin());
+    }
+
+    function wireCardAvTab() {
+        if (!window.CardAvailability || !$("kbCardAv")) return;
+        cardAv = window.CardAvailability.mount($("kbCardAv"));
+        $("kbCardAvTabBtn").addEventListener("shown.bs.tab", function () {
+            if (cardAvStale) refreshCardAvTab();
         });
     }
 
@@ -671,10 +707,13 @@
         wireFileUpload();
         wireKbQuickUploadModal();
         wireBankMapTab();
+        wireCardAvTab();
         var countriesLoaded = loadCountries();
 
         window.RccSession.init().then(function (session) {
             currentProfile = session ? session.profile : null;
+            cardAvStale = true; // droits de cochage connus : recharger l'onglet cartes s'il est ouvert
+            if (isCardAvTabActive()) refreshCardAvTab();
             $("newArticleBtn").style.display = isQaOrAdmin() ? "" : "none";
             $("newImportArticleBtn").style.display = isQaOrAdmin() ? "" : "none";
             $("newCategoryBtn").style.display = isQaOrAdmin() ? "" : "none";

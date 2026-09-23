@@ -307,6 +307,35 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
                 )
                 """);
 
+        // Disponibilité des cartes (onglet de la Base de connaissances) — cartes proposées par
+        // filiale et leur disponibilité par ville, cochée par QA. Même définition que la migration 014.
+        createIfMissing("CardProducts", """
+                CREATE TABLE dbo.CardProducts (
+                    CardProductId BIGINT IDENTITY(1,1) PRIMARY KEY,
+                    CountryCode NVARCHAR(2) NOT NULL,
+                    Name NVARCHAR(150) NOT NULL,
+                    Category NVARCHAR(80) NULL,
+                    Details NVARCHAR(1000) NULL,
+                    SortOrder INT NOT NULL DEFAULT 0,
+                    IsActive BIT NOT NULL DEFAULT 1,
+                    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    UpdatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+                )
+                """);
+        createIfMissing("CardAvailability", """
+                CREATE TABLE dbo.CardAvailability (
+                    CardAvailabilityId BIGINT IDENTITY(1,1) PRIMARY KEY,
+                    CardProductId BIGINT NOT NULL,
+                    City NVARCHAR(100) NOT NULL,
+                    Available BIT NOT NULL DEFAULT 0,
+                    Note NVARCHAR(500) NULL,
+                    UpdatedBy NVARCHAR(150) NULL,
+                    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    UpdatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    CONSTRAINT UQ_CardAvailability_CardCity UNIQUE (CardProductId, City)
+                )
+                """);
+
         createIfMissing("RefreshTokens", """
                 CREATE TABLE dbo.RefreshTokens (
                     RefreshTokenId INT IDENTITY PRIMARY KEY,
