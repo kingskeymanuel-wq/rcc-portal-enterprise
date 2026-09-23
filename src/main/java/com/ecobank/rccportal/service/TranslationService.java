@@ -97,7 +97,7 @@ public class TranslationService {
     private final LocalTranslationClient localTranslationClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(8))
+            .connectTimeout(Duration.ofSeconds(4))
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 
@@ -135,8 +135,26 @@ public class TranslationService {
         }
     };
 
+    /** Durée pendant laquelle une source injoignable est ignorée avant un nouvel essai. */
+    private static final long UNREACHABLE_RETRY_MS = 2 * 60 * 1000L;
+
+    /** Sources injoignables (serveur arrêté, domaine bloqué) → instant du prochain essai. */
+    private final Map<String, Long> unreachableUntil = new java.util.concurrent.ConcurrentHashMap<>();
+
     public TranslationService(LocalTranslationClient localTranslationClient) {
         this.localTranslationClient = localTranslationClient;
+    }
+
+    /** Erreur réseau (connexion refusée, délai de connexion, DNS) — pas une erreur de traduction. */
+    static boolean isUnreachable(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof java.net.ConnectException || t instanceof java.net.http.HttpConnectTimeoutException
+                    || t instanceof java.net.UnknownHostException || t instanceof java.net.NoRouteToHostException) {
+                return true;
+            }
+            if (t.getMessage() != null && t.getMessage().contains("serveur injoignable")) return true;
+        }
+        return false;
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -171,6 +189,13 @@ public class TranslationService {
         List<String> failures = new ArrayList<>();
         for (Provider provider : orderedProviders()) {
             if (!provider.isConfigured()) continue;
+            Long retryAt = unreachableUntil.get(provider.id());
+            if (retryAt != null && retryAt > System.currentTimeMillis()) {
+                // Source injoignable il y a peu : on ne fait pas attendre l'agent un nouveau délai réseau.
+                failures.add(provider.label() + " : injoignable (nouvel essai dans "
+                        + Math.max(1, (retryAt - System.currentTimeMillis()) / 1000) + " s)");
+                continue;
+            }
             String sourceForCall;
             if (!"auto".equals(source)) {
                 sourceForCall = source;
@@ -196,6 +221,14 @@ public class TranslationService {
                 return finalResult;
             } catch (Exception e) {
                 String reason = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                if (isUnreachable(e)) {
+                    unreachableUntil.put(provider.id(), System.currentTimeMillis() + UNREACHABLE_RETRY_MS);
+                    if (e.getMessage() == null) {
+                        reason = "injoignable depuis ce serveur (réseau ou pare-feu, " + e.getClass().getSimpleName() + ")";
+                    }
+                } else {
+                    unreachableUntil.remove(provider.id());
+                }
                 log.warn("[TRANSLATE] {} a échoué ({} → {}) : {}", provider.label(), sourceForCall, target, reason);
                 failures.add(provider.label() + " : " + reason);
             }
@@ -226,6 +259,7 @@ public class TranslationService {
                 long start = System.currentTimeMillis();
                 try {
                     TranslationResult r = provider.translate(probe, "fr", "en");
+                    unreachableUntil.remove(provider.id()); // de nouveau joignable : réutilisée tout de suite
                     row.put("status", "OK");
                     String detail = "« " + r.translatedText() + " » en " + (System.currentTimeMillis() - start) + " ms.";
                     if ("libretranslate".equals(provider.id())) {

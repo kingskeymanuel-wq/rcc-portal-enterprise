@@ -102,6 +102,14 @@ class LibreTranslateProviderTest {
     }
 
     @Test
+    void unreachableServerIsSkippedInsteadOfWaitingAgain() {
+        server.stop(0);
+        assertThrows(ApiException.class, () -> service.translate("Bonjour", "fr", "en"));
+        ApiException second = assertThrows(ApiException.class, () -> service.translate("Bonsoir", "fr", "en"));
+        assertTrue(second.getMessage().contains("nouvel essai dans"), second.getMessage());
+    }
+
+    @Test
     void diagnoseListsLoadedLanguages() {
         var row = service.diagnose().get(0);
         assertEquals("LibreTranslate (local)", row.get("source"));
