@@ -24,7 +24,12 @@ public class ShiftEvent extends Auditable {
     @JoinColumn(name = "UserId", nullable = false)
     private User user;
 
-    /** LOGIN | PAUSE_START | PAUSE_END | LUNCH_START | LUNCH_END | SHIFT_END */
+    /**
+     * LOGIN | LOGOUT | PAUSE_START | PAUSE_END | LUNCH_START | LUNCH_END | TRAINING_START |
+     * TRAINING_END | MEETING_START | MEETING_END | SHIFT_END. LOGOUT = déconnexion sans fin de
+     * shift (heure retenue) ; un LOGIN ultérieur le même jour reprend le shift en continuité —
+     * voir util.ShiftTimeline.
+     */
     @Column(name = "EventType", nullable = false, length = 20)
     private String eventType;
 

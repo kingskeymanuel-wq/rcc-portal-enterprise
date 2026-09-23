@@ -104,8 +104,9 @@ public class AuthController {
      */
     @PostMapping("/logout")
     public void logout(@RequestHeader(value = "Refresh-Token", required = false) String refreshToken,
+                       @AuthenticationPrincipal AuthenticatedUser user,
                        HttpServletResponse response) {
-        authService.logout(refreshToken);
+        authService.logout(refreshToken, user != null ? user.username() : null, user != null ? user.role() : null);
         clearAccessCookie(response);
     }
 

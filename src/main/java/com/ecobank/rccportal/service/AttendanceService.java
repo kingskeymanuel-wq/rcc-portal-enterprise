@@ -59,6 +59,12 @@ public class AttendanceService {
 
         record.setStatus("present");
 
+        // Reconnexion le même jour : l'agent est de nouveau présent, l'heure de départ
+        // (dernière déconnexion) est effacée jusqu'à sa prochaine déconnexion. L'heure
+        // d'arrivée (première connexion du jour) est conservée ; le détail des absences
+        // intermédiaires est tracé dans le suivi de shift (événements LOGOUT/LOGIN).
+        record.setDepartureTime(null);
+
         if (record.getArrivalTime() == null) {
             record.setArrivalTime(
                     LocalTime.now().withNano(0)

@@ -1267,78 +1267,66 @@ public class AuthService {
     // =========================================================
 
     @Transactional
-    public void logout(
-            String refreshTokenValue) {
+    public void logout(String refreshTokenValue) {
+        logout(refreshTokenValue, null, null);
+    }
 
-        if (refreshTokenValue == null ||
-                refreshTokenValue.isBlank()) {
+    /**
+     * Déconnexion. L'identité vient du cookie de session (principal) — le frontend n'envoie
+     * pas l'en-tête Refresh-Token : avant ce correctif, logout(null) sortait immédiatement et
+     * ni le pointage de sortie ni l'heure de déconnexion n'étaient jamais enregistrés.
+     */
+    @Transactional
+    public void logout(String refreshTokenValue, String principalUsername, String principalRole) {
+        String username = principalUsername;
+        String role = principalRole;
 
-            return;
+        if (refreshTokenValue != null && !refreshTokenValue.isBlank()) {
+            try {
+                var claims = jwtService.parseClaims(refreshTokenValue);
+                if (claims.getId() != null) {
+                    UUID jti = UUID.fromString(claims.getId());
+                    // Déconnexion best-effort côté gateway SAGED, si ce jeton portail avait
+                    // été émis suite à un vrai login gateway (voir AuthService.issueSession()).
+                    // Ne bloque jamais la déconnexion locale, même en cas d'échec.
+                    refreshTokenRepository.findByJti(jti).ifPresent(stored -> {
+                        String gatewayToken = stored.getGatewayAccessToken();
+                        if (gatewayToken != null && !gatewayToken.isBlank()) {
+                            try {
+                                authGatewayClient.logout(gatewayToken);
+                            } catch (Exception e) {
+                                log.warn("Gateway logout best-effort failed: {}", e.getMessage());
+                            }
+                        }
+                    });
+                    refreshTokenRepository.deleteByJti(jti);
+                }
+                if (username == null) {
+                    username = claims.getSubject();
+                    role = claims.get("role", String.class);
+                }
+            } catch (Exception e) {
+                // Déconnexion idempotente : un token expiré ne doit pas bloquer le logout.
+                log.debug("Logout with invalid/expired refresh token.");
+            }
         }
 
+        if (username == null || username.isBlank()) return;
+
+        if (!"ADMIN".equalsIgnoreCase(role)) {
+            try {
+                attendanceService.clockOut(username);
+            } catch (Exception e) {
+                log.warn("Attendance clock-out failed for {}: {}", username, e.getMessage());
+            }
+        }
+
+        // Heure de déconnexion retenue dans le suivi de shift (transaction séparée) : à la
+        // reconnexion le même jour, le minuteur reprend en continuité et l'absence est tracée.
         try {
-
-            var claims =
-                    jwtService.parseClaims(
-                            refreshTokenValue
-                    );
-
-            if (claims.getId() != null) {
-
-                UUID jti =
-                        UUID.fromString(
-                                claims.getId()
-                        );
-
-                // Déconnexion best-effort côté gateway SAGED, si ce jeton portail avait
-                // été émis suite à un vrai login gateway (voir AuthService.issueSession()).
-                // Ne bloque jamais la déconnexion locale, même en cas d'échec.
-                refreshTokenRepository.findByJti(jti).ifPresent(stored -> {
-                    String gatewayToken = stored.getGatewayAccessToken();
-                    if (gatewayToken != null && !gatewayToken.isBlank()) {
-                        try {
-                            authGatewayClient.logout(gatewayToken);
-                        } catch (Exception e) {
-                            log.warn("Gateway logout best-effort failed: {}", e.getMessage());
-                        }
-                    }
-                });
-
-                refreshTokenRepository
-                        .deleteByJti(jti);
-            }
-
-            String role =
-                    claims.get(
-                            "role",
-                            String.class
-                    );
-
-            if (!"ADMIN".equalsIgnoreCase(role)) {
-
-                try {
-
-                    attendanceService.clockOut(
-                            claims.getSubject()
-                    );
-
-                } catch (Exception e) {
-
-                    log.warn(
-                            "Attendance clock-out failed for {}: {}",
-                            claims.getSubject(),
-                            e.getMessage()
-                    );
-                }
-            }
-
+            shiftService.recordLogout(username);
         } catch (Exception e) {
-
-            // Déconnexion idempotente :
-            // un token expiré ne doit pas bloquer le logout.
-            log.debug(
-                    "Logout with invalid/expired refresh token."
-            );
+            log.warn("Shift LOGOUT event recording failed for {}: {}", username, e.getMessage());
         }
     }
 

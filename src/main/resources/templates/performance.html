@@ -108,6 +108,7 @@
         .my-shift-bar-segment { position:absolute; top:0; bottom:0; }
         .my-shift-bar-seg-work { background:#22c55e; }
         .my-shift-bar-seg-pause { background:#ef4444; }
+        .my-shift-bar-seg-offline { background:repeating-linear-gradient(45deg,#9ca3af 0 4px,#d1d5db 4px 8px); }
         .my-shift-bar-ruler { display:flex; justify-content:space-between; font-size:.7rem; color:var(--pf-faint); margin-top:3px; }
         .my-shift-legend { display:flex; gap:1.25rem; font-size:.82rem; color:var(--pf-sub); align-items:center; }
         .my-shift-legend .dot { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:.35rem; }
@@ -118,6 +119,9 @@
         .shift-bar-segment { position:absolute; top:0; bottom:0; }
         .shift-bar-seg-work { background:#22c55e; }
         .shift-bar-seg-pause { background:#ef4444; }
+        .shift-bar-seg-offline { background:repeating-linear-gradient(45deg,#9ca3af 0 4px,#d1d5db 4px 8px); }
+        .shift-badge-offline { background:#6b7280; color:#fff; font-weight:500; }
+        .shift-badge-reconnected { background:#fef3c7; color:#92400e; font-weight:500; }
 
         .tr-branch { border:1px solid var(--pf-line); border-radius:var(--pf-radius-sm); margin-bottom:.75rem; overflow:hidden; }
         .tr-branch-header, .tr-team-header { cursor:pointer; padding:.8rem 1rem; background:var(--pf-bg-soft);
@@ -376,6 +380,7 @@
 <script th:src="@{/js/preferences.js}"></script>
 <script th:src="@{/js/rcc-api.js}"></script>
 <script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/shift-timeline.js}"></script>
 <script th:src="@{/js/performance.js}"></script>
 </body>
 </html>

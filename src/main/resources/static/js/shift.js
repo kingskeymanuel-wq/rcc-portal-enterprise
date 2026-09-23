@@ -34,51 +34,81 @@
         return ((clamped - WINDOW_START_MIN) / (WINDOW_END_MIN - WINDOW_START_MIN)) * 100;
     }
 
-    /** Construit les segments verts/rouges d'un agent à partir de sa séquence d'événements du jour. */
+    /**
+     * Segments d'un agent pour la journée (travail vert, pause rouge, déconnexion grise) —
+     * via RccShiftTimeline (même logique que le serveur) : une déconnexion/reconnexion le même
+     * jour apparaît comme une période « Déconnecté » et ne fait plus perdre le temps travaillé
+     * avant la reconnexion (l'ancien calcul repartait de zéro au 2e LOGIN).
+     */
     function buildSegments(events, isToday) {
-        var sorted = events.slice().sort(function (a, b) { return new Date(a.occurredAt) - new Date(b.occurredAt); });
-        var segments = [];
-        var state = null; // "work" | "pause"
-        var segStartMin = null;
-
-        sorted.forEach(function (e) {
-            var min = minutesSinceMidnight(new Date(e.occurredAt));
-            if (e.eventType === "LOGIN" || e.eventType === "PAUSE_END" || e.eventType === "LUNCH_END") {
-                if (state === "pause") segments.push({ type: "pause", from: segStartMin, to: min });
-                state = "work"; segStartMin = min;
-            } else if (e.eventType === "PAUSE_START" || e.eventType === "LUNCH_START") {
-                if (state === "work") segments.push({ type: "work", from: segStartMin, to: min });
-                // Deux événements "pause" consécutifs (ex. LUNCH_START juste après PAUSE_START sans
-                // PAUSE_END entre les deux) ne doivent jamais faire perdre la pause déjà en cours —
-                // on la clôture ici avant d'en ouvrir une nouvelle, plutôt que d'écraser segStartMin.
-                if (state === "pause" && segStartMin !== null && min > segStartMin) {
-                    segments.push({ type: "pause", from: segStartMin, to: min });
-                }
-                state = "pause"; segStartMin = min;
-            } else if (e.eventType === "SHIFT_END") {
-                if (state) segments.push({ type: state, from: segStartMin, to: min });
-                state = null; segStartMin = null;
-            }
-        });
-
-        if (state && segStartMin !== null) {
-            var endMin = isToday ? minutesSinceMidnight(new Date()) : WINDOW_END_MIN;
-            segments.push({ type: state, from: segStartMin, to: endMin });
-        }
-
-        return segments;
+        var analysis = RccShiftTimeline.analyze(events, isToday ? new Date() : null);
+        return analysis.segments.map(function (s) {
+            return {
+                type: s.type,
+                from: minutesSinceMidnight(s.from),
+                to: s.to ? minutesSinceMidnight(s.to) : WINDOW_END_MIN
+            };
+        }).filter(function (s) { return s.to > s.from; });
     }
+
+    var SEGMENT_LABELS = { work: "En poste", pause: "Pause", offline: "Déconnecté" };
 
     function renderBar(events, isToday) {
         var segments = buildSegments(events, isToday);
         return segments.map(function (s) {
             var left = pct(s.from), right = pct(s.to);
-            var cls = s.type === "work" ? "shift-bar-seg-work" : "shift-bar-seg-pause";
-            var width = Math.max(s.type === "pause" ? 1 : 0.5, right - left);
+            var cls = s.type === "work" ? "shift-bar-seg-work" : s.type === "offline" ? "shift-bar-seg-offline" : "shift-bar-seg-pause";
+            var width = Math.max(s.type === "work" ? 0.5 : 1, right - left);
             return '<div class="shift-bar-segment ' + cls + '" style="left:' + left + '%;width:' + width + '%;" ' +
-                'title="' + s.type + ' ' + Math.floor(s.from / 60) + 'h' + String(s.from % 60).padStart(2, "0") +
-                ' → ' + Math.floor(s.to / 60) + 'h' + String(s.to % 60).padStart(2, "0") + '"></div>';
+                'title="' + SEGMENT_LABELS[s.type] + ' ' + Math.floor(s.from / 60) + 'h' + String(s.from % 60).padStart(2, "0") +
+                ' → ' + Math.floor(s.to / 60) + 'h' + String(s.to % 60).padStart(2, "0") +
+                ' (' + RccShiftTimeline.formatDuration(s.to - s.from) + ')"></div>';
         }).join("");
+    }
+
+    /**
+     * Pastille de déconnexion à côté du nom de l'agent : « Déconnecté depuis 10:02 » s'il est
+     * absent en ce moment, sinon « N déconnexion(s) · durée totale » — détail au survol.
+     */
+    function disconnectionBadge(events) {
+        var analysis = RccShiftTimeline.analyze(events, null);
+        if (!analysis.absences.length) return "";
+        var details = analysis.absences.map(RccShiftTimeline.describeAbsence).join(" | ");
+        var total = RccShiftTimeline.formatDuration(RccShiftTimeline.totalAbsenceMinutes(analysis.absences));
+        if (analysis.state === "DISCONNECTED") {
+            var current = analysis.absences[analysis.absences.length - 1];
+            return ' <span class="badge shift-badge-offline" title="' + escapeHtml("Déconnexions : " + details) + '">' +
+                '<i class="bi bi-plug"></i> Déconnecté depuis ' + RccShiftTimeline.hhmm(current.from) + '</span>';
+        }
+        return ' <span class="badge shift-badge-reconnected" title="' + escapeHtml("Déconnexions : " + details) + '">' +
+            '<i class="bi bi-arrow-repeat"></i> ' + analysis.absences.length + ' déconnexion' + (analysis.absences.length > 1 ? 's' : '') +
+            ' · ' + total + '</span>';
+    }
+
+    /** Tableau récapitulatif des déconnexions du jour (heure de déconnexion, reconnexion, durée). */
+    function disconnectionSummaryHtml(users) {
+        var rows = [];
+        users.forEach(function (u) {
+            var analysis = RccShiftTimeline.analyze(u.events, null);
+            analysis.absences.forEach(function (a) {
+                rows.push({ name: u.fullName || u.username, absence: a, resumedState: analysis.state });
+            });
+        });
+        if (!rows.length) return "";
+        rows.sort(function (a, b) { return a.absence.from - b.absence.from; });
+        return '<div class="card dashboard-card shadow-sm mb-3"><div class="card-body py-2">' +
+            '<div class="fw-semibold small mb-2"><i class="bi bi-plug"></i> Déconnexions en cours de shift (' + rows.length + ')</div>' +
+            '<div class="table-responsive"><table class="table table-sm mb-0 small align-middle">' +
+            '<thead><tr><th>Agent</th><th>Déconnecté à</th><th>Reconnecté à</th><th>Durée d\'absence</th></tr></thead><tbody>' +
+            rows.map(function (r) {
+                var min = Math.max(0, Math.round(((r.absence.to || new Date()) - r.absence.from) / 60000));
+                return '<tr><td>' + escapeHtml(r.name) + '</td>' +
+                    '<td>' + RccShiftTimeline.hhmm(r.absence.from) + '</td>' +
+                    '<td>' + (r.absence.to ? RccShiftTimeline.hhmm(r.absence.to) + ' <span class="text-muted">(reprise en continuité)</span>'
+                        : '<span class="badge shift-badge-offline">Toujours déconnecté</span>') + '</td>' +
+                    '<td>' + RccShiftTimeline.formatDuration(min) + '</td></tr>';
+            }).join("") +
+            '</tbody></table></div></div></div>';
     }
 
     /** Regroupe une liste d'événements (potentiellement multi-jours) par date ISO locale. */
@@ -235,7 +265,7 @@
             return;
         }
         container.innerHTML = '<div class="card dashboard-card shadow-sm"><div class="card-body">' +
-            '<div class="shift-timeline-row"><div class="shift-agent-label">Moi-même</div>' +
+            '<div class="shift-timeline-row"><div class="shift-agent-label">Moi-même' + disconnectionBadge(events) + '</div>' +
             '<div class="shift-bar-wrap">' + renderBar(events, isToday) + '</div></div>' +
             '<div class="shift-bar-ruler"><span>06h</span><span>10h</span><span>14h</span><span>18h</span><span>22h</span></div>' +
             '</div></div>';
@@ -264,12 +294,13 @@
                     ? '<div style="background:#e5e7eb;height:100%;display:flex;align-items:center;justify-content:center;" class="small text-muted"><i class="bi bi-airplane"></i> Congé / absence</div>'
                     : renderBar(u.events, isToday);
                 return '<div class="shift-timeline-row">' +
-                    '<div class="shift-agent-label">' + escapeHtml(u.fullName || u.username) + '</div>' +
+                    '<div class="shift-agent-label">' + escapeHtml(u.fullName || u.username) + disconnectionBadge(u.events) + '</div>' +
                     '<div class="shift-bar-wrap">' + barContent + '</div>' +
                     '</div>';
             }).join("");
 
-        container.innerHTML = '<div class="card dashboard-card shadow-sm"><div class="card-body">' + rows +
+        container.innerHTML = disconnectionSummaryHtml(Object.values(byUser)) +
+            '<div class="card dashboard-card shadow-sm"><div class="card-body">' + rows +
             '<div class="shift-bar-ruler"><span>06h</span><span>10h</span><span>14h</span><span>18h</span><span>22h</span></div>' +
             '</div></div>';
     }
@@ -925,7 +956,8 @@
         ON_LUNCH: '<span class="badge bg-danger">Pause déjeuner</span>',
         ON_TRAINING: '<span class="badge" style="background:#0057B8;">En formation</span>',
         ON_MEETING: '<span class="badge" style="background:#F5A623;color:#000;">En réunion</span>',
-        SHIFT_ENDED: '<span class="badge bg-dark">Shift terminé</span>'
+        SHIFT_ENDED: '<span class="badge bg-dark">Shift terminé</span>',
+        DISCONNECTED: '<span class="badge shift-badge-offline">Déconnecté</span>'
     };
     var TEAM_LABELS_SHIFT = { INBOUND_VOICE: "Inbound Voix", INBOUND_MAIL: "Inbound Mail / Rafiki", CIB: "CIB", OUTBOUND: "Outbound", OTHER: "Non classée" };
 

@@ -10,6 +10,7 @@ import com.ecobank.rccportal.repository.ShiftEventRepository;
 import com.ecobank.rccportal.repository.UserRepository;
 import com.ecobank.rccportal.repository.UserServiceAssignmentRepository;
 import com.ecobank.rccportal.util.ApiException;
+import com.ecobank.rccportal.util.ShiftTimeline;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +39,8 @@ public class ShiftService {
             "ON_TRAINING", List.of("TRAINING_END", "SHIFT_END"),
             "ON_MEETING", List.of("MEETING_END", "SHIFT_END"),
             "SHIFT_ENDED", List.of(),
+            // DISCONNECTED ne se rencontre pas ici : recordEvent() enregistre d'abord une
+            // reconnexion (LOGIN) et repart de l'état restauré — voir recordEvent().
             // NOT_STARTED (aucun événement LOGIN aujourd'hui) — le frontend affiche déjà les
             // mêmes boutons que WORKING dans ce cas (voir applyShiftUi()) ; le backend doit
             // accepter les mêmes transitions, sinon tout clic échoue systématiquement pour
@@ -87,12 +90,35 @@ public class ShiftService {
         saveEvent(user, "LOGIN");
     }
 
+    /**
+     * Déconnexion (bouton Déconnexion, sans « Fin de shift ») — enregistre l'heure de
+     * déconnexion, sauf si le shift n'a pas commencé, est déjà terminé ou déjà déconnecté.
+     * Transaction séparée : un échec ici ne doit jamais faire échouer la déconnexion.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void recordLogout(String username) {
+        User user = userRepository.findFirstByUsernameIgnoreCase(username).orElse(null);
+        if (user == null) return;
+        String state = timelineOf(todayEventsFor(user)).state();
+        if (ShiftTimeline.NOT_STARTED.equals(state) || ShiftTimeline.SHIFT_ENDED.equals(state)
+                || ShiftTimeline.DISCONNECTED.equals(state)) {
+            return;
+        }
+        saveEvent(user, "LOGOUT");
+    }
+
     @Transactional
     public ShiftStatusResponse recordEvent(String username, RecordShiftEventRequest request) {
         User user = findUser(username);
         String eventType = request.eventType() == null ? "" : request.eventType().toUpperCase();
 
         String currentState = computeState(todayEventsFor(user));
+        if (ShiftTimeline.DISCONNECTED.equals(currentState)) {
+            // Action depuis une session encore ouverte (autre onglet) après une déconnexion :
+            // c'est une reconnexion de fait — on la trace avant d'appliquer l'action.
+            saveEvent(user, "LOGIN");
+            currentState = computeState(todayEventsFor(user));
+        }
         List<String> allowed = ALLOWED_TRANSITIONS.getOrDefault(currentState, List.of());
 
         if (!allowed.contains(eventType)) {
@@ -108,9 +134,13 @@ public class ShiftService {
     public ShiftStatusResponse getStatus(String username) {
         User user = findUser(username);
         List<ShiftEvent> events = todayEventsFor(user);
-        String state = computeState(events);
+        ShiftTimeline timeline = timelineOf(events);
+        LocalDateTime now = LocalDateTime.now();
         List<ShiftEventResponse> responses = events.stream().map(this::toResponse).toList();
-        return new ShiftStatusResponse(state, responses);
+        return new ShiftStatusResponse(timeline.state(), responses, timeline.stateSince(),
+                timeline.lastDisconnectedAt(), timeline.lastReconnectedAt(),
+                timeline.absenceMinutes(now), timeline.absenceMinutesInCurrentState(now),
+                absencesOf(timeline, now));
     }
 
     /** Statut en direct de chaque agent (déduit du dernier événement du jour) — pour le
@@ -124,11 +154,13 @@ public class ShiftService {
         for (User user : userRepository.findAll()) {
             if (user.getUsername() != null && leaders.contains(user.getUsername().toLowerCase())) continue;
             List<ShiftEvent> events = todayEventsFor(user);
-            String state = computeState(events);
-            LocalDateTime since = events.isEmpty() ? null : events.get(events.size() - 1).getOccurredAt();
+            ShiftTimeline timeline = timelineOf(events);
+            LocalDateTime now = LocalDateTime.now();
             String team = com.ecobank.rccportal.util.TeamClassifier.classify(user.getActivity()).name();
             out.add(new com.ecobank.rccportal.dto.LiveShiftStatusResponse(
-                    user.getUsername(), user.getName() != null ? user.getName() : user.getUsername(), team, state, since));
+                    user.getUsername(), user.getName() != null ? user.getName() : user.getUsername(), team,
+                    timeline.state(), timeline.stateSince(), timeline.lastDisconnectedAt(),
+                    timeline.lastReconnectedAt(), timeline.absenceMinutes(now), timeline.absences().size()));
         }
         return out;
     }
@@ -162,7 +194,7 @@ public class ShiftService {
     }
 
     private static final java.util.Set<String> VALID_EVENT_TYPES =
-            java.util.Set.of("LOGIN", "PAUSE_START", "PAUSE_END", "LUNCH_START", "LUNCH_END",
+            java.util.Set.of("LOGIN", "LOGOUT", "PAUSE_START", "PAUSE_END", "LUNCH_START", "LUNCH_END",
                     "TRAINING_START", "TRAINING_END", "MEETING_START", "MEETING_END", "SHIFT_END");
 
     /**
@@ -233,16 +265,16 @@ public class ShiftService {
         List<ShiftEvent> events = shiftEventRepository.findByUserAndOccurredAtBetweenOrderByOccurredAtAsc(
                 user, from.atStartOfDay(), to.plusDays(1).atStartOfDay());
 
+        // Jour par jour via ShiftTimeline : une reconnexion (2e LOGIN) ne fait plus perdre le
+        // temps travaillé avant la déconnexion, et l'absence n'est jamais comptée.
         long minutes = 0;
-        LocalDateTime workStart = null;
+        java.util.Map<LocalDate, List<ShiftTimeline.Event>> byDay = new java.util.TreeMap<>();
         for (ShiftEvent e : events) {
-            String type = e.getEventType();
-            if ("LOGIN".equals(type) || "PAUSE_END".equals(type) || "LUNCH_END".equals(type)) {
-                workStart = e.getOccurredAt();
-            } else if (("PAUSE_START".equals(type) || "LUNCH_START".equals(type) || "SHIFT_END".equals(type)) && workStart != null) {
-                minutes += java.time.Duration.between(workStart, e.getOccurredAt()).toMinutes();
-                workStart = null;
-            }
+            byDay.computeIfAbsent(e.getOccurredAt().toLocalDate(), d -> new java.util.ArrayList<>())
+                    .add(new ShiftTimeline.Event(e.getEventType(), e.getOccurredAt()));
+        }
+        for (List<ShiftTimeline.Event> day : byDay.values()) {
+            minutes += ShiftTimeline.of(day).workedMinutes(null);
         }
         return minutes;
     }
@@ -302,20 +334,21 @@ public class ShiftService {
         return shiftEventRepository.findByUserAndOccurredAtBetweenOrderByOccurredAtAsc(user, from, to);
     }
 
-    /** Dérive l'état courant à partir du dernier événement du jour. */
+    /** État courant du jour — déconnexion/reconnexion prises en compte (voir ShiftTimeline). */
     private String computeState(List<ShiftEvent> todayEvents) {
-        if (todayEvents.isEmpty()) return "NOT_STARTED";
+        return timelineOf(todayEvents).state();
+    }
 
-        ShiftEvent last = todayEvents.get(todayEvents.size() - 1);
-        return switch (last.getEventType()) {
-            case "LOGIN", "PAUSE_END", "LUNCH_END", "TRAINING_END", "MEETING_END" -> "WORKING";
-            case "PAUSE_START" -> "ON_PAUSE";
-            case "LUNCH_START" -> "ON_LUNCH";
-            case "TRAINING_START" -> "ON_TRAINING";
-            case "MEETING_START" -> "ON_MEETING";
-            case "SHIFT_END" -> "SHIFT_ENDED";
-            default -> "NOT_STARTED";
-        };
+    private ShiftTimeline timelineOf(List<ShiftEvent> events) {
+        return ShiftTimeline.of(events.stream()
+                .map(e -> new ShiftTimeline.Event(e.getEventType(), e.getOccurredAt()))
+                .toList());
+    }
+
+    private List<com.ecobank.rccportal.dto.ShiftAbsenceResponse> absencesOf(ShiftTimeline timeline, LocalDateTime now) {
+        return timeline.absences().stream()
+                .map(a -> new com.ecobank.rccportal.dto.ShiftAbsenceResponse(a.disconnectedAt(), a.reconnectedAt(), a.minutes(now)))
+                .toList();
     }
 
     private User findUser(String username) {
@@ -438,10 +471,19 @@ public class ShiftService {
                 }
 
                 for (int i = 0; i < days.size(); i++) {
-                    int workedMinutes = workedMinutesForDay(byDay.getOrDefault(days.get(i), List.of()));
+                    java.util.List<ShiftEventResponse> dayEvents = byDay.getOrDefault(days.get(i), List.of());
+                    int workedMinutes = workedMinutesForDay(dayEvents);
                     int pct = Math.min(100, Math.round(100f * workedMinutes / REFERENCE_SHIFT_MINUTES));
                     String value = workedMinutes <= 0 ? "—"
                             : (workedMinutes / 60) + "h" + String.format("%02d", workedMinutes % 60) + " (" + pct + "%)";
+                    // Déconnexions en cours de shift, pour les RH / Team Leaders.
+                    ShiftTimeline timeline = ShiftTimeline.of(dayEvents.stream()
+                            .map(e -> new ShiftTimeline.Event(e.eventType(), e.occurredAt())).toList());
+                    if (!timeline.absences().isEmpty()) {
+                        long absence = timeline.absenceMinutes(days.get(i).equals(LocalDate.now()) ? LocalDateTime.now() : null);
+                        value += " — " + timeline.absences().size() + " déconnexion(s)"
+                                + (absence > 0 ? ", " + (absence / 60) + "h" + String.format("%02d", absence % 60) : "");
+                    }
                     row.createCell(i + 1).setCellValue(value);
                 }
             }
@@ -462,26 +504,9 @@ public class ShiftService {
      * PAUSE_START/LUNCH_START l'interrompent, SHIFT_END le clôt.
      */
     private int workedMinutesForDay(java.util.List<ShiftEventResponse> dayEvents) {
-        java.util.List<ShiftEventResponse> sorted = dayEvents.stream()
-                .sorted(java.util.Comparator.comparing(ShiftEventResponse::occurredAt))
-                .toList();
-        int total = 0;
-        String state = null; // "work" | "pause"
-        LocalDateTime segStart = null;
-        for (ShiftEventResponse e : sorted) {
-            String type = e.eventType();
-            LocalDateTime at = e.occurredAt();
-            if ("LOGIN".equals(type) || "PAUSE_END".equals(type) || "LUNCH_END".equals(type)) {
-                state = "work"; segStart = at;
-            } else if ("PAUSE_START".equals(type) || "LUNCH_START".equals(type)) {
-                if ("work".equals(state) && segStart != null) total += java.time.Duration.between(segStart, at).toMinutes();
-                state = "pause"; segStart = at;
-            } else if ("SHIFT_END".equals(type)) {
-                if ("work".equals(state) && segStart != null) total += java.time.Duration.between(segStart, at).toMinutes();
-                state = null; segStart = null;
-            }
-        }
-        return total;
+        return (int) ShiftTimeline.of(dayEvents.stream()
+                .map(e -> new ShiftTimeline.Event(e.eventType(), e.occurredAt()))
+                .toList()).workedMinutes(null);
     }
 
     private ShiftEventResponse toResponse(ShiftEvent e) {

@@ -47,7 +47,12 @@ bugs réels sont venus de l'oubli de cette normalisation.
 
 `ShiftEvents` est un journal **append-only** (jamais de UPDATE/DELETE) des
 événements de connexion/pause d'un agent — sert à calculer le taux de
-présence (`ShiftService.computePresenceRate`). `WorkflowRequests` est le
+présence (`ShiftService.computePresenceRate`). Une déconnexion sans « Fin de
+shift » écrit un événement `LOGOUT` (heure de déconnexion retenue) ; à la
+reconnexion le même jour (`LOGIN`), l'état d'avant est restauré, le minuteur
+reprend en continuité et l'absence est tracée à part (jamais comptée comme
+temps travaillé) — voir `util.ShiftTimeline`. Pas de migration : `EventType`
+est un `NVARCHAR(20)` sans contrainte. `WorkflowRequests` est le
 moteur générique de demandes à valider (congé, changement de procédure,
 matériel) : une demande est assignée à une équipe (QA ou ADMIN) qui seule
 peut la voir et la décider.

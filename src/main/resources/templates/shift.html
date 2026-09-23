@@ -26,6 +26,9 @@
         .shift-bar-segment { position:absolute; top:0; bottom:0; }
         .shift-bar-seg-work { background:#22c55e; }
         .shift-bar-seg-pause { background:#ef4444; }
+        .shift-bar-seg-offline { background:repeating-linear-gradient(45deg,#9ca3af 0 4px,#d1d5db 4px 8px); }
+        .shift-badge-offline { background:#6b7280; color:#fff; font-weight:500; }
+        .shift-badge-reconnected { background:#fef3c7; color:#92400e; font-weight:500; }
         .shift-bar-ruler { display:flex; justify-content:space-between; font-size:.68rem; color:#9aa2b1; margin-left:220px; margin-top:2px; }
         .shift-legend { display:flex; gap:1.25rem; font-size:.82rem; color:#495057; align-items:center; }
         .shift-legend .dot { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:.35rem; }
@@ -266,6 +269,7 @@
                 <div class="shift-legend mb-3">
                     <span><span class="dot" style="background:#22c55e;"></span>Temps de travail</span>
                     <span><span class="dot" style="background:#ef4444;"></span>Pause / pause déjeuner</span>
+                    <span><span class="dot shift-bar-seg-offline"></span>Déconnecté (absence en cours de shift)</span>
                     <span><span class="dot" style="background:#eef0f4;border:1px solid #dee2e6;"></span>Hors shift</span>
                 </div>
 
@@ -387,6 +391,7 @@
 <script th:src="@{/js/preferences.js}"></script>
 <script th:src="@{/js/rcc-api.js}"></script>
 <script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/shift-timeline.js}"></script>
 <script th:src="@{/js/shift.js}"></script>
 </body>
 </html>

@@ -102,6 +102,7 @@
         <div class="sidebar-footer">
             <div id="shiftStatusBadge" class="small text-white-50 mb-1 text-center">…</div>
             <div id="shiftTimer" class="text-center mb-2 fw-bold" style="font-size:1.1rem; letter-spacing:.05em;">--:--:--</div>
+            <div id="shiftResumeInfo" class="text-center small mb-2" style="display:none; color:#fde68a; line-height:1.25;"></div>
             <div class="d-grid gap-1">
                 <button id="shiftPauseBtn" type="button" class="btn btn-sm btn-outline-light" style="display:none;">
                     <i class="bi bi-pause-circle"></i> <span data-i18n="shift.pause">Pause</span>
@@ -120,6 +121,11 @@
                 </button>
                 <button id="shiftEndBtn" type="button" class="btn btn-sm btn-outline-danger" style="display:none;">
                     <i class="bi bi-box-arrow-right"></i> <span data-i18n="shift.end">Fin de shift</span>
+                </button>
+                <!-- Déconnexion SANS terminer le shift : heure de déconnexion retenue, minuteur repris
+                     en continuité à la reconnexion le même jour (voir ShiftTimeline). -->
+                <button id="shiftLogoutBtn" type="button" class="btn btn-sm btn-link text-white-50 p-0 mt-1" style="display:none;">
+                    <i class="bi bi-plug"></i> <span data-i18n="nav.logout">Déconnexion</span>
                 </button>
             </div>
         </div>

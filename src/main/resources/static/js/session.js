@@ -27,7 +27,8 @@ window.RccSession = (function () {
         ON_LUNCH: "En pause déjeuner",
         ON_TRAINING: "En formation",
         ON_MEETING: "En réunion",
-        SHIFT_ENDED: "Shift terminé"
+        SHIFT_ENDED: "Shift terminé",
+        DISCONNECTED: "Déconnecté"
     };
 
     // Empêche l'envoi d'un deuxième événement de shift tant qu'une requête
@@ -186,12 +187,17 @@ window.RccSession = (function () {
 
         if ((status.currentState === "SHIFT_ENDED" || status.currentState === "NOT_STARTED") || !lastEvent) {
             shiftCurrentStateSince = null;
+            updateResumeInfo(null);
             el.textContent = "--:--:--";
             el.style.color = "#ffffff";
             return;
         }
 
-        shiftCurrentStateSince = new Date(lastEvent.occurredAt).getTime();
+        // Début de l'état courant calculé par le serveur : après une déconnexion/reconnexion le
+        // même jour, il est conservé — le minuteur reprend en continuité (absence comprise) au
+        // lieu de repartir de zéro. Repli sur le dernier événement pour un ancien serveur.
+        shiftCurrentStateSince = new Date(status.currentStateSince || lastEvent.occurredAt).getTime();
+        updateResumeInfo(status);
         el.style.color = (status.currentState === "ON_PAUSE" || status.currentState === "ON_LUNCH") ? "#ef4444"
             : status.currentState === "ON_TRAINING" ? "#0057B8"
             : status.currentState === "ON_MEETING" ? "#F5A623"
@@ -208,6 +214,41 @@ window.RccSession = (function () {
         shiftTimerInterval = setInterval(tick, 1000);
     }
 
+    function hhmm(iso) {
+        var d = new Date(iso);
+        return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+    }
+
+    function durationLabel(min) {
+        return min < 60 ? min + " min" : Math.floor(min / 60) + "h" + String(min % 60).padStart(2, "0");
+    }
+
+    /**
+     * Précise la continuité du minuteur après une reconnexion le même jour : heure de
+     * déconnexion, heure de reprise et temps d'absence inclus dans le minuteur.
+     */
+    function updateResumeInfo(status) {
+        var info = document.getElementById("shiftResumeInfo");
+        if (!info) return;
+        if (!status || !status.lastDisconnectedAt || !status.lastReconnectedAt) {
+            info.style.display = "none";
+            info.textContent = "";
+            return;
+        }
+        var text = "Reprise à " + hhmm(status.lastReconnectedAt) + " (déconnecté à " + hhmm(status.lastDisconnectedAt) + ")";
+        if (status.absenceMinutesInCurrentState > 0) {
+            text += " — minuteur en continuité, dont " + durationLabel(status.absenceMinutesInCurrentState) + " d'absence";
+        }
+        if (status.absenceMinutesToday > status.absenceMinutesInCurrentState) {
+            text += " · absence totale du jour : " + durationLabel(status.absenceMinutesToday);
+        }
+        info.textContent = text;
+        info.title = (status.absences || []).map(function (a) {
+            return hhmm(a.disconnectedAt) + " → " + (a.reconnectedAt ? hhmm(a.reconnectedAt) : "…") + " (" + durationLabel(a.minutes) + ")";
+        }).join("\n");
+        info.style.display = "";
+    }
+
     function applyShiftUi(status) {
         var badge = document.getElementById("shiftStatusBadge");
         var pauseBtn = document.getElementById("shiftPauseBtn");
@@ -216,6 +257,7 @@ window.RccSession = (function () {
         var meetingBtn = document.getElementById("shiftMeetingBtn");
         var resumeBtn = document.getElementById("shiftResumeBtn");
         var endBtn = document.getElementById("shiftEndBtn");
+        var logoutBtn = document.getElementById("shiftLogoutBtn");
 
         if (!badge) return; // page sans sidebar (ex. login)
 
@@ -229,6 +271,8 @@ window.RccSession = (function () {
         meetingBtn.style.display = "none";
         resumeBtn.style.display = "none";
         endBtn.style.display = "none";
+        // Déconnexion simple possible tant que le shift n'est pas terminé.
+        if (logoutBtn) logoutBtn.style.display = status.currentState === "SHIFT_ENDED" ? "none" : "";
 
         // NOT_STARTED traité comme WORKING pour l'affichage : l'agent est bien
         // connecté (sinon il serait déjà redirigé vers /login) — seul l'événement
@@ -330,6 +374,20 @@ window.RccSession = (function () {
                 recordShiftEvent(RESUME_EVENT_BY_STATE[status.currentState] || "PAUSE_END");
             });
         });
+
+        var logoutBtn = document.getElementById("shiftLogoutBtn");
+        if (logoutBtn) {
+            logoutBtn.addEventListener("click", function () {
+                if (shiftActionInFlight) return;
+                if (!confirm("Vous déconnecter sans terminer votre shift ?\n\n" +
+                        "L'heure de déconnexion est enregistrée et visible par votre Team Leader, les RH et le superviseur. " +
+                        "Si vous vous reconnectez aujourd'hui, votre minuteur reprendra en continuité (temps d'absence indiqué).")) return;
+                logoutBtn.disabled = true;
+                fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" })
+                    .catch(function () {})
+                    .finally(function () { window.location.href = "/login"; });
+            });
+        }
 
         endBtn.addEventListener("click", function () {
             if (shiftActionInFlight) return;

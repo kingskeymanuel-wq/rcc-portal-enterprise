@@ -782,37 +782,29 @@
         return d.getHours() * 60 + d.getMinutes();
     }
 
-    /** Reconstruit les segments travail/pause d'une journée à partir de ses événements bruts. */
+    /**
+     * Segments travail/pause/déconnexion d'une journée — via RccShiftTimeline (même logique que
+     * le serveur et le Suivi de shift) : une reconnexion le même jour ne remet plus le compteur
+     * à zéro et l'absence apparaît comme une période « Déconnecté ».
+     */
     function computeDaySegments(events, isToday) {
         var totalMin = DAY_END_MIN - DAY_START_MIN;
+        var openEnd = isToday ? new Date() : null;
+        var analysis = RccShiftTimeline.analyze(events, openEnd);
         var segments = [];
-        var workStart = null, pauseStart = null;
-        var totalWorkMin = 0, totalPauseMin = 0;
-
-        events.forEach(function (e) {
-            var min = minutesOfDay(e.occurredAt);
-            if (e.eventType === "LOGIN") {
-                workStart = min;
-            } else if (e.eventType === "PAUSE_START" || e.eventType === "LUNCH_START") {
-                if (workStart !== null) { segments.push({ start: workStart, end: min, type: "work" }); totalWorkMin += (min - workStart); }
-                pauseStart = min;
-                workStart = null;
-            } else if (e.eventType === "PAUSE_END" || e.eventType === "LUNCH_END") {
-                if (pauseStart !== null) { segments.push({ start: pauseStart, end: min, type: "pause" }); totalPauseMin += (min - pauseStart); }
-                workStart = min;
-                pauseStart = null;
-            } else if (e.eventType === "SHIFT_END") {
-                if (workStart !== null) { segments.push({ start: workStart, end: min, type: "work" }); totalWorkMin += (min - workStart); }
-                if (pauseStart !== null) { segments.push({ start: pauseStart, end: min, type: "pause" }); totalPauseMin += (min - pauseStart); }
-                workStart = null; pauseStart = null;
-            }
+        var totalWorkMin = 0, totalPauseMin = 0, totalOfflineMin = 0;
+        analysis.segments.forEach(function (s) {
+            var start = minutesOfDay(s.from.toISOString());
+            // Segment encore ouvert : jusqu'à maintenant pour aujourd'hui, fin de fenêtre sinon.
+            var end = s.to ? minutesOfDay(s.to.toISOString()) : (isToday ? Math.min(minutesOfDay(new Date().toISOString()), DAY_END_MIN) : DAY_END_MIN);
+            if (end <= start) return;
+            segments.push({ start: start, end: end, type: s.type });
+            if (s.type === "work") totalWorkMin += end - start;
+            else if (s.type === "pause") totalPauseMin += end - start;
+            else totalOfflineMin += end - start;
         });
-        // Shift toujours en cours (pas de SHIFT_END) — ne prolonge jusqu'à "maintenant" que pour le jour courant.
-        var openEnd = isToday ? Math.min(minutesOfDay(new Date().toISOString()), DAY_END_MIN) : DAY_END_MIN;
-        if (workStart !== null && openEnd > workStart) { segments.push({ start: workStart, end: openEnd, type: "work" }); totalWorkMin += (openEnd - workStart); }
-        if (pauseStart !== null && openEnd > pauseStart) { segments.push({ start: pauseStart, end: openEnd, type: "pause" }); totalPauseMin += (openEnd - pauseStart); }
-
-        return { segments: segments, totalWorkMin: totalWorkMin, totalPauseMin: totalPauseMin, totalMin: totalMin };
+        return { segments: segments, totalWorkMin: totalWorkMin, totalPauseMin: totalPauseMin,
+            totalOfflineMin: totalOfflineMin, absences: analysis.absences, totalMin: totalMin };
     }
 
     function fmtMin(m) {
@@ -858,7 +850,7 @@
             el.className = "my-shift-bar-segment my-shift-bar-seg-" + seg.type;
             el.style.left = pct(seg.start) + "%";
             el.style.width = (pct(seg.end) - pct(seg.start)) + "%";
-            el.title = seg.type === "work" ? "Travail" : "Pause";
+            el.title = seg.type === "work" ? "Travail" : seg.type === "offline" ? "Déconnecté" : "Pause";
             wrap.appendChild(el);
         });
 
@@ -868,7 +860,10 @@
             ruler.appendChild(label);
         }
 
-        summary.textContent = "Temps de travail : " + fmtMin(computed.totalWorkMin) + " — Pauses : " + fmtMin(computed.totalPauseMin);
+        summary.textContent = "Temps de travail : " + fmtMin(computed.totalWorkMin) + " — Pauses : " + fmtMin(computed.totalPauseMin) +
+            (computed.absences.length
+                ? " — Déconnexions : " + computed.absences.map(RccShiftTimeline.describeAbsence).join(", ")
+                : "");
     }
 
     var myShiftView = "day";
@@ -909,7 +904,7 @@
 
             function pct(min) { return Math.max(0, Math.min(100, ((min - DAY_START_MIN) / computed.totalMin) * 100)); }
             var segmentsHtml = computed.segments.map(function (seg) {
-                return '<div class="shift-bar-segment shift-bar-seg-' + seg.type + '" style="left:' + pct(seg.start) + '%;width:' + (pct(seg.end) - pct(seg.start)) + '%;" title="' + (seg.type === "work" ? "Travail" : "Pause") + '"></div>';
+                return '<div class="shift-bar-segment shift-bar-seg-' + seg.type + '" style="left:' + pct(seg.start) + '%;width:' + (pct(seg.end) - pct(seg.start)) + '%;" title="' + (seg.type === "work" ? "Travail" : seg.type === "offline" ? "Déconnecté" : "Pause") + '"></div>';
             }).join("");
 
             var rowLabel = label +
