@@ -57,7 +57,8 @@ public class BankBranchSeedBootstrap implements CommandLineRunner {
                 log.warn("⚠ [BANK MAP] {} agence(s) de départ créée(s) (filiales sans aucune agence existante).", created);
             }
         } catch (Exception e) {
-            // Table BankBranches pas encore créée (migration 012 pas exécutée) — pas bloquant, réessaiera au prochain démarrage.
+            // Table BankBranches absente (normalement créée par WorkflowSchemaBootstrap, Order 1) — pas bloquant,
+            // réessaiera au prochain démarrage.
             log.warn("⚠ [BANK MAP] Import ignoré pour l'instant (table manquante ?) : {}", e.getMessage());
         }
     }

@@ -283,6 +283,30 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
                 """);
         addColumnIfMissing("SlaRules", "PoleId", "ALTER TABLE dbo.SlaRules ADD PoleId INT NULL");
 
+        // Carte des agences (BankBranch / bank-map.js) — jusqu'ici créée UNIQUEMENT par
+        // db/migrations/012_add_bank_branches.sql, jamais exécutée sur les bases existantes :
+        // BankBranchSeedBootstrap échouait alors en silence ("table manquante ?") et
+        // /api/bank-branches répondait 500 → cartes vides. Même définition que la migration 012.
+        createIfMissing("BankBranches", """
+                CREATE TABLE dbo.BankBranches (
+                    BranchId BIGINT IDENTITY(1,1) PRIMARY KEY,
+                    CountryCode NVARCHAR(2) NOT NULL,
+                    City NVARCHAR(100) NOT NULL,
+                    Name NVARCHAR(200) NOT NULL,
+                    Address NVARCHAR(500) NULL,
+                    Latitude FLOAT NULL,
+                    Longitude FLOAT NULL,
+                    Phone NVARCHAR(50) NULL,
+                    Email NVARCHAR(150) NULL,
+                    OpeningHours NVARCHAR(200) NULL,
+                    ManagerName NVARCHAR(150) NULL,
+                    BranchType NVARCHAR(50) NULL,
+                    IsActive BIT NOT NULL DEFAULT 1,
+                    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    UpdatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+                )
+                """);
+
         createIfMissing("RefreshTokens", """
                 CREATE TABLE dbo.RefreshTokens (
                     RefreshTokenId INT IDENTITY PRIMARY KEY,

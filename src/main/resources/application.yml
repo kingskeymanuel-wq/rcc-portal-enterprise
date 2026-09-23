@@ -115,6 +115,12 @@ rcc:
   uploads:
     photos-dir: ${RCC_PHOTOS_DIR:C:/rcc-portal-photos}
     kb-files-dir: ${RCC_KB_FILES_DIR:C:/rcc-portal-kb-files}
+  map:
+    # Fond de carte de l'onglet « Agences / Carte » (Base de connaissance, bank-map.js).
+    # Le réseau Ecobank peut bloquer tile.openstreetmap.org : pointer alors vers un serveur de
+    # tuiles interne (même format {z}/{x}/{y}), ou laisser vide pour ne pas charger de fond —
+    # les agences restent positionnées sur un fond neutre et listées sous la carte.
+    tile-url: "${RCC_MAP_TILE_URL:https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png}"
   translation:
     # Traducteur (/translator + bouton « Traduire » de RAF) — aucune IA générative. Les sources
     # configurées sont essayées dans cet ordre jusqu'à la première qui répond correctement ;

@@ -1,6 +1,8 @@
 package com.ecobank.rccportal.controller;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
 @Controller
@@ -42,8 +44,13 @@ public class ViewController {
         return "workflow";
     }
 
+    /** Fond de carte de l'onglet « Agences / Carte » — voir rcc.map.tile-url (application.yml). */
+    @Value("${rcc.map.tile-url:}")
+    private String mapTileUrl;
+
     @GetMapping("/knowledge")
-    public String knowledge() {
+    public String knowledge(Model model) {
+        model.addAttribute("mapTileUrl", mapTileUrl);
         return "knowledge";
     }
 
