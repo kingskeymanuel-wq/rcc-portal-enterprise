@@ -700,17 +700,16 @@
             groups[r.category].push(r);
         });
 
-        container.innerHTML = order.map(function (category, idx) {
+        container.innerHTML = '<div class="wf-pole-categories">' + order.map(function (category, idx) {
             var rows = groups[category].map(function (r) {
                 return '<div class="wf-pole-activity-row' + (isQa ? ' qa-editable' : '') + '" data-rule-id="' + r.id + '" data-motif="' + escapeHtml((r.motif || "").toLowerCase()) + '">' +
                     '<span class="wf-pole-activity-motif">' + escapeHtml(r.motif) + '</span>' +
                     '<span class="wf-pole-activity-sla ' + slaClass(r.slaLabel) + '">' + escapeHtml(r.slaLabel) + '</span>' +
                 '</div>';
             }).join("");
-            // Première catégorie ouverte par défaut pour montrer le fonctionnement, les suivantes
-            // repliées — c'est ça qui rend l'ensemble "moins complexe" au premier coup d'œil.
-            var openClass = idx === 0 ? " wf-open" : "";
-            return '<div class="wf-pole-category' + openClass + '" data-category="' + escapeHtml(category.toLowerCase()) + '">' +
+            // Grille compacte : toutes les catégories ouvertes, délais visibles d'un coup d'œil
+            // (un clic sur l'en-tête replie une catégorie).
+            return '<div class="wf-pole-category wf-open" style="animation-delay:' + (idx * 40) + 'ms" data-category="' + escapeHtml(category.toLowerCase()) + '">' +
                 '<div class="wf-pole-category-header">' +
                     '<div class="wf-pole-category-icon"><i class="bi ' + categoryIcon(category) + '"></i></div>' +
                     '<div class="wf-pole-category-title">' + escapeHtml(category) + '</div>' +
@@ -719,7 +718,7 @@
                 '</div>' +
                 '<div class="wf-pole-category-body"><div class="wf-pole-category-body-inner">' + rows + '</div></div>' +
             '</div>';
-        }).join("") + '<p class="wf-pole-no-match" style="display:none;">Aucune activité ne correspond à cette recherche.</p>';
+        }).join("") + '</div><p class="wf-pole-no-match" style="display:none;">Aucune activité ne correspond à cette recherche.</p>';
 
         Array.prototype.forEach.call(container.querySelectorAll(".wf-pole-category-header"), function (header) {
             header.addEventListener("click", function () {
@@ -738,8 +737,7 @@
     }
 
     /** Recherche instantanée : filtre les lignes par motif, masque les catégories sans résultat
-     *  et les déplie automatiquement le temps de la recherche (repliées à nouveau une fois le
-     *  champ vidé, pour revenir à l'affichage compact par défaut). */
+     *  et déplie celles qui correspondent (toutes rouvertes une fois le champ vidé). */
     function wirePoleActivitySearch(container) {
         var input = document.getElementById("wfPoleActivitySearch");
         if (!input) return;
@@ -759,9 +757,7 @@
                 });
                 var categoryMatches = matchCount > 0;
                 cat.style.display = categoryMatches ? "" : "none";
-                if (term) cat.classList.toggle("wf-open", categoryMatches);
-                else if (cat === container.querySelector(".wf-pole-category")) cat.classList.add("wf-open");
-                else cat.classList.remove("wf-open");
+                cat.classList.toggle("wf-open", categoryMatches);
                 if (categoryMatches) anyVisible = true;
             });
             var noMatch = container.querySelector(".wf-pole-no-match");

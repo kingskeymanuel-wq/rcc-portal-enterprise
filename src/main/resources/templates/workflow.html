@@ -70,26 +70,50 @@
         .wf-activity-search input { padding-left: 38px; border-radius: 10px; border: 1px solid #e5e9f0; background: #fafbfc; }
         .wf-activity-search input:focus { background: #fff; box-shadow: 0 0 0 3px rgba(0,87,184,.1); border-color: #0057B8; }
 
-        .wf-pole-category { border: 1px solid #eef1f5; border-radius: 12px; margin-bottom: .6rem; overflow: hidden; background: #fff; }
-        .wf-pole-category-header { display: flex; align-items: center; gap: .7rem; padding: .7rem .9rem; cursor: pointer; user-select: none; transition: background .12s ease; }
+        /* Catégories en grille (masonry) : chaque activité garde son délai juste à côté,
+           au lieu d'une ligne pleine largeur où le délai partait à l'autre bout de l'écran. */
+        .wf-pole-categories { columns: 3 300px; column-gap: .8rem; }
+        .wf-pole-category { break-inside: avoid; display: inline-block; width: 100%; border: 1px solid #eef1f5; border-radius: 12px; margin-bottom: .8rem; overflow: hidden; background: rgba(255,255,255,.92); backdrop-filter: blur(4px); transition: box-shadow .15s ease, transform .15s ease; animation: wfCardIn .35s ease both; }
+        .wf-pole-category:hover { box-shadow: 0 6px 18px rgba(0,87,184,.08); transform: translateY(-1px); }
+        @keyframes wfCardIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+        .wf-pole-category-header { display: flex; align-items: center; gap: .6rem; padding: .55rem .75rem; cursor: pointer; user-select: none; transition: background .12s ease; border-bottom: 1px solid transparent; }
+        .wf-pole-category.wf-open .wf-pole-category-header { border-bottom-color: #f2f4f7; background: linear-gradient(90deg, #f5f9ff, #fff); }
         .wf-pole-category-header:hover { background: #fafbfc; }
-        .wf-pole-category-icon { width: 34px; height: 34px; border-radius: 9px; background: #eaf2ff; color: #0057B8; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
-        .wf-pole-category-title { font-weight: 700; font-size: .86rem; color: #1f2937; flex-grow: 1; }
-        .wf-pole-category-badge { font-size: .72rem; font-weight: 600; color: #6b7684; background: #f2f4f7; padding: 2px 9px; border-radius: 20px; flex-shrink: 0; }
-        .wf-pole-category-chevron { color: #9aa4b2; transition: transform .2s ease; flex-shrink: 0; }
+        .wf-pole-category-icon { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, #eaf2ff, #e6f7ec); color: #0057B8; display: flex; align-items: center; justify-content: center; font-size: .95rem; flex-shrink: 0; }
+        .wf-pole-category-title { font-weight: 700; font-size: .85rem; color: #1f2937; flex-grow: 1; }
+        .wf-pole-category-badge { font-size: .7rem; font-weight: 600; color: #6b7684; background: #f2f4f7; padding: 1px 8px; border-radius: 20px; flex-shrink: 0; }
+        .wf-pole-category-chevron { color: #9aa4b2; transition: transform .2s ease; flex-shrink: 0; font-size: .8rem; }
         .wf-pole-category.wf-open .wf-pole-category-chevron { transform: rotate(180deg); }
         .wf-pole-category-body { max-height: 0; overflow: hidden; transition: max-height .25s ease; }
         .wf-pole-category.wf-open .wf-pole-category-body { max-height: 2000px; }
-        .wf-pole-category-body-inner { padding: .2rem 1rem .6rem 3.55rem; }
+        .wf-pole-category-body-inner { padding: .25rem .75rem .45rem; }
 
-        .wf-pole-activity-row { display: flex; justify-content: space-between; align-items: center; padding: .5rem .1rem; border-bottom: 1px solid #f5f5f7; gap: .75rem; cursor: default; }
-        .wf-pole-activity-row:last-child { border-bottom: none; }
-        .wf-pole-activity-motif { font-size: .88rem; color: #1f2937; }
-        .wf-pole-activity-sla { font-size: .74rem; font-weight: 700; padding: 3px 11px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+        .wf-pole-activity-row { display: flex; align-items: center; padding: .3rem .25rem; gap: .5rem; cursor: default; border-radius: 6px; }
+        .wf-pole-activity-motif { font-size: .84rem; color: #1f2937; flex: 0 1 auto; }
+        /* Pointillés de liaison activité → délai (lecture « menu ») */
+        .wf-pole-activity-row::after { content: ""; order: 1; flex: 1 1 12px; min-width: 12px; border-bottom: 1px dotted #d3d9e2; transform: translateY(3px); }
+        .wf-pole-activity-sla { order: 2; font-size: .7rem; font-weight: 700; padding: 2px 9px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
         .wf-pole-activity-sla.sla-instant { color: #0a8a3e; background: #e6f7ec; }
         .wf-pole-activity-sla.sla-fast    { color: #0057B8; background: #eaf2ff; }
         .wf-pole-activity-sla.sla-medium  { color: #b06a00; background: #fff3e0; }
         .wf-pole-activity-sla.sla-slow    { color: #6b7684; background: #f2f4f7; }
+
+        /* Fond animé de l'onglet SLA : halos colorés qui dérivent lentement + illustration
+           horloge animée dans la fiche du pôle. Désactivé si l'utilisateur réduit les animations. */
+        #wfPaneSla { position: relative; isolation: isolate; overflow-x: clip; }
+        #wfPaneSla::before, #wfPaneSla::after { content: ""; position: absolute; z-index: -1; border-radius: 50%; filter: blur(60px); opacity: .45; pointer-events: none; }
+        #wfPaneSla::before { width: 420px; height: 420px; top: -60px; right: 5%; background: radial-gradient(circle, rgba(0,87,184,.35), transparent 70%); animation: wfBlobA 18s ease-in-out infinite; }
+        #wfPaneSla::after { width: 380px; height: 380px; bottom: -40px; left: 8%; background: radial-gradient(circle, rgba(0,166,81,.3), transparent 70%); animation: wfBlobB 22s ease-in-out infinite; }
+        @keyframes wfBlobA { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-120px,80px) scale(1.15); } }
+        @keyframes wfBlobB { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(140px,-60px) scale(.9); } }
+        .wf-pole-hero { position: relative; overflow: hidden; background: linear-gradient(110deg, #fff 45%, #f3f8ff 75%, #effaf3); }
+        .wf-pole-hero-art { flex: 1 1 220px; align-self: stretch; min-height: 120px; max-width: 380px; margin: -1rem 0; background: url("/images/sla-hero.svg") no-repeat center / contain; pointer-events: none; }
+        @media (max-width: 767.98px) { .wf-pole-hero-art { display: none; } }
+        .wf-pole-hero .wf-pole-hero-contact { background: rgba(255,255,255,.85); border-radius: 10px; padding: .35rem .6rem; backdrop-filter: blur(3px); }
+        .wf-pole-card { background: rgba(255,255,255,.92); }
+        @media (prefers-reduced-motion: reduce) {
+            #wfPaneSla::before, #wfPaneSla::after, .wf-pole-category { animation: none; }
+        }
         .wf-pole-activity-row.qa-editable { cursor: pointer; }
         .wf-pole-activity-row.qa-editable:hover { background: #fafbfc; }
         .wf-pole-no-match { text-align: center; color: #9aa4b2; padding: .5rem; font-size: .85rem; }
@@ -371,7 +395,7 @@
                             <i class="bi bi-arrow-left"></i> Retour aux pôles
                         </button>
 
-                        <div class="card dashboard-card shadow-sm mb-4">
+                        <div class="card dashboard-card shadow-sm mb-4 wf-pole-hero">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
                                     <div>
@@ -379,7 +403,8 @@
                                         <p class="text-muted small mb-2" id="wfPoleDetailWho"></p>
                                         <p class="small mb-0" id="wfPoleDetailWhat"></p>
                                     </div>
-                                    <div class="text-end">
+                                    <div class="wf-pole-hero-art" aria-hidden="true"></div>
+                                    <div class="text-end wf-pole-hero-contact">
                                         <div class="fw-semibold" id="wfPoleDetailManager">—</div>
                                         <div class="small text-muted" id="wfPoleDetailContact"></div>
                                         <div class="small text-muted" id="wfPoleDetailTeamContact"></div>
