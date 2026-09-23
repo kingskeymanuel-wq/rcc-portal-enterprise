@@ -18,12 +18,17 @@ public class RalphSearchController {
     private final RalphSearchService ralphSearchService;
     private final TranslationService translationService;
     private final WebSearchClient webSearchClient;
+    private final com.ecobank.rccportal.raf.RafOrchestrator rafOrchestrator;
+    private final com.ecobank.rccportal.raf.RafGapLog rafGapLog;
 
     public RalphSearchController(RalphSearchService ralphSearchService, TranslationService translationService,
-                                 WebSearchClient webSearchClient) {
+                                 WebSearchClient webSearchClient, com.ecobank.rccportal.raf.RafOrchestrator rafOrchestrator,
+                                 com.ecobank.rccportal.raf.RafGapLog rafGapLog) {
         this.ralphSearchService = ralphSearchService;
         this.translationService = translationService;
         this.webSearchClient = webSearchClient;
+        this.rafOrchestrator = rafOrchestrator;
+        this.rafGapLog = rafGapLog;
     }
 
     @GetMapping("/search")
@@ -31,11 +36,45 @@ public class RalphSearchController {
         return ralphSearchService.search(keyword);
     }
 
-    /** Version conversationnelle — synthèse IA à partir des mêmes extraits, avec repli automatique sur /search. */
+    /**
+     * RAF — assistant conversationnel local (agents spécialisés, aucune IA externe).
+     * {@code cmd} : action d'un bouton du widget (« raf:proc:12:step:2 »...), sans question.
+     */
     @GetMapping("/ask")
-    public RalphSearchResponse ask(@RequestParam String keyword, @RequestParam(required = false) String lang,
+    public RalphSearchResponse ask(@RequestParam(required = false) String keyword, @RequestParam(required = false) String lang,
+                                   @RequestParam(required = false) String cmd,
                                    @AuthenticationPrincipal AuthenticatedUser requester) {
-        return ralphSearchService.ask(keyword, requester != null ? requester.username() : null, lang);
+        return ralphSearchService.ask(keyword, requester != null ? requester.username() : null, lang, cmd);
+    }
+
+    /** Même chose en POST — pour les longues saisies (brouillon de mail avec détails). */
+    @PostMapping("/ask")
+    public RalphSearchResponse askPost(@RequestBody java.util.Map<String, String> body,
+                                       @AuthenticationPrincipal AuthenticatedUser requester) {
+        return ralphSearchService.ask(body.get("keyword"), requester != null ? requester.username() : null,
+                body.get("lang"), body.get("cmd"));
+    }
+
+    /** Accueil de RAF avec des exemples cliquables. */
+    @GetMapping("/welcome")
+    public RalphSearchResponse welcome(@RequestParam(required = false) String lang) {
+        return rafOrchestrator.welcome(lang);
+    }
+
+    /** Agents de RAF (id, libellé). */
+    @GetMapping("/capabilities")
+    public java.util.List<java.util.Map<String, String>> capabilities() {
+        return rafOrchestrator.capabilities();
+    }
+
+    /** Questions restées sans réponse fiable — pour que la QA complète le contenu (QA / IT). */
+    @GetMapping("/gaps")
+    public java.util.List<com.ecobank.rccportal.raf.RafGapLog.Gap> gaps(@AuthenticationPrincipal AuthenticatedUser requester) {
+        boolean isAdmin = requester != null && "admin".equalsIgnoreCase(requester.role());
+        boolean isQa = requester != null && requester.service() != null
+                && requester.service().toLowerCase().replace('_', ' ').contains("quality assurance");
+        if (!isAdmin && !isQa) throw ApiException.forbidden("Réservé à la QA et à l'IT.");
+        return rafGapLog.recent();
     }
 
     /** Traduction pure d'un texte libre — bouton "Traduire" du widget RAF, et Traducteur dédié

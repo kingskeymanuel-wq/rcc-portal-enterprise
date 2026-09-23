@@ -35,6 +35,26 @@ public class RafConversationMemoryService {
 
     private final Map<String, Conversation> conversations = new ConcurrentHashMap<>();
 
+    /** Contexte de dialogue RAF (mode guidé, choix proposés, dernière question...) — même durée de vie. */
+    private record StateHolder(com.ecobank.rccportal.raf.RafModels.RafDialogueState state, Instant lastActivity) {
+    }
+
+    private final Map<String, StateHolder> states = new ConcurrentHashMap<>();
+
+    public com.ecobank.rccportal.raf.RafModels.RafDialogueState state(String username) {
+        if (username == null) return com.ecobank.rccportal.raf.RafModels.RafDialogueState.empty();
+        StateHolder holder = states.get(username);
+        if (holder == null || holder.lastActivity().isBefore(Instant.now().minusSeconds(TTL_MINUTES * 60))) {
+            return com.ecobank.rccportal.raf.RafModels.RafDialogueState.empty();
+        }
+        return holder.state();
+    }
+
+    public void saveState(String username, com.ecobank.rccportal.raf.RafModels.RafDialogueState state) {
+        if (username == null || state == null) return;
+        states.put(username, new StateHolder(state, Instant.now()));
+    }
+
     /** Historique récent (le plus ancien en premier) pour l'utilisateur donné, vide si aucun. */
     public Deque<Turn> history(String username) {
         if (username == null) {
@@ -66,6 +86,7 @@ public class RafConversationMemoryService {
     public void clear(String username) {
         if (username != null) {
             conversations.remove(username);
+            states.remove(username);
         }
     }
 
@@ -77,5 +98,6 @@ public class RafConversationMemoryService {
     @Scheduled(fixedRate = 10 * 60 * 1000)
     public void evictExpired() {
         conversations.entrySet().removeIf(entry -> isExpired(entry.getValue()));
+        states.entrySet().removeIf(entry -> entry.getValue().lastActivity().isBefore(Instant.now().minusSeconds(TTL_MINUTES * 60)));
     }
 }

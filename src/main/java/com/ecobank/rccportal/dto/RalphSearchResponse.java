@@ -23,8 +23,22 @@ public record RalphSearchResponse(
         String source,
         List<WebSearchResultItem> webResults,
         int confidencePercent,
-        List<String> sourcesConsulted
+        List<String> sourcesConsulted,
+        // RAF v2 (agents locaux) — champs ajoutés en fin, null/vides pour la barre de recherche.
+        String intent,
+        List<RafAgentTrace> agentsConsulted,
+        List<RafSuggestion> suggestions,
+        RafAction action,
+        boolean clarification,
+        List<String> reasoning
 ) {
+    /** Compatibilité — réponse sans métadonnées RAF (barre de recherche classique, anciens appelants). */
+    public RalphSearchResponse(String explanation, List<RalphResultItem> results, String source,
+                               List<WebSearchResultItem> webResults, int confidencePercent, List<String> sourcesConsulted) {
+        this(explanation, results, source, webResults, confidencePercent, sourcesConsulted,
+                null, List.of(), List.of(), null, false, List.of());
+    }
+
     /** Compatibilité avec l'ancien constructeur à 2 arguments (recherche mots-clés locale). */
     public RalphSearchResponse(String explanation, List<RalphResultItem> results) {
         this(explanation, results, "INTERNAL", List.of(), results.isEmpty() ? 0 : 60, List.of("Base de connaissances", "Procédures internes"));

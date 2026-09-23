@@ -20,7 +20,8 @@
     /** Interface RAF traduite — le contenu généré par l'IA suit lui la langue via le paramètre lang de /ask. */
     var RAF_I18N = {
         fr: {
-            greeting: "Bonjour ! Posez-moi une question sur une procédure ou un article — je cherche directement dans les deux.",
+            agentsConsulted: "Agents consultés", step: "Étape", dueBy: "À annoncer au client :", draft: "Brouillon prêt à envoyer (champs surlignés à compléter)", copy: "Copier", copied: "Copié", why: "Pourquoi cette réponse ?",
+            greeting: "Bonjour ! Je suis RAF : fiche appel, procédures guidées, SLA, glossaire, agences, modèles de mail, ton planning — uniquement à partir des données du portail, sans IA externe.",
             inputPlaceholder: "Votre question…",
             detailBtn: "Donne-moi plus de détails",
             detailAskText: "Donne-moi plus de détails",
@@ -38,7 +39,8 @@
             fileTitle: "Importer un fichier à analyser"
         },
         en: {
-            greeting: "Hello! Ask me a question about a procedure or an article — I search both directly.",
+            agentsConsulted: "Agents consulted", step: "Step", dueBy: "Tell the customer:", draft: "Draft ready to send (highlighted fields to complete)", copy: "Copy", copied: "Copied", why: "Why this answer?",
+            greeting: "Hello! I'm RAF: call cards, guided procedures, SLAs, glossary, branches, mail templates, your schedule — only from portal data, no external AI.",
             inputPlaceholder: "Your question…",
             detailBtn: "Give me more details",
             detailAskText: "Give me more details",
@@ -56,7 +58,8 @@
             fileTitle: "Import a file to analyze"
         },
         pt: {
-            greeting: "Olá! Faça-me uma pergunta sobre um procedimento ou um artigo — procuro diretamente nos dois.",
+            agentsConsulted: "Agentes consultados", step: "Passo", dueBy: "A anunciar ao cliente:", draft: "Rascunho pronto (campos destacados a completar)", copy: "Copiar", copied: "Copiado", why: "Porquê esta resposta?",
+            greeting: "Olá! Sou o RAF: ficha de chamada, procedimentos guiados, SLA, glossário, agências, modelos de e-mail, o seu horário — apenas com dados do portal, sem IA externa.",
             inputPlaceholder: "Sua pergunta…",
             detailBtn: "Dê-me mais detalhes",
             detailAskText: "Dê-me mais detalhes",
@@ -74,7 +77,8 @@
             fileTitle: "Importar um ficheiro para analisar"
         },
         es: {
-            greeting: "¡Hola! Hazme una pregunta sobre un procedimiento o un artículo — busco directamente en ambos.",
+            agentsConsulted: "Agentes consultados", step: "Paso", dueBy: "A anunciar al cliente:", draft: "Borrador listo (campos resaltados a completar)", copy: "Copiar", copied: "Copiado", why: "¿Por qué esta respuesta?",
+            greeting: "¡Hola! Soy RAF: ficha de llamada, procedimientos guiados, SLA, glosario, agencias, plantillas de correo, tu horario — solo con datos del portal, sin IA externa.",
             inputPlaceholder: "Tu pregunta…",
             detailBtn: "Dame más detalles",
             detailAskText: "Dame más detalles",
@@ -132,6 +136,8 @@
         var escaped = escapeHtml(text);
         var html = escaped
             .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+            .replace(/(^|\s)_(.+?)_(?=\s|$)/gm, "$1<em>$2</em>")
+            .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')
             .replace(/^---$/gm, "<hr>")
             .replace(/^- (.+)$/gm, "<li>$1</li>")
             .replace(/\n/g, "<br>");
@@ -158,9 +164,7 @@
         wrap.style.flexDirection = "column";
         wrap.style.gap = "6px";
         results.forEach(function (r) {
-            var badge = r.sourceType === "ARTICLE" ? "📖 Article Knowledge Base"
-                : r.sourceType === "COURSE" ? "🎓 Formation"
-                : "📋 Étape de procédure";
+            var badge = SOURCE_BADGES[r.sourceType] || "📋 Étape de procédure";
             var card = document.createElement("button");
             card.type = "button";
             card.className = "ralph-result-card ralph-result-bubble";
@@ -177,7 +181,7 @@
             card.addEventListener("mouseleave", function () { card.style.background = "#fff"; card.style.borderColor = "#dbe4ee"; });
             // Cliquer une bulle = reformuler avec son titre exact, exactement ce que RAF
             // demande dans son message de clarification — évite à l'agent de devoir retaper.
-            card.addEventListener("click", function () { ask(thread, r.title); });
+            card.addEventListener("click", function () { openSource(thread, r); });
             wrap.appendChild(card);
         });
         thread.appendChild(wrap);
@@ -244,27 +248,146 @@
         thread.scrollTop = thread.scrollHeight;
     }
 
+    var SOURCE_BADGES = {
+        ARTICLE: "📖 Article Knowledge Base", COURSE: "🎓 Formation", PROCEDURE: "📋 Procédure",
+        SLA: "⏱ Référentiel SLA", TERM: "📖 Glossaire", BRANCH: "🏦 Agence", MAIL_TEMPLATE: "✉ Modèle de mail",
+        QUIZ: "✔ Q/R vérifiée QA", SCHEDULE: "🗓 Mon planning"
+    };
+
+    /** Clic sur une source citée : ouvre l'élément exact (procédure en mode RAF, article, cours...). */
+    function openSource(thread, r) {
+        if (r.sourceType === "PROCEDURE" && r.id != null) return ask(thread, r.title, "raf:proc:" + r.id);
+        if (r.sourceType === "SLA" && r.id != null) return ask(thread, r.title, "raf:sla:" + r.id);
+        if (r.sourceType === "MAIL_TEMPLATE" && r.id != null) return ask(thread, r.title, "raf:tpl:" + r.id);
+        if (r.sourceType === "ARTICLE" && r.id != null) { window.location.href = "/knowledge?article=" + r.id; return; }
+        if (r.sourceType === "COURSE" && r.id != null) { window.location.href = "/training?openCourseId=" + r.id; return; }
+        if (r.sourceType === "TERM") return ask(thread, "c'est quoi " + r.title);
+        ask(thread, r.title);
+    }
+
+    function scrollDown(thread) { thread.scrollTop = thread.scrollHeight; }
+
+    /** Boutons de relance proposés par RAF (mode guidé, clarification, exemples...). */
+    function appendSuggestions(thread, suggestions) {
+        if (!suggestions || !suggestions.length) return false;
+        var wrap = document.createElement("div");
+        wrap.className = "ralph-chips";
+        wrap.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 8px;max-width:92%;";
+        suggestions.forEach(function (sug) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "btn btn-sm btn-outline-primary";
+            btn.style.cssText = "border-radius:14px;font-size:.78rem;padding:2px 10px;";
+            btn.textContent = sug.label;
+            btn.addEventListener("click", function () {
+                // Anti double-clic uniquement : les commandes de RAF sont rejouables sans risque.
+                btn.disabled = true;
+                setTimeout(function () { btn.disabled = false; }, 1500);
+                ask(thread, sug.query || sug.label, sug.command || null);
+            });
+            wrap.appendChild(btn);
+        });
+        thread.appendChild(wrap);
+        scrollDown(thread);
+        return true;
+    }
+
+    /** « Agents consultés » — transparence sur qui a répondu (grisé = consulté sans résultat retenu). */
+    function appendAgents(thread, traces) {
+        if (!traces || !traces.length) return;
+        var div = document.createElement("div");
+        div.style.cssText = "font-size:.7rem;margin:0 0 6px;max-width:92%;color:#6b7280;";
+        div.innerHTML = "🧭 " + escapeHtml(t("agentsConsulted")) + " : " + traces.map(function (tr) {
+            return '<span title="' + escapeHtml("routeur " + tr.routerScore + "% · correspondance " + tr.matchScore + "%") + '" style="' +
+                (tr.used ? "color:#0057B8;font-weight:600;" : "opacity:.55;") + '">' + escapeHtml(tr.label) + (tr.used ? " ✓" : "") + "</span>";
+        }).join(" · ");
+        thread.appendChild(div);
+    }
+
+    /** Élément interactif : étape guidée, échéance SLA, brouillon de mail. */
+    function renderAction(thread, action) {
+        if (!action || !action.payload) return;
+        var p = action.payload;
+        var box = document.createElement("div");
+        box.className = "ralph-result-card";
+        box.style.cssText = "max-width:92%;border:1px solid #dbe4ee;border-radius:10px;padding:8px 10px;margin:0 0 6px;background:#f8fbff;";
+        if (action.type === "GUIDED_STEP") {
+            var pct = Math.round(100 * p.step / p.total);
+            box.innerHTML = '<div style="font-size:.72rem;color:#6b7280;">' + escapeHtml(t("step")) + " " + p.step + "/" + p.total + "</div>" +
+                '<div style="height:6px;background:#e5e7eb;border-radius:3px;margin:4px 0;"><div style="height:6px;border-radius:3px;background:#0057B8;width:' + pct + '%;"></div></div>';
+        } else if (action.type === "SLA_DUE") {
+            box.innerHTML = "⏱ <strong>" + escapeHtml(t("dueBy")) + "</strong> " + escapeHtml(p.dueLabel || p.dueAt);
+        } else if (action.type === "DRAFT") {
+            var text = (p.subject ? p.subject + "\n\n" : "") + (p.body || "");
+            box.innerHTML = '<div style="font-size:.72rem;color:#6b7280;margin-bottom:4px;">✉ ' + escapeHtml(t("draft")) + "</div>" +
+                '<div style="white-space:pre-wrap;font-size:.82rem;">' + escapeHtml(text).replace(/\[([^\]]+)\]/g, '<mark>[$1]</mark>') + "</div>";
+            var copy = document.createElement("button");
+            copy.type = "button";
+            copy.className = "btn btn-sm btn-outline-secondary mt-1";
+            copy.textContent = "📋 " + t("copy");
+            copy.addEventListener("click", function () {
+                if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { copy.textContent = "✓ " + t("copied"); });
+            });
+            box.appendChild(copy);
+        } else {
+            return;
+        }
+        thread.appendChild(box);
+        scrollDown(thread);
+    }
+
+    /** « Pourquoi cette réponse ? » — trace lisible du routage et des sources. */
+    function appendWhy(thread, reasoning) {
+        if (!reasoning || !reasoning.length) return;
+        var d = document.createElement("details");
+        d.style.cssText = "font-size:.72rem;color:#6b7280;margin:0 0 8px;max-width:92%;";
+        d.innerHTML = "<summary style=\"cursor:pointer;\">" + escapeHtml(t("why")) + "</summary><ul class=\"mb-0 ps-3\">" +
+            reasoning.map(function (r) { return "<li>" + escapeHtml(r) + "</li>"; }).join("") + "</ul>";
+        thread.appendChild(d);
+    }
+
+    var welcomeShown = false;
+
+    /** Exemples cliquables à la première ouverture — RAF montre ce qu'il sait faire. */
+    function showWelcome(thread) {
+        if (welcomeShown) return;
+        welcomeShown = true;
+        fetch("/api/ralph/welcome?lang=" + encodeURIComponent(getRafLanguage()), { credentials: "same-origin" })
+            .then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (w) { if (w) appendSuggestions(thread, w.suggestions); })
+            .catch(function () {});
+    }
+
     var lastQuestionWasVoice = false;
 
-    function ask(thread, keyword) {
+    /** Pose une question à RAF, ou envoie une commande de bouton (cmd = « raf:proc:12:step:2 »...). */
+    function ask(thread, keyword, cmd) {
         appendMessage(thread, keyword, "user");
         var typing = appendMessage(thread, "…", "bot");
         var wasVoice = lastQuestionWasVoice;
         lastQuestionWasVoice = false;
 
-        fetch("/api/ralph/ask?keyword=" + encodeURIComponent(keyword) + "&lang=" + encodeURIComponent(getRafLanguage()), { credentials: "same-origin" })
+        var url = "/api/ralph/ask?lang=" + encodeURIComponent(getRafLanguage()) +
+            (cmd ? "&cmd=" + encodeURIComponent(cmd) : "&keyword=" + encodeURIComponent(keyword));
+        fetch(url, { credentials: "same-origin" })
             .then(function (res) {
                 if (!res.ok) return res.text().then(function (t) { return Promise.reject(new Error(t || "HTTP " + res.status)); });
                 return res.json();
             })
             .then(function (result) {
                 typing.innerHTML = renderRafMarkdown(result.explanation);
+                renderAction(thread, result.action);
+                if (!appendSuggestions(thread, result.suggestions) && result.source !== "LOCAL" && result.source !== "NONE") {
+                    appendDetailButton(thread, function () { ask(thread, t("detailAskText")); });
+                }
                 appendResults(thread, result.results);
                 appendSourceBadge(thread, result.source);
                 appendWebResults(thread, result.webResults);
                 appendConfidence(thread, result.confidencePercent, result.sourcesConsulted);
-                appendDetailButton(thread, function () { ask(thread, t("detailAskText")); });
-                if (wasVoice) speak(result.explanation);
+                appendAgents(thread, result.agentsConsulted);
+                appendWhy(thread, result.reasoning);
+                scrollDown(thread);
+                if (wasVoice) speak(result.explanation.replace(/\*\*/g, ""));
             })
             .catch(function (e) {
                 typing.textContent = t("error") + " : " + e.message;
@@ -486,6 +609,7 @@
                 fab.classList.add("d-none");
                 panel.classList.remove("d-none");
                 input.focus();
+                showWelcome(thread);
             }, 480);
         });
 

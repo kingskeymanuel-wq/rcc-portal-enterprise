@@ -6,11 +6,9 @@ import com.ecobank.rccportal.dto.WebSearchResultItem;
 import com.ecobank.rccportal.model.KnowledgeArticle;
 import com.ecobank.rccportal.model.Procedure;
 import com.ecobank.rccportal.model.ProcedureStep;
-import com.ecobank.rccportal.model.SlaRule;
 import com.ecobank.rccportal.repository.KnowledgeArticleRepository;
 import com.ecobank.rccportal.repository.ProcedureRepository;
 import com.ecobank.rccportal.repository.ProcedureStepRepository;
-import com.ecobank.rccportal.repository.SlaRuleRepository;
 import com.ecobank.rccportal.util.ApiException;
 import com.ecobank.rccportal.util.SearchText;
 import org.springframework.stereotype.Service;
@@ -19,371 +17,84 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 
 /**
- * "Ralph" (RAF) — assistant conversationnel autonome du RCC Portal.
+ * Façade de RAF et de la barre de recherche classique.
  *
- * Architecture volontairement simplifiée : le dialogue (ask/askDetails) NE dépend plus ni
- * de la Base de connaissances/des procédures internes, ni de Copilot Studio — RAF répond
- * librement, comme un collègue autonome, via Anthropic Claude uniquement, avec un repli
- * web optionnel pour enrichir la réponse. Aucun grounding ne contraint plus ses réponses.
- *
- * La Base de connaissances et les procédures restent consultables séparément, sans lien
- * avec RAF, via la barre de recherche classique ({@link #search(String)},
- * /api/ralph/search) — c'est un moteur de recherche mots-clés distinct, pas RAF.
- *
- * RAF garde une courte mémoire conversationnelle par agent (voir
- * {@link RafConversationMemoryService}) et sait développer sa dernière réponse sur demande
- * ("donne-moi les détails"), traduire un texte, et répondre dans la langue choisie par
- * l'agent (français par défaut — anglais, portugais, espagnol sur demande).
+ * <ul>
+ *   <li>{@link #ask} — RAF, assistant conversationnel : délégué à {@link com.ecobank.rccportal.raf.RafOrchestrator}
+ *       (agents locaux spécialisés, aucune IA externe dans le chemin de réponse).</li>
+ *   <li>{@link #search(String)} — barre de recherche globale (/api/ralph/search) : moteur de
+ *       pertinence local, complété par la recherche web quand les résultats internes sont maigres.</li>
+ *   <li>{@link #analyzeFile} — analyse de fichier réservée à l'IT (seul usage restant d'Anthropic,
+ *       hors du dialogue RAF).</li>
+ * </ul>
  */
 @Service
 public class RalphSearchService {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RalphSearchService.class);
 
-    /** Expressions qui, seules ou en tête de question, déclenchent le mode "détails" sur la dernière réponse. */
-    private static final List<String> DETAIL_TRIGGERS = List.of(
-            "donne moi les details", "donne moi plus de details", "plus de details",
-            "detaille", "en detail", "peux tu detailler", "developpe", "explique plus",
-            "dis m en plus", "j en veux plus", "plus d informations", "plus d infos"
-    );
-
-    /** Civilités reconnues localement, texte déjà normalisé (sans accent, en minuscule) — voir smallTalkFallback(). */
-    private static final Set<String> SMALL_TALK_GREETINGS = Set.of(
-            "bonjour", "salut", "bonsoir", "coucou", "hello", "hi", "bjr", "slt");
-    private static final Set<String> SMALL_TALK_THANKS = Set.of(
-            "merci", "merci beaucoup", "merci bien", "top merci");
-    private static final Set<String> SMALL_TALK_HOWAREYOU = Set.of(
-            "ca va", "comment ca va", "tu vas bien", "comment vas tu");
-    private static final Set<String> SMALL_TALK_BYE = Set.of(
-            "au revoir", "a plus", "bye", "bonne journee", "a bientot");
-
-    /** Langue de réponse voulue (code ISO — fr/en/pt/es) — voir languageInstruction() et translate(). */
-    private static final java.util.Map<String, String> LANGUAGE_NAMES = java.util.Map.of(
-            "en", "anglais", "pt", "portugais", "es", "espagnol", "fr", "français"
-    );
-
     /** Utilisés uniquement par {@link #search(String)} (barre de recherche classique) — plus par le dialogue RAF. */
     private final KnowledgeArticleRepository articleRepository;
     private final ProcedureRepository procedureRepository;
     private final ProcedureStepRepository procedureStepRepository;
     private final com.ecobank.rccportal.repository.CourseRepository courseRepository;
-    /** Référentiel SLA RCC — seule source de vérité injectée dans le prompt système
-     *  de RAF (voir {@link #buildSlaContext()}) pour qu'il ne devine jamais un délai. */
-    private final SlaRuleRepository slaRuleRepository;
-
     private final AnthropicClient anthropicClient;
     private final WebSearchClient webSearchClient;
     private final DataProtectionService dataProtectionService;
     private final RafConversationMemoryService conversationMemoryService;
     private final DocumentTextExtractionService documentTextExtractionService;
 
-    /** Banque de questions d'évaluation QA — leurs bonnes réponses augmentent les connaissances
-     *  de RAF (voir {@link #buildQuizKnowledgeContext()}), même principe que buildSlaContext(). */
-    private final QuizQuestionService quizQuestionService;
-
     private final TranslationService translationService;
+    private final com.ecobank.rccportal.raf.RafOrchestrator rafOrchestrator;
 
     public RalphSearchService(KnowledgeArticleRepository articleRepository, ProcedureRepository procedureRepository,
                               ProcedureStepRepository procedureStepRepository,
                               com.ecobank.rccportal.repository.CourseRepository courseRepository,
-                              SlaRuleRepository slaRuleRepository,
                               AnthropicClient anthropicClient,
                               WebSearchClient webSearchClient,
                               DataProtectionService dataProtectionService,
                               RafConversationMemoryService conversationMemoryService,
                               DocumentTextExtractionService documentTextExtractionService,
-                              QuizQuestionService quizQuestionService,
-                              TranslationService translationService) {
+                              TranslationService translationService,
+                              com.ecobank.rccportal.raf.RafOrchestrator rafOrchestrator) {
         this.articleRepository = articleRepository;
         this.procedureRepository = procedureRepository;
         this.procedureStepRepository = procedureStepRepository;
         this.courseRepository = courseRepository;
-        this.slaRuleRepository = slaRuleRepository;
         this.anthropicClient = anthropicClient;
         this.webSearchClient = webSearchClient;
         this.dataProtectionService = dataProtectionService;
         this.conversationMemoryService = conversationMemoryService;
         this.documentTextExtractionService = documentTextExtractionService;
-        this.quizQuestionService = quizQuestionService;
         this.translationService = translationService;
+        this.rafOrchestrator = rafOrchestrator;
     }
 
-    /**
-     * Point d'entrée conversationnel de RAF, sans mémoire ni masquage — conservé pour
-     * compatibilité (ancien appelant sans identité utilisateur). Préférer
-     * {@link #ask(String, String)} dès que l'identité de l'agent est disponible.
-     */
-    @Transactional(readOnly = true)
+    /** Compatibilité — sans identité ni langue. */
     public RalphSearchResponse ask(String question) {
         return ask(question, null);
     }
 
-    /** Compatibilité — français par défaut. Préférer {@link #ask(String, String, String)} pour choisir la langue. */
-    @Transactional(readOnly = true)
+    /** Compatibilité — français par défaut. */
     public RalphSearchResponse ask(String question, String username) {
         return ask(question, username, null);
     }
 
-    /**
-     * Point d'entrée conversationnel de RAF — Anthropic Claude uniquement, avec repli web
-     * optionnel. Aucun grounding sur la Base de connaissances/les procédures, aucun appel à
-     * Copilot Studio. Ne lève jamais d'exception vers l'appelant : si Anthropic est
-     * indisponible ou échoue, réponse locale honnête plutôt qu'un texte inventé.
-     *
-     * @param lang code ISO de la langue de réponse voulue (fr/en/pt/es) — null ou "fr" = français.
-     */
-    @Transactional(readOnly = true)
     public RalphSearchResponse ask(String question, String username, String lang) {
-        if (question == null || question.isBlank()) {
+        return ask(question, username, lang, null);
+    }
+
+    /**
+     * Point d'entrée conversationnel de RAF — délégué à {@link RafOrchestrator} : agents locaux
+     * spécialisés, AUCUNE IA externe ni appel réseau dans le chemin de réponse, chaque réponse
+     * ancrée dans les données du portail et citée. {@code command} = action déterministe issue
+     * d'un bouton du widget (mode guidé, choix proposé...).
+     */
+    public RalphSearchResponse ask(String question, String username, String lang, String command) {
+        if ((question == null || question.isBlank()) && (command == null || command.isBlank())) {
             throw ApiException.badRequest("La question ne peut pas être vide.");
         }
-
-        // Mode "détails" — développe la dernière réponse RAF de cet agent plutôt que de
-        // relancer une recherche à partir d'une question qui n'a de sens qu'en contexte.
-        if (isDetailRequest(question)) {
-            Deque<RafConversationMemoryService.Turn> history = conversationMemoryService.history(username);
-            if (!history.isEmpty()) {
-                return askDetails(history.getLast(), username, lang);
-            }
-            // Pas d'historique disponible : on traite quand même la question telle quelle.
-        }
-
-        // Repli web — best-effort, uniquement pour enrichir la réponse de l'IA, jamais pour
-        // la contraindre. La question est assainie avant tout envoi externe.
-        List<WebSearchResultItem> webResults = List.of();
-        boolean usedWeb = false;
-        if (webSearchClient.isConfigured()) {
-            String sanitizedQuestion = dataProtectionService.sanitize(question);
-            webResults = webSearchClient.search(sanitizedQuestion);
-            usedWeb = !webResults.isEmpty();
-            if (usedWeb) {
-                log.info("RAF : repli web pour la question posée par {} ({} résultat(s)).",
-                        username != null ? username : "anonyme", webResults.size());
-            }
-        }
-
-        String source = usedWeb ? "WEB" : "AI";
-        List<String> sourcesConsulted = usedWeb ? new ArrayList<>(List.of("Recherche web")) : new ArrayList<>();
-        int confidence = usedWeb ? 65 : 70;
-
-        String prompt = dataProtectionService.sanitize(languageInstruction(lang) + buildSynthesisPrompt(question, webResults));
-
-        if (anthropicClient.isConfigured()) {
-            try {
-                String answer = anthropicClient.chat(synthesisSystemPrompt(), prompt, 900);
-                List<String> sourcesWithEngine = withEngine(sourcesConsulted, "Anthropic Claude");
-                RalphSearchResponse response = new RalphSearchResponse(answer, List.of(), source, webResults, confidence, sourcesWithEngine);
-                conversationMemoryService.record(username, question, answer);
-                return response;
-            } catch (ApiException e) {
-                log.warn("RAF : appel Anthropic Claude échoué, repli sur réponse locale : {}", e.getMessage());
-            }
-        } else {
-            log.debug("RAF : Anthropic Claude non configuré (quality.ai.anthropic-key manquant).");
-        }
-
-        // Repli final — Anthropic indisponible, en échec, ou non configuré. Au lieu d'un
-        // message d'impasse, RAF interroge maintenant sa propre base locale (Knowledge Base +
-        // procédures + banque de questions — même moteur que la barre de recherche
-        // "/api/ralph/search") et compose une vraie réponse structurée à partir de ce qu'il
-        // trouve. Aucune dépendance à un fournisseur externe pour cette voie.
-        String smallTalkReply = smallTalkFallback(question);
-        if (smallTalkReply != null) {
-            List<String> sourcesSmallTalk = withEngine(sourcesConsulted, "Réponse locale");
-            RalphSearchResponse response = new RalphSearchResponse(
-                    smallTalkReply, List.of(), source, webResults, confidence, sourcesSmallTalk);
-            conversationMemoryService.record(username, question, smallTalkReply);
-            return response;
-        }
-
-        InternalContext internal = buildInternalContext(question);
-        if (!internal.articleMatches().isEmpty() || !internal.stepMatches().isEmpty() || !internal.courseMatches().isEmpty()) {
-            String localAnswer = buildExplanation(question, internal.articleMatches(), internal.stepMatches(), internal.courseMatches(), 400);
-            List<String> sourcesLocal = withEngine(sourcesConsulted, "Base de connaissances / procédures / formations (recherche locale)");
-            int localConfidence = usedWeb ? 55 : 50; // un peu moins qu'une synthèse IA — c'est un extrait, pas une reformulation
-            RalphSearchResponse response = new RalphSearchResponse(
-                    localAnswer, internal.results(), usedWeb ? "MIXED" : "INTERNAL", webResults, localConfidence, sourcesLocal);
-            conversationMemoryService.record(username, question, localAnswer);
-            return response;
-        }
-
-        if (usedWeb) {
-            // Rien en interne, mais la recherche web a des résultats — les présenter
-            // directement plutôt que d'abandonner (RAF reste utile même sans IA de synthèse).
-            String webAnswer = "Je n'ai rien trouvé d'assez précis dans la Base de connaissances ou les procédures internes, " +
-                    "mais voici ce que la recherche web a remonté sur ce sujet — à vérifier avant de t'en servir.";
-            List<String> sourcesWebOnly = withEngine(sourcesConsulted, "Recherche web");
-            RalphSearchResponse response = new RalphSearchResponse(webAnswer, List.of(), "WEB", webResults, 45, sourcesWebOnly);
-            conversationMemoryService.record(username, question, webAnswer);
-            return response;
-        }
-
-        List<String> sourcesFallback = withEngine(sourcesConsulted, "Aucune source disponible");
-        String noAiReply = "**Aucun résultat** pour « " + question + " » — ni dans la Base de connaissances, ni dans les procédures, ni sur le web.\n\n" +
-                "💡 Tu peux :\n" +
-                "- Reformuler avec des mots-clés plus précis (ex. le nom exact du produit ou de la procédure)\n" +
-                "- Consulter directement la **Base de connaissances** ou les **Procédures** via le menu\n" +
-                "- Demander « détails » si ta question précédente avait des résultats partiels";
-        RalphSearchResponse response = new RalphSearchResponse(noAiReply, List.of(), source, webResults, confidence, sourcesFallback);
-        conversationMemoryService.record(username, question, noAiReply);
-        return response;
-    }
-
-    /** Ajoute le moteur réellement utilisé (celui qui a produit la réponse) à la liste des sources, sans dupliquer la liste de base. */
-    private List<String> withEngine(List<String> baseSources, String engineLabel) {
-        List<String> result = new ArrayList<>(baseSources);
-        result.add(engineLabel);
-        return result;
-    }
-
-    /**
-     * Petites civilités reconnues localement (aucune IA nécessaire) — pour que RAF reste
-     * accueillant même quand Anthropic et le repli web sont tous les deux indisponibles.
-     * Ne couvre QUE les civilités très courantes ; toute vraie question sans IA disponible
-     * reçoit une réponse honnête ("pas d'IA configurée"), jamais un texte inventé.
-     */
-    private String smallTalkFallback(String question) {
-        String normalized = normalize(question);
-        if (SMALL_TALK_GREETINGS.contains(normalized)) {
-            return "Bonjour ! Je suis RAF, à ton service. 😊 Qu'est-ce que je peux faire pour toi aujourd'hui — " +
-                    "une procédure, une info sur un produit, ou autre chose ?";
-        }
-        if (SMALL_TALK_THANKS.contains(normalized)) {
-            return "Avec plaisir ! N'hésite pas si tu as une autre question.";
-        }
-        if (SMALL_TALK_HOWAREYOU.contains(normalized)) {
-            return "Tout va bien de mon côté, merci ! Comment puis-je t'aider ?";
-        }
-        if (SMALL_TALK_BYE.contains(normalized)) {
-            return "À bientôt !";
-        }
-        return null;
-    }
-
-    /** Développe la dernière réponse de l'agent — même principe (Anthropic seul, aucun grounding). */
-    private RalphSearchResponse askDetails(RafConversationMemoryService.Turn lastTurn, String username, String lang) {
-        List<String> sourcesConsulted = new ArrayList<>();
-        int confidence = 70;
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("L'agent demande à développer la réponse précédente. Question d'origine :\n")
-                .append(lastTurn.question()).append("\n\nRéponse résumée déjà donnée :\n")
-                .append(lastTurn.answer()).append("\n\n");
-        sb.append("Développe une réponse complète et détaillée, avec des exemples concrets si utile. ")
-                .append("Reste cohérent avec ce que tu as déjà répondu, sans inventer de fait présenté comme officiel Ecobank.");
-
-        String prompt = dataProtectionService.sanitize(languageInstruction(lang) + sb);
-
-        if (anthropicClient.isConfigured()) {
-            try {
-                String answer = anthropicClient.chat(synthesisSystemPrompt(), prompt, 1200);
-                conversationMemoryService.record(username, "(détails) " + lastTurn.question(), answer);
-                return new RalphSearchResponse(answer, List.of(), "AI", List.of(), confidence, withEngine(sourcesConsulted, "Anthropic Claude"));
-            } catch (ApiException e) {
-                log.warn("RAF (détails) : appel Anthropic Claude échoué : {}", e.getMessage());
-            }
-        } else {
-            log.debug("RAF (détails) : Anthropic Claude non configuré (quality.ai.anthropic-key manquant).");
-        }
-
-        // Repli local — même principe que ask() : on redéveloppe la question d'ORIGINE via la
-        // recherche locale, avec un extrait plus long qu'en réponse résumée (l'agent veut du détail).
-        InternalContext internal = buildInternalContext(lastTurn.question());
-        String reply;
-        String sourceLabel;
-        if (!internal.articleMatches().isEmpty() || !internal.stepMatches().isEmpty() || !internal.courseMatches().isEmpty()) {
-            reply = buildExplanation(lastTurn.question(), internal.articleMatches(), internal.stepMatches(), internal.courseMatches(), 1200);
-            sourceLabel = "Base de connaissances / procédures / formations (recherche locale)";
-        } else {
-            reply = "Je n'ai pas de détail supplémentaire disponible localement pour « " + lastTurn.question() +
-                    " ». Essayez de reformuler la question d'origine avec des mots plus précis.";
-            sourceLabel = "Aucune source disponible";
-        }
-        conversationMemoryService.record(username, "(détails) " + lastTurn.question(), reply);
-        return new RalphSearchResponse(reply, internal.results(), "INTERNAL", List.of(), 50, withEngine(sourcesConsulted, sourceLabel));
-    }
-
-    private boolean isDetailRequest(String question) {
-        String normalized = normalize(question);
-        return DETAIL_TRIGGERS.stream().anyMatch(normalized::contains);
-    }
-
-    private String synthesisSystemPrompt() {
-        return "Tu es RAF, un collègue IA autonome et humain au RCC Portal Ecobank — pas un moteur de recherche. " +
-                "Réponds avec la même aisance qu'un collègue expérimenté et sympathique : direct, " +
-                "naturel, jamais robotique. Tu peux répondre à absolument n'importe quelle question, y compris " +
-                "sans rapport avec Ecobank (conseils, rédaction, réflexion, discussion générale) — réponds " +
-                "toujours librement à partir de tes propres connaissances, comme le ferait un collègue compétent.\n\n" +
-                "Sois proactif dans le dialogue : après une réponse complète, si une question de suivi logique " +
-                "aiderait l'utilisateur à avancer (préciser un cas, aller plus loin, explorer un sujet lié), " +
-                "propose-la brièvement en une phrase à la fin — sans forcer si ce n'est pas naturel. Ne jamais " +
-                "inventer un chiffre ou un fait présenté comme officiel Ecobank sans certitude.\n\n" +
-                buildSlaContext() +
-                buildQuizKnowledgeContext() +
-                "Réponds en français, sauf instruction explicite contraire donnée juste avant la question.";
-    }
-
-    /**
-     * Sérialise les questions actives de la banque d'évaluation (Q/R vérifiées, créées
-     * uniquement par QA/Admin — voir QuizQuestionController) en un bloc de contexte factuel,
-     * même principe que buildSlaContext() : RAF s'appuie dessus au lieu d'inventer, ses
-     * connaissances augmentent automatiquement à chaque nouvelle question ajoutée à la
-     * banque d'évaluation. Retourne une chaîne vide si la banque est vide.
-     */
-    private String buildQuizKnowledgeContext() {
-        List<String> summaries = quizQuestionService.activeQuestionsKnowledgeSummary();
-        if (summaries.isEmpty()) return "";
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("\n\n=== Connaissances issues de la banque d'évaluation RCC (Q/R vérifiées par QA) ===\n");
-        sb.append("Utilise ces informations comme faits fiables quand elles sont pertinentes pour la question posée :\n");
-        for (String line : summaries) {
-            sb.append(line).append("\n");
-        }
-        sb.append("\n");
-        return sb.toString();
-    }
-
-    /**
-     * Sérialise le référentiel SLA RCC actif (table SlaRules, éditable depuis
-     * Administration) en un bloc de contexte factuel injecté dans le prompt système.
-     * C'est la SEULE source de vérité pour les délais annoncés au client — RAF doit
-     * s'appuyer dessus plutôt que d'inventer un chiffre. Retourne une chaîne vide
-     * (aucun impact sur le prompt) si la table n'est pas encore peuplée.
-     */
-    private String buildSlaContext() {
-        List<SlaRule> rules = slaRuleRepository.findByIsActiveTrueAndPoleIsNullOrderBySortOrderAscMotifAsc();
-        if (rules.isEmpty()) return "";
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("RÉFÉRENTIEL SLA RCC (délais de traitement officiels — utilise UNIQUEMENT ces valeurs quand on te demande ")
-          .append("un délai de traitement ou un SLA ; ne dévie jamais de ce tableau et ne l'invente jamais s'il n'y figure pas) :\n");
-        for (SlaRule r : rules) {
-            sb.append("- ").append(r.getMotif()).append(" [").append(r.getCategory());
-            if (r.getLevel() != null && !r.getLevel().isBlank()) sb.append(", ").append(r.getLevel());
-            sb.append("] → SLA : ").append(r.getSlaLabel());
-            if (Boolean.TRUE.equals(r.getAutoEscalation())) {
-                sb.append(" (une reverse/traitement automatique s'applique d'abord, avant ouverture d'un dossier manuel)");
-            }
-            if (r.getDestinationService() != null && !r.getDestinationService().isBlank()) {
-                sb.append(" — service : ").append(r.getDestinationService());
-            }
-            if (r.getNotes() != null && !r.getNotes().isBlank()) {
-                sb.append(". ").append(r.getNotes());
-            }
-            sb.append("\n");
-        }
-        sb.append("Si la question porte sur un motif absent de ce tableau, dis clairement que tu n'as pas ce SLA en ")
-          .append("référence plutôt que d'estimer un délai.\n\n");
-        return sb.toString();
-    }
-
-    /** Instruction de langue préfixée au prompt — vide si français (comportement par défaut inchangé, aucune régression). */
-    private String languageInstruction(String lang) {
-        if (lang == null || lang.isBlank() || "fr".equalsIgnoreCase(lang)) return "";
-        String languageName = LANGUAGE_NAMES.get(lang.toLowerCase());
-        if (languageName == null) return ""; // code de langue non reconnu — on ignore plutôt que de deviner
-        return "IMPORTANT : réponds intégralement en " + languageName + ", quelle que soit la langue de la question ci-dessous.\n\n";
+        return rafOrchestrator.handle(question, username, lang, command);
     }
 
     /**
@@ -392,24 +103,6 @@ public class RalphSearchService {
      */
     public String translate(String text, String targetLang) {
         return translationService.translate(text, "auto", targetLang).translatedText();
-    }
-
-    /** Construit le prompt utilisateur envoyé à Anthropic Claude — plus de contexte interne Ecobank, juste la question et le web éventuel. */
-    private String buildSynthesisPrompt(String question, List<WebSearchResultItem> webResults) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Question posée par un utilisateur du RCC Portal Ecobank :\n").append(question).append("\n\n");
-
-        if (!webResults.isEmpty()) {
-            sb.append("=== Résultats web (source externe, à distinguer clairement de toute information Ecobank officielle) ===\n");
-            for (WebSearchResultItem item : webResults) {
-                sb.append("[").append(item.title()).append("] ").append(item.snippet())
-                        .append(" (").append(item.url()).append(")\n");
-            }
-            sb.append("\n");
-        }
-
-        sb.append("Réponds naturellement, comme un collègue. Termine par une question de suivi utile si ça a du sens, sans forcer.");
-        return sb.toString();
     }
 
     /** Efface le fil de conversation courant de l'agent — nouvelle conversation explicite. */
@@ -641,16 +334,6 @@ public class RalphSearchService {
             sb.append("💡 Dis « détails » pour un extrait plus complet, ou pose-moi une question plus précise sur ce sujet.");
         }
         return sb.toString();
-    }
-
-    private String normalize(String text) {
-        if (text == null) return "";
-        String withoutAccents = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", ""); // retire les diacritiques (accents) après décomposition Unicode
-        return withoutAccents.toLowerCase(Locale.FRENCH)
-                .replaceAll("[^\\p{L}\\p{Nd}\\s]", " ")
-                .replaceAll("\\s+", " ")
-                .trim();
     }
 
     private String stripHtml(String html) {

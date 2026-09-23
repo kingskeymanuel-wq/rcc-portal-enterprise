@@ -245,6 +245,25 @@ public class QuizQuestionService {
     @Transactional(readOnly = true)
     public List<String> activeQuestionsKnowledgeSummary() {
         List<String> summaries = new java.util.ArrayList<>();
+        for (VerifiedAnswer a : activeVerifiedAnswers()) {
+            String line = "Q: " + a.question() + "\nR: " + a.answer();
+            if (a.explanation() != null && !a.explanation().isBlank()) {
+                line += " — " + a.explanation();
+            }
+            summaries.add(line);
+        }
+        return summaries;
+    }
+
+    /** Question active de la banque d'évaluation avec sa (ses) bonne(s) réponse(s) vérifiée(s) par la QA. */
+    public record VerifiedAnswer(Integer questionId, String question, String answer, String explanation,
+                                 String category, String tags) {
+    }
+
+    /** Bonnes réponses vérifiées — source de l'agent « Q/R vérifiées » de RAF. */
+    @Transactional(readOnly = true)
+    public List<VerifiedAnswer> activeVerifiedAnswers() {
+        List<VerifiedAnswer> out = new java.util.ArrayList<>();
         for (QuizQuestion q : repository.findByActiveTrueOrderByCreatedAtDesc()) {
             List<String> options = fromJsonStringList(q.getOptionsJson());
             String correctAnswer;
@@ -259,13 +278,10 @@ public class QuizQuestionService {
                 correctAnswer = (idx != null && idx >= 0 && idx < options.size()) ? options.get(idx) : null;
             }
             if (correctAnswer == null || correctAnswer.isBlank()) continue;
-            String line = "Q: " + q.getQuestionText() + "\nR: " + correctAnswer;
-            if (q.getExplanation() != null && !q.getExplanation().isBlank()) {
-                line += " — " + q.getExplanation();
-            }
-            summaries.add(line);
+            out.add(new VerifiedAnswer(q.getQuestionId(), q.getQuestionText(), correctAnswer, q.getExplanation(),
+                    q.getCategory(), q.getTags()));
         }
-        return summaries;
+        return out;
     }
 
     private List<String> fromJsonStringList(String json) {
