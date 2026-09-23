@@ -471,7 +471,10 @@
 
             select.addEventListener("change", function () {
                 currentCountryCode = select.value;
-                if (currentCountryCode) {
+                bankMapStale = true;
+                if (isBankMapTabActive()) {
+                    refreshBankMapTab(); // onglet « Agences / Carte » ouvert : on suit la filiale, sans modale
+                } else if (currentCountryCode) {
                     openCountryModal(currentCountryCode);
                 } else if (currentCategoryId) {
                     selectCategory(currentCategoryId);
@@ -513,13 +516,54 @@
             });
         }
         new bootstrap.Modal($("countryModal")).show();
+    }
 
-        // Carte des banques de cette filiale — voir bank-map.js. isQaOrAdmin() décide
-        // si le bouton "Ajouter une agence" est visible (écriture réservée QA/ADMIN,
-        // même règle que le reste de la Base de connaissance).
-        if (window.BankMap) {
-            window.BankMap.open(countryCode, isQaOrAdmin());
+    // ===== Onglet « Agences / Carte » =====
+
+    var bankMap = null;       // instance BankMap.mount (bank-map.js)
+    var bankMapStale = true;  // filiale changée depuis le dernier chargement de la carte
+
+    function isBankMapTabActive() {
+        var btn = $("kbBankMapTabBtn");
+        return !!btn && btn.classList.contains("active");
+    }
+
+    /** Affiche les agences de la filiale sélectionnée (currentCountryCode, "" = toutes → message).
+     *  isQaOrAdmin() décide si "Ajouter une agence" est visible (écriture réservée QA/ADMIN). */
+    function refreshBankMapTab() {
+        if (!bankMap) return;
+        bankMapStale = false;
+        var country = countriesCache.filter(function (c) { return c.countryCode === currentCountryCode; })[0];
+        $("kbBankMapCountryLabel").textContent = currentCountryCode
+            ? (country ? country.label : currentCountryCode)
+            : "choisissez une filiale";
+        $("kbBankMapNoCountry").style.display = currentCountryCode ? "none" : "";
+        $("kbBankMapBody").style.display = currentCountryCode ? "" : "none";
+        if (currentCountryCode) {
+            bankMap.load(currentCountryCode, isQaOrAdmin());
         }
+    }
+
+    function wireBankMapTab() {
+        if (!window.BankMap || !$("kbBankMap")) return;
+        bankMap = window.BankMap.mount($("kbBankMap"));
+
+        // Chargement paresseux : la carte n'est (re)chargée qu'à l'affichage de l'onglet, puis
+        // à chaque changement de filiale tant qu'il reste ouvert. Leaflet doit être recalé une
+        // fois le conteneur visible (il mesure 0×0 dans un onglet masqué).
+        $("kbBankMapTabBtn").addEventListener("shown.bs.tab", function () {
+            if (bankMapStale) {
+                refreshBankMapTab();
+            } else {
+                bankMap.refresh();
+            }
+        });
+
+        $("countryModalBankMapBtn").addEventListener("click", function () {
+            var countryModalInstance = bootstrap.Modal.getInstance($("countryModal"));
+            if (countryModalInstance) countryModalInstance.hide();
+            bootstrap.Tab.getOrCreateInstance($("kbBankMapTabBtn")).show();
+        });
     }
 
     var kbQuickUploadCategoryId = null;
@@ -622,6 +666,7 @@
         wireCategoryForm();
         wireFileUpload();
         wireKbQuickUploadModal();
+        wireBankMapTab();
         var countriesLoaded = loadCountries();
 
         window.RccSession.init().then(function (session) {
@@ -663,6 +708,7 @@
 
                 if (article.countryCode) {
                     currentCountryCode = article.countryCode;
+                    bankMapStale = true;
                     var select = $("countrySelect");
                     if (select) select.value = currentCountryCode;
                     openCountryModal(currentCountryCode); // modale existante — donne le contexte filiale

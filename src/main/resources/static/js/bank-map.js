@@ -1,16 +1,26 @@
 "use strict";
 
 /* ==========================================================
-   Carte des banques — onglet de la Base de connaissance.
-   Ouverte depuis knowledge.js (openCountryModal → window.BankMap.open).
+   Carte des agences — onglet « Agences / Carte » de la Base de
+   connaissance (knowledge.js → BankMap.mount(conteneur).load(pays)).
 
-   Choix technique : Leaflet + tuiles OpenStreetMap. Carte géographique
-   RÉELLE (zoom/pan/marqueurs cliquables, comme Google Maps dans l'usage)
-   mais sans dépendance à Google Maps ni clé API — conformément à la
-   demande ("on ne s'appuie pas sur Google Maps, on va juste choisir
-   l'affichage"). La recherche d'adresse pour positionner une nouvelle
-   agence utilise Nominatim (moteur de géocodage libre d'OpenStreetMap,
-   gratuit, sans clé), jamais l'API Google Places/Geocoding.
+   Choix technique : Leaflet (servi localement, /vendor/leaflet) + tuiles
+   OpenStreetMap. Carte géographique RÉELLE (zoom/pan/marqueurs cliquables,
+   comme Google Maps dans l'usage) mais sans dépendance à Google Maps ni clé
+   API — conformément à la demande ("on ne s'appuie pas sur Google Maps, on
+   va juste choisir l'affichage"). La recherche d'adresse pour positionner
+   une nouvelle agence utilise Nominatim (moteur de géocodage libre
+   d'OpenStreetMap, gratuit, sans clé), jamais l'API Google Places/Geocoding.
+
+   Réseau Ecobank : les tuiles OpenStreetMap peuvent être bloquées. L'URL
+   des tuiles est configurable (rcc.map.tile-url → data-tile-url du
+   conteneur, vide = pas de fond) ; sans tuiles, les marqueurs restent
+   placés sur un fond neutre, la liste des agences reste affichée et un
+   bandeau explique pourquoi le fond de carte manque.
+
+   Conteneur réutilisable : tout élément contenant .bank-map-canvas,
+   .bank-map-cities, .bank-map-list, .bank-map-status, .bank-map-tile-notice
+   et .bank-map-add-btn (voir knowledge.html, #kbBankMap).
 ========================================================== */
 
 window.BankMap = (function () {
@@ -20,50 +30,52 @@ window.BankMap = (function () {
     var sendJson = RccApi.sendJson;
     var escapeHtml = RccApi.escapeHtml;
 
-    var map = null;
-    var markers = []; // { marker, branch }
-    var allBranches = [];
-    var currentCountryCode = null;
-    var currentCity = null; // null = toutes les villes du pays
-    var canEdit = false;
+    var DEFAULT_TILE_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+    var DEFAULT_VIEW = { center: [6.0, 2.0], zoom: 4 }; // vue Afrique de l'Ouest si aucune coordonnée
+    var TILE_TIMEOUT_MS = 8000; // réseau qui "avale" les requêtes sans jamais répondre ni échouer
 
-    var formModal = null;
-    var formMap = null;
-    var formMarker = null;
+    // Réglages partagés (carte de l'onglet + mini-carte du formulaire admin) — lus sur le
+    // conteneur monté (data-tile-url / data-icon-path, posés par Thymeleaf).
+    var tileUrl = DEFAULT_TILE_URL;
+    var iconPath = "/vendor/leaflet/images/";
 
-    // Icône par défaut Leaflet — les chemins relatifs par défaut ne fonctionnent pas
-    // hors bundler, on pointe explicitement vers les images du même CDN que leaflet.js.
+    // Icône Leaflet servie localement : les chemins par défaut sont devinés depuis le CSS
+    // (fragile hors bundler) et l'ancien CDN pouvait être bloqué → marqueurs invisibles.
     var defaultIcon = null;
     function icon() {
         if (!defaultIcon) {
             defaultIcon = L.icon({
-                iconUrl: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon.png",
-                iconRetinaUrl: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-                shadowUrl: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-shadow.png",
+                iconUrl: iconPath + "marker-icon.png",
+                iconRetinaUrl: iconPath + "marker-icon-2x.png",
+                shadowUrl: iconPath + "marker-shadow.png",
                 iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
             });
         }
         return defaultIcon;
     }
 
-    function ensureMap() {
-        if (map) {
-            // La modale pays est display:none avant ouverture — Leaflet a besoin d'un
-            // recalcul de taille une fois le conteneur réellement visible.
-            setTimeout(function () { map.invalidateSize(); }, 200);
-            return map;
+    /** Crée une carte Leaflet + fond de tuiles ; onTilesUnavailable(raison) est appelé si le
+     *  fond est désactivé ("disabled") ou ne se charge pas ("error"), onTilesOk dès la 1re tuile. */
+    function createLeafletMap(element, options, onTilesUnavailable, onTilesOk) {
+        var leafletMap = L.map(element, options);
+        if (!tileUrl) {
+            onTilesUnavailable("disabled");
+            return leafletMap;
         }
-        map = L.map("bankMapLeaflet", { scrollWheelZoom: false });
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            attribution: "&copy; contributeurs OpenStreetMap",
-            maxZoom: 19
-        }).addTo(map);
-        return map;
-    }
-
-    function clearMarkers() {
-        markers.forEach(function (m) { map.removeLayer(m.marker); });
-        markers = [];
+        var loaded = 0;
+        var layer = L.tileLayer(tileUrl, { attribution: "&copy; contributeurs OpenStreetMap", maxZoom: 19 });
+        layer.on("tileload", function () {
+            loaded++;
+            if (onTilesOk) onTilesOk();
+        });
+        layer.on("tileerror", function () {
+            if (!loaded) onTilesUnavailable("error");
+        });
+        layer.addTo(leafletMap);
+        setTimeout(function () {
+            if (!loaded) onTilesUnavailable("error"); // la 1re tuile chargée masquera le bandeau (onTilesOk)
+        }, TILE_TIMEOUT_MS);
+        return leafletMap;
     }
 
     function branchPopupHtml(b) {
@@ -77,117 +89,224 @@ window.BankMap = (function () {
         return lines.join("");
     }
 
-    function renderCityChips(cities) {
-        var container = $("bankMapCityChips");
-        var allChip = '<span class="badge rounded-pill bg-secondary bank-city-chip' +
-            (currentCity === null ? " active" : "") + '" data-city="">Toutes les villes (' + allBranches.length + ')</span>';
-        var chips = cities.map(function (c) {
-            return '<span class="badge rounded-pill bg-secondary bank-city-chip' +
-                (currentCity === c.city ? " active" : "") + '" data-city="' + escapeHtml(c.city) + '">' +
-                escapeHtml(c.city) + ' (' + c.branchCount + ')</span>';
-        }).join("");
-        container.innerHTML = allChip + chips;
+    /* ==========================================================
+       Instance montée sur un conteneur (onglet « Agences / Carte »)
+    ========================================================== */
 
-        Array.prototype.forEach.call(container.querySelectorAll(".bank-city-chip"), function (chip) {
-            chip.addEventListener("click", function () {
-                currentCity = chip.getAttribute("data-city") || null;
-                render();
-            });
-        });
-    }
+    function mount(root) {
+        var el = function (cls) { return root.querySelector("." + cls); };
+        var canvas = el("bank-map-canvas");
+        var citiesBox = el("bank-map-cities");
+        var listBox = el("bank-map-list");
+        var statusBox = el("bank-map-status");
+        var tileNotice = el("bank-map-tile-notice");
+        var addBtn = el("bank-map-add-btn");
 
-    function renderBranchList(branches) {
-        var container = $("bankMapBranchList");
-        if (!branches.length) {
-            container.innerHTML = "";
-            return;
+        if (root.hasAttribute("data-tile-url")) tileUrl = root.getAttribute("data-tile-url").trim();
+        if (root.getAttribute("data-icon-path")) iconPath = root.getAttribute("data-icon-path");
+
+        var map = null;
+        var markers = []; // { marker, branch }
+        var allBranches = [];
+        var countryCode = null;
+        var currentCity = null; // null = toutes les villes du pays
+        var canEdit = false;
+        var needsFit = false; // cadrage reporté tant que le conteneur est masqué (onglet inactif)
+        var requestSeq = 0;   // ignore les réponses d'un pays précédent (changements rapides de filiale)
+
+        var instance = {
+            load: load,
+            refresh: refresh,
+            countryCode: function () { return countryCode; },
+            city: function () { return currentCity; }
+        };
+
+        function showTileNotice(reason) {
+            tileNotice.innerHTML = '<i class="bi bi-exclamation-triangle"></i> ' + (reason === "disabled"
+                ? "Fond de carte désactivé (rcc.map.tile-url vide) — les agences sont placées sur un fond neutre et listées ci-dessous."
+                : "Fond de carte indisponible sur ce réseau (tuiles OpenStreetMap bloquées ?) — les agences restent placées sur la carte et listées ci-dessous.");
+            tileNotice.style.display = "";
         }
-        container.innerHTML = branches.map(function (b, idx) {
-            return '<div class="col-md-6">' +
-                '<div class="card card-body bank-branch-card p-2" data-idx="' + idx + '">' +
-                '<div class="d-flex justify-content-between align-items-start">' +
-                '<div>' +
-                '<div class="fw-semibold">' + escapeHtml(b.name) + '</div>' +
-                '<div class="small text-muted">' + escapeHtml(b.city) + (b.address ? " — " + escapeHtml(b.address) : "") + '</div>' +
-                (b.phone ? '<div class="small"><i class="bi bi-telephone"></i> ' + escapeHtml(b.phone) + '</div>' : "") +
-                (b.openingHours ? '<div class="small text-muted"><i class="bi bi-clock"></i> ' + escapeHtml(b.openingHours) + '</div>' : "") +
-                '</div>' +
-                (canEdit ? '<button class="btn btn-sm btn-outline-secondary bank-branch-edit-btn" data-idx="' + idx + '"><i class="bi bi-pencil"></i></button>' : "") +
-                '</div></div></div>';
-        }).join("");
 
-        Array.prototype.forEach.call(container.querySelectorAll(".bank-branch-card"), function (card) {
-            card.addEventListener("click", function (evt) {
-                if (evt.target.closest(".bank-branch-edit-btn")) return;
-                var b = branches[Number(card.getAttribute("data-idx"))];
-                focusBranch(b);
+        function hideTileNotice() {
+            tileNotice.style.display = "none";
+        }
+
+        function ensureMap() {
+            if (map) return map;
+            map = createLeafletMap(canvas, { scrollWheelZoom: false }, showTileNotice, hideTileNotice);
+            map.setView(DEFAULT_VIEW.center, DEFAULT_VIEW.zoom);
+            // Un conteneur masqué (onglet inactif, display:none) mesure 0×0 : Leaflet ne charge
+            // alors aucune tuile et cadre mal les marqueurs. On recalcule dès qu'il devient visible.
+            if (window.ResizeObserver) {
+                new ResizeObserver(function () { refresh(); }).observe(canvas);
+            }
+            return map;
+        }
+
+        /** À appeler quand le conteneur redevient visible (ex. shown.bs.tab). */
+        function refresh() {
+            if (!map || !canvas.clientWidth) return;
+            map.invalidateSize();
+            if (needsFit) fitToMarkers();
+        }
+
+        function fitToMarkers() {
+            if (!canvas.clientWidth) { needsFit = true; return; }
+            needsFit = false;
+            var points = markers.map(function (m) { return m.marker.getLatLng(); });
+            if (points.length === 1) {
+                map.setView(points[0], 14);
+            } else if (points.length > 1) {
+                map.fitBounds(points, { padding: [30, 30] });
+            } else {
+                map.setView(DEFAULT_VIEW.center, DEFAULT_VIEW.zoom);
+            }
+        }
+
+        function setStatus(text, cls) {
+            statusBox.className = "bank-map-status small mt-2 " + (cls || "text-muted");
+            statusBox.textContent = text || "";
+            statusBox.style.display = text ? "" : "none";
+        }
+
+        function clearMarkers() {
+            markers.forEach(function (m) { map.removeLayer(m.marker); });
+            markers = [];
+        }
+
+        function renderCityChips(cities) {
+            if (!allBranches.length) { citiesBox.innerHTML = ""; return; }
+            var allChip = '<span class="badge rounded-pill bg-secondary bank-city-chip' +
+                (currentCity === null ? " active" : "") + '" data-city="">Toutes les villes (' + allBranches.length + ')</span>';
+            var chips = cities.map(function (c) {
+                return '<span class="badge rounded-pill bg-secondary bank-city-chip' +
+                    (currentCity === c.city ? " active" : "") + '" data-city="' + escapeHtml(c.city) + '">' +
+                    escapeHtml(c.city) + ' (' + c.branchCount + ')</span>';
+            }).join("");
+            citiesBox.innerHTML = allChip + chips;
+
+            Array.prototype.forEach.call(citiesBox.querySelectorAll(".bank-city-chip"), function (chip) {
+                chip.addEventListener("click", function () {
+                    currentCity = chip.getAttribute("data-city") || null;
+                    Array.prototype.forEach.call(citiesBox.querySelectorAll(".bank-city-chip"), function (c) {
+                        c.classList.toggle("active", c === chip);
+                    });
+                    render();
+                });
             });
-        });
-        Array.prototype.forEach.call(container.querySelectorAll(".bank-branch-edit-btn"), function (btn) {
-            btn.addEventListener("click", function () {
-                openForm(branches[Number(btn.getAttribute("data-idx"))]);
+        }
+
+        function renderBranchList(branches) {
+            if (!branches.length) {
+                listBox.innerHTML = "";
+                return;
+            }
+            listBox.innerHTML = branches.map(function (b, idx) {
+                // "À compléter" = simple repère centre-ville de la filiale (bank-branches.json), pas une agence vérifiée.
+                var toComplete = b.branchType === "À compléter";
+                var typeBadge = b.branchType
+                    ? ' <span class="badge ' + (toComplete ? "text-bg-warning" : "text-bg-light border") + '">' + escapeHtml(b.branchType) + '</span>'
+                    : "";
+                var noCoords = b.latitude == null || b.longitude == null
+                    ? '<div class="small text-muted fst-italic">Position non renseignée</div>'
+                    : "";
+                return '<div class="col-md-6">' +
+                    '<div class="card card-body bank-branch-card p-2" data-idx="' + idx + '">' +
+                    '<div class="d-flex justify-content-between align-items-start">' +
+                    '<div>' +
+                    '<div class="fw-semibold">' + escapeHtml(b.name) + typeBadge + '</div>' +
+                    '<div class="small text-muted">' + escapeHtml(b.city) + (b.address ? " — " + escapeHtml(b.address) : "") + '</div>' +
+                    (b.phone ? '<div class="small"><i class="bi bi-telephone"></i> ' + escapeHtml(b.phone) + '</div>' : "") +
+                    (b.openingHours ? '<div class="small text-muted"><i class="bi bi-clock"></i> ' + escapeHtml(b.openingHours) + '</div>' : "") +
+                    noCoords +
+                    '</div>' +
+                    (canEdit ? '<button class="btn btn-sm btn-outline-secondary bank-branch-edit-btn" data-idx="' + idx + '"><i class="bi bi-pencil"></i></button>' : "") +
+                    '</div></div></div>';
+            }).join("");
+
+            Array.prototype.forEach.call(listBox.querySelectorAll(".bank-branch-card"), function (card) {
+                card.addEventListener("click", function (evt) {
+                    if (evt.target.closest(".bank-branch-edit-btn")) return;
+                    Array.prototype.forEach.call(listBox.querySelectorAll(".bank-branch-card"), function (c) {
+                        c.classList.toggle("active", c === card);
+                    });
+                    focusBranch(branches[Number(card.getAttribute("data-idx"))]);
+                });
             });
-        });
-    }
+            Array.prototype.forEach.call(listBox.querySelectorAll(".bank-branch-edit-btn"), function (btn) {
+                btn.addEventListener("click", function () {
+                    openForm(branches[Number(btn.getAttribute("data-idx"))], instance);
+                });
+            });
+        }
 
-    function focusBranch(b) {
-        if (b.latitude == null || b.longitude == null) return;
-        map.setView([b.latitude, b.longitude], 15);
-        var found = markers.filter(function (m) { return m.branch === b; })[0];
-        if (found) found.marker.openPopup();
-    }
-
-    function render() {
-        var branches = currentCity ? allBranches.filter(function (b) { return b.city === currentCity; }) : allBranches;
-
-        clearMarkers();
-        var withCoords = [];
-        branches.forEach(function (b) {
+        function focusBranch(b) {
             if (b.latitude == null || b.longitude == null) return;
-            var marker = L.marker([b.latitude, b.longitude], { icon: icon() }).addTo(map);
-            marker.bindPopup(branchPopupHtml(b));
-            markers.push({ marker: marker, branch: b });
-            withCoords.push([b.latitude, b.longitude]);
-        });
-
-        if (withCoords.length === 1) {
-            map.setView(withCoords[0], 14);
-        } else if (withCoords.length > 1) {
-            map.fitBounds(withCoords, { padding: [30, 30] });
-        } else {
-            map.setView([6.0, 2.0], 4); // vue Afrique de l'Ouest par défaut si aucune coordonnée
+            map.setView([b.latitude, b.longitude], 15);
+            var found = markers.filter(function (m) { return m.branch === b; })[0];
+            if (found) found.marker.openPopup();
         }
 
-        renderBranchList(branches);
-        $("bankMapEmptyState").style.display = allBranches.length ? "none" : "";
-    }
+        function render() {
+            var branches = currentCity ? allBranches.filter(function (b) { return b.city === currentCity; }) : allBranches;
 
-    function open(countryCode, editAllowed) {
-        currentCountryCode = countryCode;
-        currentCity = null;
-        canEdit = !!editAllowed;
-        $("bankMapAddBtn").style.display = canEdit ? "" : "none";
+            clearMarkers();
+            branches.forEach(function (b) {
+                if (b.latitude == null || b.longitude == null) return;
+                var marker = L.marker([b.latitude, b.longitude], { icon: icon(), title: b.name }).addTo(map);
+                marker.bindPopup(branchPopupHtml(b));
+                markers.push({ marker: marker, branch: b });
+            });
+            fitToMarkers();
+            renderBranchList(branches);
+        }
 
-        ensureMap();
+        /** Charge (ou recharge) les agences d'une filiale — code KnowledgeCountry (ex. "CI"). */
+        function load(newCountryCode, editAllowed) {
+            countryCode = newCountryCode;
+            currentCity = null;
+            canEdit = !!editAllowed;
+            if (addBtn) addBtn.style.display = canEdit ? "" : "none";
 
-        Promise.all([
-            getJson("/api/bank-branches?country=" + encodeURIComponent(countryCode)),
-            getJson("/api/bank-branches/cities?country=" + encodeURIComponent(countryCode))
-        ]).then(function (results) {
-            allBranches = results[0];
-            renderCityChips(results[1]);
-            render();
-        }).catch(function () {
-            allBranches = [];
-            $("bankMapCityChips").innerHTML = "";
-            $("bankMapBranchList").innerHTML = "";
-            $("bankMapEmptyState").style.display = "";
-        });
+            ensureMap();
+            var seq = ++requestSeq;
+            setStatus("Chargement des agences…");
+
+            Promise.all([
+                getJson("/api/bank-branches?country=" + encodeURIComponent(countryCode)),
+                getJson("/api/bank-branches/cities?country=" + encodeURIComponent(countryCode))
+            ]).then(function (results) {
+                if (seq !== requestSeq) return;
+                allBranches = results[0] || [];
+                renderCityChips(results[1] || []);
+                render();
+                setStatus(allBranches.length ? "" : "Aucune agence enregistrée pour cette filiale pour le moment.");
+            }).catch(function (e) {
+                if (seq !== requestSeq) return;
+                allBranches = [];
+                citiesBox.innerHTML = "";
+                render();
+                setStatus("Impossible de charger les agences : " + e.message, "text-danger");
+            });
+        }
+
+        if (addBtn) {
+            addBtn.addEventListener("click", function () { openForm(null, instance); });
+        }
+
+        return instance;
     }
 
     /* ==========================================================
        Formulaire admin — ajout/modification (QA/ADMIN uniquement)
+       Modale unique (#bankBranchFormModal), rattachée à l'instance qui l'ouvre.
     ========================================================== */
+
+    var formModal = null;
+    var formMap = null;
+    var formMarker = null;
+    var formOwner = null; // instance mount() à recharger après enregistrement
 
     function ensureFormModal() {
         if (formModal) return;
@@ -195,10 +314,8 @@ window.BankMap = (function () {
 
         $("bankBranchFormModal").addEventListener("shown.bs.modal", function () {
             if (!formMap) {
-                formMap = L.map("bankBranchFormMap").setView([6.0, 2.0], 4);
-                L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                    attribution: "&copy; contributeurs OpenStreetMap", maxZoom: 19
-                }).addTo(formMap);
+                formMap = createLeafletMap($("bankBranchFormMap"), {}, function () {}, null);
+                formMap.setView(DEFAULT_VIEW.center, DEFAULT_VIEW.zoom);
                 formMap.on("click", function (e) {
                     setFormLatLon(e.latlng.lat, e.latlng.lng);
                 });
@@ -209,7 +326,6 @@ window.BankMap = (function () {
         $("bankBranchFormGeocodeBtn").addEventListener("click", geocodeAddress);
         $("bankBranchFormSaveBtn").addEventListener("click", saveForm);
         $("bankBranchFormDeleteBtn").addEventListener("click", deleteForm);
-        $("bankMapAddBtn").addEventListener("click", function () { openForm(null); });
     }
 
     function setFormLatLon(lat, lon) {
@@ -260,19 +376,20 @@ window.BankMap = (function () {
                 });
             })
             .catch(function () {
-                resultsBox.innerHTML = '<div class="list-group-item small text-danger">Recherche indisponible pour le moment — placez le point directement sur la carte.</div>';
+                resultsBox.innerHTML = '<div class="list-group-item small text-danger">Recherche indisponible pour le moment — saisissez latitude/longitude ou placez le point directement sur la carte.</div>';
             });
     }
 
-    function openForm(branch) {
+    function openForm(branch, owner) {
         ensureFormModal();
+        formOwner = owner;
         $("bankBranchFormError").textContent = "";
         $("bankBranchFormGeocodeResults").innerHTML = "";
         $("bankBranchFormTitle").textContent = branch ? "Modifier l'agence" : "Ajouter une agence";
         $("bankBranchFormId").value = branch ? branch.id : "";
         $("bankBranchFormName").value = branch ? branch.name : "";
         $("bankBranchFormType").value = branch ? (branch.branchType || "Agence") : "Agence";
-        $("bankBranchFormCity").value = branch ? branch.city : (currentCity || "");
+        $("bankBranchFormCity").value = branch ? branch.city : ((owner && owner.city()) || "");
         $("bankBranchFormPhone").value = branch ? (branch.phone || "") : "";
         $("bankBranchFormAddress").value = branch ? (branch.address || "") : "";
         $("bankBranchFormLat").value = branch && branch.latitude != null ? branch.latitude : "";
@@ -289,9 +406,15 @@ window.BankMap = (function () {
             if (branch && branch.latitude != null && branch.longitude != null) {
                 setFormLatLon(branch.latitude, branch.longitude);
             } else {
-                formMap.setView([6.0, 2.0], 4);
+                formMap.setView(DEFAULT_VIEW.center, DEFAULT_VIEW.zoom);
             }
         }, 250);
+    }
+
+    function reloadOwner() {
+        if (formOwner && formOwner.countryCode()) {
+            formOwner.load(formOwner.countryCode(), true); // recharge la liste/carte avec les données à jour
+        }
     }
 
     function saveForm() {
@@ -307,7 +430,7 @@ window.BankMap = (function () {
         }
 
         var payload = {
-            countryCode: currentCountryCode,
+            countryCode: formOwner ? formOwner.countryCode() : null,
             city: city,
             name: name,
             address: $("bankBranchFormAddress").value.trim() || null,
@@ -325,7 +448,7 @@ window.BankMap = (function () {
 
         request.then(function () {
             formModal.hide();
-            open(currentCountryCode, canEdit); // recharge la liste/carte avec les données à jour
+            reloadOwner();
         }).catch(function (e) {
             $("bankBranchFormError").textContent = "Erreur : " + e.message;
         });
@@ -338,12 +461,12 @@ window.BankMap = (function () {
 
         sendJson("/api/bank-branches/" + id, "DELETE").then(function () {
             formModal.hide();
-            open(currentCountryCode, canEdit);
+            reloadOwner();
         }).catch(function (e) {
             $("bankBranchFormError").textContent = "Erreur : " + e.message;
         });
     }
 
-    return { open: open };
+    return { mount: mount };
 
 })();
