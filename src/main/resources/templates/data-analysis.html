@@ -28,6 +28,66 @@
         .da-timeline-bar { width: 60%; border-radius: 4px 4px 0 0; background: var(--eco-blue); min-height: 2px; }
         .da-timeline-label { font-size: .68rem; color: #6b7280; margin-top: 4px; text-align: center; }
         .da-timeline-value { font-size: .72rem; font-weight: 600; margin-bottom: 2px; }
+        /* ===== Refonte visuelle : cartes équipes, photos d'agents, modales détaillées ===== */
+        .da-kpi { background: #fff; border: 1px solid #e7ebf3; border-radius: 18px; padding: 1rem 1.1rem; display: flex; align-items: center; gap: .9rem; height: 100%; animation: daIn .4s ease both; }
+        .da-kpi-icon { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; font-size: 1.3rem; flex-shrink: 0; }
+        .da-kpi b { display: block; font-size: 1.55rem; line-height: 1.1; color: #172033; }
+        .da-kpi small { color: #718096; font-size: .76rem; }
+        .da-kpi .da-kpi-hint { display: block; font-size: .7rem; font-weight: 700; margin-top: 2px; }
+        .da-legend-pill { border: 1px solid #e7ebf3; background: #fff; border-radius: 999px; padding: .3rem .75rem; font-size: .8rem; display: inline-flex; align-items: center; gap: .4rem; margin: 0 .35rem .35rem 0; cursor: pointer; transition: all .15s ease; }
+        .da-legend-pill:hover { border-color: #b9cbe6; transform: translateY(-1px); }
+        .da-legend-pill i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .da-team-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 1rem; }
+        .da-team-card { background: #fff; border: 1px solid #e7ebf3; border-radius: 18px; overflow: hidden; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease; animation: daIn .4s ease both; }
+        .da-team-card:hover { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(0, 87, 184, .12); }
+        .da-team-band { padding: .8rem 1rem; color: #fff; display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+        .da-team-band h6 { margin: 0; font-weight: 800; }
+        .da-team-band span { font-size: .75rem; background: rgba(255,255,255,.2); border-radius: 999px; padding: 2px 9px; font-weight: 700; }
+        .da-team-gauges { display: flex; justify-content: space-around; padding: .9rem .5rem .4rem; }
+        .da-team-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: .35rem .8rem; padding: .3rem 1rem .9rem; font-size: .76rem; color: #4a5568; }
+        .da-team-stats b { color: #172033; }
+        .da-team-foot { border-top: 1px solid #f0f3f7; padding: .55rem 1rem; font-size: .78rem; color: #0057B8; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+        .da-avatars { display: flex; }
+        .da-avatars .da-avatar { margin-left: -8px; border: 2px solid #fff; }
+        .da-avatars .da-avatar:first-child { margin-left: 0; }
+        .da-avatar { border-radius: 50%; display: inline-grid; place-items: center; font-weight: 800; color: #fff; overflow: hidden; flex-shrink: 0; background: #9aa4b2; }
+        .da-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .da-mini-gauge { text-align: center; font-size: .7rem; color: #718096; }
+        .da-mini-gauge .ring { width: 62px; height: 62px; border-radius: 50%; display: grid; place-items: center; margin: 0 auto 4px; }
+        .da-mini-gauge .ring span { width: 46px; height: 46px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-weight: 800; font-size: .8rem; color: #172033; }
+        .da-modal-hero { color: #fff; padding: 1.2rem 1.4rem; border-radius: 0; }
+        .da-modal-hero h5 { margin: 0; font-weight: 800; }
+        .da-agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: .75rem; }
+        .da-agent-card { border: 1px solid #e7ebf3; border-radius: 16px; padding: .85rem; background: #fff; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; animation: daIn .35s ease both; position: relative; }
+        .da-agent-card:hover { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(30, 41, 80, .1); }
+        .da-agent-card.bad { border-top: 4px solid #d93025; } .da-agent-card.good { border-top: 4px solid #00A651; } .da-agent-card.na { border-top: 4px solid #cfd6e2; }
+        .da-agent-head { display: flex; align-items: center; gap: .6rem; margin-bottom: .6rem; }
+        .da-agent-head b { font-size: .86rem; color: #172033; display: block; line-height: 1.2; }
+        .da-agent-head small { color: #718096; font-size: .72rem; }
+        .da-metric { display: grid; grid-template-columns: 68px 1fr 38px; gap: .4rem; align-items: center; font-size: .72rem; color: #4a5568; margin-bottom: .25rem; }
+        .da-metric-track { height: 6px; background: #eef0f4; border-radius: 4px; overflow: hidden; }
+        .da-metric-track i { display: block; height: 100%; border-radius: 4px; }
+        .da-metric b { text-align: right; color: #172033; }
+        .da-filter { display: inline-flex; gap: .3rem; flex-wrap: wrap; }
+        .da-filter button { border: 1px solid #e7ebf3; background: #fff; border-radius: 999px; padding: .25rem .75rem; font-size: .75rem; font-weight: 700; color: #5e6a7d; }
+        .da-filter button.active { background: #eaf2ff; color: #0057B8; border-color: #cfe0f7; }
+        .da-agent-profile { display: flex; gap: 1rem; align-items: center; }
+        .da-kpi-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; margin: 1rem 0; }
+        .da-kpi-tile { background: #f7f9fc; border-radius: 12px; padding: .6rem .7rem; text-align: center; }
+        .da-kpi-tile b { display: block; font-size: 1.2rem; color: #172033; }
+        .da-kpi-tile small { color: #718096; font-size: .7rem; }
+        .da-chip { display: inline-flex; gap: 4px; align-items: center; font-size: .72rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #f2f4f7; color: #4a5568; margin: 0 .3rem .3rem 0; }
+        .da-history { list-style: none; padding: 0; margin: 0; border-left: 2px solid #e3e8f0; }
+        .da-history li { position: relative; padding: 0 0 .7rem 1rem; font-size: .8rem; }
+        .da-history li::before { content: ""; position: absolute; left: -6px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: #F5A623; }
+        .da-history li.crit::before { background: #d93025; }
+        .da-alert-card { border: 1px solid #e7ebf3; border-radius: 18px; padding: 1rem; text-align: center; background: #fff; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; animation: daIn .35s ease both; height: 100%; }
+        .da-alert-card:hover { transform: translateY(-3px); box-shadow: 0 12px 26px rgba(217, 48, 37, .12); }
+        .da-alert-person { display: flex; gap: .7rem; align-items: flex-start; border: 1px solid #eef1f5; border-radius: 14px; padding: .7rem .8rem; margin-bottom: .55rem; background: #fff; }
+        .da-alert-person.done { opacity: .65; }
+        @keyframes daIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+        @media (max-width: 576px) { .da-kpi-tiles { grid-template-columns: 1fr 1fr; } }
+        @media (prefers-reduced-motion: reduce) { .da-kpi, .da-team-card, .da-agent-card, .da-alert-card { animation: none; } }
     </style>
 </head>
 <body>
@@ -82,6 +142,18 @@
 
                 <div class="card dashboard-card shadow-sm mb-4">
                     <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                            <div>
+                                <h6 class="card-title mb-0"><i class="bi bi-people-fill"></i> Les équipes en un coup d'œil</h6>
+                                <small class="text-muted">Cliquez sur une équipe pour voir ses agents (avec photos), leurs résultats et l'évolution sur 6 mois.</small>
+                            </div>
+                        </div>
+                        <div class="da-team-grid" id="daTeamCards"><p class="text-muted">Aucune analyse générée pour le moment.</p></div>
+                    </div>
+                </div>
+
+                <div class="card dashboard-card shadow-sm mb-4">
+                    <div class="card-body">
                         <h6 class="card-title mb-3"><i class="bi bi-robot"></i> Synthèse</h6>
                         <div class="da-narrative" id="daNarrative">Cliquez sur « Générer l'analyse » pour lancer le calcul.</div>
                     </div>
@@ -89,8 +161,8 @@
 
                 <div class="card dashboard-card shadow-sm mb-4">
                     <div class="card-body">
-                        <h6 class="card-title mb-3"><i class="bi bi-diagram-3"></i> Détail par équipe</h6>
-                        <p class="text-muted small">Cliquez sur une équipe pour recentrer l'analyse dessus.</p>
+                        <h6 class="card-title mb-3"><i class="bi bi-table"></i> Tableau détaillé par équipe</h6>
+                        <p class="text-muted small">Toutes les valeurs chiffrées — cliquez sur une ligne pour ouvrir le détail de l'équipe.</p>
                         <div class="table-responsive">
                             <table class="table table-hover table-sm align-middle">
                                 <thead>
@@ -134,47 +206,72 @@
 
 <!-- ===================== MODALE — DÉTAIL ÉQUIPE ===================== -->
 <div class="modal fade" id="daTeamDetailModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="daTeamDetailTitle"><i class="bi bi-diagram-3"></i></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content overflow-hidden">
+            <div class="da-modal-hero d-flex justify-content-between align-items-start" id="daTeamHero">
+                <div>
+                    <h5 id="daTeamDetailTitle"><i class="bi bi-diagram-3"></i></h5>
+                    <small id="daTeamHeroSub"></small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <h6 class="mb-3">Indicateurs</h6>
-                <div class="d-flex justify-content-around flex-wrap gap-3 mb-4" id="daTeamGauges"></div>
-
-                <h6 class="mb-2">Comparaison à la moyenne RCC</h6>
-                <div id="daTeamBars" class="mb-4"></div>
-
-                <h6 class="mb-2">Frise chronologique — performance globale (6 derniers mois)</h6>
-                <div class="da-timeline" id="daTeamTimeline"></div>
-
-                <h6 class="mb-2 mt-4">Détail par agent — ce qui a marché ou pas</h6>
-                <div class="table-responsive">
-                    <table class="table table-hover table-sm align-middle">
-                        <thead><tr><th>Agent</th><th>Présence</th><th>Score qualité</th><th>Performance</th><th>Résultat</th></tr></thead>
-                        <tbody id="daAgentsBody"><tr><td colspan="5" class="text-center text-muted">Chargement…</td></tr></tbody>
-                    </table>
+                <div class="row g-4">
+                    <div class="col-lg-5">
+                        <h6 class="mb-3">Indicateurs</h6>
+                        <div class="d-flex justify-content-around flex-wrap gap-3 mb-4" id="daTeamGauges"></div>
+                        <h6 class="mb-2">Comparaison à la moyenne RCC</h6>
+                        <div id="daTeamBars" class="mb-4"></div>
+                    </div>
+                    <div class="col-lg-7">
+                        <h6 class="mb-2">Évolution — performance globale (6 derniers mois)</h6>
+                        <div class="da-timeline" id="daTeamTimeline"></div>
+                    </div>
                 </div>
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4 mb-2">
+                    <h6 class="mb-0">Les agents de l'équipe — ce qui a marché ou pas</h6>
+                    <div class="da-filter" id="daAgentFilter">
+                        <button type="button" class="active" data-filter="all">Tous</button>
+                        <button type="button" data-filter="bad">À surveiller</button>
+                        <button type="button" data-filter="good">A marché</button>
+                        <button type="button" data-filter="na">Données incomplètes</button>
+                    </div>
+                </div>
+                <div class="da-agent-grid" id="daAgentsGrid"><p class="text-muted small">Chargement…</p></div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- ===================== MODALE — DÉTAIL AGENT ===================== -->
+<div class="modal fade" id="daAgentDetailModal" tabindex="-1" style="z-index:1065;">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content overflow-hidden">
+            <div class="da-modal-hero" style="background:linear-gradient(120deg,#0d1b3e,#0057B8);">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="da-agent-profile" id="daAgentDetailTitle"></div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div id="daAgentDetailBody"></div>
+                <h6 class="mt-3 mb-2"><i class="bi bi-clock-history"></i> Historique des alertes</h6>
+                <div id="daAgentAlertHistory"><p class="text-muted small">Chargement…</p></div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ===================== MODALE — DÉTAIL AGENT ===================== -->
-<div class="modal fade" id="daAgentDetailModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="daAgentDetailTitle"><i class="bi bi-person-fill"></i></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+<!-- ===================== MODALE — AGENTS CONCERNÉS PAR LES ALERTES ===================== -->
+<div class="modal fade" id="daAlertsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content overflow-hidden">
+            <div class="da-modal-hero" style="background:linear-gradient(120deg,#5a1020,#d93025);">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div><h5 id="daAlertsModalTitle"></h5><small id="daAlertsModalSub"></small></div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
             </div>
-            <div class="modal-body">
-                <div id="daAgentDetailBody"></div>
-                <h6 class="mt-4 mb-2">Historique des alertes — évolution depuis son arrivée</h6>
-                <div id="daAgentAlertHistory"><p class="text-muted small">Chargement…</p></div>
-            </div>
+            <div class="modal-body" id="daAlertsModalBody"></div>
         </div>
     </div>
 </div>

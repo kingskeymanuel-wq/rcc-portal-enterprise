@@ -16,13 +16,36 @@ public class DataAnalysisController {
     private final DataAnalysisService dataAnalysisService;
     private final com.ecobank.rccportal.service.AlertEngineService alertEngineService;
     private final com.ecobank.rccportal.service.TeamLeaderService teamLeaderService;
+    private final com.ecobank.rccportal.repository.UserProfileRepository userProfileRepository;
 
     public DataAnalysisController(DataAnalysisService dataAnalysisService,
                                   com.ecobank.rccportal.service.AlertEngineService alertEngineService,
-                                  com.ecobank.rccportal.service.TeamLeaderService teamLeaderService) {
+                                  com.ecobank.rccportal.service.TeamLeaderService teamLeaderService,
+                                  com.ecobank.rccportal.repository.UserProfileRepository userProfileRepository) {
         this.dataAnalysisService = dataAnalysisService;
         this.alertEngineService = alertEngineService;
         this.teamLeaderService = teamLeaderService;
+        this.userProfileRepository = userProfileRepository;
+    }
+
+    /**
+     * Photos de profil des agents affichés dans les fenêtres de détail (équipe, alertes) :
+     * userId → URL de la photo (Mon profil). Les agents sans photo sont simplement absents
+     * de la réponse — l'interface affiche alors leurs initiales.
+     */
+    @GetMapping("/photos")
+    public java.util.Map<Long, String> photos(@RequestParam(name = "ids") java.util.List<Long> ids,
+                                              @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireCanView(requester);
+        java.util.Set<Long> wanted = new java.util.HashSet<>(ids);
+        java.util.Map<Long, String> out = new java.util.HashMap<>();
+        if (wanted.isEmpty()) return out;
+        for (com.ecobank.rccportal.model.UserProfile p : userProfileRepository.findAll()) {
+            if (p.getUser() == null || p.getPhotoUrl() == null || p.getPhotoUrl().isBlank()) continue;
+            Long id = p.getUser().getId();
+            if (id != null && wanted.contains(id)) out.put(id, p.getPhotoUrl());
+        }
+        return out;
     }
 
     /**

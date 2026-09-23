@@ -216,7 +216,7 @@
                 <div class="pf-section" id="importCard" style="display:none;">
                     <div class="pf-section-head">
                         <h6 class="pf-section-title"><i class="bi bi-upload"></i> Charger des données d'équipe</h6>
-                        <p class="pf-section-hint">Colonne A = matricule/nom, colonnes suivantes = métriques</p>
+                        <p class="pf-section-hint">N'importe quel fichier de résultats : Excel, CSV, TXT, HTML, JSON, PDF ou image — les colonnes agent, date et indicateurs sont reconnues par leurs en-têtes</p>
                     </div>
                     <label class="pf-field-label">Équipe concernée</label>
                     <div class="pf-chip-group" id="kpiImportTeamPicker">
@@ -236,7 +236,7 @@
                     </div>
                     <div class="d-flex gap-2 flex-wrap">
                         <input type="month" class="form-control form-control-sm" id="kpiImportMonth" style="max-width:160px;">
-                        <input type="file" class="form-control form-control-sm" id="kpiImportFile" accept=".xlsx" style="max-width:260px;">
+                        <input type="file" class="form-control form-control-sm" id="kpiImportFile" accept=".xlsx,.xlsm,.xls,.csv,.tsv,.txt,.htm,.html,.json,.pdf,image/*,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain" style="max-width:260px;">
                         <button class="btn btn-sm btn-primary text-nowrap pf-btn" id="kpiImportBtn">Importer</button>
                     </div>
                     <div class="d-flex gap-2 mt-2 flex-wrap align-items-center">

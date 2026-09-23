@@ -147,6 +147,16 @@ public class ManualKpiEntryService {
             int wideFormatMonthRow = detectWideFormatMonthRow(sheet);
             int sheetYear = findYearInFirstRows(sheet, defaultPeriod.getYear());
 
+            // Tableau « quelconque » (colonne agent pas en A, Nom + Prénom, colonne date, format
+            // Indicateur/Valeur, colonnes descriptives…) : lu par en-têtes plutôt que par position.
+            if (wideFormatMonthRow < 0) {
+                SmartLayout smart = detectSmartLayout(sheet);
+                if (smart != null) {
+                    parseSmartTable(sheet, smart, sheetYear, defaultPeriod.atDay(1), ctx);
+                    continue;
+                }
+            }
+
             if (wideFormatMonthRow >= 0) {
                 parseWideFormat(sheet, wideFormatMonthRow, sheetYear, defaultPeriod.atDay(1), ctx);
             } else {
@@ -291,17 +301,21 @@ public class ManualKpiEntryService {
 
         ImportContext ctx = new ImportContext(enteredBy, usersByNormalizedName, importService, normalizedCountry, normalizedTeam);
 
-        String originalFilename = file.getOriginalFilename();
-        boolean isCsv = originalFilename != null && originalFilename.toLowerCase().endsWith(".csv");
-        if (originalFilename != null && originalFilename.toLowerCase().endsWith(".xlsb")) {
-            throw ApiException.badRequest(
-                    "Le format Excel binaire (.xlsb) n'est pas pris en charge par le moteur d'import. " +
-                    "Solution rapide : ouvrez le fichier dans Excel, puis « Fichier > Enregistrer sous » et " +
-                    "choisissez « Classeur Excel (.xlsx) » ou « CSV (séparateur : point-virgule) » — les deux " +
-                    "formats sont pleinement pris en charge ici, aucune donnée n'est perdue dans la conversion.");
+        // Format reconnu au contenu (Excel, CSV/TSV/TXT, HTML, JSON, PDF…) — voir KpiFileReader.
+        // Une image envoyée ici est lue comme une capture d'écran : « peu importe le fichier ».
+        KpiFileReader.Result read;
+        try {
+            read = KpiFileReader.read(file.getBytes(), file.getOriginalFilename(), file.getContentType());
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw ApiException.badRequest("Impossible de lire ce fichier : " + e.getMessage());
+        }
+        if (read.kind() == KpiFileReader.Kind.IMAGE) {
+            return importFromScreenshot(file, defaultPeriod, enteredByUsername, serviceCode, countryCode, team);
         }
 
-        try (Workbook workbook = isCsv ? buildWorkbookFromCsv(file.getInputStream()) : WorkbookFactory.create(file.getInputStream())) {
+        try (Workbook workbook = read.workbook()) {
             processWorkbook(workbook, defaultPeriod, ctx);
         } catch (IOException e) {
             throw ApiException.badRequest("Impossible de lire le fichier Excel : " + e.getMessage());
@@ -707,8 +721,251 @@ public class ManualKpiEntryService {
     }
 
     /** Nettoyage commun d'un intitulé de colonne en code métrique stable (accents retirés, un seul style dans tout le projet). */
+    // ══════════════════════════════════════════════════════════════════════
+    // Tableau quelconque, lu par ses EN-TÊTES (et non par la position des colonnes)
+    // ══════════════════════════════════════════════════════════════════════
+
+    /** Rôle de chaque colonne d'un tableau reconnu par ses en-têtes. */
+    record SmartLayout(int headerRow, Integer idCol, Integer nameCol, Integer firstNameCol, Integer dateCol,
+                       Integer indicatorCol, Integer valueCol, Map<Integer, String> metricCols) {
+        boolean longFormat() { return indicatorCol != null && valueCol != null; }
+    }
+
+    private static final List<String> ID_HEADERS = List.of("matricule", "mat", "id agent", "identifiant", "login", "username",
+            "user id", "code agent", "employee id", "id employe", "id conseiller", "agent id", "id", "code");
+    private static final List<String> NAME_HEADERS = List.of("nom et prenom", "nom prenom", "nom complet", "nom & prenom", "prenom et nom",
+            "prenom nom", "agent", "nom agent", "nom de l agent", "conseiller", "nom conseiller", "collaborateur", "employe", "full name",
+            "name", "agent name", "nom", "last name", "utilisateur", "operateur", "teleconseiller");
+    private static final List<String> FIRST_NAME_HEADERS = List.of("prenom", "prenoms", "first name", "firstname");
+    private static final List<String> DATE_HEADERS = List.of("date", "jour", "mois", "periode", "period", "month", "day", "semaine",
+            "week", "date d activite", "date activite");
+    private static final List<String> INDICATOR_HEADERS = List.of("indicateur", "kpi", "metrique", "metric", "critere", "libelle indicateur",
+            "nom indicateur", "mesure");
+    private static final List<String> VALUE_HEADERS = List.of("valeur", "value", "resultat", "result", "realise", "realisation", "score", "note", "taux");
+    /** Colonnes descriptives, jamais des indicateurs chiffrés. */
+    private static final List<String> DIMENSION_KEYWORDS = List.of("equipe", "team", "site", "service", "filiale", "pays", "country",
+            "superviseur", "supervisor", "team leader", "manager", "responsable", "activite", "campagne", "campaign", "file", "queue",
+            "statut", "status", "commentaire", "comment", "observation", "remarque", "rang", "numero", "email", "mail", "telephone",
+            "poste", "fonction", "role", "sexe", "genre", "contrat", "anciennete", "shift", "vacation", "tl", "n", "no", "num");
+
+    private static String headerKey(String raw) {
+        return raw == null ? "" : new ManualKpiEntryService.HeaderNormalizer().apply(raw);
+    }
+
+    /** Minuscules sans accents ni ponctuation : « N° Matricule » → « n matricule ». */
+    static final class HeaderNormalizer implements java.util.function.Function<String, String> {
+        @Override public String apply(String raw) {
+            String t = java.text.Normalizer.normalize(raw, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "");
+            return t.toLowerCase(Locale.ROOT).replace("\u00a0", " ").replaceAll("[^a-z0-9%]+", " ").trim();
+        }
+    }
+
+    private static boolean matchesAny(String key, List<String> candidates) {
+        if (key.isEmpty()) return false;
+        for (String c : candidates) {
+            if (key.equals(c) || key.startsWith(c + " ") || key.endsWith(" " + c)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Cherche, dans les 25 premières lignes, un en-tête qui désigne l'agent (matricule et/ou nom)
+     * et au moins un indicateur chiffré (ou un couple Indicateur/Valeur). Retourne null si la
+     * feuille ressemble au format historique (agent en colonne A, indicateurs à droite, titres de
+     * mois en sections) : le moteur historique garde alors la main.
+     */
+    SmartLayout detectSmartLayout(Sheet sheet) {
+        int limit = Math.min(sheet.getLastRowNum(), 25);
+        for (int r = 0; r <= limit; r++) {
+            Row row = sheet.getRow(r);
+            if (row == null || row.getLastCellNum() < 2) continue;
+            Integer idCol = null, nameCol = null, firstNameCol = null, dateCol = null, indicatorCol = null, valueCol = null;
+            Map<Integer, String> metricCols = new java.util.LinkedHashMap<>();
+            List<Integer> dimensionCols = new ArrayList<>();
+            int textCells = 0;
+            for (int c = 0; c < row.getLastCellNum(); c++) {
+                Cell cell = row.getCell(c);
+                if (cell == null || cell.getCellType() != CellType.STRING) continue;
+                String raw = cleanText(cell);
+                String key = headerKey(raw);
+                if (key.isEmpty()) continue;
+                textCells++;
+                if (idCol == null && matchesAny(key, ID_HEADERS) && !key.contains("nom")) { idCol = c; continue; }
+                if (firstNameCol == null && matchesAny(key, FIRST_NAME_HEADERS) && !key.contains(" nom") && !key.startsWith("nom")) { firstNameCol = c; continue; }
+                if (nameCol == null && matchesAny(key, NAME_HEADERS)) { nameCol = c; continue; }
+                if (dateCol == null && matchesAny(key, DATE_HEADERS)) { dateCol = c; continue; }
+                if (indicatorCol == null && matchesAny(key, INDICATOR_HEADERS)) { indicatorCol = c; continue; }
+                if (valueCol == null && indicatorCol != null && matchesAny(key, VALUE_HEADERS)) { valueCol = c; continue; }
+                if (matchesAny(key, DIMENSION_KEYWORDS)) { dimensionCols.add(c); continue; }
+                String code = sanitizeMetricCode(raw);
+                if (!code.isBlank()) metricCols.put(c, code);
+            }
+            if (idCol == null && nameCol == null) continue;
+            if (textCells < 2) continue;
+            boolean longFormat = indicatorCol != null && valueCol != null;
+            // Au moins une ligne de données sous l'en-tête avec une valeur chiffrée dans une colonne d'indicateur.
+            List<Integer> valueColumns = longFormat ? List.of(valueCol) : new ArrayList<>(metricCols.keySet());
+            if (valueColumns.isEmpty() || !hasNumericBelow(sheet, r, valueColumns)) continue;
+
+            int agentCol = idCol != null ? idCol : nameCol;
+            boolean legacyShape = agentCol == 0 && firstNameCol == null && dateCol == null && !longFormat && dimensionCols.isEmpty()
+                    && (idCol == null || nameCol == null);
+            if (legacyShape) return null;
+            return new SmartLayout(r, idCol, nameCol, firstNameCol, dateCol, indicatorCol, valueCol, metricCols);
+        }
+        return null;
+    }
+
+    private boolean hasNumericBelow(Sheet sheet, int headerRow, List<Integer> cols) {
+        int limit = Math.min(sheet.getLastRowNum(), headerRow + 15);
+        for (int r = headerRow + 1; r <= limit; r++) {
+            Row row = sheet.getRow(r);
+            if (row == null) continue;
+            for (Integer c : cols) if (cellToNumber(row.getCell(c)) != null) return true;
+        }
+        return false;
+    }
+
+    private void parseSmartTable(Sheet sheet, SmartLayout layout, int sheetYear, LocalDate fallbackPeriod, ImportContext ctx) {
+        Row headerRow = sheet.getRow(layout.headerRow());
+        for (int r = layout.headerRow() + 1; r <= sheet.getLastRowNum(); r++) {
+            Row row = sheet.getRow(r);
+            if (row == null) continue;
+            String matricule = layout.idCol() != null ? cellAsIdentifier(row.getCell(layout.idCol())) : "";
+            String name = layout.nameCol() != null ? cleanText(row.getCell(layout.nameCol())) : "";
+            if (layout.firstNameCol() != null) {
+                String first = cleanText(row.getCell(layout.firstNameCol()));
+                if (!first.isBlank()) name = (name + " " + first).trim();
+            }
+            String label = !name.isBlank() ? name : matricule;
+            if (label.isBlank()) continue;
+            if (isTotalOrSummaryRow(label)) continue;
+            // En-tête répété (fichiers concaténés, une page par équipe…)
+            if (headerRow != null && layout.nameCol() != null
+                    && headerKey(label).equals(headerKey(cleanText(headerRow.getCell(layout.nameCol()))))) continue;
+
+            LocalDate period = fallbackPeriod;
+            if (layout.dateCol() != null) {
+                LocalDate detected = cellToPeriod(row.getCell(layout.dateCol()), sheetYear);
+                if (detected != null) period = detected;
+            }
+
+            ctx.rowsProcessed++;
+            User subject = resolveUserSmart(matricule, name, ctx);
+            if (subject == null) {
+                ctx.unresolvedNames.add(label);
+                continue;
+            }
+
+            if (layout.longFormat()) {
+                String indicator = cleanText(row.getCell(layout.indicatorCol()));
+                String code = sanitizeMetricCode(indicator);
+                Cell valueCell = row.getCell(layout.valueCol());
+                if (code.isBlank()) {
+                    if (cellToNumber(valueCell) != null) flagSkipped(label, "(indicateur vide)", valueCell, "Indicateur non renseigné sur cette ligne", ctx);
+                    continue;
+                }
+                saveSmartValue(subject, label, code, valueCell, period, ctx);
+            } else {
+                for (Map.Entry<Integer, String> m : layout.metricCols().entrySet()) {
+                    saveSmartValue(subject, label, m.getValue(), row.getCell(m.getKey()), period, ctx);
+                }
+            }
+        }
+    }
+
+    private void saveSmartValue(User subject, String rowLabel, String metricCode, Cell cell, LocalDate period, ImportContext ctx) {
+        BigDecimal value = cellToNumber(cell);
+        if (value == null) {
+            String text = cleanText(cell);
+            if (!text.isBlank() && !text.equals("-") && !text.equalsIgnoreCase("na")) {
+                flagSkipped(rowLabel, metricCode, cell, "Valeur illisible comme nombre : « " + text + " »", ctx);
+            }
+            return;
+        }
+        ctx.numericCellsDetected++;
+        flagIfAnomalous(subject, metricCode, value, period, ctx);
+        manualKpiEntryRepository.save(ManualKpiEntry.builder()
+                .subject(subject).enteredBy(ctx.enteredBy)
+                .metricCode(metricCode.length() > 50 ? metricCode.substring(0, 50) : metricCode)
+                .metricValue(value).periodDate(period)
+                .importBatchId(ctx.importBatchId)
+                .build());
+        ctx.entriesCreated++;
+        if (ctx.preview.size() < ctx.previewCap) {
+            ctx.preview.add(new com.ecobank.rccportal.dto.ImportedKpiPreview(subject.getName(), metricCode, value, period.toString()));
+        }
+    }
+
+    /** Matricule tel qu'écrit (un matricule numérique « 012345 » ou 12345.0 garde sa forme entière). */
+    private String cellAsIdentifier(Cell cell) {
+        if (cell == null) return "";
+        if (cell.getCellType() == CellType.NUMERIC && !DateUtil.isCellDateFormatted(cell)) {
+            double d = cell.getNumericCellValue();
+            return d == Math.rint(d) ? String.valueOf((long) d) : String.valueOf(d);
+        }
+        return cleanText(cell);
+    }
+
+    /** Matricule d'abord (compte existant), puis nom ; sinon même logique que l'import historique (création). */
+    private User resolveUserSmart(String matricule, String name, ImportContext ctx) {
+        if (!matricule.isBlank()) {
+            User byMatricule = userRepository.findFirstByUsernameIgnoreCase(matricule).orElse(null);
+            if (byMatricule != null) return linkToTeamIfMissing(byMatricule, ctx);
+        }
+        if (!name.isBlank()) return resolveUser(name, ctx);
+        return resolveUser(matricule, ctx);
+    }
+
+    private static final Pattern DMY = Pattern.compile("^(\\d{1,2})[/.-](\\d{1,2})[/.-](\\d{2,4})");
+    private static final Pattern YMD = Pattern.compile("^(\\d{4})[/.-](\\d{1,2})(?:[/.-](\\d{1,2}))?");
+    private static final Pattern MY = Pattern.compile("^(\\d{1,2})[/.-](\\d{4})$");
+
+    /** Date/période d'une cellule : vraie date Excel, « 15/09/2026 », « 2026-09-15 », « 09/2026 », « septembre 2026 »… */
+    LocalDate cellToPeriod(Cell cell, int sheetYear) {
+        if (cell == null) return null;
+        try {
+            if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
+                return cell.getLocalDateTimeCellValue().toLocalDate();
+            }
+        } catch (Exception ignored) { }
+        String text = cleanText(cell);
+        if (text.isBlank()) return null;
+        try {
+            Matcher m = YMD.matcher(text);
+            if (m.find()) return LocalDate.of(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)), m.group(3) != null ? Integer.parseInt(m.group(3)) : 1);
+            m = DMY.matcher(text);
+            if (m.find()) {
+                int y = Integer.parseInt(m.group(3));
+                return LocalDate.of(y < 100 ? 2000 + y : y, Integer.parseInt(m.group(2)), Integer.parseInt(m.group(1)));
+            }
+            m = MY.matcher(text);
+            if (m.find()) return LocalDate.of(Integer.parseInt(m.group(2)), Integer.parseInt(m.group(1)), 1);
+        } catch (Exception ignored) { }
+        return tryExtractPeriod(text, sheetYear);
+    }
+
     private String sanitizeMetricCode(String headerText) {
-        return stripAccents(headerText.toUpperCase()).replaceAll("[^A-Z0-9]+", "_").replaceAll("^_|_$", "");
+        String code = stripAccents(headerText.toUpperCase()).replaceAll("[^A-Z0-9]+", "_").replaceAll("^_|_$", "");
+        return METRIC_ALIASES.getOrDefault(code, code);
+    }
+
+    /**
+     * Libellés courants des fichiers de reporting ramenés aux codes que l'Analyse de données et la
+     * Performance exploitent (SCORE_QA = performance globale, INTERACTIONS et TARGET = écart à
+     * l'objectif). Les autres colonnes gardent leur propre code et restent visibles par agent.
+     */
+    private static final Map<String, String> METRIC_ALIASES = buildMetricAliases();
+
+    private static Map<String, String> buildMetricAliases() {
+        Map<String, String> m = new HashMap<>();
+        for (String a : List.of("SCORE_QUALITE", "NOTE_QUALITE", "QUALITE", "NOTE_QA", "QA", "SCORE_QUALITY", "QUALITY_SCORE",
+                "EVALUATION_QA", "SCORE_QA_MOYEN", "MOYENNE_QA", "SCORE_QA_MOYENNE", "NOTE_QA_MOYENNE", "QUALITY")) m.put(a, "SCORE_QA");
+        for (String a : List.of("NB_INTERACTIONS", "NOMBRE_D_INTERACTIONS", "NOMBRE_INTERACTIONS", "INTERACTIONS_TRAITEES", "APPELS_TRAITES",
+                "NB_APPELS", "NOMBRE_D_APPELS", "NOMBRE_APPELS", "NB_APPELS_TRAITES", "APPELS_REPONDUS", "APPELS_DECROCHES", "CONTACTS_TRAITES",
+                "VOLUME_TRAITE", "CALLS_HANDLED", "HANDLED_CALLS", "TICKETS_TRAITES", "MAILS_TRAITES", "INTERACTION")) m.put(a, "INTERACTIONS");
+        for (String a : List.of("OBJECTIF", "OBJECTIFS", "CIBLE", "OBJECTIF_INTERACTIONS", "TARGET_INTERACTIONS", "OBJECTIF_MENSUEL")) m.put(a, "TARGET");
+        return m;
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -953,6 +1210,49 @@ public class ManualKpiEntryService {
 
     private static final Pattern TIME_PATTERN = Pattern.compile("^(\\d{1,2}):(\\d{2}):(\\d{2})(?:\\s*([AaPp][Mm]))?$");
 
+    private static final Pattern HOURS_MIN = Pattern.compile("^(\\d+)\\s*h\\s*(\\d{1,2})?\\s*(?:min|mn|m)?$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern MIN_ONLY = Pattern.compile("^(\\d+(?:[.,]\\d+)?)\\s*(?:min|mn)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SEC_ONLY = Pattern.compile("^(\\d+(?:[.,]\\d+)?)\\s*(?:s|sec|secondes?)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern MM_SS = Pattern.compile("^(\\d{1,3}):(\\d{2})$");
+
+    /**
+     * Nombres « du monde réel » : « 85 % », « 85,5 % », « 1 234,5 », « 1.234,5 », « 1,234.5 »,
+     * « 12 500 FCFA », « 1h30 », « 45 min », « 90 s », « 04:32 » (durée mm:ss, en minutes).
+     * Retourne null si le texte n'est pas un nombre — la cellule est alors signalée, pas perdue.
+     */
+    static BigDecimal parseFlexibleNumber(String raw) {
+        String t = raw.replace("\u202f", " ").replace("\u00a0", " ").trim();
+        if (t.isEmpty()) return null;
+        Matcher m;
+        if ((m = HOURS_MIN.matcher(t)).matches()) {
+            return BigDecimal.valueOf(Integer.parseInt(m.group(1)) * 60L + (m.group(2) != null ? Integer.parseInt(m.group(2)) : 0));
+        }
+        if ((m = MIN_ONLY.matcher(t)).matches()) return new BigDecimal(m.group(1).replace(',', '.'));
+        if ((m = SEC_ONLY.matcher(t)).matches()) {
+            return new BigDecimal(m.group(1).replace(',', '.')).divide(BigDecimal.valueOf(60), 4, java.math.RoundingMode.HALF_UP);
+        }
+        if ((m = MM_SS.matcher(t)).matches()) {
+            return BigDecimal.valueOf(Integer.parseInt(m.group(1)) + Integer.parseInt(m.group(2)) / 60.0);
+        }
+        String n = t.replaceAll("(?i)(fcfa|xof|xaf|eur|usd|cfa|€|\\$|%|pts?|points?)", "").replace(" ", "").replace("'", "");
+        if (!n.matches("[-+]?[\\d.,]+")) return null;
+        int lastDot = n.lastIndexOf('.'), lastComma = n.lastIndexOf(',');
+        if (lastDot >= 0 && lastComma >= 0) {
+            n = lastComma > lastDot ? n.replace(".", "").replace(',', '.') : n.replace(",", "");
+        } else if (lastComma >= 0) {
+            // « 1,234 » (milliers anglo) vs « 85,5 » (décimale FR) : 3 chiffres après une virgule unique = milliers
+            boolean thousands = n.indexOf(',') != lastComma || (n.length() - lastComma - 1 == 3 && n.indexOf(',') > 0 && !n.startsWith("0"));
+            n = thousands ? n.replace(",", "") : n.replace(',', '.');
+        } else if (lastDot >= 0 && n.indexOf('.') != lastDot) {
+            n = n.replace(".", ""); // « 1.234.567 »
+        }
+        try {
+            return new BigDecimal(n);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     private BigDecimal cellToNumber(Cell cell) {
         if (cell == null) return null;
         try {
@@ -968,6 +1268,8 @@ public class ManualKpiEntryService {
             if (cell.getCellType() == CellType.STRING) {
                 String text = cell.getStringCellValue().replace("\u200b", "").replace("\u00a0", "").trim();
                 if (text.isBlank() || text.equalsIgnoreCase("N/A") || text.equals("#DIV/0!")) return null;
+                BigDecimal flexible = parseFlexibleNumber(text);
+                if (flexible != null) return flexible;
                 Matcher timeMatch = TIME_PATTERN.matcher(text);
                 if (timeMatch.matches()) {
                     int h = Integer.parseInt(timeMatch.group(1));
