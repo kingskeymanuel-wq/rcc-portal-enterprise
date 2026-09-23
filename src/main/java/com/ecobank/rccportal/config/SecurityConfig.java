@@ -47,6 +47,10 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
+                // Aperçu intégré des pièces jointes (PDF de la Base de connaissances affiché dans une
+                // fenêtre du portail) : cadres autorisés depuis le portail lui-même uniquement — le
+                // défaut « DENY » bloquait l'aperçu, tout site externe reste refusé.
+                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth

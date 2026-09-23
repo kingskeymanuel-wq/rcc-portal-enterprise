@@ -422,7 +422,7 @@
             var starClass = a.isFavorite ? "bi-star-fill text-warning" : "bi-star";
             return '<li class="list-group-item d-flex justify-content-between align-items-center">' +
                 '<span><i class="bi ' + starClass + ' favorite-attachment-btn" data-attachment-id="' + a.id + '" data-favorite="' + a.isFavorite + '" style="cursor:pointer;"></i> ' +
-                '<a href="' + escapeHtml(a.storageUrl) + '" target="_blank" rel="noopener">' + escapeHtml(a.fileName) + '</a></span>' +
+                '<a href="' + escapeHtml(a.storageUrl) + '" target="_blank" rel="noopener" data-rcc-view="file" data-mime="' + escapeHtml(a.mimeType || "") + '" data-name="' + escapeHtml(a.fileName) + '">' + escapeHtml(a.fileName) + '</a></span>' +
                 '<button class="btn btn-sm btn-outline-danger remove-attachment-btn" data-attachment-id="' + a.id + '">Retirer</button>' +
                 '</li>';
         }).join("");

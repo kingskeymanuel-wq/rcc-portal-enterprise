@@ -32,8 +32,8 @@ public class RalphSearchController {
     }
 
     @GetMapping("/search")
-    public RalphSearchResponse search(@RequestParam String keyword) {
-        return ralphSearchService.search(keyword);
+    public RalphSearchResponse search(@RequestParam String keyword, @RequestParam(required = false) String country) {
+        return ralphSearchService.search(keyword, country);
     }
 
     /**

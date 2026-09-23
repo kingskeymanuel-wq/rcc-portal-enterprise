@@ -257,12 +257,16 @@
             var isLink = a.mimeType === "text/uri-list";
             var icon = isLink ? "bi-link-45deg" : "bi-file-earmark-text";
             return '<div class="list-group-item d-flex justify-content-between align-items-center">' +
-                '<a href="' + escapeHtml(a.storageUrl) + '" target="_blank" rel="noopener">' +
+                '<a href="' + escapeHtml(a.storageUrl) + '" target="_blank" rel="noopener" data-rcc-view="file" ' +
+                'data-mime="' + escapeHtml(a.mimeType || "") + '" data-name="' + escapeHtml(a.fileName) + '">' +
                 '<i class="bi ' + icon + '"></i> ' + escapeHtml(a.fileName) + '</a>' + removeBtn + '</div>';
         }).join("");
 
         Array.prototype.forEach.call(container.querySelectorAll(".attachment-image-preview"), function (img) {
-            img.addEventListener("click", function () { window.open(img.getAttribute("data-full"), "_blank"); });
+            img.addEventListener("click", function () {
+                if (window.RccViewer) window.RccViewer.openFile({ url: img.getAttribute("data-full"), fileName: img.getAttribute("alt") });
+                else window.open(img.getAttribute("data-full"), "_blank");
+            });
         });
 
         Array.prototype.forEach.call(container.querySelectorAll(".remove-attachment-btn"), function (btn) {

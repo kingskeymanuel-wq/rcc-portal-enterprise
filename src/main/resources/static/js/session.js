@@ -6,6 +6,15 @@
  * et gère le suivi de shift (pause/pause déjeuner/fin de shift). À inclure sur
  * toutes les pages protégées, AVANT les scripts propres à chaque page.
  */
+// Visionneuse commune (articles, procédures, fichiers en fenêtre) — chargée sur toutes les pages.
+(function () {
+    if (window.RccViewer || document.querySelector('script[data-rcc-viewer]')) return;
+    var script = document.createElement("script");
+    script.src = "/js/content-viewer.js";
+    script.setAttribute("data-rcc-viewer", "1");
+    document.head.appendChild(script);
+})();
+
 window.RccSession = (function () {
 
     var PROFILE_LABELS = {
@@ -431,7 +440,6 @@ window.RccSession = (function () {
     }
 
     var globalSearchModal = null;
-    var globalSearchDebounceTimer = null;
 
     function wireGlobalSearch() {
         var form = document.getElementById("globalSearchForm");
@@ -442,35 +450,85 @@ window.RccSession = (function () {
 
         form.addEventListener("submit", function (evt) {
             evt.preventDefault();
-            runGlobalSearch(input.value.trim(), modalEl);
-        });
-
-        input.addEventListener("input", function () {
             var term = input.value.trim();
-            clearTimeout(globalSearchDebounceTimer);
-            if (term.length < 2) return; // pas de recherche prématurée sur 1 caractère
-            globalSearchDebounceTimer = setTimeout(function () { runGlobalSearch(term, modalEl); }, 350);
+            if (term.length < 2) return;
+            askSearchCountry(term, modalEl);
         });
     }
 
     var globalSearchSeq = 0;
+    var SEARCH_COUNTRY_KEY = "rcc.search.country";
+    var searchCountries = null;
 
-    function runGlobalSearch(term, modalEl) {
+    function loadSearchCountries() {
+        if (searchCountries) return Promise.resolve(searchCountries);
+        return getJson("/api/kb/countries").then(function (list) {
+            searchCountries = list || [];
+            return searchCountries;
+        }).catch(function () { return []; });
+    }
+
+    /**
+     * Étape 1 — une fois la recherche lancée, l'agent précise le PAYS (filiale) concerné : la
+     * réponse porte alors sur les procédures et articles de ce pays (plus ceux valables partout).
+     * Le dernier pays choisi est mis en avant pour aller vite.
+     */
+    function askSearchCountry(term, modalEl) {
+        if (!globalSearchModal) globalSearchModal = new bootstrap.Modal(modalEl);
+        var box = document.getElementById("globalSearchResults");
+        document.getElementById("globalSearchModalTitle").innerHTML = '<i class="bi bi-globe"></i> Pour quel pays ? — « ' + RccApi.escapeHtml(term) + ' »';
+        box.innerHTML = '<p class="text-muted text-center">Chargement des pays…</p>';
+        globalSearchModal.show();
+        var last = null;
+        try { last = localStorage.getItem(SEARCH_COUNTRY_KEY); } catch (ignore) {}
+        loadSearchCountries().then(function (countries) {
+            var chip = function (code, label, flag) {
+                var active = (code || "") === (last || "");
+                return '<button type="button" class="btn ' + (active ? "btn-primary" : "btn-outline-primary") + ' search-country-btn" ' +
+                    'data-country="' + RccApi.escapeHtml(code || "") + '" style="min-width:150px;">' +
+                    (flag ? flag + " " : "") + RccApi.escapeHtml(label) + "</button>";
+            };
+            box.innerHTML = '<p class="small text-muted mb-3">Choisissez la filiale concernée par la demande du client, pour une réponse précise.</p>' +
+                '<div class="d-flex flex-wrap gap-2">' +
+                countries.map(function (c) { return chip(c.countryCode, c.label, c.flagEmoji); }).join("") +
+                chip("", "Toutes les filiales", "🌍") + "</div>";
+            Array.prototype.forEach.call(box.querySelectorAll(".search-country-btn"), function (btn) {
+                btn.addEventListener("click", function () {
+                    var code = btn.getAttribute("data-country");
+                    try { localStorage.setItem(SEARCH_COUNTRY_KEY, code); } catch (ignore) {}
+                    var label = btn.textContent.trim();
+                    runGlobalSearch(term, modalEl, code, label);
+                });
+            });
+        });
+    }
+
+    /** Étape 2 — résultats pour ce pays ; la meilleure réponse s'ouvre automatiquement en fenêtre. */
+    function runGlobalSearch(term, modalEl, country, countryLabel) {
         if (!term) return;
         if (!globalSearchModal) globalSearchModal = new bootstrap.Modal(modalEl);
         var resultsBox = document.getElementById("globalSearchResults");
-        document.getElementById("globalSearchModalTitle").innerHTML = '<i class="bi bi-search"></i> Résultats pour « ' + RccApi.escapeHtml(term) + ' »';
+        document.getElementById("globalSearchModalTitle").innerHTML = '<i class="bi bi-search"></i> « ' + RccApi.escapeHtml(term) + ' »' +
+            (countryLabel ? ' <span class="badge bg-light text-dark border ms-1">' + RccApi.escapeHtml(countryLabel) + "</span>" : "");
         resultsBox.innerHTML = '<p class="text-muted text-center">Recherche en cours…</p>';
         globalSearchModal.show();
 
-        // Numéro de requête : avec la recherche « au fil de la frappe », une réponse lente pour
-        // « car » pouvait arriver après celle de « carte bloquée » et écraser les bons résultats.
+        // Numéro de requête : une réponse lente d'une recherche précédente n'écrase jamais la courante.
         var seq = ++globalSearchSeq;
-        fetch("/api/ralph/search?keyword=" + encodeURIComponent(term), { credentials: "same-origin" })
+        fetch("/api/ralph/search?keyword=" + encodeURIComponent(term) + (country ? "&country=" + encodeURIComponent(country) : ""),
+            { credentials: "same-origin" })
             .then(function (res) { return res.ok ? res.json() : { results: [], webResults: [] }; })
             .then(function (data) {
                 if (seq !== globalSearchSeq) return;
-                renderGlobalSearchResults(data.results || [], data.webResults || [], term);
+                var results = data.results || [];
+                renderGlobalSearchResults(results, data.webResults || [], term);
+                var back = document.createElement("div");
+                back.className = "text-center mt-2";
+                back.innerHTML = '<button type="button" class="btn btn-sm btn-link">Changer de pays</button>';
+                back.querySelector("button").addEventListener("click", function () { askSearchCountry(term, modalEl); });
+                resultsBox.appendChild(back);
+                // La réponse la plus pertinente s'ouvre directement, par-dessus la liste des résultats.
+                if (results.length && window.RccViewer) window.RccViewer.openResult(results[0]);
             })
             .catch(function () {
                 if (seq !== globalSearchSeq) return;
@@ -516,7 +574,7 @@ window.RccSession = (function () {
                 : r.sourceType === "PROCEDURE" ? "/procedures?openProcedureId=" + r.id
                 : r.sourceType === "COURSE" ? "/training?openCourseId=" + r.id
                 : "/games";
-            return '<a href="' + href + '" class="d-flex gap-3 p-2 mb-1 rounded text-decoration-none text-reset global-search-result-link">' +
+            return '<a href="' + href + '" data-result-index="' + results.indexOf(r) + '" class="d-flex gap-3 p-2 mb-1 rounded text-decoration-none text-reset global-search-result-link">' +
                 '<div style="font-size:1.3rem;" class="text-primary"><i class="bi ' + meta.icon + '"></i></div>' +
                 '<div class="flex-grow-1">' +
                     '<div class="small text-muted">' + meta.label + '</div>' +
@@ -525,6 +583,15 @@ window.RccSession = (function () {
                 '</div></a>';
         }).join("");
 
+        setTimeout(function () {
+            Array.prototype.forEach.call(resultsBox.querySelectorAll("[data-result-index]"), function (link) {
+                link.addEventListener("click", function (evt) {
+                    if (!window.RccViewer) return; // visionneuse pas encore chargée : lien classique
+                    evt.preventDefault();
+                    window.RccViewer.openResult(results[Number(link.getAttribute("data-result-index"))]);
+                });
+            });
+        }, 0);
         resultsBox.innerHTML = internalHtml + webHtml +
             '<div class="text-center mt-2 pt-2 border-top">' +
                 '<a class="small text-muted" target="_blank" rel="noopener" href="https://www.google.com/search?q=' + encodeURIComponent(term) + '">' +

@@ -146,6 +146,16 @@ public class RalphSearchService {
 
     @Transactional(readOnly = true)
     public RalphSearchResponse search(String keyword) {
+        return search(keyword, null);
+    }
+
+    /**
+     * Recherche précisée par pays (filiale choisie par l'agent dans la fenêtre de recherche) :
+     * les contenus d'un AUTRE pays sont écartés, ceux valables pour toutes les filiales (sans
+     * pays) sont gardés, et ceux du pays choisi passent devant.
+     */
+    @Transactional(readOnly = true)
+    public RalphSearchResponse search(String keyword, String countryCode) {
         if (keyword == null || keyword.isBlank()) {
             throw ApiException.badRequest("keyword is required.");
         }
@@ -154,7 +164,8 @@ public class RalphSearchService {
             return new RalphSearchResponse("Précise un peu plus ta recherche avec des mots plus spécifiques.", List.of());
         }
 
-        InternalContext internal = buildInternalContext(keyword);
+        String country = countryCode == null || countryCode.isBlank() ? null : countryCode.trim().toUpperCase(Locale.ROOT);
+        InternalContext internal = buildInternalContext(keyword, country);
         String explanation = buildExplanation(keyword, internal.articleMatches(), internal.stepMatches(), internal.courseMatches(), 400);
 
         // Barre de recherche autonome — quand les résultats internes sont maigres (0 ou 1),
@@ -180,7 +191,7 @@ public class RalphSearchService {
      * {@link SearchText} (accents, pluriels, fautes de frappe, pondération titre/contenu)
      * au lieu de l'ancien {@code contains()} qui faisait matcher « art » dans « carte ».
      */
-    private InternalContext buildInternalContext(String question) {
+    private InternalContext buildInternalContext(String question, String country) {
         List<String> terms = SearchText.queryTerms(question);
         if (terms.isEmpty()) {
             return new InternalContext(List.of(), List.of(), List.of(), List.of());
@@ -189,11 +200,15 @@ public class RalphSearchService {
 
         List<Scored<KnowledgeArticle>> articleMatches = new ArrayList<>();
         for (KnowledgeArticle article : articleRepository.findAll()) {
+            String articleCountry = article.getCountry() != null ? article.getCountry().getCountryCode() : null;
+            if (country != null && articleCountry != null && !country.equalsIgnoreCase(articleCountry)) continue;
             SearchText.Match m = SearchText.score(question, terms,
                     SearchText.Field.of(article.getTitle(), 3.0),
                     SearchText.Field.of(article.getTags(), 2.0),
                     SearchText.Field.of(stripHtml(article.getContentHtml()), 1.0));
-            if (m.isRelevant(termCount)) articleMatches.add(new Scored<>(article, m.score()));
+            if (m.isRelevant(termCount)) {
+                articleMatches.add(new Scored<>(article, m.score() * (country != null && articleCountry != null ? 1.3 : 1.0)));
+            }
         }
         articleMatches.sort((a, b) -> Double.compare(b.score, a.score));
 
@@ -204,6 +219,7 @@ public class RalphSearchService {
                 .collect(java.util.stream.Collectors.groupingBy(st -> st.getProcedure().getProcedureId()));
         List<Scored<ProcedureStepMatch>> stepMatches = new ArrayList<>();
         for (Procedure procedure : procedures) {
+            if (country != null && procedure.getCountryCode() != null && !country.equalsIgnoreCase(procedure.getCountryCode())) continue;
             // Une seule entrée par procédure (sa meilleure étape) — évite qu'une procédure
             // longue occupe à elle seule toute la liste de résultats.
             Scored<ProcedureStepMatch> best = null;
