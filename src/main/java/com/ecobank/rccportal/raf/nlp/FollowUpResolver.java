@@ -70,10 +70,29 @@ public class FollowUpResolver {
             if (m.matches()) return "raf:proc:" + proc + ":step:" + Integer.parseInt(m.group(1));
         }
 
-        if (state.lastDetails() != null && DETAILS.stream().anyMatch(d -> n.equals(d) || n.startsWith(d + " "))) {
+        if ((state.lastDetails() != null || state.lastQuestion() != null) && isDetailRequest(n)) {
             return "raf:details";
         }
         return null;
+    }
+
+    /** « donne-moi plus de détails », « explique », « tu peux développer ? »… sans nouveau sujet. */
+    static boolean isDetailRequest(String n) {
+        if (DETAILS.stream().anyMatch(d -> n.equals(d) || n.startsWith(d + " "))) return true;
+        // Mot à mot : on retire les mots de politesse / de liaison ; il doit rester UNIQUEMENT un
+        // mot de demande de détail (sinon c'est une vraie nouvelle question).
+        Set<String> filler = Set.of("donne", "donnes", "donner", "moi", "m", "en", "plus", "de", "des", "les", "le", "la", "stp", "svp",
+                "s", "il", "te", "plait", "tu", "peux", "pourrais", "me", "un", "peu", "encore", "ok", "merci", "please", "can", "you",
+                "give", "tell", "more", "mais", "mas", "por", "favor", "d", "sur", "ca", "cela", "ce", "point", "sujet", "bien", "vouloir");
+        Set<String> detailWords = Set.of("details", "detail", "detaille", "detailler", "developpe", "developper", "explique",
+                "expliquer", "explications", "precisions", "precise", "infos", "informations", "savoir", "detalhes", "detalles", "explain");
+        boolean hasDetailWord = false;
+        for (String w : n.split(" ")) {
+            if (w.isEmpty() || filler.contains(w)) continue;
+            if (!detailWords.contains(w)) return false;
+            hasDetailWord = true;
+        }
+        return hasDetailWord;
     }
 
     /** Recompose une relance elliptique avec la question précédente (« et pour le Sénégal ? »). */

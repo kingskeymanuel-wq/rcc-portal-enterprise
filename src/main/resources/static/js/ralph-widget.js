@@ -378,7 +378,7 @@
                 typing.innerHTML = renderRafMarkdown(result.explanation);
                 renderAction(thread, result.action);
                 if (!appendSuggestions(thread, result.suggestions) && result.source !== "LOCAL" && result.source !== "NONE") {
-                    appendDetailButton(thread, function () { ask(thread, t("detailAskText")); });
+                    appendDetailButton(thread, function () { ask(thread, t("detailAskText"), "raf:details"); });
                 }
                 appendResults(thread, result.results);
                 appendSourceBadge(thread, result.source);

@@ -200,4 +200,39 @@ public final class SearchText {
         start = Math.max(0, end - maxLength);
         return (start > 0 ? "…" : "") + text.substring(start, end).trim() + (end < text.length() ? "…" : "");
     }
+
+    /**
+     * Les phrases du texte qui répondent le mieux à la requête, dans leur ordre d'origine — un
+     * vrai extrait lisible (phrases entières) au lieu d'une fenêtre coupée au milieu d'un mot.
+     * Sans phrase pertinente : le début du texte.
+     */
+    public static String bestSentences(String text, List<String> terms, int maxSentences, int maxChars) {
+        if (text == null || text.isBlank()) return "";
+        String[] sentences = text.replaceAll("\\s*\\n+\\s*", "\n").split("(?<=[.!?;:])\\s+|\\n");
+        record Scored(int index, String sentence, double score) {
+        }
+        List<Scored> scored = new ArrayList<>();
+        for (int i = 0; i < sentences.length; i++) {
+            String s = sentences[i].trim();
+            if (s.length() < 3) continue;
+            Set<String> tokens = index(s);
+            double score = 0;
+            for (String term : terms) score += bestTokenMatch(term, tokens);
+            scored.add(new Scored(i, s, score));
+        }
+        List<Scored> picked = scored.stream().filter(x -> x.score() > 0)
+                .sorted((a, b) -> Double.compare(b.score(), a.score())).limit(maxSentences)
+                .sorted((a, b) -> Integer.compare(a.index(), b.index())).toList();
+        if (picked.isEmpty()) picked = scored.stream().limit(maxSentences).toList();
+        StringBuilder out = new StringBuilder();
+        int previous = -2;
+        for (Scored s : picked) {
+            String piece = s.sentence();
+            if (out.length() + piece.length() > maxChars && out.length() > 0) break;
+            if (out.length() > 0) out.append(s.index() == previous + 1 ? " " : " … ");
+            out.append(piece.length() > maxChars ? piece.substring(0, maxChars).trim() + "…" : piece);
+            previous = s.index();
+        }
+        return out.toString();
+    }
 }

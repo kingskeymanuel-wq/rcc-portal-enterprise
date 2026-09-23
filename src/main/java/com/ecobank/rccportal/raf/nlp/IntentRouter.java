@@ -54,6 +54,31 @@ public class IntentRouter {
             "ola", "hola", "buenos dias", "bom dia", "merci", "merci beaucoup", "merci bien", "thanks", "thank you", "obrigado",
             "gracias", "ca va", "comment ca va", "tu vas bien", "au revoir", "bye", "a bientot", "bonne journee");
 
+    /**
+     * Mots qui disent CE QUE l'agent demande (« signifie », « délai », « procédure », « rédige »…)
+     * et non DE QUOI il parle. Ils servent au routage mais pas à la recherche dans les données :
+     * sinon « Que signifie l'acronyme RIB ? » cherchait trois mots au lieu de « RIB ».
+     */
+    private static final Set<String> QUESTION_WORDS = new HashSet<>();
+
+    static {
+        List<String> extra = List.of("que", "quoi", "quel", "quelle", "quels", "quelles", "combien", "pourquoi", "ou", "quand",
+                "comment", "signifie", "signification", "acronyme", "sigle", "veut", "dire", "definition", "definir", "explique",
+                "expliquer", "donne", "donner", "moi", "peux", "peut", "pourrais", "faire", "fait", "besoin", "savoir", "aide",
+                "est", "ce", "cela", "ca", "il", "elle", "stp", "svp", "merci", "please", "what", "is", "does", "mean", "meaning",
+                "how", "why", "the", "o", "que", "significa", "sabes", "info", "infos", "information", "informations");
+        LEXICON.values().forEach(list -> list.forEach(t -> {
+            for (String w : t.phrase().split(" ")) QUESTION_WORDS.add(SearchText.stem(w));
+        }));
+        extra.forEach(w -> QUESTION_WORDS.add(SearchText.stem(w)));
+    }
+
+    /** Termes de recherche sans les mots de la question ; les termes d'origine si rien ne reste. */
+    public static List<String> contentTerms(List<String> terms) {
+        List<String> content = terms.stream().filter(t -> !QUESTION_WORDS.contains(t)).toList();
+        return content.isEmpty() ? terms : content;
+    }
+
     private static List<Trigger> triggers(String... specs) {
         List<Trigger> out = new ArrayList<>();
         for (String spec : specs) {

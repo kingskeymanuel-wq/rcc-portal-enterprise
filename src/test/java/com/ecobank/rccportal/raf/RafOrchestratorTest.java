@@ -47,6 +47,9 @@ class RafOrchestratorTest {
                                 new StepDoc(2, "Bloquer la carte dans l'outil monétique."),
                                 new StepDoc(3, "Confirmer le blocage au client et proposer une nouvelle carte."),
                                 new StepDoc(4, "Tracer la demande dans le CRM."))),
+                        new ProcedureDoc(3, "Demande de RIB", "CI", "N1", "Agence", null, List.of(
+                                new StepDoc(1, "Vérifier l'identité du client."),
+                                new StepDoc(2, "Éditer le RIB depuis l'outil de gestion des comptes et l'envoyer par mail sécurisé."))),
                         new ProcedureDoc(2, "Réclamation retrait GAB non obtenu", "CI", "N1", "Back-office", null, List.of(
                                 new StepDoc(1, "Relever la date, le montant et le GAB concerné."),
                                 new StepDoc(2, "Vérifier la reverse automatique sous 48h."),
@@ -61,8 +64,12 @@ class RafOrchestratorTest {
                         new BranchDoc(31, "SN", "Dakar", "Agence Dakar Centre", "Place de l'Indépendance", 14.67, -17.43, null, null, "AGENCE")),
                 List.of(new CountryDoc("CI", "Côte d'Ivoire", "🇨🇮", Set.of("cote d ivoire", "abidjan")),
                         new CountryDoc("SN", "Sénégal", "🇸🇳", Set.of("senegal", "dakar"))),
-                List.of(new VerifiedQaDoc(40, "Quel est le plafond de retrait Xpress par jour ?", "500 000 FCFA", null, "Xpress", "plafond retrait")),
-                List.of(new ArticleDoc(50, "Ecobank Xpress Account", "xpress compte", "Le compte Xpress s'ouvre avec une pièce d'identité.", "CI")),
+                List.of(new VerifiedQaDoc(40, "Quel est le plafond de retrait Xpress par jour ?", "500 000 FCFA", null, "Xpress", "plafond retrait"),
+                        new VerifiedQaDoc(41, "Que signifie l'acronyme RIB ?", "Relevé d'Identité Bancaire",
+                                "Le RIB identifie un compte bancaire précis (banque, guichet, numéro, clé).", "Compte", "rib")),
+                List.of(new ArticleDoc(50, "Ecobank Xpress Account", "xpress compte", "Le compte Xpress s'ouvre avec une pièce d'identité.", "CI"),
+                        new ArticleDoc(51, "Les prêts proposés par Ecobank Côte d'Ivoire", "pret credit",
+                                "Pour plus de détails sur les conditions, voir la fiche de souscription. Frais mensuels de mise en place 1 100 F TTC.", "CI")),
                 List.of(),
                 List.of(new MailTemplateDoc(60, "Réclamation retrait GAB", "Bonjour [Nom], nous avons enregistré votre réclamation de [Montant] (réf. [Référence]).", "Monétique")));
         RafCatalog catalog = RafCatalog.fixed(data);
@@ -86,7 +93,7 @@ class RafOrchestratorTest {
         when(protection.sanitize(anyString())).thenAnswer(i -> i.getArgument(0));
         gapLog = new RafGapLog();
         raf = new RafOrchestrator(agents, new IntentRouter(catalog), new EntityExtractor(catalog), new FollowUpResolver(),
-                new RafConversationMemoryService(), protection, gapLog);
+                new RafConversationMemoryService(), protection, gapLog, catalog);
         raf.setClock(Clock.fixed(NOW.atZone(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault()));
     }
 
@@ -103,7 +110,9 @@ class RafOrchestratorTest {
         assertTrue(r.explanation().contains("29/09/2026"), r.explanation());
         assertEquals("SLA_DUE", r.action().type());
         // Aucun nombre qui ne viendrait pas de la table ou de la date calculée.
-        Matcher m = Pattern.compile("\\d+").matcher(r.explanation());
+        // (on ne contrôle que la partie SLA : les compléments cités ont leurs propres données)
+        String slaPart = r.explanation().split("\n---\n")[0];
+        Matcher m = Pattern.compile("\\d+").matcher(slaPart);
         Set<String> allowed = Set.of("5", "1", "29", "09", "2026", "14", "30"); // 1 = niveau N1 de la table
         while (m.find()) assertTrue(allowed.contains(m.group()), "nombre inventé : " + m.group() + " dans " + r.explanation());
     }
@@ -146,6 +155,42 @@ class RafOrchestratorTest {
         var r = ask("c'est quoi un RIB");
         assertEquals("GLOSSARY", r.intent());
         assertTrue(r.explanation().contains("Relevé d'identité bancaire"));
+    }
+
+    @Test
+    void acronymQuestionIsAnsweredOnTheSubjectNotOnTheQuestionWords() {
+        var r = ask("Que signifie l'acronyme RIB ?");
+        assertTrue(r.intent().equals("GLOSSARY") || r.intent().equals("VERIFIED_QA"), r.intent());
+        assertTrue(r.explanation().contains("Relevé d'identité bancaire") || r.explanation().contains("Relevé d'Identité Bancaire"));
+        // RAF compose UNE réponse à partir de plusieurs sources (pas un empilement) :
+        // définition du glossaire + explication validée QA + ce qu'il faut faire pour le client.
+        String e = r.explanation();
+        assertTrue(e.contains("identifie un compte bancaire"), e);
+        assertTrue(e.contains("Demande de RIB"), e);
+        assertTrue(e.contains("Sources croisées"), e);
+        assertFalse(e.contains("---"), "réponse empilée au lieu d'une synthèse : " + e);
+        // Prochaine étape logique proposée : dérouler la procédure qui porte sur le RIB.
+        assertTrue(r.suggestions().stream().anyMatch(s -> "raf:proc:3:step:1".equals(s.command())), r.suggestions().toString());
+    }
+
+    @Test
+    void detailsFollowUpStaysOnThePreviousSubject() {
+        ask("Que signifie l'acronyme RIB ?");
+        var d = ask("Donne-moi plus de détails");
+        assertTrue(d.explanation().contains("RIB"), d.explanation());
+        assertFalse(d.explanation().contains("prêts"), "réponse hors sujet : " + d.explanation());
+        assertTrue(d.explanation().contains("identifie un compte bancaire"), d.explanation());
+        // même chose par le bouton du widget
+        ask("Que signifie l'acronyme RIB ?");
+        var viaButton = raf.handle("Donne-moi plus de détails", "agent.conseiller", null, "raf:details");
+        assertFalse(viaButton.explanation().contains("prêts"));
+    }
+
+    @Test
+    void knowledgeAnswerQuotesWholeRelevantSentences() {
+        var r = ask("frais de mise en place des prêts");
+        assertTrue(r.explanation().contains("Frais mensuels de mise en place 1 100 F TTC."), r.explanation());
+        assertFalse(r.explanation().startsWith("…"));
     }
 
     @Test
