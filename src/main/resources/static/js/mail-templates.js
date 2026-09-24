@@ -38,7 +38,9 @@
         return getJson("/api/mail-templates").then(function (overview) {
             overviewCache = overview || { categories: [], recipientGroups: [], templates: [] };
             renderTeamPicker();
+            renderKpis();
             renderUnclassified();
+            renderSearch();
             populateAdminSelectors();
             if (currentTeamCode) renderTeamDetail(currentTeamCode);
         }).catch(function (e) { console.error(e); });
@@ -52,30 +54,108 @@
         return (overviewCache.templates || []).filter(function (t) { return t.categoryId === categoryId; });
     }
 
+    // ===================== UTILITAIRES D'AFFICHAGE =====================
+
+    var CATEGORY_ICONS = [
+        [/carte|card|visa|gab|atm/, "bi-credit-card-2-front", "#eaf2ff", "#0057B8"],
+        [/virement|transfert|transfer|rapid/, "bi-arrow-left-right", "#e4f7ef", "#0b7a4b"],
+        [/compte|account|rib|solde/, "bi-bank", "#fff4e0", "#c77700"],
+        [/digital|mobile|app|internet|omni/, "bi-phone", "#f1e9ff", "#6a2bd9"],
+        [/chat|rafiki|whatsapp/, "bi-chat-dots", "#f1e9ff", "#6a2bd9"],
+        [/promo|offre|campagne|marketing/, "bi-megaphone", "#ffe9f2", "#c2185b"],
+        [/interne|message|note/, "bi-envelope-paper", "#eef1f5", "#4a5568"],
+        [/reclam|plainte|litige|contest/, "bi-exclamation-octagon", "#ffecee", "#c2414f"],
+        [/pret|credit|loan/, "bi-cash-coin", "#e4f7ef", "#0b7a4b"],
+        [/social|facebook|twitter|linkedin/, "bi-share", "#e4f7ef", "#0b7a4b"]
+    ];
+    function categoryVisual(label) {
+        var l = (label || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+        for (var i = 0; i < CATEGORY_ICONS.length; i++) {
+            if (CATEGORY_ICONS[i][0].test(l)) return { icon: CATEGORY_ICONS[i][1], bg: CATEGORY_ICONS[i][2], fg: CATEGORY_ICONS[i][3] };
+        }
+        return { icon: "bi-folder2-open", bg: "#eef4ff", fg: "#0057B8" };
+    }
+    function catIconHtml(label) {
+        var v = categoryVisual(label);
+        return '<span class="mt-cat-icon" style="background:' + v.bg + ';color:' + v.fg + '"><i class="bi ' + v.icon + '"></i></span>';
+    }
+    function plural(n, word) { return n + " " + word + (n > 1 ? "s" : ""); }
+    function placeholdersOf(text) {
+        var found = [], re = /\[([A-Za-zÀ-ÿ_]+)\]/g, m;
+        while ((m = re.exec(text || ""))) if (found.indexOf(m[1]) === -1) found.push(m[1]);
+        return found;
+    }
+    function snippet(body) {
+        return (body || "").replace(/\s+/g, " ").trim().slice(0, 160);
+    }
+    function isMine(t) {
+        return !!(currentUsername && t.createdByUserId && currentUsername.toLowerCase() === t.createdByUserId.toLowerCase());
+    }
+    function countUp(el, target) {
+        if (!el) return;
+        var start = Number(el.getAttribute("data-value") || 0), t0 = null;
+        el.setAttribute("data-value", target);
+        if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { el.textContent = target; return; }
+        function step(ts) {
+            if (!t0) t0 = ts;
+            var k = Math.min(1, (ts - t0) / 700);
+            el.textContent = Math.round(start + (target - start) * (1 - Math.pow(1 - k, 3)));
+            if (k < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+    }
+    function toast(message, error) {
+        var t = $("mtToast");
+        if (!t) { alert(message); return; }
+        t.textContent = message;
+        t.classList.toggle("error", !!error);
+        t.classList.add("show");
+        clearTimeout(toast.timer);
+        toast.timer = setTimeout(function () { t.classList.remove("show"); }, 3000);
+    }
+    function renderKpis() {
+        var templates = overviewCache.templates || [];
+        countUp($("mtKpiTemplates"), templates.length);
+        countUp($("mtKpiCategories"), (overviewCache.categories || []).length);
+        countUp($("mtKpiMine"), templates.filter(isMine).length);
+    }
+
     // ===================== SÉLECTEUR D'ÉQUIPE =====================
 
     function renderTeamPicker() {
         var grid = $("mtTeamGrid");
-        grid.innerHTML = TEAMS.map(function (team) {
+        var total = Math.max(1, (overviewCache.templates || []).length);
+        grid.innerHTML = TEAMS.map(function (team, i) {
             var cats = categoriesForTeam(team.code);
             var count = cats.reduce(function (sum, c) { return sum + templatesForCategory(c.id).length; }, 0);
-            return '<div class="mt-team-card" style="background:' + team.gradient + ';" data-team="' + team.code + '">' +
-                '<i class="bi ' + team.icon + ' mt-team-icon"></i>' +
+            return '<div class="mt-team-card" tabindex="0" role="button" style="background:' + team.gradient + ';animation-delay:' + (i * 90) + 'ms" data-team="' + team.code + '">' +
+                '<span class="mt-team-icon"><i class="bi ' + team.icon + '"></i></span>' +
                 '<div class="mt-team-name">' + escapeHtml(team.label) + '</div>' +
-                '<div class="mt-team-count">' + count + ' masque' + (count > 1 ? "s" : "") + ' · ' + cats.length + ' catégorie' + (cats.length > 1 ? "s" : "") + '</div>' +
+                '<div class="mt-team-count">' + plural(count, "masque") + ' · ' + plural(cats.length, "catégorie") + '</div>' +
+                '<div class="mt-team-bar"><span data-w="' + Math.round(count / total * 100) + '"></span></div>' +
+                '<div class="mt-team-foot"><span>' + (count ? "Voir les masques" : "Commencer") + '</span><span class="mt-arrow"><i class="bi bi-arrow-right"></i></span></div>' +
                 '</div>';
         }).join("");
 
         Array.prototype.forEach.call(grid.querySelectorAll("[data-team]"), function (card) {
             card.addEventListener("click", function () { selectTeam(card.getAttribute("data-team")); });
+            card.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectTeam(card.getAttribute("data-team")); } });
+        });
+        requestAnimationFrame(function () {
+            Array.prototype.forEach.call(grid.querySelectorAll("[data-w]"), function (bar) { bar.style.width = Math.max(4, Number(bar.getAttribute("data-w"))) + "%"; });
         });
     }
 
     function selectTeam(teamCode) {
         currentTeamCode = teamCode;
+        var team = TEAM_BY_CODE[teamCode] || { label: teamCode, icon: "bi-envelope-paper-fill", gradient: "linear-gradient(135deg, #0057B8, #003d82)" };
         $("mtTeamPickerView").style.display = "none";
         $("mtTeamDetailView").style.display = "";
-        $("mtTeamDetailTitle").textContent = (TEAM_BY_CODE[teamCode] || {}).label || teamCode;
+        $("mtTeamDetailTitle").textContent = team.label;
+        $("mtDetailIcon").style.background = team.gradient;
+        $("mtDetailIcon").innerHTML = '<i class="bi ' + team.icon + '"></i>';
+        var head = $("mtDetailHead");
+        head.style.animation = "none"; void head.offsetWidth; head.style.animation = "";
         renderTeamDetail(teamCode);
     }
 
@@ -91,68 +171,145 @@
 
     function renderTeamDetail(teamCode) {
         var container = $("mtCategoriesContainer");
+        var openIds = Array.prototype.map.call(container.querySelectorAll(".mt-category-card.open"), function (c) { return c.getAttribute("data-category"); });
         var cats = categoriesForTeam(teamCode).sort(function (a, b) { return a.sortOrder - b.sortOrder; });
 
         if (!cats.length) {
-            container.innerHTML = '<div class="mt-empty-state"><i class="bi bi-inbox"></i>Aucun masque pour cette équipe pour l\'instant.</div>';
+            container.innerHTML = '<div class="mt-empty-state"><div class="mt-empty-art"><i class="bi bi-inbox"></i></div>' +
+                '<b>Aucun masque pour cette équipe pour l\'instant</b>' +
+                '<small>' + (isQaOrAdmin ? "Créez une catégorie puis vos premiers masques." : "La QA prépare les modèles : revenez bientôt.") + '</small></div>';
             return;
         }
 
-        container.innerHTML = cats.map(function (c) {
+        container.innerHTML = cats.map(function (c, i) {
             var templates = templatesForCategory(c.id);
-            var icon = c.accentColor ? '' : "bi-folder2"; // accentColor non utilisé comme icône — fallback simple
-            return '<div class="mt-category-card" data-category="' + c.id + '">' +
-                '<div class="mt-category-header">' +
-                    '<span class="mt-cat-title"><span class="mt-cat-icon" style="background:#eef1f5;color:#0057B8;"><i class="bi bi-folder2-open"></i></span>' +
-                    escapeHtml(c.label) + ' <span class="badge bg-light text-dark ms-1">' + templates.length + '</span></span>' +
-                    '<i class="bi bi-chevron-right mt-cat-chevron"></i>' +
+            return '<div class="mt-category-card' + (openIds.indexOf(String(c.id)) !== -1 ? " open" : "") + '" data-category="' + c.id + '" style="animation-delay:' + (i * 60) + 'ms">' +
+                '<div class="mt-category-header" role="button" tabindex="0">' + catIconHtml(c.label) +
+                    '<span class="mt-cat-title"><b>' + escapeHtml(c.label) + '</b><small>' + plural(templates.length, "masque") + '</small></span>' +
+                    '<button type="button" class="mt-btn mt-btn-soft mt-btn-sm add-in-category-btn" data-category-id="' + c.id + '" title="Nouveau masque dans cette catégorie"><i class="bi bi-plus-lg"></i></button>' +
+                    '<i class="bi bi-chevron-down mt-cat-chevron"></i>' +
                 '</div>' +
-                '<div class="mt-category-body">' +
+                '<div class="mt-category-body"><div class="mt-category-inner">' +
                     (templates.length
-                        ? templates.map(function (t) { return templateRowHtml(t); }).join("")
-                        : '<p class="text-muted small mb-0 mt-2">Aucun masque dans cette catégorie.</p>') +
-                '</div>' +
+                        ? '<div class="mt-template-grid">' + templates.map(function (t, k) { return templateCardHtml(t, null, k); }).join("") + '</div>'
+                        : '<p class="mt-empty-mini mb-0"><i class="bi bi-info-circle"></i> Aucun masque dans cette catégorie : utilisez « + » pour en créer un.</p>') +
+                '</div></div>' +
             '</div>';
         }).join("");
 
         Array.prototype.forEach.call(container.querySelectorAll(".mt-category-header"), function (header) {
-            header.addEventListener("click", function () { header.parentElement.classList.toggle("open"); });
+            var toggle = function () { header.parentElement.classList.toggle("open"); };
+            header.addEventListener("click", toggle);
+            header.addEventListener("keydown", function (e) { if (e.key === "Enter") toggle(); });
         });
-        Array.prototype.forEach.call(container.querySelectorAll(".use-template-btn"), function (btn) {
+        Array.prototype.forEach.call(container.querySelectorAll(".add-in-category-btn"), function (btn) {
             btn.addEventListener("click", function (evt) {
                 evt.stopPropagation();
-                openUseTemplate(Number(btn.getAttribute("data-id")));
+                openCreate(Number(btn.getAttribute("data-category-id")));
             });
         });
-        Array.prototype.forEach.call(container.querySelectorAll(".delete-template-btn"), function (btn) {
-            btn.addEventListener("click", function (evt) {
-                evt.stopPropagation();
-                if (!confirm("Supprimer ce masque de mail ? Cette action est définitive.")) return;
-                sendJson("/api/mail-templates/" + btn.getAttribute("data-id"), "DELETE")
-                    .then(loadMailTemplates)
-                    .catch(function (e) { alert("Erreur : " + e.message); });
-            });
-        });
+        wireTemplateButtons(container);
 
         // Une seule catégorie -> on l'ouvre directement, pas besoin de cliquer pour rien.
         if (cats.length === 1) container.querySelector(".mt-category-card").classList.add("open");
     }
 
-    function templateRowHtml(t) {
-        var isOwner = currentUsername && t.createdByUserId && currentUsername.toLowerCase() === t.createdByUserId.toLowerCase();
-        var canDelete = !t.isSystemTemplate && (isOwner || isQaOrAdmin);
-        var personalBadge = t.isSystemTemplate ? "" : '<span class="badge bg-light text-primary border ms-2">Personnel' + (isOwner ? "" : (t.createdByUserId ? " · " + escapeHtml(t.createdByUserId) : "")) + '</span>';
-        return '<div class="mt-template-row">' +
-            '<div><div class="mt-template-subject">' + escapeHtml(t.subject) + personalBadge + '</div>' +
-            '<div class="mt-template-recipient">' + escapeHtml(t.recipientType === "service" ? "Service" : "Personne") + '</div></div>' +
-            '<div class="d-flex gap-1">' +
-            '<button class="btn btn-sm btn-outline-primary use-template-btn" data-id="' + t.id + '"><i class="bi bi-magic"></i> Utiliser</button>' +
-            (canDelete ? '<button class="btn btn-sm btn-outline-danger delete-template-btn" data-id="' + t.id + '" title="Supprimer ce masque"><i class="bi bi-trash3"></i></button>' : '') +
-            '</div>' +
-        '</div>';
+    function highlight(text, query) {
+        var safe = escapeHtml(text || "");
+        if (!query) return safe;
+        var q = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return safe.replace(new RegExp("(" + q + ")", "ig"), '<mark class="mt-hl">$1</mark>');
     }
 
+    function templateCardHtml(t, query, index) {
+        var mine = isMine(t);
+        var canDelete = !t.isSystemTemplate && (mine || isQaOrAdmin);
+        var cat = (overviewCache.categories || []).find(function (c) { return c.id === t.categoryId; });
+        var fields = placeholdersOf(t.subject + " " + t.body);
+        var tags = [];
+        tags.push(t.recipientType === "service"
+            ? '<span class="mt-tag mt-tag-violet"><i class="bi bi-building"></i> Service</span>'
+            : '<span class="mt-tag"><i class="bi bi-person"></i> Personne</span>');
+        if (fields.length) tags.push('<span class="mt-tag mt-tag-blue"><i class="bi bi-input-cursor-text"></i> ' + plural(fields.length, "champ") + '</span>');
+        if (!t.isSystemTemplate) tags.push('<span class="mt-tag mt-tag-green"><i class="bi bi-person-badge"></i> ' +
+            (mine ? "Personnel" : "Personnel" + (t.createdByUserId ? " · " + escapeHtml(t.createdByUserId) : "")) + '</span>');
+        return '<div class="mt-tpl" style="animation-delay:' + ((index || 0) * 40) + 'ms">' +
+            '<div class="mt-tpl-top"><span class="mt-tpl-ic"><i class="bi bi-envelope"></i></span><div class="min-w-0">' +
+            (query && cat ? '<div class="mt-tpl-cat">' + escapeHtml(cat.label) + '</div>' : "") +
+            '<div class="mt-tpl-subject">' + highlight(t.subject, query) + '</div></div></div>' +
+            '<p class="mt-tpl-snippet">' + highlight(snippet(t.body), query) + '</p>' +
+            '<div class="mt-tpl-tags">' + tags.join("") + '</div>' +
+            '<div class="mt-tpl-actions">' +
+            '<button class="mt-btn mt-btn-primary mt-btn-sm use-template-btn" data-id="' + t.id + '"><i class="bi bi-magic"></i> Utiliser</button>' +
+            (canDelete ? '<button class="mt-btn mt-btn-danger mt-btn-sm delete-template-btn" data-id="' + t.id + '" title="Supprimer ce masque"><i class="bi bi-trash3"></i></button>' : '') +
+            '</div></div>';
+    }
+
+    function wireTemplateButtons(root) {
+        Array.prototype.forEach.call(root.querySelectorAll(".use-template-btn"), function (btn) {
+            btn.addEventListener("click", function (evt) {
+                evt.stopPropagation();
+                openUseTemplate(Number(btn.getAttribute("data-id")));
+            });
+        });
+        Array.prototype.forEach.call(root.querySelectorAll(".delete-template-btn"), function (btn) {
+            btn.addEventListener("click", function (evt) {
+                evt.stopPropagation();
+                if (!confirm("Supprimer ce masque de mail ? Cette action est définitive.")) return;
+                sendJson("/api/mail-templates/" + btn.getAttribute("data-id"), "DELETE")
+                    .then(function () { toast("Masque supprimé"); return loadMailTemplates(); })
+                    .catch(function (e) { toast("Erreur : " + e.message, true); });
+            });
+        });
+    }
+
+    // ===================== RECHERCHE =====================
+
+    function visibleTemplates() {
+        // Un agent Outbound verrouillé ne cherche que dans son équipe.
+        var templates = overviewCache.templates || [];
+        if (!isLockedOutboundAgent) return templates;
+        var ids = categoriesForTeam(currentTeamCode).map(function (c) { return c.id; });
+        return templates.filter(function (t) { return ids.indexOf(t.categoryId) !== -1; });
+    }
+
+    function renderSearch() {
+        var query = ($("mtSearch").value || "").trim();
+        var view = $("mtSearchView");
+        if (!query) { view.hidden = true; return; }
+        var norm = function (x) { return (x || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); };
+        var terms = norm(query).split(/\s+/).filter(Boolean);
+        var hits = visibleTemplates().filter(function (t) {
+            var cat = (overviewCache.categories || []).find(function (c) { return c.id === t.categoryId; });
+            var hay = norm(t.subject + " " + t.body + " " + (cat ? cat.label : ""));
+            return terms.every(function (term) { return hay.indexOf(term) !== -1; });
+        });
+        view.hidden = false;
+        $("mtSearchCount").textContent = hits.length;
+        var box = $("mtSearchResults");
+        box.innerHTML = hits.length
+            ? hits.slice(0, 30).map(function (t, i) { return templateCardHtml(t, query.split(/\s+/)[0], i); }).join("")
+            : '<div class="mt-empty-state" style="grid-column:1/-1"><div class="mt-empty-art"><i class="bi bi-search"></i></div><b>Aucun masque ne correspond à « ' + escapeHtml(query) + ' »</b><small>Essayez un autre mot-clé, ou créez ce masque.</small></div>';
+        wireTemplateButtons(box);
+    }
+
+    $("mtSearch").addEventListener("input", renderSearch);
+    document.addEventListener("keydown", function (e) {
+        var tag = (e.target.tagName || "").toLowerCase();
+        if (e.key === "/" && tag !== "input" && tag !== "textarea" && tag !== "select" && !e.target.isContentEditable) {
+            e.preventDefault();
+            $("mtSearch").focus();
+        }
+        if (e.key === "Escape" && e.target === $("mtSearch")) { $("mtSearch").value = ""; renderSearch(); }
+    });
+
     // ===================== CATÉGORIES NON CLASSÉES (QA/ADMIN) =====================
+
+    $("mtUnclassifiedToggle").addEventListener("click", function () {
+        var section = $("mtUnclassifiedSection");
+        section.classList.toggle("open");
+        this.setAttribute("aria-expanded", section.classList.contains("open") ? "true" : "false");
+    });
 
     function renderUnclassified() {
         var section = $("mtUnclassifiedSection");
@@ -162,23 +319,31 @@
         if (!unclassified.length) { section.style.display = "none"; return; }
 
         section.style.display = "";
-        $("mtUnclassifiedList").innerHTML = unclassified.map(function (c) {
-            return '<div class="d-flex align-items-center gap-2 mb-2">' +
-                '<span class="flex-grow-1">' + escapeHtml(c.label) + '</span>' +
-                '<select class="form-select form-select-sm" style="max-width:200px;" data-team-select="' + c.id + '">' +
+        $("mtUnclassifiedCount").textContent = unclassified.length;
+        $("mtUnclassifiedList").innerHTML = unclassified.map(function (c, i) {
+            return '<div class="mt-unc-item" style="animation-delay:' + (i * 40) + 'ms">' + catIconHtml(c.label) +
+                '<span class="lbl" title="' + escapeHtml(c.label) + '">' + escapeHtml(c.label) + '</span>' +
+                '<select class="form-select form-select-sm" data-team-select="' + c.id + '">' +
                     TEAMS.map(function (t) { return '<option value="' + t.code + '">' + escapeHtml(t.label) + '</option>'; }).join("") +
                 '</select>' +
-                '<button class="btn btn-sm btn-primary" data-classify="' + c.id + '">Classer</button>' +
+                '<button class="mt-btn mt-btn-primary mt-btn-sm" data-classify="' + c.id + '"><i class="bi bi-check2"></i> Classer</button>' +
             '</div>';
         }).join("");
 
         Array.prototype.forEach.call($("mtUnclassifiedList").querySelectorAll("[data-classify]"), function (btn) {
             btn.addEventListener("click", function () {
                 var id = btn.getAttribute("data-classify");
-                var team = $("mtUnclassifiedList").querySelector('[data-team-select="' + id + '"]').value;
+                var select = $("mtUnclassifiedList").querySelector('[data-team-select="' + id + '"]');
+                var team = select.value;
+                btn.disabled = true;
                 sendJson("/api/mail-templates/categories/" + id + "/team", "PUT", { team: team })
-                    .then(loadMailTemplates)
-                    .catch(function (e) { alert("Erreur : " + e.message); });
+                    .then(function () {
+                        var row = btn.closest(".mt-unc-item");
+                        row.classList.add("leaving");
+                        toast("Catégorie rattachée à « " + select.selectedOptions[0].textContent + " » ✓");
+                        setTimeout(loadMailTemplates, 300);
+                    })
+                    .catch(function (e) { btn.disabled = false; toast("Erreur : " + e.message, true); });
             });
         });
     }
@@ -210,20 +375,91 @@
 
     $("createCategoryBtn").addEventListener("click", function () {
         var label = $("newCategoryLabel").value.trim();
-        if (!label) { alert("Le nom de la catégorie est obligatoire."); return; }
+        if (!label) { toast("Le nom de la catégorie est obligatoire.", true); return; }
         sendJson("/api/mail-templates/categories", "POST", {
             label: label,
             team: $("newCategoryTeam").value,
             iconGlyph: $("newCategoryIcon").value.trim() || null
         }).then(function () {
             newCategoryModal.hide();
+            toast("Catégorie créée ✓");
             loadMailTemplates();
-        }).catch(function (e) { alert("Erreur : " + e.message); });
+        }).catch(function (e) { toast("Erreur : " + e.message, true); });
     });
 
-    $("newTemplateRecipientType").addEventListener("change", function () {
-        $("newTemplateRecipientGroup").style.display = this.value === "service" ? "" : "none";
+    // ===================== CRÉER UN MASQUE (modale + aperçu) =====================
+
+    var newTemplateModal = null;
+
+    function setRecipientType(type) {
+        $("newTemplateRecipientType").value = type;
+        Array.prototype.forEach.call($("mtRecipientSeg").querySelectorAll("[data-rt]"), function (b) {
+            b.classList.toggle("active", b.getAttribute("data-rt") === type);
+        });
+        $("newTemplateRecipientGroup").style.display = type === "service" ? "" : "none";
+        refreshCreatePreview();
+    }
+
+    Array.prototype.forEach.call($("mtRecipientSeg").querySelectorAll("[data-rt]"), function (b) {
+        b.addEventListener("click", function () { setRecipientType(b.getAttribute("data-rt")); });
     });
+    $("newTemplateRecipientGroup").addEventListener("change", refreshCreatePreview);
+    $("newTemplateSubject").addEventListener("input", refreshCreatePreview);
+    $("newTemplateBody").addEventListener("input", refreshCreatePreview);
+
+    Array.prototype.forEach.call($("mtPlaceholderChips").querySelectorAll("[data-ph]"), function (b) {
+        b.addEventListener("click", function () {
+            var area = $("newTemplateBody");
+            var token = "[" + b.getAttribute("data-ph") + "]";
+            var start = area.selectionStart != null ? area.selectionStart : area.value.length;
+            var end = area.selectionEnd != null ? area.selectionEnd : area.value.length;
+            area.value = area.value.slice(0, start) + token + area.value.slice(end);
+            area.focus();
+            area.selectionStart = area.selectionEnd = start + token.length;
+            refreshCreatePreview();
+        });
+    });
+
+    function withVars(text) {
+        return escapeHtml(text).replace(/\[([A-Za-zÀ-ÿ_]+)\]/g, '<span class="mt-var">[$1]</span>');
+    }
+
+    function refreshCreatePreview() {
+        var subject = $("newTemplateSubject").value;
+        var body = $("newTemplateBody").value;
+        $("mtPrevSubject").className = subject ? "" : "mt-ph";
+        $("mtPrevSubject").innerHTML = subject ? withVars(subject) : "Objet du mail";
+        $("mtPrevBody").innerHTML = body ? withVars(body) : '<span class="mt-ph">Le corps du message apparaîtra ici.</span>';
+        var to = "client@exemple.com";
+        if ($("newTemplateRecipientType").value === "service") {
+            var g = recipientGroupsCache.find(function (x) { return String(x.id) === $("newTemplateRecipientGroup").value; });
+            to = g ? (g.email || g.label) : "service";
+        }
+        $("mtPrevTo").textContent = to;
+        var fields = placeholdersOf(subject + " " + body);
+        $("mtPrevFields").innerHTML = fields.length
+            ? fields.map(function (f) { return '<span class="mt-tag mt-tag-blue">' + escapeHtml(humanizePlaceholder(f)) + '</span>'; }).join("")
+            : '<span class="mt-muted small">Aucun pour l\'instant.</span>';
+    }
+
+    function openCreate(categoryId) {
+        var select = $("newTemplateCategory");
+        if (categoryId) {
+            select.value = String(categoryId);
+        } else if (currentTeamCode) {
+            var first = categoriesForTeam(currentTeamCode)[0];
+            if (first) select.value = String(first.id);
+        }
+        $("newTemplateSubject").value = "";
+        $("newTemplateBody").value = "";
+        setRecipientType("person");
+        refreshCreatePreview();
+        newTemplateModal.show();
+        setTimeout(function () { $("newTemplateSubject").focus(); }, 350);
+    }
+
+    $("mtOpenCreateBtn").addEventListener("click", function () { openCreate(null); });
+    $("mtDetailCreateBtn").addEventListener("click", function () { openCreate(null); });
 
     $("createTemplateBtn").addEventListener("click", function () {
         var categoryId = Number($("newTemplateCategory").value);
@@ -232,16 +468,30 @@
         var recipientType = $("newTemplateRecipientType").value;
         var recipientGroupId = recipientType === "service" ? Number($("newTemplateRecipientGroup").value) : null;
 
-        if (!categoryId || !subject || !body) { alert("Catégorie, sujet et corps sont obligatoires."); return; }
+        if (!categoryId || !subject || !body) {
+            toast("Catégorie, objet et corps du message sont obligatoires.", true);
+            (!subject ? $("newTemplateSubject") : $("newTemplateBody")).focus();
+            return;
+        }
 
+        var btn = $("createTemplateBtn");
+        btn.disabled = true;
         sendJson("/api/mail-templates", "POST", {
             categoryId: categoryId, subject: subject, body: body,
             recipientType: recipientType, recipientGroupId: recipientGroupId
         }).then(function () {
-            $("newTemplateSubject").value = "";
-            $("newTemplateBody").value = "";
-            loadMailTemplates();
-        }).catch(function (e) { alert("Erreur : " + e.message); });
+            newTemplateModal.hide();
+            toast("Masque créé ✓");
+            var cat = (overviewCache.categories || []).find(function (c) { return c.id === categoryId; });
+            return loadMailTemplates().then(function () {
+                if (cat && cat.team && !isLockedOutboundAgent) {
+                    if (currentTeamCode !== cat.team) selectTeam(cat.team);
+                    var card = document.querySelector('.mt-category-card[data-category="' + categoryId + '"]');
+                    if (card) { card.classList.add("open"); card.scrollIntoView({ behavior: "smooth", block: "center" }); }
+                }
+            });
+        }).catch(function (e) { toast("Erreur : " + e.message, true); })
+          .then(function () { btn.disabled = false; });
     });
 
     // ===== Utilisation d'un masque — remplissage automatique =====
@@ -256,6 +506,7 @@
         var template = (overviewCache.templates || []).find(function (t) { return t.id === templateId; });
         getJson("/api/mail-templates/" + templateId + "/placeholders").then(function (placeholders) {
             $("useTemplateModal").setAttribute("data-template-id", templateId);
+            $("mtUseTitle").textContent = template ? template.subject : "Masque";
             $("useTemplateModal").setAttribute("data-recipient-type", template ? template.recipientType : "");
             $("useTemplateModal").setAttribute("data-recipient-group-id", template && template.recipientGroupId ? template.recipientGroupId : "");
 
@@ -275,7 +526,10 @@
                 }).join("");
 
                 Array.prototype.forEach.call($("clientFieldsRow").querySelectorAll(".client-field-input"), function (input) {
-                    input.addEventListener("input", refreshFilledMail);
+                    input.addEventListener("input", function () {
+                        input.classList.toggle("filled", !!input.value.trim());
+                        refreshFilledMail();
+                    });
                 });
             }
 
@@ -309,6 +563,14 @@
     function refreshFilledMail() {
         var templateId = $("useTemplateModal").getAttribute("data-template-id");
         if (!templateId) return;
+
+        var inputs = $("clientFieldsRow").querySelectorAll(".client-field-input");
+        var filled = Array.prototype.filter.call(inputs, function (i) { return i.value.trim(); }).length;
+        var label = $("mtFillProgress");
+        if (label) {
+            label.textContent = inputs.length ? filled + "/" + inputs.length + " champs remplis" : "";
+            label.classList.toggle("done", inputs.length > 0 && filled === inputs.length);
+        }
 
         var values = {};
         Array.prototype.forEach.call($("clientFieldsRow").querySelectorAll(".client-field-input"), function (input) {
@@ -355,6 +617,7 @@
     document.addEventListener("DOMContentLoaded", function () {
         useTemplateModal = new bootstrap.Modal($("useTemplateModal"));
         newCategoryModal = new bootstrap.Modal($("newCategoryModal"));
+        newTemplateModal = new bootstrap.Modal($("newTemplateModal"));
     });
 
     window.RccSession.init().then(function (session) {
@@ -362,7 +625,8 @@
         currentUsername = session && session.user ? session.user.username : null;
         if (session) applyQaVisibility(session.profile);
         if ($("mtCreateCardHeader")) {
-            $("mtCreateCardHeader").textContent = isQaOrAdmin ? "Créer un masque de mail" : "Créer mon masque de mail";
+            $("mtCreateCardHeader").textContent = isQaOrAdmin ? "Nouveau masque" : "Créer mon masque";
+            $("mtCreateTitle").textContent = isQaOrAdmin ? "Créer un masque de mail" : "Créer mon masque de mail";
         }
         if ($("mtCreateCardHint") && isQaOrAdmin) {
             $("mtCreateCardHint").textContent = "Choisissez la catégorie (type de mail) concernée, puis rédigez le modèle — visible par toute l'équipe qui utilise cette catégorie.";

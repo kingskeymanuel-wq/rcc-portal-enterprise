@@ -16,42 +16,7 @@
 
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
 
-    <style>
-        .mt-hero { border-radius: 20px; background: linear-gradient(135deg, #0057B8 0%, #003d82 100%); color: #fff; padding: 2rem 2.25rem; position: relative; overflow: hidden; }
-        .mt-hero::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 85% 20%, rgba(255,255,255,.12), transparent 55%); }
-        .mt-hero h2 { font-weight: 700; margin-bottom: .25rem; }
-        .mt-hero p { color: rgba(255,255,255,.85); margin-bottom: 0; }
-
-        .mt-team-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
-        .mt-team-card { border: none; border-radius: 18px; padding: 1.5rem; cursor: pointer; color: #fff; position: relative; overflow: hidden; box-shadow: 0 10px 24px rgba(0,0,0,.08); transition: transform .15s ease, box-shadow .15s ease; }
-        .mt-team-card:hover { transform: translateY(-3px); box-shadow: 0 16px 32px rgba(0,0,0,.14); }
-        .mt-team-card .mt-team-icon { font-size: 2rem; opacity: .95; }
-        .mt-team-card .mt-team-name { font-size: 1.15rem; font-weight: 700; margin: .6rem 0 .15rem; }
-        .mt-team-card .mt-team-count { font-size: .82rem; color: rgba(255,255,255,.85); }
-        .mt-team-card.mt-unclassified { background: #fff !important; color: #1f2937; border: 1.5px dashed #d9dee6; box-shadow: none; }
-        .mt-team-card.mt-unclassified .mt-team-count,
-        .mt-team-card.mt-unclassified .mt-team-icon { color: #9aa4b2; }
-
-        .mt-back-btn { border: none; background: transparent; color: #0057B8; font-weight: 600; padding: 0; margin-bottom: 1rem; display: inline-flex; align-items: center; gap: .35rem; }
-        .mt-back-btn:hover { text-decoration: underline; }
-
-        .mt-category-card { border: 1px solid #eef1f5; border-radius: 14px; margin-bottom: .9rem; overflow: hidden; }
-        .mt-category-header { padding: .9rem 1.1rem; background: #fafbfc; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
-        .mt-category-header .mt-cat-title { font-weight: 700; color: #1f2a44; display: flex; align-items: center; gap: .55rem; }
-        .mt-category-header .mt-cat-icon { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
-        .mt-category-body { display: none; padding: .3rem .9rem .9rem; }
-        .mt-category-card.open .mt-category-body { display: block; }
-        .mt-category-card.open .mt-cat-chevron { transform: rotate(90deg); }
-        .mt-cat-chevron { transition: transform .15s ease; }
-
-        .mt-template-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .65rem .5rem; border-top: 1px solid #f5f6f8; }
-        .mt-template-row:first-child { border-top: none; }
-        .mt-template-subject { font-weight: 600; color: #1f2937; font-size: .92rem; }
-        .mt-template-recipient { font-size: .72rem; color: #9aa4b2; text-transform: uppercase; letter-spacing: .03em; }
-
-        .mt-empty-state { text-align: center; padding: 2.5rem 1rem; color: #9aa4b2; }
-        .mt-empty-state i { font-size: 2.2rem; display: block; margin-bottom: .5rem; opacity: .5; }
-    </style>
+    <link rel="stylesheet" th:href="@{/css/mail-templates.css}">
 
 </head>
 
@@ -67,57 +32,79 @@
 
         <main id="page-content">
 
-            <div class="container-fluid">
+            <div class="container-fluid mt-page">
 
-                <div class="mt-hero mb-4">
-                    <h2><i class="bi bi-envelope-paper-fill"></i> Masques de mail</h2>
-                    <p>Modèles prêts à l'emploi, organisés par équipe — choisissez la vôtre pour retrouver vos masques.</p>
-                </div>
+                <!-- ===================== BANDEAU ===================== -->
+                <section class="mt-hero mb-4">
+                    <div class="mt-hero-art" aria-hidden="true">
+                        <i class="bi bi-envelope-fill"></i><i class="bi bi-send-fill"></i><i class="bi bi-envelope-open-fill"></i><i class="bi bi-at"></i><i class="bi bi-envelope-heart-fill"></i>
+                    </div>
+                    <div class="mt-hero-main">
+                        <span class="mt-eyebrow"><i class="bi bi-stars"></i> Bibliothèque de réponses</span>
+                        <h2><span class="mt-hero-icon"><i class="bi bi-envelope-paper-fill"></i></span> Masques de mail</h2>
+                        <p>Modèles prêts à l'emploi, organisés par équipe : remplissez les champs du client, le mail se complète tout seul.</p>
+                        <div class="mt-search">
+                            <i class="bi bi-search"></i>
+                            <input type="search" id="mtSearch" placeholder="Rechercher un masque (sujet, contenu, catégorie)…" autocomplete="off">
+                            <kbd>/</kbd>
+                        </div>
+                    </div>
+                    <div class="mt-hero-side">
+                        <div class="mt-kpis">
+                            <div class="mt-kpi"><strong data-count id="mtKpiTemplates">0</strong><span>masques</span></div>
+                            <div class="mt-kpi"><strong data-count id="mtKpiCategories">0</strong><span>catégories</span></div>
+                            <div class="mt-kpi"><strong data-count id="mtKpiMine">0</strong><span>personnels</span></div>
+                        </div>
+                        <button type="button" class="mt-btn mt-btn-light" id="mtOpenCreateBtn"><i class="bi bi-plus-lg"></i> <span id="mtCreateCardHeader">Créer mon masque de mail</span></button>
+                    </div>
+                </section>
+
+                <!-- ===================== RÉSULTATS DE RECHERCHE ===================== -->
+                <section id="mtSearchView" class="mb-4" hidden>
+                    <div class="mt-section-head"><h5><i class="bi bi-search"></i> Résultats <span class="mt-count" id="mtSearchCount">0</span></h5></div>
+                    <div class="mt-template-grid" id="mtSearchResults"></div>
+                </section>
 
                 <!-- ===================== SÉLECTEUR D'ÉQUIPE ===================== -->
                 <div id="mtTeamPickerView">
                     <div class="mt-team-grid" id="mtTeamGrid">
-                        <p class="text-muted text-center">Chargement…</p>
+                        <div class="mt-skeleton"></div><div class="mt-skeleton"></div><div class="mt-skeleton"></div>
                     </div>
                 </div>
 
                 <!-- ===================== MASQUES DE L'ÉQUIPE SÉLECTIONNÉE ===================== -->
                 <div id="mtTeamDetailView" style="display:none;">
-                    <button type="button" class="mt-back-btn" id="mtBackBtn"><i class="bi bi-arrow-left"></i> Toutes les équipes</button>
-
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h4 class="mb-0" id="mtTeamDetailTitle">—</h4>
-                        <button class="btn btn-sm btn-outline-primary qa-only" id="mtNewCategoryBtn" style="display:none;">
-                            <i class="bi bi-plus-lg"></i> Nouvelle catégorie
+                    <div class="mt-detail-head" id="mtDetailHead">
+                        <button type="button" class="mt-back-btn" id="mtBackBtn"><i class="bi bi-arrow-left"></i></button>
+                        <span class="mt-detail-icon" id="mtDetailIcon"><i class="bi bi-envelope-paper-fill"></i></span>
+                        <div class="flex-grow-1 min-w-0">
+                            <small class="mt-muted">Équipe</small>
+                            <h4 class="mb-0" id="mtTeamDetailTitle">—</h4>
+                        </div>
+                        <button class="mt-btn mt-btn-soft qa-only" id="mtNewCategoryBtn" style="display:none;">
+                            <i class="bi bi-folder-plus"></i> Nouvelle catégorie
                         </button>
+                        <button class="mt-btn mt-btn-primary" id="mtDetailCreateBtn"><i class="bi bi-plus-lg"></i> Nouveau masque</button>
                     </div>
-
-                    <div id="mtCategoriesContainer"></div>
+                    <div id="mtCategoriesContainer" class="mt-cat-grid"></div>
                 </div>
 
                 <!-- ===================== CATÉGORIES NON CLASSÉES (QA/ADMIN) ===================== -->
-                <div id="mtUnclassifiedSection" class="mt-4 qa-only" style="display:none;">
-                    <h5 class="mb-3"><i class="bi bi-inboxes text-warning"></i> Catégories non classées</h5>
-                    <p class="text-muted small">Ces catégories existent déjà mais ne sont rattachées à aucune équipe — classez-les pour qu'elles apparaissent dans le bon onglet.</p>
-                    <div id="mtUnclassifiedList"></div>
-                </div>
-
-                <!-- ===================== CRÉER UN MASQUE ===================== -->
-                <div class="card dashboard-card shadow-sm mt-4">
-                    <div class="card-header" id="mtCreateCardHeader">Créer mon masque de mail</div>
-                    <div class="card-body">
-                        <p class="text-muted small" id="mtCreateCardHint">Choisissez le type de mail (catégorie) correspondant à ce que vous devez envoyer, puis rédigez votre modèle — il n'apparaîtra que pour vous, dans la catégorie choisie.</p>
-                        <select class="form-select mb-2" id="newTemplateCategory"></select>
-                        <input type="text" class="form-control mb-2" id="newTemplateSubject" placeholder="Sujet">
-                        <textarea class="form-control mb-2" id="newTemplateBody" rows="5" placeholder="Corps du message"></textarea>
-                        <select class="form-select mb-2" id="newTemplateRecipientType">
-                            <option value="person">Destinataire : personne</option>
-                            <option value="service">Destinataire : service</option>
-                        </select>
-                        <select class="form-select mb-2" id="newTemplateRecipientGroup" style="display:none;"></select>
-                        <button class="btn btn-primary w-100" id="createTemplateBtn">Créer</button>
+                <section id="mtUnclassifiedSection" class="mt-unclassified mt-4 qa-only" style="display:none;">
+                    <button type="button" class="mt-unclassified-head" id="mtUnclassifiedToggle" aria-expanded="false">
+                        <span class="mt-unc-icon"><i class="bi bi-inboxes-fill"></i></span>
+                        <span class="flex-grow-1 text-start">
+                            <b>Catégories non classées <span class="mt-count mt-count-warn" id="mtUnclassifiedCount">0</span></b>
+                            <small>Rattachez-les à une équipe pour qu'elles apparaissent dans le bon onglet.</small>
+                        </span>
+                        <i class="bi bi-chevron-down mt-unc-chevron"></i>
+                    </button>
+                    <div class="mt-unclassified-body">
+                        <div class="mt-unclassified-inner">
+                            <div id="mtUnclassifiedList" class="mt-unc-grid"></div>
+                        </div>
                     </div>
-                </div>
+                </section>
 
             </div>
 
@@ -127,17 +114,82 @@
 
 </div>
 
-<!-- ===================== MODALE : UTILISER UN MASQUE ===================== -->
-<div class="modal fade" id="useTemplateModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+<!-- ===================== MODALE : CRÉER UN MASQUE ===================== -->
+<div class="modal fade mt-modal" id="newTemplateModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-fullscreen-lg-down">
         <div class="modal-content">
-            <div class="modal-header">
-                <h6 class="modal-title"><i class="bi bi-magic"></i> Utiliser ce masque</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="mt-modal-head">
+                <span class="mt-modal-icon"><i class="bi bi-pencil-square"></i></span>
+                <div class="flex-grow-1"><small>Nouveau masque</small><h5 class="mb-0" id="mtCreateTitle">Créer mon masque de mail</h5></div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="mt-create-layout">
+                    <div class="mt-create-form">
+                        <p class="mt-muted small" id="mtCreateCardHint">Choisissez le type de mail (catégorie) correspondant à ce que vous devez envoyer, puis rédigez votre modèle : il n'apparaîtra que pour vous, dans la catégorie choisie.</p>
+                        <label class="mt-label" for="newTemplateCategory">Catégorie</label>
+                        <select class="form-select mt-input mb-3" id="newTemplateCategory"></select>
+                        <label class="mt-label" for="newTemplateSubject">Objet</label>
+                        <input type="text" class="form-control mt-input mb-3" id="newTemplateSubject" placeholder="Ex. Votre réclamation [REFERENCE] a bien été prise en compte">
+                        <label class="mt-label" for="newTemplateBody">Corps du message</label>
+                        <div class="mt-chips" id="mtPlaceholderChips">
+                            <span class="mt-muted small me-1">Insérer :</span>
+                            <button type="button" data-ph="NOM_CLIENT">Nom client</button>
+                            <button type="button" data-ph="NUMERO_COMPTE">N° compte</button>
+                            <button type="button" data-ph="REFERENCE">Référence</button>
+                            <button type="button" data-ph="MONTANT">Montant</button>
+                            <button type="button" data-ph="DATE">Date</button>
+                            <button type="button" data-ph="EMAIL_CLIENT">E-mail client</button>
+                            <button type="button" data-ph="NOM_CONSEILLER">Conseiller</button>
+                        </div>
+                        <textarea class="form-control mt-input mb-1" id="newTemplateBody" rows="9" placeholder="Bonjour [NOM_CLIENT],&#10;&#10;…&#10;&#10;Cordialement,"></textarea>
+                        <small class="mt-muted d-block mb-3"><i class="bi bi-lightbulb"></i> Les mots entre crochets, comme [NOM_CLIENT], deviennent des champs à remplir.</small>
+                        <label class="mt-label">Destinataire</label>
+                        <div class="mt-seg mb-2" id="mtRecipientSeg">
+                            <button type="button" data-rt="person" class="active"><i class="bi bi-person"></i> Une personne</button>
+                            <button type="button" data-rt="service"><i class="bi bi-building"></i> Un service</button>
+                        </div>
+                        <select class="d-none" id="newTemplateRecipientType">
+                            <option value="person">Destinataire : personne</option>
+                            <option value="service">Destinataire : service</option>
+                        </select>
+                        <select class="form-select mt-input mb-2" id="newTemplateRecipientGroup" style="display:none;"></select>
+                    </div>
+                    <aside class="mt-create-preview">
+                        <div class="mt-label">Aperçu</div>
+                        <div class="mt-mail">
+                            <div class="mt-mail-bar"><span></span><span></span><span></span></div>
+                            <div class="mt-mail-meta">
+                                <div><b>À :</b> <span id="mtPrevTo">client@exemple.com</span></div>
+                                <div><b>Objet :</b> <span id="mtPrevSubject" class="mt-ph">Objet du mail</span></div>
+                            </div>
+                            <div class="mt-mail-body" id="mtPrevBody"><span class="mt-ph">Le corps du message apparaîtra ici.</span></div>
+                        </div>
+                        <div class="mt-label mt-3">Champs détectés</div>
+                        <div id="mtPrevFields" class="mt-fields"><span class="mt-muted small">Aucun pour l'instant.</span></div>
+                    </aside>
+                </div>
+            </div>
+            <div class="modal-footer mt-modal-foot">
+                <button class="mt-btn mt-btn-soft" data-bs-dismiss="modal">Annuler</button>
+                <button class="mt-btn mt-btn-primary" id="createTemplateBtn"><i class="bi bi-check2-circle"></i> Créer le masque</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== MODALE : UTILISER UN MASQUE ===================== -->
+<div class="modal fade mt-modal" id="useTemplateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="mt-modal-head">
+                <span class="mt-modal-icon"><i class="bi bi-magic"></i></span>
+                <div class="flex-grow-1 min-w-0"><small>Utiliser ce masque</small><h5 class="mb-0 text-truncate" id="mtUseTitle">—</h5></div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div id="clientFieldsCard" class="card mb-3">
-                    <div class="card-body">
+                <div id="clientFieldsCard" class="mt-fill-card mb-3">
+                    <div>
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <strong class="small text-uppercase text-muted">Coordonnées du client</strong>
                             <span class="small text-muted">Remplissage automatique du mail</span>
@@ -162,20 +214,21 @@
                 <input type="text" class="form-control mb-3" id="filledSubject" readonly>
 
                 <label class="form-label small text-uppercase text-muted">Corps</label>
-                <textarea class="form-control mb-0" id="filledBody" rows="8" readonly></textarea>
+                <textarea class="form-control mb-0 mt-filled-body" id="filledBody" rows="9" readonly></textarea>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Fermer</button>
-                <button class="btn btn-outline-primary btn-sm" id="copyFilledMailBtn"><i class="bi bi-clipboard"></i> Copier</button>
-                <button class="btn btn-primary btn-sm" id="sendFilledMailBtn"><i class="bi bi-send"></i> Envoyer par Outlook</button>
+                <span class="mt-progress-label me-auto" id="mtFillProgress"></span>
+                <button class="mt-btn mt-btn-soft" data-bs-dismiss="modal">Fermer</button>
+                <button class="mt-btn mt-btn-soft" id="copyFilledMailBtn"><i class="bi bi-clipboard"></i> Copier</button>
+                <button class="mt-btn mt-btn-primary" id="sendFilledMailBtn"><i class="bi bi-send"></i> Envoyer par Outlook</button>
             </div>
         </div>
     </div>
 </div>
 
 <!-- ===================== MODALE : NOUVELLE CATÉGORIE ===================== -->
-<div class="modal fade" id="newCategoryModal" tabindex="-1">
-    <div class="modal-dialog">
+<div class="modal fade mt-modal" id="newCategoryModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h6 class="modal-title">Nouvelle catégorie</h6>
@@ -200,6 +253,8 @@
         </div>
     </div>
 </div>
+
+<div class="mt-toast" id="mtToast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script th:src="@{/js/preferences.js}"></script>
