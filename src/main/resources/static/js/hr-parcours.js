@@ -14,6 +14,7 @@
     var teamRosterModal = null;
     var dossierModal = null;
     var controlDetailModal = null;
+    var currentProfile = null;
 
     function el(id) { return document.getElementById(id); }
     function val(v, fallback) { return v === null || v === undefined || v === "" ? (fallback || "—") : v; }
@@ -32,7 +33,67 @@
         var t = String(raw || "").replace(/[_\s]+/g, " ").trim();
         return t ? t.toUpperCase() : "SANS ÉQUIPE";
     }
-    function teamKey(u) { return normTeam(u.activity || u.service); }
+    /** RCC est l'enceinte qui regroupe toutes les équipes — jamais une équipe en soi. */
+    var UMBRELLA = ["RCC", "RELATION CLIENT", "CENTRE DE RELATION CLIENT", "SANS ÉQUIPE", "SANS EQUIPE", "AUCUNE", "NONE", "N/A", "NA", "-"];
+    var UNASSIGNED = "À AFFECTER";
+    function isUmbrella(raw) {
+        var t = normTeam(raw);
+        return !String(raw || "").trim() || UMBRELLA.indexOf(t) !== -1;
+    }
+    function teamKey(u) {
+        if (!isUmbrella(u.activity)) return normTeam(u.activity);
+        if (!isUmbrella(u.service)) return normTeam(u.service);
+        return UNASSIGNED;
+    }
+
+    function fold(s) { return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
+    /** Même personne = même e-mail, ou même nom (ordre des mots, accents et casse ignorés). */
+    function nameKey(name) {
+        var words = fold(name).replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter(function (w) { return w.length > 1; });
+        return words.length < 2 ? "" : words.sort().join(" ");
+    }
+    var mergedDuplicates = 0;
+    /** Fusionne les comptes d'une même personne : on garde celui qui a une vraie équipe (puis l'actif). */
+    function dedupeEmployees(list) {
+        var parent = list.map(function (_, i) { return i; });
+        function find(i) { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; }
+        function union(a, b) { parent[find(a)] = find(b); }
+        // 1) Même e-mail = même personne.
+        var byEmail = {};
+        list.forEach(function (u, i) {
+            var k = u.email && u.email.indexOf("@") !== -1 ? u.email.trim().toLowerCase() : "";
+            if (!k) return;
+            if (byEmail[k] !== undefined) union(i, byEmail[k]); else byEmail[k] = i;
+        });
+        // 2) Même nom : seulement pour rattacher un compte SANS équipe, et seulement s'il n'y a
+        //    qu'un seul homonyme dans une équipe (deux homonymes = ambigu, on ne devine pas).
+        var byName = {};
+        list.forEach(function (u, i) {
+            var k = nameKey(u.fullName);
+            if (k && teamKey(u) !== UNASSIGNED) (byName[k] = byName[k] || []).push(i);
+        });
+        list.forEach(function (u, i) {
+            var k = nameKey(u.fullName);
+            if (k && teamKey(u) === UNASSIGNED && byName[k] && byName[k].length === 1) union(i, byName[k][0]);
+        });
+        var groups = {};
+        list.forEach(function (u, i) { (groups[find(i)] = groups[find(i)] || []).push(u); });
+        mergedDuplicates = 0;
+        return Object.keys(groups).map(function (k) {
+            var g = groups[k];
+            if (g.length === 1) return g[0];
+            mergedDuplicates += g.length - 1;
+            var score = function (u) { return (teamKey(u) !== UNASSIGNED ? 4 : 0) + (u.active !== false ? 2 : 0) + (u.photoUrl ? 1 : 0); };
+            var main = g.slice().sort(function (a, b) { return score(b) - score(a); })[0];
+            var merged = Object.assign({}, main);
+            // Champs RH manquants complétés depuis les autres comptes de la même personne.
+            ["email", "contractType", "contractStatus", "contractStartDate", "contractEndDate", "residencePlace", "gender", "affiliateBranch", "photoUrl"].forEach(function (f) {
+                if (!merged[f]) { var other = g.filter(function (x) { return x[f]; })[0]; if (other) merged[f] = other[f]; }
+            });
+            merged.aliases = g.filter(function (x) { return x !== main; }).map(function (x) { return x.username; });
+            return merged;
+        });
+    }
 
     var TEAM_COLORS = ["#0057b8", "#10a36a", "#7357d8", "#f59e0b", "#0d7f86", "#e45d6a", "#2f7de1", "#c2185b", "#5e6a7d", "#00897b"];
     function teamColor(name) {
@@ -94,7 +155,8 @@
         var activeTraining = formations.filter(function (f) { return !f.status || !["ARCHIVED", "CLOSED", "TERMINEE"].includes(String(f.status).toUpperCase()); });
 
         countUp(el("kpiEmployees"), employees.length);
-        el("kpiEmployeesTrend").textContent = activeEmployees.length + " actifs · " + (employees.length - activeEmployees.length) + " inactifs";
+        el("kpiEmployeesTrend").textContent = activeEmployees.length + " actifs · " + (employees.length - activeEmployees.length) + " inactifs" +
+            (mergedDuplicates ? " · " + mergedDuplicates + " doublon" + (mergedDuplicates > 1 ? "s" : "") + " fusionné" + (mergedDuplicates > 1 ? "s" : "") : "");
         var bar = el("kpiActiveBar");
         if (bar) setTimeout(function () { bar.style.width = (employees.length ? activeEmployees.length / employees.length * 100 : 0) + "%"; }, 80);
         countUp(el("kpiLeave"), onLeave.length);
@@ -118,7 +180,7 @@
             var team = teamKey(u);
             counts[team] = (counts[team] || 0) + 1;
         });
-        var rows = Object.keys(counts).map(function (team) { return { team: team, count: counts[team] }; })
+        var rows = Object.keys(counts).filter(function (t) { return t !== UNASSIGNED; }).map(function (team) { return { team: team, count: counts[team] }; })
             .sort(function (a, b) { return b.count - a.count; });
         var max = rows.length ? rows[0].count : 1;
         el("teamBars").innerHTML = rows.length ? rows.slice(0, 8).map(function (r) {
@@ -176,7 +238,12 @@
         employees.forEach(function (u) { var t = teamKey(u); (groups[t] = groups[t] || []).push(u); });
         var q = ((el("teamSearch") && el("teamSearch").value) || "").trim().toUpperCase();
         var teams = Object.keys(groups).filter(function (t) { return !q || t.indexOf(q) !== -1; })
-            .sort(function (a, b) { return groups[b].length - groups[a].length; });
+            .sort(function (a, b) {
+                if (a === UNASSIGNED) return 1;
+                if (b === UNASSIGNED) return -1;
+                return groups[b].length - groups[a].length;
+            });
+        renderUmbrella(groups);
         el("employeeTeamGrid").innerHTML = teams.length ? teams.map(function (t, i) {
             var members = groups[t];
             var active = members.filter(function (u) { return normalizeStatus(u) === "ACTIF"; }).length;
@@ -186,7 +253,7 @@
                     ? '<span style="background-image:url(\'' + escapeHtml(u.photoUrl) + '\')" title="' + escapeHtml(name) + '"></span>'
                     : '<span style="background:' + teamColor(name) + '" title="' + escapeHtml(name) + '">' + escapeHtml(initials(name)) + '</span>';
             }).join("");
-            return '<div class="team-tile" data-team="' + escapeHtml(t) + '" role="button" tabindex="0" style="animation-delay:' + Math.min(i * 35, 500) + 'ms">' +
+            return '<div class="team-tile' + (t === UNASSIGNED ? " team-tile-unassigned" : "") + '" data-team="' + escapeHtml(t) + '" role="button" tabindex="0" style="animation-delay:' + Math.min(i * 35, 500) + 'ms">' +
                 '<i class="bi bi-chevron-right tt-go"></i>' +
                 '<div class="tt-top"><span class="tt-avatar" style="background:' + teamColor(t) + '">' + escapeHtml(initials(t)) + '</span>' +
                 '<div class="min-w-0"><b>' + escapeHtml(t) + '</b><span class="tt-sub">' + members.length + ' collaborateur' + (members.length > 1 ? "s" : "") + ' · ' + active + ' actif' + (active > 1 ? "s" : "") + '</span></div></div>' +
@@ -199,12 +266,65 @@
         });
     }
 
+    /** Bandeau « RCC — l'enceinte » au-dessus des équipes : toutes les équipes lui appartiennent. */
+    function renderUmbrella(groups) {
+        var box = el("rccUmbrella");
+        if (!box) return;
+        var teams = Object.keys(groups).filter(function (t) { return t !== UNASSIGNED; });
+        var toAssign = (groups[UNASSIGNED] || []).length;
+        var canFix = currentProfile === "RH" || currentProfile === "ADMIN";
+        box.innerHTML = '<div class="rcc-umb-ic"><i class="bi bi-buildings-fill"></i></div>' +
+            '<div class="flex-grow-1 min-w-0"><div class="rcc-umb-eyebrow">L\'enceinte</div><h4>RCC — Relation Client</h4>' +
+            '<p>Toutes les équipes sont regroupées sous RCC. Chaque collaborateur n\'apparaît qu\'une fois, dans sa propre équipe.</p></div>' +
+            '<div class="rcc-umb-stats"><span><b>' + teams.length + '</b> équipes</span><span><b>' + employees.length + '</b> collaborateurs</span>' +
+            (mergedDuplicates ? '<span title="Comptes d\'une même personne réunis"><b>' + mergedDuplicates + '</b> doublons fusionnés</span>' : "") +
+            (toAssign ? '<span class="warn"><b>' + toAssign + '</b> à affecter</span>' : '<span class="ok"><i class="bi bi-check2-circle"></i> tous affectés</span>') + '</div>' +
+            (canFix ? '<button type="button" class="hr-btn hr-btn-light" id="consolidateBtn"><i class="bi bi-magic"></i> Ranger les comptes sans équipe</button>' : "");
+        var btn = el("consolidateBtn");
+        if (btn) btn.addEventListener("click", openConsolidation);
+    }
+
+    var consolidationModal = null;
+    function openConsolidation() {
+        if (!consolidationModal) consolidationModal = new bootstrap.Modal(el("consolidationModal"));
+        el("consolidationBody").innerHTML = '<div class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm"></span> Recherche des doublons…</div>';
+        el("consolidationApplyBtn").disabled = true;
+        consolidationModal.show();
+        getJson("/api/users/hr/team-consolidation").then(function (r) {
+            el("consolidationBody").innerHTML =
+                '<div class="cons-stats"><div><b>' + r.totalAccounts + '</b><span>comptes</span></div><div><b>' + r.people + '</b><span>personnes</span></div>' +
+                '<div class="ok"><b>' + r.moves.length + '</b><span>comptes à ranger</span></div><div class="warn"><b>' + r.unmatched.length + '</b><span>sans double trouvé</span></div></div>' +
+                (r.moves.length ? '<div class="table-responsive"><table class="table table-sm align-middle hr-table"><thead><tr><th>Compte sans équipe</th><th>Actuellement</th><th></th><th>Rejoint l\'équipe</th><th>Double trouvé</th></tr></thead><tbody>' +
+                    r.moves.map(function (m) {
+                        return '<tr><td><b>' + escapeHtml(m.fullName || m.username) + '</b><div class="employee-meta">' + escapeHtml(m.username) + '</div></td><td>' + escapeHtml(m.fromTeam) + '</td>' +
+                            '<td><i class="bi bi-arrow-right text-primary"></i></td><td><span class="status-pill status-approved">' + escapeHtml(m.toTeam) + '</span></td>' +
+                            '<td>' + escapeHtml(m.matchedWith) + ' <span class="employee-meta">(même ' + escapeHtml(m.matchedBy) + ')</span></td></tr>';
+                    }).join("") + '</tbody></table></div>'
+                    : '<p class="text-muted">Aucun compte sans équipe n\'a de double dans une équipe.</p>') +
+                (r.unmatched.length ? '<details class="mt-2"><summary class="small">' + r.unmatched.length + ' compte(s) sans double — à affecter manuellement (Administration)</summary><div class="small text-muted mt-1">' +
+                    r.unmatched.map(escapeHtml).join(" · ") + '</div></details>' : "") +
+                '<p class="small text-muted mt-3 mb-0"><i class="bi bi-shield-check"></i> Seule l\'équipe des comptes listés est renseignée — aucun compte n\'est supprimé.</p>';
+            el("consolidationApplyBtn").disabled = !r.moves.length;
+        }).catch(function (e) { el("consolidationBody").innerHTML = '<div class="alert alert-danger small mb-0">' + escapeHtml(e.message) + '</div>'; });
+    }
+
+    function applyConsolidation() {
+        var btn = el("consolidationApplyBtn");
+        btn.disabled = true;
+        RccApi.sendJson("/api/users/hr/team-consolidation", "POST", {}).then(function (r) {
+            consolidationModal.hide();
+            loadAll();
+            alert(r.moves.length + " compte(s) rangé(s) dans leur équipe.");
+        }).catch(function (e) { btn.disabled = false; alert("Erreur : " + e.message); });
+    }
+
     function openTeamRoster(team) {
         var members = employees.filter(function (u) { return teamKey(u) === team; });
         el("teamRosterName").textContent = team;
         el("teamRosterBody").innerHTML = members.length ? members.map(function (u) {
             var statusClass = normalizeStatus(u) === "ACTIF" ? "status-approved" : "status-rejected";
-            return '<tr><td><div class="employee-name">' + escapeHtml(val(u.fullName, u.username)) + '</div><div class="employee-meta">' + escapeHtml(val(u.username)) + '</div></td>' +
+            return '<tr><td><div class="employee-name">' + escapeHtml(val(u.fullName, u.username)) + '</div><div class="employee-meta">' + escapeHtml(val(u.username)) +
+                (u.aliases && u.aliases.length ? ' · aussi : ' + escapeHtml(u.aliases.join(", ")) : "") + '</div></td>' +
                 '<td><span class="status-pill ' + statusClass + '">' + normalizeStatus(u) + '</span></td>' +
                 '<td>' + escapeHtml(val(u.role)) + '</td>' +
                 '<td>' + escapeHtml(val(u.contractType)) + '</td>' +
@@ -549,7 +669,7 @@
             api("/api/reporting/team?month=" + encodeURIComponent(month)),
             api("/api/sync/status")
         ]);
-        employees = Array.isArray(results[0]) ? results[0] : [];
+        employees = dedupeEmployees(Array.isArray(results[0]) ? results[0] : []);
         leaves = Array.isArray(results[1]) ? results[1] : [];
         balances = Array.isArray(results[2]) ? results[2] : [];
         formations = Array.isArray(results[3]) ? results[3] : [];
@@ -603,6 +723,7 @@
         el("teamSearch").addEventListener("input", renderTeamGrid);
         el("openLeaveControlBtn").addEventListener("click", function () { openControlDetail("leave"); });
         wireTabs();
+        el("consolidationApplyBtn").addEventListener("click", applyConsolidation);
         el("employeeStatus").addEventListener("change", renderEmployees);
         el("exportEmployeesBtn").addEventListener("click", exportEmployees);
 
@@ -621,6 +742,7 @@
         });
 
         window.RccSession.init().then(function (session) {
+            currentProfile = session ? session.profile : null;
             if (!session || (session.profile !== "RH" && session.profile !== "ADMIN")) {
                 showError("Cette interface est réservée au portail RH et à l’administrateur.");
                 return;

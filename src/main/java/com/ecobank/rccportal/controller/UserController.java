@@ -30,6 +30,12 @@ public class UserController {
     private final UserFeaturePermissionService userFeaturePermissionService;
     private final CurrentUserAccessService currentUserAccessService;
     private final com.ecobank.rccportal.service.AuthService authService;
+    private com.ecobank.rccportal.service.HrTeamConsolidationService teamConsolidation;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setTeamConsolidation(com.ecobank.rccportal.service.HrTeamConsolidationService teamConsolidation) {
+        this.teamConsolidation = teamConsolidation;
+    }
 
     public UserController(UserService userService, AdministrationService administrationService,
                           UserFeaturePermissionService userFeaturePermissionService,
@@ -177,6 +183,26 @@ public class UserController {
             throw ApiException.forbidden("Only Human Resources, a Supervisor or an administrator can view contract tracking.");
         }
         return userService.listContractsForHr(requester.username(), isAdmin || isSupervisor);
+    }
+
+    /** Aperçu : comptes « RCC » / sans équipe rapprochés de leur double qui a une vraie équipe. */
+    @GetMapping("/hr/team-consolidation")
+    public com.ecobank.rccportal.service.HrTeamConsolidationService.Report teamConsolidationPreview(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireRhOrAdmin(requester);
+        return teamConsolidation.preview();
+    }
+
+    /** Range chaque compte sans équipe dans l'équipe de son double (aucune suppression de compte). */
+    @PostMapping("/hr/team-consolidation")
+    public com.ecobank.rccportal.service.HrTeamConsolidationService.Report teamConsolidationApply(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireRhOrAdmin(requester);
+        return teamConsolidation.apply();
+    }
+
+    private void requireRhOrAdmin(AuthenticatedUser requester) {
+        if (requester == null || !("admin".equalsIgnoreCase(requester.role()) || "rh".equalsIgnoreCase(requester.role()))) {
+            throw ApiException.forbidden("Réservé aux Ressources Humaines et à l'administrateur.");
+        }
     }
 
     @GetMapping("/directory")

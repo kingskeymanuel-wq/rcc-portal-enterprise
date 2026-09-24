@@ -108,6 +108,7 @@
                                     <button id="exportEmployeesBtn" class="hr-btn hr-btn-soft hr-btn-sm"><i class="bi bi-download"></i> Export CSV</button>
                                 </div>
                             </div>
+                            <div class="rcc-umbrella" id="rccUmbrella"></div>
                             <div id="teamGridView">
                                 <div class="hr-search mb-3"><i class="bi bi-search"></i><input id="teamSearch" placeholder="Filtrer les équipes…"></div>
                                 <div id="employeeTeamGrid" class="team-tile-grid"></div>
@@ -177,6 +178,23 @@
                                 <tbody id="teamRosterBody"></tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modale : rangement des comptes sans équipe dans l'équipe de leur double -->
+        <div class="modal fade" id="consolidationModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-magic"></i> Ranger les comptes sans équipe</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" id="consolidationBody"></div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Annuler</button>
+                        <button type="button" class="btn btn-primary" id="consolidationApplyBtn" disabled><i class="bi bi-check2-circle"></i> Appliquer</button>
                     </div>
                 </div>
             </div>

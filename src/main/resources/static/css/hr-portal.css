@@ -174,9 +174,9 @@
 .dossier-list{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow:auto}
 .dossier-item{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--hr-border);border-radius:10px;padding:7px 10px;font-size:.78rem}
 .dossier-item a{color:var(--hr-text);text-decoration:none}.dossier-item a:hover{color:var(--hr-blue)}
-.hr-page ~ .modal .modal-content,#teamRosterModal .modal-content,#dossierModal .modal-content,#controlDetailModal .modal-content,#agentDetailModal .modal-content{border:0;border-radius:20px;overflow:hidden;box-shadow:0 30px 80px rgba(13,27,62,.25)}
-#teamRosterModal .modal-header,#dossierModal .modal-header,#controlDetailModal .modal-header,#agentDetailModal .modal-header{background:linear-gradient(120deg,#062b52,#0057b8);color:#fff;border:0}
-#teamRosterModal .btn-close,#dossierModal .btn-close,#controlDetailModal .btn-close,#agentDetailModal .btn-close{filter:invert(1) grayscale(1) brightness(2)}
+.hr-page ~ .modal .modal-content,#teamRosterModal .modal-content,#consolidationModal .modal-content,#dossierModal .modal-content,#controlDetailModal .modal-content,#agentDetailModal .modal-content{border:0;border-radius:20px;overflow:hidden;box-shadow:0 30px 80px rgba(13,27,62,.25)}
+#teamRosterModal .modal-header,#consolidationModal .modal-header,#dossierModal .modal-header,#controlDetailModal .modal-header,#agentDetailModal .modal-header{background:linear-gradient(120deg,#062b52,#0057b8);color:#fff;border:0}
+#teamRosterModal .btn-close,#consolidationModal .btn-close,#dossierModal .btn-close,#controlDetailModal .btn-close,#agentDetailModal .btn-close{filter:invert(1) grayscale(1) brightness(2)}
 #controlDetailBreadcrumb a{color:#bfe0ff}#controlDetailBreadcrumb span{color:#fff}
 
 /* Sombre */
@@ -198,3 +198,24 @@ html[data-theme="dark"] .hr-chart-empty{background:#1a2233}
   .hr-tabs button{padding:.55rem .8rem;font-size:.8rem}
 }
 @media(prefers-reduced-motion:reduce){.hr-hero,.hr-hero-art span,.hr-kpi,.team-tile,.hr-pane.active,.mini-row,.training-item,.activity-item,.hr-chip .sync-dot,.hr-empty i,.hr-chart-empty i{animation:none!important}}
+
+/* RCC — l'enceinte qui regroupe toutes les équipes */
+.rcc-umbrella{position:relative;overflow:hidden;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;border-radius:18px;padding:1rem 1.2rem;margin-bottom:1rem;color:#fff;background:linear-gradient(120deg,#062b52,#0057b8 60%,#0d7f86);box-shadow:0 14px 32px rgba(0,48,96,.18);animation:hrRise .4s ease both}
+.rcc-umbrella:empty{display:none}
+.rcc-umbrella::after{content:"";position:absolute;width:220px;height:220px;border-radius:50%;right:-70px;top:-110px;background:rgba(255,255,255,.08)}
+.rcc-umb-ic{width:52px;height:52px;border-radius:16px;background:rgba(255,255,255,.16);display:grid;place-items:center;font-size:1.5rem;flex-shrink:0}
+.rcc-umb-eyebrow{font-size:.68rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.75}
+.rcc-umbrella h4{margin:0;font-weight:800;font-size:1.15rem}
+.rcc-umbrella p{margin:.15rem 0 0;font-size:.8rem;color:rgba(255,255,255,.8)}
+.rcc-umb-stats{position:relative;z-index:1;display:flex;flex-wrap:wrap;gap:.4rem}
+.rcc-umb-stats span{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:.3rem .75rem;font-size:.76rem}
+.rcc-umb-stats span.warn{background:rgba(255,201,77,.25);border-color:rgba(255,201,77,.5)}
+.rcc-umb-stats span.ok{background:rgba(126,226,176,.22);border-color:rgba(126,226,176,.45)}
+.rcc-umbrella .hr-btn{position:relative;z-index:1}
+.team-tile-unassigned{border-style:dashed;border-color:#f3c86b;background:#fffbf1}
+.cons-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin-bottom:1rem}
+.cons-stats div{border:1px solid var(--hr-border);border-radius:14px;padding:.7rem;text-align:center}
+.cons-stats b{display:block;font-size:1.4rem;font-weight:800;color:var(--hr-text)}
+.cons-stats span{font-size:.74rem;color:var(--hr-muted)}
+.cons-stats .ok b{color:var(--hr-green)}.cons-stats .warn b{color:#c77700}
+@media(max-width:700px){.cons-stats{grid-template-columns:1fr 1fr}}
