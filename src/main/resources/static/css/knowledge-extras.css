@@ -109,3 +109,28 @@
 }
 .ob-actions .btn-light { background: #fff; border: 1px solid #dfe5ee; }
 .ob-actions .btn-light:hover { border-color: #0057b8; color: #0057b8; }
+
+/* Itinéraire intégré à la fiche agence */
+.ob-view-route .ob-frame { min-height: 400px; }
+.ob-route { position: relative; z-index: 2; background: #fff; padding: 3.6rem .9rem .8rem; display: grid; gap: .5rem; border-bottom: 1px solid #e7ebf3; animation: caRise .25s ease both; }
+.ob-route-from, .ob-route-to { display: flex; align-items: center; gap: .55rem; border: 1.5px solid #dfe5ee; border-radius: 12px; padding: .35rem .45rem .35rem .75rem; background: #fff; }
+.ob-route-from:focus-within { border-color: #0057b8; box-shadow: 0 0 0 4px rgba(0, 87, 184, .1); }
+.ob-route-from > i { color: #10a36a; } .ob-route-to > i { color: #e45d6a; }
+.ob-route-from input { flex: 1; min-width: 0; border: 0; outline: none; font-size: .88rem; padding: .3rem 0; }
+.ob-route-to { background: #f7f9fc; font-size: .84rem; font-weight: 700; color: #14243a; padding: .55rem .75rem; }
+.ob-route-to span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ob-route-me { border: 0; background: #eaf2ff; color: #0057b8; border-radius: 9px; padding: .35rem .7rem; font-size: .78rem; font-weight: 800; white-space: nowrap; }
+.ob-route-me:disabled { opacity: .6; }
+.ob-route-bar { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.ob-route-mode { display: inline-flex; background: #eef2f8; border-radius: 12px; padding: 3px; gap: 2px; }
+.ob-route-mode button { border: 0; background: transparent; border-radius: 10px; padding: .35rem .75rem; font-size: .78rem; font-weight: 700; color: #5e6a7d; }
+.ob-route-mode button.active { background: #fff; color: #0057b8; box-shadow: 0 2px 8px rgba(30, 41, 80, .12); }
+.ob-route-go { margin-left: auto; border: 0; border-radius: 12px; background: linear-gradient(135deg, #0057b8, #2f7de1); color: #fff; font-weight: 800; font-size: .84rem; padding: .5rem 1rem; box-shadow: 0 8px 18px rgba(0, 87, 184, .25); }
+.ob-route-msg { font-size: .78rem; color: #718096; min-height: 0; }
+.ob-route-msg:empty { display: none; }
+.ob-route-msg.err { color: #b42333; }
+.ob-route-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: .35rem; color: #cfe0f7; padding: 1.5rem; }
+.ob-route-empty i { font-size: 2.4rem; animation: obFloat 3.5s ease-in-out infinite; }
+.ob-route-empty b { color: #fff; font-size: 1.05rem; }
+.ob-route-empty span { font-size: .84rem; max-width: 380px; }
+@keyframes obFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
