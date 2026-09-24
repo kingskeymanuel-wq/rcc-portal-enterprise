@@ -44,5 +44,7 @@ public class TestBypassProperties {
         private String activity;
         /** Uniquement pour role=TEAM_LEADER — voir User.ledTeam / TeamClassifier.Team. */
         private String ledTeam;
+        /** Uniquement pour les agents d'agence : code agence (ex. K27) rattaché d'office (Portail Agence). */
+        private String agencyCode;
     }
 }

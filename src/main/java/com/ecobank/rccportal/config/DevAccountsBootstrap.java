@@ -38,6 +38,14 @@ public class DevAccountsBootstrap implements CommandLineRunner {
     private final UserServiceAssignmentRepository userServiceAssignmentRepository;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
+    /** Rattachement agent ↔ agence des comptes de test d'agence (table UserAgency). */
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setJdbc(org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
+
     public DevAccountsBootstrap(
             TestBypassProperties testBypassProperties,
             UserRepository userRepository,
@@ -154,10 +162,32 @@ public class DevAccountsBootstrap implements CommandLineRunner {
             userRepository.save(user);
         }
 
+        if (account.getAgencyCode() != null && !account.getAgencyCode().isBlank() && jdbc != null) {
+            assignTestAgency(user, account.getAgencyCode().trim().toUpperCase());
+        }
+
         if (account.getLedTeam() != null && !account.getLedTeam().isBlank()
                 && !account.getLedTeam().equals(user.getLedTeam())) {
             user.setLedTeam(account.getLedTeam());
             userRepository.save(user);
+        }
+    }
+
+    /** Rattache un compte de test d'agence à son agence (une seule fois — jamais d'écrasement). */
+    private void assignTestAgency(User user, String agencyCode) {
+        try {
+            Integer existing = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.UserAgency WHERE UserId = ?", Integer.class, user.getId());
+            if (existing != null && existing > 0) return;
+            java.util.List<Long> ids = jdbc.queryForList(
+                    "SELECT BranchId FROM dbo.BankBranches WHERE IsActive = 1 AND Name LIKE ? ORDER BY BranchId", Long.class, "%(" + agencyCode + ")");
+            if (ids.isEmpty()) {
+                log.warn("[Bootstrap] Agence {} introuvable — compte {} non rattaché.", agencyCode, user.getUsername());
+                return;
+            }
+            jdbc.update("INSERT INTO dbo.UserAgency (UserId, BranchId, AssignedBy) VALUES (?, ?, ?)", user.getId(), ids.get(0), "Compte de test");
+            log.warn("[Bootstrap] Compte de test {} rattaché à l'agence {}.", user.getUsername(), agencyCode);
+        } catch (RuntimeException e) {
+            log.warn("[Bootstrap] Rattachement agence de {} impossible pour l'instant : {}", user.getUsername(), e.getMessage());
         }
     }
 }
