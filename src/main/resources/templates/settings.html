@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/settings.css}">
 </head>
 <body>
 <div class="layout">
@@ -14,108 +15,193 @@
     <div class="content">
         <div th:replace="~{fragments/header :: header}"></div>
         <main id="page-content">
-            <div class="container-fluid">
+            <div class="container-fluid st-page">
 
-                <div class="welcome-banner">
-                    <div>
-                        <h2 data-i18n="settings.title">Paramètres</h2>
-                        <p class="text-muted" data-i18n="settings.subtitle">Votre profil et vos préférences</p>
+                <!-- ===== Bandeau profil ===== -->
+                <section class="st-hero mb-4">
+                    <div class="st-hero-art" aria-hidden="true"><span></span><span></span><span></span></div>
+                    <button type="button" class="st-hero-avatar" id="heroAvatarBtn" title="Changer ma photo ou mon avatar">
+                        <img id="photoPreview" src="/images/avatar.png" alt="Photo">
+                        <span class="st-hero-avatar-edit"><i class="bi bi-camera-fill"></i></span>
+                    </button>
+                    <div class="st-hero-copy">
+                        <span class="st-eyebrow"><i class="bi bi-gear-wide-connected"></i> <span data-i18n="settings.title">Paramètres</span></span>
+                        <h2 id="profileName">—</h2>
+                        <div class="st-hero-meta"><span id="profileUsername"></span><span id="heroRole"></span><span id="heroTeam"></span></div>
                     </div>
-                </div>
+                    <div class="st-complete" title="Complétude du profil">
+                        <svg viewBox="0 0 120 120"><circle class="st-ring-bg" cx="60" cy="60" r="50"></circle><circle class="st-ring-fg" id="completeRing" cx="60" cy="60" r="50"></circle></svg>
+                        <div><strong id="completePct">0%</strong><small>profil complété</small></div>
+                    </div>
+                </section>
 
-                <div id="profileSaved" class="alert alert-success" style="display:none;">Profil mis à jour.</div>
-                <div id="profileError" class="alert alert-danger" style="display:none;"></div>
+                <div id="profileSaved" class="st-alert st-alert-ok" style="display:none;"><i class="bi bi-check-circle-fill"></i> Profil mis à jour.</div>
+                <div id="profileError" class="st-alert st-alert-err" style="display:none;"></div>
 
-                <div class="row g-4">
-                    <div class="col-lg-7">
-                        <div class="card shadow-sm">
-                            <div class="card-body">
-                                <h5 class="card-title mb-3" data-i18n="settings.myProfile"><i class="bi bi-person-circle"></i> Mon profil</h5>
+                <div class="st-layout">
+                    <nav class="st-nav" id="stNav">
+                        <button type="button" class="active" data-sec="profile"><i class="bi bi-person-vcard"></i><span>Profil</span></button>
+                        <button type="button" data-sec="photo"><i class="bi bi-person-bounding-box"></i><span>Photo &amp; avatar</span></button>
+                        <button type="button" data-sec="appearance"><i class="bi bi-palette2"></i><span data-i18n="settings.appearance">Apparence</span></button>
+                        <button type="button" data-sec="a11y"><i class="bi bi-universal-access-circle"></i><span>Accessibilité</span></button>
+                        <button type="button" data-sec="notif"><i class="bi bi-bell"></i><span>Notifications</span></button>
+                        <button type="button" data-sec="account"><i class="bi bi-shield-lock"></i><span>Compte &amp; sécurité</span></button>
+                    </nav>
 
-                                <div class="d-flex align-items-center gap-3 mb-3">
-                                    <img id="photoPreview" src="/images/avatar.png" alt="Photo" title="Cliquer pour agrandir"
-                                         class="rounded-circle" style="width:72px;height:72px;object-fit:cover;cursor:pointer;">
-                                    <div class="flex-grow-1">
-                                        <label class="form-label small mb-1">Photo de profil</label>
-                                        <input id="photoFileInput" type="file" accept=".jpg,.jpeg,.png,.webp,.gif" class="form-control form-control-sm">
-                                        <div class="form-text" id="photoUploadStatus"></div>
+                    <div class="st-main">
+                        <!-- ===== Profil ===== -->
+                        <section class="st-sec active" data-sec="profile">
+                            <header><h4><i class="bi bi-person-vcard"></i> <span data-i18n="settings.myProfile">Mon profil</span></h4><p>Ces informations sont visibles par vos collègues dans MON RCC.</p></header>
+                            <div class="st-info-grid" id="identityGrid"></div>
+                            <form id="profileForm" class="st-card">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="st-label" for="phoneInput" data-i18n="settings.phone">Téléphone</label>
+                                        <div class="st-input-ic"><i class="bi bi-telephone"></i><input id="phoneInput" type="tel" class="form-control" maxlength="30" placeholder="+225 07 00 00 00 00"></div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="st-label" for="birthdateInput" data-i18n="settings.birthdate">Date de naissance</label>
+                                        <div class="st-input-ic"><i class="bi bi-cake2"></i><input id="birthdateInput" type="date" class="form-control"></div>
+                                        <small class="st-hint">Utilisée pour vous souhaiter votre anniversaire dans MON RCC.</small>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="st-label" for="bioInput" data-i18n="settings.bio">Bio</label>
+                                        <textarea id="bioInput" class="form-control" rows="4" maxlength="1000" placeholder="Quelques mots sur vous, vos domaines d'expertise, vos langues…"></textarea>
+                                        <small class="st-hint"><span id="bioCount">0</span>/1000</small>
                                     </div>
                                 </div>
+                                <div class="st-form-foot">
+                                    <span class="st-dirty" id="dirtyHint"><i class="bi bi-dot"></i> Modifications non enregistrées</span>
+                                    <button type="submit" class="st-btn st-btn-primary"><i class="bi bi-check2-circle"></i> <span data-i18n="settings.save">Enregistrer</span></button>
+                                </div>
+                            </form>
+                        </section>
 
-                                <form id="profileForm">
-                                    <p class="mb-2"><strong id="profileName">—</strong>
-                                        <span class="text-muted small" id="profileUsername"></span></p>
-
-                                    <div class="mb-2">
-                                        <label class="form-label small" data-i18n="settings.phone">Téléphone</label>
-                                        <input id="phoneInput" type="tel" class="form-control" maxlength="30">
-                                    </div>
-                                    <div class="mb-2">
-                                        <label class="form-label small" data-i18n="settings.birthdate">Date de naissance</label>
-                                        <input id="birthdateInput" type="date" class="form-control">
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label small" data-i18n="settings.bio">Bio</label>
-                                        <textarea id="bioInput" class="form-control" rows="3" maxlength="1000"></textarea>
-                                    </div>
-
-                                    <p class="text-muted small">
-                                        <i class="bi bi-info-circle"></i>
-                                        Le mot de passe se gère depuis votre compte Active Directory Ecobank, pas ici.
-                                    </p>
-
-                                    <button type="submit" class="btn btn-primary" data-i18n="settings.save">
-                                        <i class="bi bi-check-lg"></i> Enregistrer
-                                    </button>
-                                </form>
+                        <!-- ===== Photo & avatar ===== -->
+                        <section class="st-sec" data-sec="photo">
+                            <header><h4><i class="bi bi-person-bounding-box"></i> Photo &amp; avatar</h4><p>Importez une photo ou choisissez un avatar : il s'affiche partout dans le portail.</p></header>
+                            <div class="st-card">
+                                <label class="st-drop" id="photoDrop">
+                                    <input id="photoFileInput" type="file" accept=".jpg,.jpeg,.png,.webp,.gif" hidden>
+                                    <i class="bi bi-cloud-arrow-up"></i>
+                                    <span><b>Importer une photo</b> ou glisser-déposer ici<br><small>JPG, PNG, WEBP · 20 Mo max · cadrage carré conseillé</small></span>
+                                </label>
+                                <div class="form-text" id="photoUploadStatus"></div>
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="col-lg-5">
-                        <div class="card shadow-sm">
-                            <div class="card-body">
-                                <h5 class="card-title mb-3" data-i18n="settings.appearance"><i class="bi bi-sliders"></i> Apparence</h5>
-
-                                <div class="mb-4">
-                                    <label class="form-label small" data-i18n="settings.language">Langue</label>
-                                    <div class="btn-group w-100" role="group">
-                                        <input type="radio" class="btn-check" name="langChoice" id="langFr" value="fr">
-                                        <label class="btn btn-outline-primary" for="langFr">Français</label>
-                                        <input type="radio" class="btn-check" name="langChoice" id="langEn" value="en">
-                                        <label class="btn btn-outline-primary" for="langEn">English</label>
-                                    </div>
+                            <div class="st-card">
+                                <div class="st-card-title"><i class="bi bi-emoji-smile"></i> Choisir un avatar</div>
+                                <div class="st-seg mb-3" id="avatarKind">
+                                    <button type="button" class="active" data-kind="people">Conseillers</button>
+                                    <button type="button" data-kind="initials">Mes initiales</button>
+                                    <button type="button" data-kind="fun">Symboles</button>
                                 </div>
-
-                                <div>
-                                    <label class="form-label small" data-i18n="settings.theme">Thème</label>
-                                    <div class="btn-group w-100" role="group">
-                                        <input type="radio" class="btn-check" name="themeChoice" id="themeLight" value="light">
-                                        <label class="btn btn-outline-secondary" for="themeLight">
-                                            <i class="bi bi-sun-fill"></i> <span data-i18n="settings.themeLight">Clair</span>
-                                        </label>
-                                        <input type="radio" class="btn-check" name="themeChoice" id="themeDark" value="dark">
-                                        <label class="btn btn-outline-secondary" for="themeDark">
-                                            <i class="bi bi-moon-stars-fill"></i> <span data-i18n="settings.themeDark">Sombre</span>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <div class="mt-4">
-                                    <label class="form-label small">Police d'écriture</label>
-                                    <select class="form-select" id="fontChoice">
-                                        <option value="system">Standard (système)</option>
-                                        <option value="classic">Classique (Arial)</option>
-                                        <option value="serif">Élégante (Georgia)</option>
-                                        <option value="rounded">Arrondie (Trebuchet)</option>
-                                        <option value="mono">Machine à écrire (monospace)</option>
-                                    </select>
+                                <div class="st-avatars" id="avatarGrid"></div>
+                                <div class="st-form-foot">
+                                    <span class="st-hint" id="avatarHint">Cliquez sur un avatar pour le prévisualiser.</span>
+                                    <button type="button" class="st-btn st-btn-primary" id="avatarApplyBtn" disabled><i class="bi bi-check2-circle"></i> Utiliser cet avatar</button>
                                 </div>
                             </div>
-                        </div>
+                        </section>
+
+                        <!-- ===== Apparence ===== -->
+                        <section class="st-sec" data-sec="appearance">
+                            <header><h4><i class="bi bi-palette2"></i> <span data-i18n="settings.appearance">Apparence</span></h4><p>Appliqué immédiatement, sur ce poste.</p></header>
+                            <div class="st-card">
+                                <div class="st-card-title" data-i18n="settings.language">Langue</div>
+                                <div class="st-choice-row">
+                                    <input type="radio" class="btn-check" name="langChoice" id="langFr" value="fr"><label class="st-choice" for="langFr"><span class="st-flag">🇫🇷</span><b>Français</b></label>
+                                    <input type="radio" class="btn-check" name="langChoice" id="langEn" value="en"><label class="st-choice" for="langEn"><span class="st-flag">🇬🇧</span><b>English</b></label>
+                                </div>
+                            </div>
+                            <div class="st-card">
+                                <div class="st-card-title" data-i18n="settings.theme">Thème</div>
+                                <div class="st-choice-row">
+                                    <input type="radio" class="btn-check" name="themeChoice" id="themeLight" value="light">
+                                    <label class="st-choice st-theme" for="themeLight"><span class="st-theme-prev light"><i></i><i></i><i></i></span><b><i class="bi bi-sun-fill"></i> <span data-i18n="settings.themeLight">Clair</span></b></label>
+                                    <input type="radio" class="btn-check" name="themeChoice" id="themeDark" value="dark">
+                                    <label class="st-choice st-theme" for="themeDark"><span class="st-theme-prev dark"><i></i><i></i><i></i></span><b><i class="bi bi-moon-stars-fill"></i> <span data-i18n="settings.themeDark">Sombre</span></b></label>
+                                </div>
+                            </div>
+                            <div class="st-card">
+                                <div class="st-card-title">Couleur d'accent</div>
+                                <div class="st-swatches" id="accentSwatches"></div>
+                            </div>
+                            <div class="st-card">
+                                <div class="st-card-title">Police d'écriture</div>
+                                <select class="form-select" id="fontChoice">
+                                    <option value="system">Standard (système)</option>
+                                    <option value="classic">Classique (Arial)</option>
+                                    <option value="serif">Élégante (Georgia)</option>
+                                    <option value="rounded">Arrondie (Trebuchet)</option>
+                                    <option value="mono">Machine à écrire (monospace)</option>
+                                </select>
+                                <p class="st-font-preview" id="fontPreview">Bonjour, Ecobank à votre écoute — 0123456789</p>
+                            </div>
+                            <div class="st-card">
+                                <div class="st-card-title">Densité d'affichage</div>
+                                <div class="st-seg" id="densitySeg">
+                                    <button type="button" data-v="comfort"><i class="bi bi-arrows-expand"></i> Confortable</button>
+                                    <button type="button" data-v="compact"><i class="bi bi-arrows-collapse"></i> Compacte</button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- ===== Accessibilité ===== -->
+                        <section class="st-sec" data-sec="a11y">
+                            <header><h4><i class="bi bi-universal-access-circle"></i> Accessibilité</h4><p>Pour travailler confortablement toute la journée.</p></header>
+                            <div class="st-card">
+                                <div class="st-card-title">Taille du texte <span class="st-badge" id="fontScaleLabel">100 %</span></div>
+                                <div class="d-flex align-items-center gap-3"><small>A</small><input type="range" class="form-range" id="fontScale" min="85" max="130" step="5"><b style="font-size:1.3rem">A</b></div>
+                            </div>
+                            <div class="st-card">
+                                <label class="st-toggle"><input type="checkbox" id="reduceMotion"><span class="st-toggle-ui"></span><span><b>Réduire les animations</b><small>Désactive les mouvements, fondus et animations de fond.</small></span></label>
+                                <label class="st-toggle"><input type="checkbox" id="highContrast"><span class="st-toggle-ui"></span><span><b>Contraste renforcé</b><small>Textes plus foncés, bordures visibles, liens soulignés, focus clavier très visible.</small></span></label>
+                            </div>
+                        </section>
+
+                        <!-- ===== Notifications ===== -->
+                        <section class="st-sec" data-sec="notif">
+                            <header><h4><i class="bi bi-bell"></i> Notifications</h4><p>Soyez prévenu des nouvelles notifications (messages, validations, rappels) même sur un autre onglet.</p></header>
+                            <div class="st-card">
+                                <label class="st-toggle"><input type="checkbox" id="notifSound"><span class="st-toggle-ui"></span><span><b>Son discret</b><small>Petit signal sonore à l'arrivée d'une notification.</small></span></label>
+                                <button type="button" class="st-btn st-btn-soft st-btn-sm" id="testSoundBtn"><i class="bi bi-volume-up"></i> Tester le son</button>
+                            </div>
+                            <div class="st-card">
+                                <label class="st-toggle"><input type="checkbox" id="notifDesktop"><span class="st-toggle-ui"></span><span><b>Notifications du navigateur</b><small id="desktopStatus">Affiche une alerte Windows même quand le portail est en arrière-plan.</small></span></label>
+                                <button type="button" class="st-btn st-btn-soft st-btn-sm" id="testDesktopBtn"><i class="bi bi-window-stack"></i> Envoyer un test</button>
+                            </div>
+                            <div class="st-card">
+                                <div class="st-card-title">Fréquence de vérification</div>
+                                <div class="st-seg" id="pollSeg">
+                                    <button type="button" data-v="30">30 s</button><button type="button" data-v="60">1 min</button><button type="button" data-v="300">5 min</button>
+                                </div>
+                                <small class="st-hint d-block mt-2">Prise en compte au prochain chargement de page.</small>
+                            </div>
+                        </section>
+
+                        <!-- ===== Compte & sécurité ===== -->
+                        <section class="st-sec" data-sec="account">
+                            <header><h4><i class="bi bi-shield-lock"></i> Compte &amp; sécurité</h4><p>Votre accès au portail RCC.</p></header>
+                            <div class="st-card st-note">
+                                <i class="bi bi-key-fill"></i>
+                                <div><b>Mot de passe</b><p>Le mot de passe se gère depuis votre compte Active Directory Ecobank, pas ici. En cas d'oubli ou de blocage, contactez le support IT.</p></div>
+                            </div>
+                            <div class="st-card">
+                                <div class="st-card-title">Ce poste</div>
+                                <div class="st-kv" id="sessionInfo"></div>
+                            </div>
+                            <div class="st-card">
+                                <div class="st-card-title">Préférences locales</div>
+                                <p class="st-hint">Langue, thème, police, accessibilité et notifications sont enregistrés sur ce navigateur.</p>
+                                <button type="button" class="st-btn st-btn-soft" id="resetPrefsBtn"><i class="bi bi-arrow-counterclockwise"></i> Rétablir les réglages par défaut</button>
+                            </div>
+                            <div class="st-card st-danger">
+                                <div><b>Se déconnecter</b><p>Ferme votre session sur ce poste. Pensez à terminer votre shift avant si vous quittez le travail.</p></div>
+                                <button type="button" class="st-btn st-btn-danger" id="logoutBtn"><i class="bi bi-box-arrow-right"></i> Déconnexion</button>
+                            </div>
+                        </section>
                     </div>
                 </div>
-
             </div>
         </main>
     </div>
@@ -126,6 +212,7 @@
 <script th:src="@{/js/rcc-api.js}"></script>
 <script th:src="@{/js/session.js}"></script>
 <script th:src="@{/js/settings.js}"></script>
+<div class="st-toast" id="stToast"></div>
 <div class="modal fade" id="photoLightbox" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content bg-dark">

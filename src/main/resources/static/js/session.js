@@ -609,7 +609,15 @@ window.RccSession = (function () {
         fetch("/api/mon-rcc/notifications/me", { credentials: "same-origin" })
             .then(function (res) { return res.ok ? res.json() : []; })
             .then(function (rows) {
-                var unread = rows.filter(function (r) { return !r.isRead; }).length;
+                var unreadRows = rows.filter(function (r) { return !r.isRead; });
+                var unread = unreadRows.length;
+                // Son / notification bureau (Paramètres > Notifications) quand le nombre de non lues augmente.
+                var prev = null;
+                try { prev = sessionStorage.getItem("rcc_unread_seen"); sessionStorage.setItem("rcc_unread_seen", String(unread)); } catch (e) { /* ignore */ }
+                if (prev !== null && unread > Number(prev) && window.RccPreferences && window.RccPreferences.notifyNew) {
+                    var latest = unreadRows[0] || {};
+                    window.RccPreferences.notifyNew(unread - Number(prev), latest.title || latest.message || latest.content || "");
+                }
                 if (unread > 0) {
                     badge.textContent = unread > 9 ? "9+" : String(unread);
                     badge.style.display = "";
@@ -673,6 +681,9 @@ window.RccSession = (function () {
                     }
 
                     refreshNotificationBadge();
+                    // Vérification périodique (onglet visible uniquement) pour signaler les nouvelles notifications.
+                    var pollSec = Math.max(30, Number(window.RccPreferences && window.RccPreferences.get ? window.RccPreferences.get("notifPollSeconds") : 60) || 60);
+                    setInterval(function () { if (!document.hidden) refreshNotificationBadge(); }, pollSec * 1000);
                     return { user: user, profile: profile, isOutboundAgent: isOutboundAgent };
                 });
             })
@@ -683,7 +694,15 @@ window.RccSession = (function () {
             });
     }
 
-    return { init: init };
+    // Une seule initialisation par page : l'appel automatique (DOMContentLoaded) et celui de la
+    // page partagent la même promesse — pas de double chargement ni de double vérification.
+    var initPromise = null;
+    function initOnce() {
+        if (!initPromise) initPromise = init();
+        return initPromise;
+    }
+
+    return { init: initOnce };
 })();
 
 document.addEventListener("DOMContentLoaded", function () {

@@ -171,11 +171,93 @@ window.RccPreferences = (function () {
         applyTheme();
     }
 
+    // ── Préférences génériques (accessibilité, notifications) ─────────────────
+    var DEFAULTS = {
+        fontScale: "100", reduceMotion: "0", contrast: "0", density: "comfort",
+        notifSound: "1", notifDesktop: "0", notifPollSeconds: "60", accent: "blue"
+    };
+    var ACCENTS = { blue: ["#0057B8", "#004a9e"], green: ["#00A651", "#008a44"], violet: ["#6a2bd9", "#5723b5"], orange: ["#e8710a", "#c65f06"], teal: ["#0d7f86", "#0a6a70"] };
+
+    function get(key) {
+        try { var v = localStorage.getItem("rcc_" + key); return v === null ? DEFAULTS[key] : v; } catch (e) { return DEFAULTS[key]; }
+    }
+    function set(key, value) {
+        try { localStorage.setItem("rcc_" + key, String(value)); } catch (e) { /* stockage indisponible */ }
+        applyAccessibility();
+    }
+
+    /** Taille du texte, animations réduites, contraste renforcé, densité, couleur d'accent. */
+    function applyAccessibility() {
+        var root = document.documentElement;
+        root.style.fontSize = (Number(get("fontScale")) || 100) + "%";
+        root.toggleAttribute("data-reduce-motion", get("reduceMotion") === "1");
+        root.toggleAttribute("data-high-contrast", get("contrast") === "1");
+        root.setAttribute("data-density", get("density"));
+        var accent = ACCENTS[get("accent")] || ACCENTS.blue;
+        root.style.setProperty("--bs-primary", accent[0]);
+        root.style.setProperty("--rcc-accent", accent[0]);
+        root.style.setProperty("--rcc-accent-dark", accent[1]);
+        root.setAttribute("data-accent", get("accent"));
+    }
+
+    function injectAccessibilityCss() {
+        if (document.getElementById("rccA11yCss")) return;
+        var st = document.createElement("style");
+        st.id = "rccA11yCss";
+        st.textContent =
+            "html[data-reduce-motion] *, html[data-reduce-motion] *::before, html[data-reduce-motion] *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}" +
+            "html[data-high-contrast] body{color:#000}html[data-high-contrast] .text-muted,html[data-high-contrast] small{color:#1f2937!important}" +
+            "html[data-high-contrast] .card,html[data-high-contrast] .dashboard-card{border:1.5px solid #4a5568!important}" +
+            "html[data-high-contrast] a{text-decoration:underline}html[data-high-contrast] :focus-visible{outline:3px solid #ffbf00!important;outline-offset:2px}" +
+            "html[data-density=compact] .card-body{padding:.75rem}html[data-density=compact] .container-fluid{padding-left:.75rem;padding-right:.75rem}" +
+            "html[data-density=compact] .mb-4{margin-bottom:1rem!important}html[data-density=compact] .g-4{--bs-gutter-y:1rem;--bs-gutter-x:1rem}" +
+            "html:not([data-accent=blue]) .btn-primary{--bs-btn-bg:var(--rcc-accent);--bs-btn-border-color:var(--rcc-accent);--bs-btn-hover-bg:var(--rcc-accent-dark);--bs-btn-hover-border-color:var(--rcc-accent-dark);--bs-btn-active-bg:var(--rcc-accent-dark)}" +
+            "html:not([data-accent=blue]) .btn-outline-primary{--bs-btn-color:var(--rcc-accent);--bs-btn-border-color:var(--rcc-accent);--bs-btn-hover-bg:var(--rcc-accent);--bs-btn-hover-border-color:var(--rcc-accent);--bs-btn-active-bg:var(--rcc-accent)}" +
+            "html:not([data-accent=blue]) .text-primary{color:var(--rcc-accent)!important}html:not([data-accent=blue]) .bg-primary{background-color:var(--rcc-accent)!important}";
+        (document.head || document.documentElement).appendChild(st);
+    }
+
+    // ── Notifications (son + bureau) ─────────────────────────────────────────
+    function playSound() {
+        try {
+            var Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return;
+            var ctx = new Ctx(), now = ctx.currentTime;
+            [880, 1320].forEach(function (f, i) {
+                var o = ctx.createOscillator(), g = ctx.createGain();
+                o.type = "sine"; o.frequency.value = f;
+                g.gain.setValueAtTime(0.0001, now + i * 0.14);
+                g.gain.exponentialRampToValueAtTime(0.18, now + i * 0.14 + 0.02);
+                g.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.14 + 0.22);
+                o.connect(g); g.connect(ctx.destination);
+                o.start(now + i * 0.14); o.stop(now + i * 0.14 + 0.25);
+            });
+            setTimeout(function () { ctx.close(); }, 800);
+        } catch (e) { /* audio bloqué */ }
+    }
+
+    function desktopNotify(title, body) {
+        if (!("Notification" in window) || Notification.permission !== "granted") return;
+        try {
+            var n = new Notification(title, { body: body || "", icon: "/images/ecobank-logo.png", tag: "rcc-notif" });
+            n.onclick = function () { window.focus(); window.location.href = "/notifications"; };
+        } catch (e) { /* ignore */ }
+    }
+
+    /** Appelé par session.js quand de nouvelles notifications non lues arrivent. */
+    function notifyNew(count, latest) {
+        if (get("notifSound") === "1") playSound();
+        if (get("notifDesktop") === "1") desktopNotify(count > 1 ? count + " nouvelles notifications RCC" : "Nouvelle notification RCC", latest || "");
+    }
+
     // Applique le thème et la police immédiatement (avant même DOMContentLoaded) pour éviter le flash.
     applyTheme();
     applyFont();
+    injectAccessibilityCss();
+    applyAccessibility();
     document.addEventListener("DOMContentLoaded", applyTranslations);
 
     return { t: t, getLanguage: getLanguage, getTheme: getTheme, setLanguage: setLanguage, setTheme: setTheme,
-             getFont: getFont, setFont: setFont, FONT_STACKS: FONT_STACKS };
+             getFont: getFont, setFont: setFont, FONT_STACKS: FONT_STACKS,
+             get: get, set: set, ACCENTS: ACCENTS, playSound: playSound, desktopNotify: desktopNotify, notifyNew: notifyNew };
 })();
