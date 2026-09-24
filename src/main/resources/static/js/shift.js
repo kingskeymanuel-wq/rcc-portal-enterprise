@@ -182,6 +182,8 @@
     // ═══════════════════════════════════════════════════════════════════
 
     var currentWho = "me";
+    /** Team Leader : son équipe est fixe — pas de sélecteur, vue Équipe affichée d'office. */
+    var teamLeaderFixedTeam = false;
     var currentWhen = "day";
 
     // ═══════════════════════════════════════════════════════════════════
@@ -232,7 +234,9 @@
         currentWho = who;
         $("whoMeBtn").className = "btn btn-sm " + (who === "me" ? "btn-primary" : "btn-outline-primary");
         $("whoTeamBtn").className = "btn btn-sm " + (who === "team" ? "btn-primary" : "btn-outline-primary");
-        $("teamSelect").style.display = who === "team" ? "" : "none";
+        $("teamSelect").style.display = who === "team" && !teamLeaderFixedTeam ? "" : "none";
+        var badge = $("tlTeamBadge");
+        if (badge) badge.style.display = who === "team" ? "" : "none";
         updateScheduleImportVisibility();
         saveShiftState();
         loadAll();
@@ -826,17 +830,56 @@
             b.addEventListener("click", function () { b.parentNode.classList.toggle("open"); });
         });
         Array.prototype.forEach.call(list.querySelectorAll(".sp-goto"), function (b) {
-            b.addEventListener("click", function () {
-                var row = document.querySelector('#shiftTree .shift-timeline-row[data-username="' + b.getAttribute("data-user") + '"]');
-                if (!row) { alert("La frise de cet agent s'affiche en vue « Équipe » (choisissez son équipe)."); return; }
-                row.scrollIntoView({ behavior: "smooth", block: "center" });
-                row.classList.add("sp-flash");
-                setTimeout(function () { row.classList.remove("sp-flash"); }, 2200);
-            });
+            b.addEventListener("click", function () { toggleAgentFrise(b); });
         });
     }
 
+    /** Frise de la journée d'un agent, affichée directement sous le bouton (plus besoin de la
+     *  chercher dans la vue Équipe). Les pointages de l'équipe sont mis en cache par date|équipe. */
+    var friseCache = {};
+    function toggleAgentFrise(btn) {
+        var username = btn.getAttribute("data-user");
+        var detail = btn.parentNode;
+        var box = detail.querySelector(".sp-frise");
+        if (box) { box.remove(); btn.innerHTML = '<i class="bi bi-bar-chart-steps"></i> Voir sa frise de la journée'; return; }
+        box = document.createElement("div");
+        box.className = "sp-frise";
+        box.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm"></span> Chargement de la frise…</div>';
+        detail.appendChild(box);
+        btn.innerHTML = '<i class="bi bi-eye-slash"></i> Masquer la frise';
+
+        var row = presenceRows.filter(function (r) { return r.username === username; })[0] || {};
+        var date = $("shiftDate").value || todayIso();
+        // Team Leader : toujours son équipe (seule autorisée) ; sinon l'équipe de l'agent.
+        var team = teamLeaderFixedTeam ? ($("teamSelect").value || "") : (row.team || (currentWho === "team" ? $("teamSelect").value : "") || "");
+        if (row.status === "LEAVE" || row.status === "PLANNED_ABSENCE") {
+            box.innerHTML = friseHtml(row, '<div class="sp-frise-leave"><i class="bi bi-airplane"></i> ' +
+                (row.status === "LEAVE" ? "En congé ce jour-là" : "Absence prévue ce jour-là") + (row.detail ? " — " + escapeHtml(row.detail) : "") + '</div>');
+            return;
+        }
+        var key = date + "|" + team;
+        var request = friseCache[key] || (friseCache[key] = getJson("/api/shift/team?date=" + date + (team ? "&team=" + encodeURIComponent(team) : ""))
+            .catch(function (e) { delete friseCache[key]; throw e; }));
+        request.then(function (events) {
+            var mine = (events || []).filter(function (e) { return e.username === username; });
+            box.innerHTML = mine.length
+                ? friseHtml(row, renderBar(mine, date === todayIso()), disconnectionBadge(mine))
+                : friseHtml(row, '<div class="sp-frise-leave"><i class="bi bi-plug"></i> Aucun pointage enregistré pour cet agent ce jour-là.</div>');
+        }).catch(function (e) {
+            box.innerHTML = '<div class="text-danger small">Frise indisponible : ' + escapeHtml(e.message) + '</div>';
+        });
+    }
+
+    function friseHtml(row, barHtml, badge) {
+        var planned = row.plannedStart
+            ? '<span class="sp-frise-plan"><i class="bi bi-calendar-check"></i> Planning ' + hhmm(row.plannedStart) + "–" + hhmm(row.plannedEnd) + '</span>' : "";
+        return '<div class="sp-frise-head"><b><i class="bi bi-bar-chart-steps"></i> Frise de la journée</b>' + planned + (badge || "") + '</div>' +
+            '<div class="shift-timeline-row"><div class="shift-bar-wrap">' + barHtml + '</div></div>' +
+            '<div class="shift-bar-ruler"><span>06h</span><span>10h</span><span>14h</span><span>18h</span><span>22h</span></div>';
+    }
+
     function loadLateness() {
+        friseCache = {};
         var date = $("shiftDate").value;
         var team = currentWho === "team" ? $("teamSelect").value : "";
         fetchCompliance(date, team).then(function (cached) {
@@ -1801,14 +1844,31 @@
             // Excelliam, Superviseur, Admin et QA gardent le choix (voir demande utilisateur).
             // L'équipe éventuellement mémorisée en localStorage est ignorée pour ce profil :
             // elle n'a plus de sens à choisir, la sienne est fixe.
-            getJson("/api/shift/me/led-team").then(function (r) {
-                $("teamSelect").innerHTML = r.ledTeam
-                    ? '<option value="' + escapeHtml(r.ledTeam) + '">' + escapeHtml(r.ledTeam) + '</option>'
+            teamLeaderFixedTeam = true;
+            var showMyTeam = function (ledTeam) {
+                $("teamSelect").innerHTML = ledTeam
+                    ? '<option value="' + escapeHtml(ledTeam) + '">' + escapeHtml(ledTeam) + '</option>'
                     : '<option value="">— Mon équipe —</option>';
-                $("teamSelect").value = r.ledTeam || "";
+                $("teamSelect").value = ledTeam || "";
                 $("teamSelect").disabled = true;
+                $("teamSelect").style.display = "none";
+                var badge = $("tlTeamBadge");
+                if (!badge) {
+                    badge = document.createElement("span");
+                    badge.id = "tlTeamBadge";
+                    badge.className = "badge rounded-pill text-bg-primary px-3 py-2";
+                    $("teamSelect").parentNode.insertBefore(badge, $("teamSelect"));
+                }
+                badge.innerHTML = '<i class="bi bi-people-fill"></i> Mon équipe' + (ledTeam ? " : " + escapeHtml(ledTeam.replace(/_/g, " ")) : "");
+                // Le Team Leader arrive directement sur son équipe (plus de clic ni de choix).
+                currentWho = "team";
+                $("whoMeBtn").className = "btn btn-sm btn-outline-primary";
+                $("whoTeamBtn").className = "btn btn-sm btn-primary";
+                badge.style.display = "";
+                updateScheduleImportVisibility();
                 loadAll();
-            }).catch(function () { loadAll(); });
+            };
+            getJson("/api/shift/me/led-team").then(function (r) { showMyTeam(r.ledTeam); }).catch(function () { showMyTeam(null); });
         } else {
             loadTeams().then(function () {
                 // teamSelect n'a d'options qu'une fois loadTeams() résolu — restaurer avant

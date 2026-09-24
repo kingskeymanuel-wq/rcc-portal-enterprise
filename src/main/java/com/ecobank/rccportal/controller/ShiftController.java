@@ -40,9 +40,10 @@ public class ShiftController {
      *  proposer de sélecteur (RH/Excelliam/Superviseur/Admin/QA gardent le choix, eux). */
     @GetMapping("/me/led-team")
     public java.util.Map<String, String> myLedTeam(@AuthenticationPrincipal AuthenticatedUser requester) {
+        // Équipe dirigée ; à défaut (Team Leader pas encore configuré), sa propre équipe.
         String ledTeam = "team_leader".equalsIgnoreCase(requester.role())
                 ? userRepository.findFirstByUsernameIgnoreCase(requester.username())
-                        .map(com.ecobank.rccportal.model.User::getLedTeam)
+                        .map(u -> u.getLedTeam() != null && !u.getLedTeam().isBlank() ? u.getLedTeam() : u.getActivity())
                         .orElse(null)
                 : null;
         java.util.Map<String, String> body = new java.util.HashMap<>();
