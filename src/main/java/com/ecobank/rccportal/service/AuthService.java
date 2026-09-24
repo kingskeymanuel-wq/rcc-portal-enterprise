@@ -739,6 +739,7 @@ public class AuthService {
 
         User user = userRepository
                 .findFirstByUsernameIgnoreCase(username)
+                .or(() -> adoptImportedAccount(username, gatewayUser))
                 .orElseGet(() -> provisionUserFromGateway(username, gatewayUser));
 
         // Rattrapage — un compte créé AVANT que la gateway ne transmette l'email (voir
@@ -806,6 +807,39 @@ public class AuthService {
         }
         userRoleRepository.save(UserRole.builder().user(user).role(adminRole).build());
         log.warn("[AUTH PROVISIONING] {} correspond à bootstrap-admin-username — promu ADMIN.", username);
+    }
+
+    private com.ecobank.rccportal.repository.LoginAuditRepository loginAuditRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setLoginAuditRepository(com.ecobank.rccportal.repository.LoginAuditRepository loginAuditRepository) {
+        this.loginAuditRepository = loginAuditRepository;
+    }
+
+    /**
+     * Première connexion Active Directory d'un agent dont le compte a déjà été créé par un import
+     * (planning, KPI, roster) sous un autre identifiant : on reprend CE compte (même e-mail, ou nom
+     * correspondant sans ambiguïté, et jamais utilisé pour se connecter) au lieu d'en créer un
+     * second — c'est ainsi que naissaient les doublons « MOKE CARMELA » / « MOKE Marie Carmella ».
+     */
+    java.util.Optional<User> adoptImportedAccount(String username, AuthGatewayClient.GatewayUser gatewayUser) {
+        if (gatewayUser == null) return java.util.Optional.empty();
+        User candidate = null;
+        if (gatewayUser.email() != null && !gatewayUser.email().isBlank()) {
+            candidate = userRepository.findByEmailIgnoreCase(gatewayUser.email().trim()).orElse(null);
+        }
+        if (candidate == null && gatewayUser.fullName() != null && !gatewayUser.fullName().isBlank()) {
+            candidate = com.ecobank.rccportal.util.PersonNames.findUnique(gatewayUser.fullName(), userRepository.findAll(), User::getName);
+        }
+        if (candidate == null || candidate.getUsername().equalsIgnoreCase(username)) return java.util.Optional.empty();
+        if (loginAuditRepository != null && loginAuditRepository.existsByUser_Id(candidate.getId())) {
+            return java.util.Optional.empty(); // compte déjà utilisé par quelqu'un : on ne le reprend pas
+        }
+        log.warn("[AUTH PROVISIONING] Compte importé {} repris par la connexion AD {} (même personne : {}).",
+                candidate.getUsername(), username, candidate.getName());
+        candidate.setUsername(username);
+        if ((candidate.getEmail() == null || candidate.getEmail().isBlank()) && gatewayUser.email() != null) candidate.setEmail(gatewayUser.email());
+        return java.util.Optional.of(userRepository.save(candidate));
     }
 
     private User provisionUserFromGateway(String username, AuthGatewayClient.GatewayUser gatewayUser) {

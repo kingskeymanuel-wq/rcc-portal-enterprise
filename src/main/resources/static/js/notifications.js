@@ -10,7 +10,17 @@
         return new Date(iso).toLocaleString(RccPreferences.getLanguage() === "en" ? "en-US" : "fr-FR");
     }
 
-    function render(rows) {
+    var allRows = [];
+    var filter = "all";
+
+    function render(source) {
+        allRows = source || [];
+        var unread = allRows.filter(function (r) { return !r.isRead; }).length;
+        var counter = document.getElementById("notifUnreadCount");
+        if (counter) counter.textContent = unread;
+        var readAll = document.getElementById("notifReadAllBtn");
+        if (readAll) readAll.disabled = unread === 0;
+        var rows = filter === "unread" ? allRows.filter(function (r) { return !r.isRead; }) : allRows;
         var container = document.getElementById("notificationsList");
         if (!rows.length) {
             container.innerHTML = '<p class="text-muted text-center py-4">' + RccPreferences.t("notifications.empty") + '</p>';
@@ -83,6 +93,20 @@
                 '<p class="text-danger text-center">Erreur : ' + escapeHtml(e.message) + '</p>';
         });
     }
+
+    Array.prototype.forEach.call(document.querySelectorAll("[data-notif-filter]"), function (b) {
+        b.addEventListener("click", function () {
+            filter = b.getAttribute("data-notif-filter");
+            Array.prototype.forEach.call(document.querySelectorAll("[data-notif-filter]"), function (x) { x.classList.toggle("active", x === b); });
+            render(allRows);
+        });
+    });
+    var readAllBtn = document.getElementById("notifReadAllBtn");
+    if (readAllBtn) readAllBtn.addEventListener("click", function () {
+        readAllBtn.disabled = true;
+        sendJson("/api/mon-rcc/notifications/read-all", "POST").then(load)
+            .catch(function (e) { readAllBtn.disabled = false; alert("Erreur : " + e.message); });
+    });
 
     window.RccSession.init();
     load();

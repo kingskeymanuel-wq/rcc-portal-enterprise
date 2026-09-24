@@ -150,6 +150,8 @@ public class RosterImportService {
         String normalized = normalizeName(name);
         User existing = usersByNormalizedName.get(normalized);
         if (existing != null) return existing;
+        User similar = com.ecobank.rccportal.util.PersonNames.findUnique(name, usersByNormalizedName.values(), User::getName);
+        if (similar != null) return similar;
 
         if (importIntelligenceService.isAvailable() && !usersByNormalizedName.isEmpty()) {
             List<String> candidateNames = usersByNormalizedName.values().stream()

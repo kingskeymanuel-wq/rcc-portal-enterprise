@@ -134,6 +134,9 @@ public class AttendanceImportService {
         String normalized = normalizeName(cellValue);
         User existing = usersByNormalizedName.get(normalized);
         if (existing != null) return existing;
+        // Même personne écrite autrement (prénom en plus, petite faute) : jamais de doublon.
+        User similar = com.ecobank.rccportal.util.PersonNames.findUnique(cellValue, usersByNormalizedName.values(), User::getName);
+        if (similar != null) return similar;
 
         User created = User.builder()
                 .username(generateUsername(cellValue))

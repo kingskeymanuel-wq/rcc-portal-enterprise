@@ -241,7 +241,7 @@ public class KnowledgeService {
                 .sortOrder(request.sortOrder() != null ? request.sortOrder() : 0)
                 .createdByUserId(createdByUserId)
                 .build());
-        notifyUpdate("Nouvel article publié dans la Base de connaissances : " + saved.getTitle());
+        notifyArticle("Nouvel article publié dans la Base de connaissances : " + saved.getTitle(), saved);
         return toArticleResponse(saved);
     }
 
@@ -267,7 +267,7 @@ public class KnowledgeService {
         if (request.sortOrder() != null) article.setSortOrder(request.sortOrder());
 
         articleRepository.save(article);
-        notifyUpdate("Article mis à jour dans la Base de connaissances : " + article.getTitle());
+        notifyArticle("Article mis à jour dans la Base de connaissances : " + article.getTitle(), article);
         return toArticleResponse(article);
     }
 
@@ -305,8 +305,7 @@ public class KnowledgeService {
                 .contentHtml("<p>Dossier de fichiers — voir les pièces jointes.</p>")
                 .sortOrder(0).createdByUserId(createdByUserId)
                 .build());
-        notifyUpdate("Nouveau dossier de fichiers dans la Base de connaissances : " + saved.getTitle(),
-                "OPEN_KB_ARTICLE", String.valueOf(saved.getArticleId()));
+        notifyArticle("Nouveau dossier de fichiers dans la Base de connaissances : " + saved.getTitle(), saved);
         return saved;
     }
 
@@ -324,18 +323,20 @@ public class KnowledgeService {
     }
 
     /** Diffusion globale (TargetUserId=null, visible par tous) — chaque agent voit l'alerte de mise à jour. */
-    private void notifyUpdate(String content) {
-        notifyUpdate(content, null, null);
-    }
+    /** Profils qui consultent la Base de connaissances pour répondre aux clients (pas ceux qui la rédigent). */
+    static final String KB_AUDIENCE_ROLES = "AGENT,TEAM_LEADER,SUPERVISOR,FORMATEUR";
 
-    /** Notification avec une action réelle attachée — cliquer dessus ouvre directement l'élément concerné, plutôt que de laisser deviner. */
-    private void notifyUpdate(String content, String actionType, String actionTarget) {
+    /** Notification ciblée : seulement la filiale (et le service) de l'article, et les profils qui l'utilisent. */
+    private void notifyArticle(String content, KnowledgeArticle article) {
         notificationRepository.save(RccNotification.builder()
                 .targetUser(null)
-                .content(content)
+                .content(content.length() > 500 ? content.substring(0, 497) + "…" : content)
                 .isRead(false)
-                .actionType(actionType)
-                .actionTarget(actionTarget)
+                .actionType("OPEN_KB_ARTICLE")
+                .actionTarget(String.valueOf(article.getArticleId()))
+                .audienceCountry(article.getCountry() != null ? article.getCountry().getCountryCode() : null)
+                .audienceServiceCode(article.getService() != null ? article.getService().getCode() : null)
+                .audienceRoles(KB_AUDIENCE_ROLES)
                 .build());
     }
 

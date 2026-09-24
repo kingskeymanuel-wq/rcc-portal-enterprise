@@ -364,6 +364,7 @@ public class ScheduleService {
 
             User user = usersByNormalizedName.get(normalizeName(name));
             boolean isNew = false;
+            if (user == null) user = com.ecobank.rccportal.util.PersonNames.findUnique(name, usersByNormalizedName.values(), User::getName);
             if (user == null) {
                 if (importIntelligenceService.isAvailable() && !usersByNormalizedName.isEmpty()) {
                     List<String> candidates = usersByNormalizedName.values().stream()

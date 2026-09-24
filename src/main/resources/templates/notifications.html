@@ -25,6 +25,14 @@
 
                 <div class="card dashboard-card shadow-sm">
                     <div class="card-body">
+                        <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
+                            <div class="btn-group btn-group-sm" role="group" aria-label="Filtre">
+                                <button type="button" class="btn btn-outline-secondary active" data-notif-filter="all">Toutes</button>
+                                <button type="button" class="btn btn-outline-secondary" data-notif-filter="unread">Non lues <span id="notifUnreadCount" class="badge bg-primary ms-1">0</span></button>
+                            </div>
+                            <button type="button" id="notifReadAllBtn" class="btn btn-sm btn-primary"><i class="bi bi-check2-all me-1"></i>Tout marquer comme lu</button>
+                        </div>
+                        <p class="small text-muted mb-2"><i class="bi bi-funnel me-1"></i>Vous ne recevez que les notifications qui vous concernent : votre profil, votre filiale et vos services.</p>
                         <div id="notificationsList" class="list-group list-group-flush">
                             <p class="text-muted text-center">Chargement…</p>
                         </div>

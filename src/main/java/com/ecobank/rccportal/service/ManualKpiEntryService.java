@@ -1092,6 +1092,8 @@ public class ManualKpiEntryService {
         String normalized = normalizeName(cellValue);
         User existing = ctx.usersByNormalizedName.get(normalized);
         if (existing != null) return linkToTeamIfMissing(existing, ctx);
+        User similar = com.ecobank.rccportal.util.PersonNames.findUnique(cellValue, ctx.usersByNormalizedName.values(), User::getName);
+        if (similar != null) return linkToTeamIfMissing(similar, ctx);
 
         if (importIntelligenceService.isAvailable() && !ctx.usersByNormalizedName.isEmpty()) {
             List<String> candidateNames = ctx.usersByNormalizedName.values().stream()

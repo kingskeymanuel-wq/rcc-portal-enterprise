@@ -213,15 +213,41 @@ public class UserDeduplicationService {
         }
 
         User keep = pickKeeper(users);
-        List<Long> duplicateIds = new ArrayList<>();
-        for (User u : users) {
-            if (!u.getId().equals(keep.getId())) duplicateIds.add(u.getId());
-        }
+        List<User> dups = users.stream().filter(u -> !u.getId().equals(keep.getId())).toList();
+        MergeCounts counts = mergeInto(keep, dups);
+        List<Long> duplicateIds = dups.stream().map(User::getId).toList();
+        log.warn("⚠ [FUSION UTILISATEURS] {} — fiches fusionnées {} vers la fiche {} conservée ({} lignes réassignées, {} doublons supprimés en amont).",
+                username, duplicateIds, keep.getId(), counts.reassigned(), counts.dedupedAway());
+        return new UserMergeResultResponse(username, keep.getId(), duplicateIds, counts.reassigned(), counts.dedupedAway());
+    }
 
+    public record MergeCounts(int reassigned, int dedupedAway, List<String> warnings) {}
+
+    /**
+     * Fusionne des fiches d'une MÊME personne (identifiants différents possibles) dans la fiche
+     * gardée : tout l'historique est réassigné, les champs manquants complétés, les fiches en
+     * trop supprimées. Utilisé par la fusion par identifiant ET par la fusion des doublons de
+     * nom (UserDuplicateService). En plus de la liste connue REFERENCE_COLUMNS, les autres
+     * colonnes …UserId de la base (tables ajoutées depuis) et les colonnes …Username sont
+     * découvertes et traitées — aucune donnée orpheline.
+     */
+    @Transactional
+    public MergeCounts mergeInto(User keep, List<User> dups) {
         int reassigned = 0;
         int dedupedAway = 0;
+        List<String> warnings = new ArrayList<>();
+        java.util.Set<String> known = new java.util.HashSet<>();
+        for (String[] ref : REFERENCE_COLUMNS) known.add((ref[0] + "." + ref[1]).toLowerCase());
+        known.add((USER_PROFILE_TABLE + "." + USER_PROFILE_USER_COL).toLowerCase());
+        List<String[]> extraIdColumns = discover("SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'dbo' "
+                + "AND TABLE_NAME <> 'USERS' AND DATA_TYPE IN ('int','bigint') AND (COLUMN_NAME LIKE '%UserId' OR COLUMN_NAME IN ('USER_ID','USERS_ID'))")
+                .stream().filter(c -> !known.contains((c[0] + "." + c[1]).toLowerCase())).toList();
+        List<String[]> usernameColumns = discover("SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'dbo' "
+                + "AND TABLE_NAME <> 'USERS' AND DATA_TYPE IN ('nvarchar','varchar') AND (COLUMN_NAME LIKE '%Username' OR COLUMN_NAME = 'USERNAME')");
 
-        for (Long dupId : duplicateIds) {
+        for (User dup : dups) {
+            Long dupId = dup.getId();
+            if (dupId == null || dupId.equals(keep.getId())) continue;
             // 1) Tables à contrainte unique composite : supprime d'abord les lignes du doublon
             //    qui entreraient en conflit avec une ligne déjà présente côté fiche gardée.
             for (String[] spec : UNIQUE_TABLES) {
@@ -231,22 +257,20 @@ public class UserDeduplicationService {
                         "INNER JOIN " + table + " k ON k." + userCol + " = ? AND " +
                         buildJoinConditions(otherCols, "d", "k") +
                         " WHERE d." + userCol + " = ?";
-                int deleted = jdbcTemplate.update(sql, keep.getId(), dupId);
-                dedupedAway += deleted;
+                dedupedAway += safeUpdate(sql, warnings, keep.getId(), dupId);
             }
 
-            // 1bis) UserProfiles : contrainte unique simple sur UserId (pas composite, voir
-            //       USER_PROFILE_TABLE). Si la fiche gardée a déjà un profil, celui du doublon
-            //       est supprimé plutôt que réassigné (conflit sinon) ; ce n'est pas une perte
-            //       de donnée utilisateur — juste des préférences d'affichage recréables.
-            //       COUNT(*) plutôt qu'un CASE WHEN...THEN 1 ELSE 0 mappé en Boolean : SQL
-            //       Server n'a pas de type booléen natif pour un littéral entier, un mapping
-            //       direct en Boolean.class n'est pas fiable selon le driver JDBC.
+            // 1bis) UserProfiles : contrainte unique simple sur UserId. Si la fiche gardée a
+            //       déjà un profil, on lui recopie ce qui lui manque puis on supprime celui du doublon.
             Integer profileCount = jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM " + USER_PROFILE_TABLE + " WHERE " + USER_PROFILE_USER_COL + " = ?",
                     Integer.class, keep.getId());
             boolean keepHasProfile = profileCount != null && profileCount > 0;
             if (keepHasProfile) {
+                safeUpdate("UPDATE k SET k.PhotoUrl = COALESCE(NULLIF(k.PhotoUrl, ''), d.PhotoUrl), k.Phone = COALESCE(NULLIF(k.Phone, ''), d.Phone), "
+                        + "k.Bio = COALESCE(NULLIF(k.Bio, ''), d.Bio), k.Birthdate = COALESCE(k.Birthdate, d.Birthdate) "
+                        + "FROM " + USER_PROFILE_TABLE + " k JOIN " + USER_PROFILE_TABLE + " d ON d." + USER_PROFILE_USER_COL + " = ? "
+                        + "WHERE k." + USER_PROFILE_USER_COL + " = ?", warnings, dupId, keep.getId());
                 dedupedAway += jdbcTemplate.update(
                         "DELETE FROM " + USER_PROFILE_TABLE + " WHERE " + USER_PROFILE_USER_COL + " = ?", dupId);
             } else {
@@ -255,33 +279,56 @@ public class UserDeduplicationService {
                         keep.getId(), dupId);
             }
 
-            // 2) Toutes les colonnes connues référençant USERS.ID : réassigne ce qui reste du
-            //    doublon vers la fiche gardée.
+            // 2) Toutes les colonnes connues référençant USERS.ID.
             for (String[] ref : REFERENCE_COLUMNS) {
-                String table = ref[0], col = ref[1];
-                String sql = "UPDATE " + table + " SET " + col + " = ? WHERE " + col + " = ?";
-                reassigned += jdbcTemplate.update(sql, keep.getId(), dupId);
+                reassigned += safeUpdate("UPDATE " + ref[0] + " SET " + ref[1] + " = ? WHERE " + ref[1] + " = ?", warnings, keep.getId(), dupId);
             }
-        }
-
-        // 3) Fusionne les champs USERS eux-mêmes : la fiche gardée récupère tout champ qu'elle
-        //    n'a pas mais qu'une fiche en doublon avait (ne remplace jamais un champ déjà
-        //    rempli côté fiche gardée — c'est la fiche la plus complète, on ne veut pas régresser).
-        for (User dup : users) {
-            if (dup.getId().equals(keep.getId())) continue;
+            // 2bis) Colonnes découvertes dans la base (tables plus récentes que la liste) :
+            //       réassignation, ou suppression de la ligne en conflit si elle ferait double emploi.
+            for (String[] ref : extraIdColumns) {
+                String t = "dbo.[" + ref[0] + "]", c = "[" + ref[1] + "]";
+                try {
+                    reassigned += jdbcTemplate.update("UPDATE " + t + " SET " + c + " = ? WHERE " + c + " = ?", keep.getId(), dupId);
+                } catch (RuntimeException conflict) {
+                    dedupedAway += safeUpdate("DELETE FROM " + t + " WHERE " + c + " = ?", warnings, dupId);
+                }
+            }
+            // 2ter) Colonnes qui mémorisent l'identifiant de connexion (…Username).
+            if (dup.getUsername() != null && keep.getUsername() != null && !dup.getUsername().equalsIgnoreCase(keep.getUsername())) {
+                for (String[] ref : usernameColumns) {
+                    reassigned += safeUpdate("UPDATE dbo.[" + ref[0] + "] SET [" + ref[1] + "] = ? WHERE [" + ref[1] + "] = ?",
+                            warnings, keep.getUsername(), dup.getUsername());
+                }
+            }
+            // 3) Champs USERS manquants côté fiche gardée.
             mergeMissingFields(keep, dup);
         }
         userRepository.save(keep);
 
-        // 4) Supprime les fiches devenues vides (tout leur historique a été réassigné à l'étape 2).
-        for (Long dupId : duplicateIds) {
-            userRepository.deleteById(dupId);
+        // 4) Supprime les fiches devenues vides.
+        for (User dup : dups) {
+            if (dup.getId() != null && !dup.getId().equals(keep.getId())) userRepository.deleteById(dup.getId());
         }
+        return new MergeCounts(reassigned, dedupedAway, warnings);
+    }
 
-        log.warn("⚠ [FUSION UTILISATEURS] {} — fiches fusionnées {} vers la fiche {} conservée ({} lignes réassignées, {} doublons supprimés en amont).",
-                username, duplicateIds, keep.getId(), reassigned, dedupedAway);
+    private int safeUpdate(String sql, List<String> warnings, Object... args) {
+        try {
+            return jdbcTemplate.update(sql, args);
+        } catch (RuntimeException e) {
+            String m = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            warnings.add(m.length() > 160 ? m.substring(0, 160) + "…" : m);
+            return 0;
+        }
+    }
 
-        return new UserMergeResultResponse(username, keep.getId(), duplicateIds, reassigned, dedupedAway);
+    private List<String[]> discover(String sql) {
+        try {
+            return jdbcTemplate.query(sql, (rs, i) -> new String[]{rs.getString(1), rs.getString(2)});
+        } catch (RuntimeException e) {
+            log.warn("[FUSION UTILISATEURS] Lecture du schéma impossible : {}", e.getMessage());
+            return List.of();
+        }
     }
 
     private String buildJoinConditions(String[] cols, String alias1, String alias2) {

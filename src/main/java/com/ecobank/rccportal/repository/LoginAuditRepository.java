@@ -12,6 +12,8 @@ public interface LoginAuditRepository extends JpaRepository<LoginAudit, Integer>
 
     List<LoginAudit> findTop10ByOrderByOccurredAtDesc();
 
+    boolean existsByUser_Id(Long userId);
+
     List<LoginAudit> findAllByOrderByOccurredAtDesc(Pageable pageable);
 
 }

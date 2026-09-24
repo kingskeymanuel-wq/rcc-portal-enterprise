@@ -171,8 +171,13 @@ public class MonRccController {
 
     @PostMapping("/notifications/{id}/read")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void markNotificationRead(@PathVariable Integer id) {
-        monRccService.markNotificationRead(id);
+    public void markNotificationRead(@PathVariable Integer id, @AuthenticationPrincipal AuthenticatedUser requester) {
+        monRccService.markNotificationRead(id, requester);
+    }
+
+    @PostMapping("/notifications/read-all")
+    public java.util.Map<String, Integer> markAllNotificationsRead(@AuthenticationPrincipal AuthenticatedUser requester) {
+        return java.util.Map.of("marked", monRccService.markAllRead(requester));
     }
 
     @PostMapping("/notifications")

@@ -551,6 +551,18 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         addColumnIfMissing("USERS", "ROLE_DETAIL", "ALTER TABLE dbo.USERS ADD ROLE_DETAIL NVARCHAR(150) NULL");
         addColumnIfMissing("RccNotifications", "ActionType", "ALTER TABLE dbo.RccNotifications ADD ActionType NVARCHAR(50) NULL");
         addColumnIfMissing("RccNotifications", "ActionTarget", "ALTER TABLE dbo.RccNotifications ADD ActionTarget NVARCHAR(100) NULL");
+        // Ciblage des notifications communes (« chaque portail sa notification ») + lecture individuelle.
+        addColumnIfMissing("RccNotifications", "AudienceCountry", "ALTER TABLE dbo.RccNotifications ADD AudienceCountry NVARCHAR(3) NULL");
+        addColumnIfMissing("RccNotifications", "AudienceRoles", "ALTER TABLE dbo.RccNotifications ADD AudienceRoles NVARCHAR(200) NULL");
+        addColumnIfMissing("RccNotifications", "AudienceServiceCode", "ALTER TABLE dbo.RccNotifications ADD AudienceServiceCode NVARCHAR(50) NULL");
+        createIfMissing("RccNotificationReads", """
+                CREATE TABLE dbo.RccNotificationReads (
+                    NotificationId INT NOT NULL,
+                    UserId BIGINT NOT NULL,
+                    ReadAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    CONSTRAINT PK_RccNotificationReads PRIMARY KEY (NotificationId, UserId)
+                )
+                """);
 
         createIfMissing("SiteSettings", """
                 CREATE TABLE dbo.SiteSettings (

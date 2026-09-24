@@ -52,6 +52,32 @@ public class UserDeduplicationController {
         return Map.of("status", "locked");
     }
 
+    // ── Même personne, identifiants différents (« MOKE CARMELA » / « MOKE Marie Carmella (2°) ») ──
+
+    private com.ecobank.rccportal.service.UserDuplicateService people;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setPeople(com.ecobank.rccportal.service.UserDuplicateService people) {
+        this.people = people;
+    }
+
+    @GetMapping("/people")
+    public List<com.ecobank.rccportal.service.UserDuplicateService.Group> peopleGroups(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return people.findGroups();
+    }
+
+    @PostMapping("/people/merge")
+    public com.ecobank.rccportal.service.UserDuplicateService.MergeResult mergePeople(@RequestBody Map<String, Object> body,
+                                                                                    @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        Object main = body.get("mainId");
+        Object dups = body.get("duplicateIds");
+        if (!(main instanceof Number) || !(dups instanceof List<?> list)) throw ApiException.badRequest("mainId et duplicateIds sont requis.");
+        List<Long> ids = list.stream().filter(Number.class::isInstance).map(x -> ((Number) x).longValue()).toList();
+        return people.merge(((Number) main).longValue(), ids);
+    }
+
     private void requireAdmin(AuthenticatedUser requester) {
         if (requester == null || !"admin".equalsIgnoreCase(requester.role())) {
             throw ApiException.forbidden("Seul un administrateur peut nettoyer les comptes en doublon.");

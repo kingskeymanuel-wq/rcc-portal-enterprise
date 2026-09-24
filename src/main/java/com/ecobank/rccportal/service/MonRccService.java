@@ -335,33 +335,150 @@ public class MonRccService {
             "COMPETITION_TEAM_SELECTION", Set.of("TEAM_LEADER")
     );
 
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private com.ecobank.rccportal.repository.KnowledgeArticleRepository articleRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setNotificationSupport(org.springframework.jdbc.core.JdbcTemplate jdbc,
+                                com.ecobank.rccportal.repository.KnowledgeArticleRepository articleRepository) {
+        this.jdbc = jdbc;
+        this.articleRepository = articleRepository;
+    }
+
+    /** Profils par défaut des notifications communes de la Base de connaissances (anciennes, sans ciblage enregistré). */
+    private static final Set<String> KB_DEFAULT_ROLES = Set.of("AGENT", "TEAM_LEADER", "SUPERVISOR", "FORMATEUR");
+
+    private static final Map<String, String> ISO3_TO_ISO2 = new java.util.HashMap<>();
+    static {
+        for (String iso2 : java.util.Locale.getISOCountries()) {
+            try { ISO3_TO_ISO2.put(new java.util.Locale("", iso2).getISO3Country().toUpperCase(), iso2); } catch (Exception ignored) { /* code sans ISO3 */ }
+        }
+    }
+
+    /** « CIV », « ci », « CI » → « CI ». */
+    static String country2(String code) {
+        if (code == null || code.isBlank()) return null;
+        String c = code.trim().toUpperCase();
+        if (c.length() == 3) return ISO3_TO_ISO2.getOrDefault(c, c);
+        return c;
+    }
+
+    /**
+     * Les notifications de l'utilisateur : ses notifications personnelles + les notifications
+     * communes QUI LE CONCERNENT (« chaque portail sa notification ») — bon profil, bonne filiale,
+     * bon service. Une notification commune dont on n'est pas la cible n'est jamais montrée.
+     */
     @Transactional(readOnly = true)
     public List<RccNotificationResponse> myNotifications(AuthenticatedUser requester) {
         User me = userRepository.findFirstByUsernameIgnoreCase(requester.username())
                 .orElseThrow(() -> ApiException.unauthorized("Unknown user."));
         String myRole = requester.role() != null ? requester.role().toUpperCase() : "";
+        boolean qa = isQualityAssurance(requester);
+        String myCountry = country2(me.getAffiliateBranch());
+        List<RccNotification> all = notificationRepository.findForUserOrGlobal(me);
 
-        return notificationRepository.findForUserOrGlobal(me).stream()
-                .filter(n -> {
-                    if (n.getTargetUser() != null) return true; // notification personnelle — jamais filtrée par rôle
-                    // Map.of(...) lève toujours NPE sur une clé null (contrairement à HashMap) — or
-                    // actionType reste null par défaut sur toute notification créée sans .actionType(...)
-                    // explicite (ex. MonRccService.createGlobalNotification, annonces "signaler" sans
-                    // ciblage). On sécurise l'appel plutôt que d'imposer actionType partout.
-                    String actionType = n.getActionType();
-                    if (actionType == null) return true; // pas de restriction de rôle définie — visible par tous, comme avant
-                    Set<String> allowedRoles = GLOBAL_NOTIFICATION_ROLES.get(actionType);
-                    return allowedRoles == null || allowedRoles.contains(myRole);
-                })
-                .map(this::toResponse).toList();
+        // Filiale des anciennes notifications de la Base de connaissances (créées sans ciblage).
+        Map<Integer, String> legacyKbCountry = new java.util.HashMap<>();
+        Map<Integer, String> legacyKbService = new java.util.HashMap<>();
+        if (articleRepository != null) {
+            List<Integer> ids = all.stream()
+                    .filter(n -> n.getTargetUser() == null && "OPEN_KB_ARTICLE".equals(n.getActionType()) && n.getAudienceCountry() == null && n.getAudienceRoles() == null)
+                    .map(n -> { try { return Integer.valueOf(n.getActionTarget()); } catch (Exception e) { return null; } })
+                    .filter(java.util.Objects::nonNull).distinct().toList();
+            if (!ids.isEmpty()) {
+                articleRepository.findAllById(ids).forEach(a -> {
+                    legacyKbCountry.put(a.getArticleId(), a.getCountry() != null ? a.getCountry().getCountryCode() : "");
+                    legacyKbService.put(a.getArticleId(), a.getService() != null ? a.getService().getCode() : "");
+                });
+            }
+        }
+        Set<String> myServices = null; // chargé seulement si une notification est ciblée par service
+        Set<Integer> readIds = readGlobalIds(me);
+
+        List<RccNotificationResponse> out = new java.util.ArrayList<>();
+        for (RccNotification n : all) {
+            if (n.getTargetUser() != null) { out.add(toResponse(n)); continue; } // personnelle : toujours à son destinataire
+            if (!rolesAllow(n, myRole, qa)) continue;
+
+            String country = n.getAudienceCountry();
+            String service = n.getAudienceServiceCode();
+            if (country == null && n.getAudienceRoles() == null && "OPEN_KB_ARTICLE".equals(n.getActionType())) {
+                // Ancienne notification KB sans ciblage : on retrouve la filiale et le service de l'article.
+                Integer id = null;
+                try { id = Integer.valueOf(n.getActionTarget()); } catch (Exception ignored) { /* cible non numérique */ }
+                if (id == null || !legacyKbCountry.containsKey(id)) continue; // article supprimé : plus rien à ouvrir
+                country = legacyKbCountry.get(id).isEmpty() ? null : legacyKbCountry.get(id);
+                service = legacyKbService.get(id).isEmpty() ? null : legacyKbService.get(id);
+            }
+            if (country != null && !country.equalsIgnoreCase(myCountry)) continue;
+            if (service != null) {
+                if (myServices == null) {
+                    myServices = new java.util.HashSet<>();
+                    for (var a : userServiceAssignmentRepository.findServicesByUserId(me.getId())) {
+                        if (a.getService() != null && a.getService().getCode() != null) myServices.add(a.getService().getCode().toUpperCase());
+                    }
+                }
+                if (!myServices.contains(service.toUpperCase())) continue;
+            }
+            RccNotificationResponse r = toResponse(n);
+            out.add(new RccNotificationResponse(r.id(), r.content(), readIds.contains(n.getNotificationId()), r.createdAt(), r.actionType(), r.actionTarget()));
+        }
+        return out;
+    }
+
+    private boolean rolesAllow(RccNotification n, String myRole, boolean qa) {
+        String myProfile = qa && ("AGENT".equals(myRole) || myRole.isEmpty()) ? "QA" : myRole;
+        if (n.getAudienceRoles() != null && !n.getAudienceRoles().isBlank()) {
+            for (String r : n.getAudienceRoles().split(",")) if (r.trim().equalsIgnoreCase(myProfile)) return true;
+            return false;
+        }
+        String actionType = n.getActionType();
+        if (actionType == null) return true; // annonce générale sans restriction (diffusion admin/QA)
+        if ("OPEN_KB_ARTICLE".equals(actionType)) return KB_DEFAULT_ROLES.contains(myProfile);
+        Set<String> allowedRoles = GLOBAL_NOTIFICATION_ROLES.get(actionType);
+        return allowedRoles == null || allowedRoles.contains(myRole);
+    }
+
+    private Set<Integer> readGlobalIds(User me) {
+        if (jdbc == null) return Set.of();
+        try {
+            return new java.util.HashSet<>(jdbc.queryForList("SELECT NotificationId FROM dbo.RccNotificationReads WHERE UserId = ?", Integer.class, me.getId()));
+        } catch (RuntimeException e) {
+            return Set.of(); // table pas encore créée
+        }
+    }
+
+    /** Lecture individuelle : une notification commune lue par l'un reste non lue pour les autres. */
+    @Transactional
+    public void markNotificationRead(Integer id, AuthenticatedUser requester) {
+        RccNotification notification = notificationRepository.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Notification not found."));
+        if (notification.getTargetUser() == null && requester != null && jdbc != null) {
+            User me = userRepository.findFirstByUsernameIgnoreCase(requester.username())
+                    .orElseThrow(() -> ApiException.unauthorized("Unknown user."));
+            jdbc.update("IF NOT EXISTS (SELECT 1 FROM dbo.RccNotificationReads WHERE NotificationId = ? AND UserId = ?) "
+                    + "INSERT INTO dbo.RccNotificationReads (NotificationId, UserId) VALUES (?, ?)", id, me.getId(), id, me.getId());
+            return;
+        }
+        notification.setIsRead(true);
+        notificationRepository.save(notification);
+    }
+
+    /** « Tout marquer comme lu » — uniquement ce que l'utilisateur voit. */
+    @Transactional
+    public int markAllRead(AuthenticatedUser requester) {
+        int count = 0;
+        for (RccNotificationResponse r : myNotifications(requester)) {
+            if (r.isRead()) continue;
+            markNotificationRead(r.id(), requester);
+            count++;
+        }
+        return count;
     }
 
     @Transactional
     public void markNotificationRead(Integer id) {
-        RccNotification notification = notificationRepository.findById(id)
-                .orElseThrow(() -> ApiException.notFound("Notification not found."));
-        notification.setIsRead(true);
-        notificationRepository.save(notification);
+        markNotificationRead(id, null);
     }
 
     /** Diffuse une notification globale (targetUser = null) — ex. "signaler" une publication à tous. */

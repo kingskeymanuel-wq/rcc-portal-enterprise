@@ -1068,37 +1068,81 @@
             .catch(function (e) { alert("Erreur : " + e.message); });
     }
 
+    /** Doublons d'agents — MÊME PERSONNE sous des identifiants différents (« MOKE CARMELA »,
+     *  « MOKE Marie Carmella (2°) »…) : même e-mail, ou nom identique/très proche. L'admin choisit
+     *  le compte gardé et coche les doublons ; la fusion déplace tout l'historique puis supprime
+     *  les comptes en trop en base (/api/admin/user-deduplication/people). */
     function wireFindDuplicatesButton() {
         var btn = document.getElementById("findDuplicatesBtn");
         if (!btn) return;
         if (currentProfile !== "ADMIN") { btn.closest(".card").style.display = "none"; return; }
+        btn.addEventListener("click", loadPeopleDuplicates);
+    }
 
-        btn.addEventListener("click", function () {
-            var box = document.getElementById("duplicatesResult");
-            box.innerHTML = '<p class="text-muted small mb-0">Recherche…</p>';
-            getJson("/api/admin/users/duplicates")
-                .then(function (groups) {
-                    if (!groups.length) {
-                        box.innerHTML = '<p class="text-success small mb-0"><i class="bi bi-check-circle"></i> Aucun doublon détecté.</p>';
-                        return;
-                    }
-                    box.innerHTML = groups.map(function (group) {
-                        return '<div class="border rounded p-2 mb-2"><b>' + escapeHtml(group[0].fullName) + '</b> — ' + group.length + ' comptes<ul class="mb-0 mt-1">' +
-                            group.map(function (u) {
-                                return '<li><a href="#" class="dup-open-user" data-id="' + u.id + '">' + escapeHtml(u.username) +
-                                    '</a> — ' + escapeHtml(u.affiliateBranch || "—") + ' · ' + escapeHtml(u.activity || "Non classée") +
-                                    (u.active ? "" : ' <span class="badge bg-secondary">Désactivé</span>') + '</li>';
-                            }).join("") + '</ul></div>';
+    function loadPeopleDuplicates() {
+        var box = document.getElementById("duplicatesResult");
+        box.innerHTML = '<p class="text-muted small mb-0"><span class="spinner-border spinner-border-sm"></span> Recherche des doublons…</p>';
+        getJson("/api/admin/user-deduplication/people")
+            .then(function (groups) {
+                if (!groups.length) {
+                    box.innerHTML = '<p class="text-success small mb-0"><i class="bi bi-check-circle"></i> Aucun doublon d\'agent détecté.</p>';
+                    return;
+                }
+                box.innerHTML = '<p class="small mb-2"><b>' + groups.length + ' groupe(s)</b> — vérifiez chaque groupe : le compte <b>gardé</b> est présélectionné (celui qui a une vraie équipe), ' +
+                    'décochez une ligne qui ne serait pas la même personne.</p>' +
+                    groups.map(function (g, gi) {
+                        return '<div class="dup-group border rounded-3 p-2 mb-2" data-g="' + gi + '">' +
+                            '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">' +
+                            '<b>' + escapeHtml(g.members[0].name || g.members[0].username) + '</b>' +
+                            '<span class="badge text-bg-light border">' + escapeHtml(g.reason) + ' · ' + g.members.length + ' comptes</span></div>' +
+                            '<table class="table table-sm align-middle mb-2"><thead><tr><th>Gardé</th><th>Fusionner</th><th>Compte</th><th>Équipe</th><th>E-mail</th></tr></thead><tbody>' +
+                            g.members.map(function (m) {
+                                return '<tr><td><input type="radio" name="dupMain' + gi + '" value="' + m.id + '"' + (m.main ? " checked" : "") + '></td>' +
+                                    '<td><input type="checkbox" class="dup-merge" value="' + m.id + '"' + (m.main ? "" : " checked") + '></td>' +
+                                    '<td><a href="#" class="dup-open-user" data-id="' + m.id + '">' + escapeHtml(m.name || "—") + '</a> <span class="text-muted">(' + escapeHtml(m.username) + ')</span>' +
+                                    (m.active ? "" : ' <span class="badge bg-secondary">Désactivé</span>') + '</td>' +
+                                    '<td>' + escapeHtml(m.team || "—") + '</td><td class="small">' + escapeHtml(m.email || "—") + '</td></tr>';
+                            }).join("") + '</tbody></table>' +
+                            '<div class="d-flex justify-content-end"><button class="btn btn-sm btn-danger dup-merge-btn" data-g="' + gi + '"><i class="bi bi-arrow-down-up"></i> Fusionner ce groupe</button></div>' +
+                            '</div>';
                     }).join("");
-                    Array.prototype.forEach.call(box.querySelectorAll(".dup-open-user"), function (link) {
-                        link.addEventListener("click", function (e) {
-                            e.preventDefault();
-                            openUserDetail(Number(link.getAttribute("data-id")));
+                Array.prototype.forEach.call(box.querySelectorAll(".dup-group"), function (el) {
+                    // Le compte gardé ne peut pas être aussi « à fusionner ».
+                    Array.prototype.forEach.call(el.querySelectorAll('input[type=radio]'), function (r) {
+                        r.addEventListener("change", function () {
+                            Array.prototype.forEach.call(el.querySelectorAll(".dup-merge"), function (c) {
+                                if (c.value === r.value) c.checked = false;
+                                c.disabled = c.value === r.value;
+                            });
                         });
+                        if (r.checked) r.dispatchEvent(new Event("change"));
                     });
-                })
-                .catch(function (e) { box.innerHTML = '<p class="text-danger small mb-0">Erreur : ' + e.message + '</p>'; });
-        });
+                });
+                Array.prototype.forEach.call(box.querySelectorAll(".dup-open-user"), function (link) {
+                    link.addEventListener("click", function (e) { e.preventDefault(); openUserDetail(Number(link.getAttribute("data-id"))); });
+                });
+                Array.prototype.forEach.call(box.querySelectorAll(".dup-merge-btn"), function (mb) {
+                    mb.addEventListener("click", function () {
+                        var el = box.querySelector('.dup-group[data-g="' + mb.getAttribute("data-g") + '"]');
+                        var main = el.querySelector("input[type=radio]:checked");
+                        var dups = Array.prototype.filter.call(el.querySelectorAll(".dup-merge:checked"), function (c) { return !c.disabled; })
+                            .map(function (c) { return Number(c.value); });
+                        if (!main || !dups.length) { alert("Choisissez le compte gardé et au moins un doublon."); return; }
+                        if (!confirm("Fusionner " + dups.length + " compte(s) dans le compte gardé ? Tout leur historique (pointages, plannings, KPI, évaluations, demandes, messages…) " +
+                            "est transféré, puis les comptes en trop sont SUPPRIMÉS de la base. Action irréversible.")) return;
+                        mb.disabled = true;
+                        sendJson("/api/admin/user-deduplication/people/merge", "POST", { mainId: Number(main.value), duplicateIds: dups })
+                            .then(function (r) {
+                                alert("Fusion effectuée dans « " + r.mainUsername + " » : " + r.merged.join(", ") + " — " + r.rowsReassigned + " ligne(s) d'historique transférée(s)." +
+                                    (r.warnings && r.warnings.length ? "\n\nRemarques :\n- " + r.warnings.slice(0, 5).join("\n- ") : ""));
+                                loadPeopleDuplicates();
+                                loadUsers();
+                            })
+                            .catch(function (e) { mb.disabled = false; alert("Erreur lors de la fusion : " + e.message); });
+                    });
+                });
+            })
+            .catch(function (e) { box.innerHTML = '<p class="text-danger small mb-0">Erreur : ' + escapeHtml(e.message) + '</p>'; });
     }
 
     document.addEventListener("DOMContentLoaded", init);
