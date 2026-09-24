@@ -39,8 +39,31 @@ public class MailTemplateService {
         this.userRepository = userRepository;
     }
 
+    /**
+     * Masque PERSONNEL (créé par un agent, non système) : visible uniquement par son auteur.
+     * Les masques système (QA / escalades) restent communs à tous.
+     */
+    static boolean visibleTo(MailTemplate t, AuthenticatedUser requester) {
+        if (Boolean.TRUE.equals(t.getIsSystemTemplate())) return true;
+        String author = t.getCreatedBy() != null ? t.getCreatedBy().getUsername() : null;
+        if (author == null) return true; // ancien masque sans auteur connu : reste commun
+        return requester != null && requester.username() != null && requester.username().equalsIgnoreCase(author);
+    }
+
+    private MailTemplate findVisible(Integer id, AuthenticatedUser requester) {
+        MailTemplate template = mailTemplateRepository.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Mail template not found."));
+        if (!visibleTo(template, requester)) throw ApiException.notFound("Mail template not found.");
+        return template;
+    }
+
     @Transactional(readOnly = true)
     public MailTemplatesOverviewResponse listAll() {
+        return listAll(null);
+    }
+
+    @Transactional(readOnly = true)
+    public MailTemplatesOverviewResponse listAll(AuthenticatedUser requester) {
         var categories = categoryRepository.findAll().stream()
                 .sorted((a, b) -> a.getSortOrder().compareTo(b.getSortOrder()))
                 .map(c -> new MailTemplatesOverviewResponse.CategoryDto(c.getCategoryId(), c.getCode(), c.getLabel(),
@@ -51,6 +74,7 @@ public class MailTemplateService {
                 .map(g -> new MailTemplatesOverviewResponse.RecipientGroupDto(g.getGroupId(), g.getLabel(), g.getEmail()))
                 .toList();
         var templates = mailTemplateRepository.findAll().stream()
+                .filter(t -> visibleTo(t, requester))
                 .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
                 .map(this::toResponse)
                 .toList();
@@ -215,8 +239,14 @@ public class MailTemplateService {
     /** Balises [XXX] présentes dans le sujet + le corps — sert à générer le formulaire de saisie côté écran. */
     @Transactional(readOnly = true)
     public java.util.List<String> listPlaceholders(Integer id) {
-        MailTemplate template = mailTemplateRepository.findById(id)
-                .orElseThrow(() -> ApiException.notFound("Mail template not found."));
+        return listPlaceholders(id, null);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<String> listPlaceholders(Integer id, AuthenticatedUser requester) {
+        MailTemplate template = requester == null
+                ? mailTemplateRepository.findById(id).orElseThrow(() -> ApiException.notFound("Mail template not found."))
+                : findVisible(id, requester);
         java.util.LinkedHashSet<String> found = new java.util.LinkedHashSet<>();
         extractPlaceholders(template.getSubject(), found);
         extractPlaceholders(template.getBody(), found);
@@ -230,8 +260,14 @@ public class MailTemplateService {
      */
     @Transactional(readOnly = true)
     public com.ecobank.rccportal.dto.MailTemplateFillResponse fill(Integer id, java.util.Map<String, String> values) {
-        MailTemplate template = mailTemplateRepository.findById(id)
-                .orElseThrow(() -> ApiException.notFound("Mail template not found."));
+        return fill(id, values, null);
+    }
+
+    @Transactional(readOnly = true)
+    public com.ecobank.rccportal.dto.MailTemplateFillResponse fill(Integer id, java.util.Map<String, String> values, AuthenticatedUser requester) {
+        MailTemplate template = requester == null
+                ? mailTemplateRepository.findById(id).orElseThrow(() -> ApiException.notFound("Mail template not found."))
+                : findVisible(id, requester);
 
         java.util.Map<String, String> normalizedValues = new java.util.HashMap<>();
         if (values != null) {
@@ -243,7 +279,7 @@ public class MailTemplateService {
         String filledSubject = applyPlaceholders(template.getSubject(), normalizedValues);
         String filledBody = applyPlaceholders(template.getBody(), normalizedValues);
 
-        return new com.ecobank.rccportal.dto.MailTemplateFillResponse(filledSubject, filledBody, listPlaceholders(id));
+        return new com.ecobank.rccportal.dto.MailTemplateFillResponse(filledSubject, filledBody, listPlaceholders(id, requester));
     }
 
     private void extractPlaceholders(String text, java.util.Set<String> target) {

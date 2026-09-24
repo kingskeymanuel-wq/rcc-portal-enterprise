@@ -232,7 +232,7 @@
             : '<span class="mt-tag"><i class="bi bi-person"></i> Personne</span>');
         if (fields.length) tags.push('<span class="mt-tag mt-tag-blue"><i class="bi bi-input-cursor-text"></i> ' + plural(fields.length, "champ") + '</span>');
         if (!t.isSystemTemplate) tags.push('<span class="mt-tag mt-tag-green"><i class="bi bi-person-badge"></i> ' +
-            (mine ? "Personnel" : "Personnel" + (t.createdByUserId ? " · " + escapeHtml(t.createdByUserId) : "")) + '</span>');
+            (mine ? '<i class="bi bi-lock-fill"></i> Personnel · visible par vous seul' : "Personnel" + (t.createdByUserId ? " · " + escapeHtml(t.createdByUserId) : "")) + '</span>');
         return '<div class="mt-tpl" style="animation-delay:' + ((index || 0) * 40) + 'ms">' +
             '<div class="mt-tpl-top"><span class="mt-tpl-ic"><i class="bi bi-envelope"></i></span><div class="min-w-0">' +
             (query && cat ? '<div class="mt-tpl-cat">' + escapeHtml(cat.label) + '</div>' : "") +

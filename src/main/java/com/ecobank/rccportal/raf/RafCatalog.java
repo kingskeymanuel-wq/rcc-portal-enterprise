@@ -134,6 +134,8 @@ public class RafCatalog {
                         .map(c -> new CourseDoc(c.getCourseId(), c.getTitle(), c.getCategory(), c.getDescription()))
                         .toList()),
                 load("modèles de mail", () -> mailTemplateRepository.findAll().stream()
+                        // Catalogue partagé : jamais les masques personnels d'un agent (réservés à leur auteur).
+                        .filter(m -> Boolean.TRUE.equals(m.getIsSystemTemplate()) || m.getCreatedBy() == null)
                         .map(m -> new MailTemplateDoc(m.getTemplateId(), m.getSubject(), m.getBody(),
                                 m.getCategory() != null ? m.getCategory().getLabel() : null))
                         .toList()));

@@ -22,8 +22,8 @@ public class MailTemplateController {
     }
 
     @GetMapping
-    public MailTemplatesOverviewResponse listAll() {
-        return mailTemplateService.listAll();
+    public MailTemplatesOverviewResponse listAll(@AuthenticationPrincipal AuthenticatedUser requester) {
+        return mailTemplateService.listAll(requester);
     }
 
     @PostMapping
@@ -60,16 +60,17 @@ public class MailTemplateController {
         mailTemplateService.remove(id, requester);
     }
 
-    /** Balises [XXX] du masque — pour générer le formulaire "Coordonnées du client". Ouvert à tous (usage, pas édition). */
+    /** Balises [XXX] du masque — pour générer le formulaire "Coordonnées du client". Masque personnel : réservé à son auteur. */
     @GetMapping("/{id}/placeholders")
-    public java.util.List<String> placeholders(@PathVariable Integer id) {
-        return mailTemplateService.listPlaceholders(id);
+    public java.util.List<String> placeholders(@PathVariable Integer id, @AuthenticationPrincipal AuthenticatedUser requester) {
+        return mailTemplateService.listPlaceholders(id, requester);
     }
 
-    /** Remplissage automatique — ouvert à tous, c'est l'agent qui utilise le masque, pas seulement son auteur. */
+    /** Remplissage automatique — masques communs ouverts à tous, masque personnel réservé à son auteur. */
     @PostMapping("/{id}/fill")
     public com.ecobank.rccportal.dto.MailTemplateFillResponse fill(@PathVariable Integer id,
-                                                                    @RequestBody com.ecobank.rccportal.dto.MailTemplateFillRequest request) {
-        return mailTemplateService.fill(id, request.values());
+                                                                    @RequestBody com.ecobank.rccportal.dto.MailTemplateFillRequest request,
+                                                                    @AuthenticationPrincipal AuthenticatedUser requester) {
+        return mailTemplateService.fill(id, request.values(), requester);
     }
 }
