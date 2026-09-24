@@ -8,6 +8,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <link rel="stylesheet" th:href="@{/css/support-requests.css}">
+    <link rel="stylesheet" th:href="@{/css/workflow-tasks.css}">
     <style>
         .wf-tab-nav .btn.nav-link { border: none; border-bottom: 3px solid transparent; border-radius: 0; color: #6b7280; font-weight: 600; padding: .75rem 1.1rem; }
         .wf-tab-nav .btn.nav-link.active { color: #0057B8; border-bottom-color: #0057B8; background: transparent; }
@@ -497,74 +498,109 @@
 
                 <!-- ===================== TÂCHES & NOTES ===================== -->
                 <div id="wfPaneTasks" class="wf-tab-pane" style="display:none;">
+
+                    <section class="tk-hero mb-4">
+                        <div class="tk-hero-art" aria-hidden="true"><i class="bi bi-check2-square"></i><i class="bi bi-calendar2-check"></i><i class="bi bi-pin-angle-fill"></i><i class="bi bi-lightning-charge-fill"></i></div>
+                        <div class="tk-hero-copy">
+                            <span class="tk-eyebrow"><i class="bi bi-stars"></i> <span id="tkToday">Aujourd'hui</span></span>
+                            <h3 id="tkGreeting">Mes tâches &amp; notes</h3>
+                            <p id="tkHeroText">Organisez votre journée : notes rapides, tâches assignées, échéances et priorités.</p>
+                        </div>
+                        <div class="tk-ring" aria-label="Progression">
+                            <svg viewBox="0 0 120 120"><circle class="tk-ring-bg" cx="60" cy="60" r="50"></circle><circle class="tk-ring-fg" id="tkRingFg" cx="60" cy="60" r="50"></circle></svg>
+                            <div class="tk-ring-label"><strong id="tkRingPct">0%</strong><small>terminé</small></div>
+                        </div>
+                    </section>
+
+                    <div class="tk-stats mb-4">
+                        <div class="tk-stat tk-stat-open"><span class="tk-stat-ic"><i class="bi bi-list-task"></i></span><div><strong id="wfTaskStatOpen">0</strong><small>Ouvertes</small></div></div>
+                        <div class="tk-stat tk-stat-late"><span class="tk-stat-ic"><i class="bi bi-alarm"></i></span><div><strong id="wfTaskStatOverdue">0</strong><small>En retard</small></div></div>
+                        <div class="tk-stat tk-stat-done"><span class="tk-stat-ic"><i class="bi bi-check2-circle"></i></span><div><strong id="wfTaskStatDone">0</strong><small>Terminées</small></div></div>
+                    </div>
+
                     <div class="row g-4">
-                        <div class="col-lg-5 qa-only" style="display:none;">
-                            <div id="taskAssignCard" class="card dashboard-card shadow-sm mb-4">
-                                <div class="card-body">
-                                    <h5 class="card-title mb-3"><i class="bi bi-calendar-plus text-primary"></i> Programmer une tâche</h5>
-                                    <div class="row g-2 mb-2">
+                        <div class="col-xl-5 qa-only" style="display:none;">
+                            <div id="taskAssignCard" class="tk-card tk-assign">
+                                <div class="tk-card-head tk-card-head-grad">
+                                    <span class="tk-head-ic"><i class="bi bi-send-check"></i></span>
+                                    <div><h5>Programmer une tâche</h5><small>Notifiée par e-mail et dans le portail</small></div>
+                                </div>
+                                <div class="tk-card-body">
+                                    <label class="tk-label">Pour qui ?</label>
+                                    <div class="row g-2 mb-3">
                                         <div class="col-md-6">
-                                            <label class="form-label small">Équipe</label>
-                                            <select class="form-select form-select-sm" id="taskAssignTeam">
-                                                <option value="">— Moi-même —</option>
-                                            </select>
+                                            <div class="tk-select-ic"><i class="bi bi-people"></i>
+                                                <select class="form-select tk-input" id="taskAssignTeam"><option value="">— Moi-même —</option></select>
+                                            </div>
                                         </div>
                                         <div class="col-md-6">
-                                            <label class="form-label small">Individu (optionnel — sinon toute l'équipe)</label>
-                                            <select class="form-select form-select-sm" id="taskAssignIndividual">
-                                                <option value="">— Toute l'équipe —</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <input type="text" class="form-control form-control-sm mb-2" id="taskAssignTitle" placeholder="Titre de la tâche">
-                                    <textarea class="form-control form-control-sm mb-2" id="taskAssignDescription" rows="2" placeholder="Description (optionnel)"></textarea>
-                                    <div class="row g-2 align-items-end mb-2">
-                                        <div class="col-md-6">
-                                            <label class="form-label small">Échéance (optionnel)</label>
-                                            <input type="date" class="form-control form-control-sm" id="taskAssignDueDate">
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label small">Priorité</label>
-                                            <select class="form-select form-select-sm" id="taskAssignPriority">
-                                                <option value="LOW">Basse</option>
-                                                <option value="NORMAL" selected>Normale</option>
-                                                <option value="HIGH">Haute</option>
-                                            </select>
+                                            <div class="tk-select-ic"><i class="bi bi-person"></i>
+                                                <select class="form-select tk-input" id="taskAssignIndividual"><option value="">— Toute l'équipe —</option></select>
+                                            </div>
                                         </div>
                                     </div>
-                                    <button class="btn btn-sm btn-primary w-100" id="taskAssignSubmitBtn"><i class="bi bi-send"></i> Assigner (notifie par e-mail + en app)</button>
+                                    <div class="tk-target" id="tkAssignTarget"><i class="bi bi-person-check"></i> Tâche pour <b>vous-même</b></div>
+                                    <label class="tk-label" for="taskAssignTitle">Tâche</label>
+                                    <input type="text" class="form-control tk-input mb-2" id="taskAssignTitle" placeholder="Ex. Relancer les clients GAB en attente">
+                                    <textarea class="form-control tk-input mb-3" id="taskAssignDescription" rows="3" placeholder="Détails, consignes, liens utiles… (optionnel)"></textarea>
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <label class="tk-label" for="taskAssignDueDate">Échéance</label>
+                                            <input type="date" class="form-control tk-input" id="taskAssignDueDate">
+                                            <div class="tk-quickdates" data-target="taskAssignDueDate">
+                                                <button type="button" data-days="0">Aujourd'hui</button><button type="button" data-days="1">Demain</button><button type="button" data-days="7">+7 j</button>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="tk-label">Priorité</label>
+                                            <select class="d-none" id="taskAssignPriority"><option value="LOW">Basse</option><option value="NORMAL" selected>Normale</option><option value="HIGH">Haute</option></select>
+                                            <div class="tk-prio" data-target="taskAssignPriority">
+                                                <button type="button" data-p="LOW">Basse</button><button type="button" data-p="NORMAL" class="active">Normale</button><button type="button" data-p="HIGH">Haute</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button class="tk-btn tk-btn-primary w-100" id="taskAssignSubmitBtn"><i class="bi bi-send"></i> Assigner la tâche</button>
                                     <div id="taskAssignResult" class="small mt-2"></div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="col-lg-7">
-                            <div class="card dashboard-card shadow-sm mb-4">
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <h5 class="card-title mb-0"><i class="bi bi-journal-text text-primary"></i> Mes tâches &amp; notes</h5>
-                                    </div>
-
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-4"><div class="wf-task-stat"><div class="num text-primary" id="wfTaskStatOpen">0</div><div class="lbl">Ouvertes</div></div></div>
-                                        <div class="col-4"><div class="wf-task-stat"><div class="num text-danger" id="wfTaskStatOverdue">0</div><div class="lbl">En retard</div></div></div>
-                                        <div class="col-4"><div class="wf-task-stat"><div class="num text-success" id="wfTaskStatDone">0</div><div class="lbl">Terminées</div></div></div>
-                                    </div>
-
-                                    <div class="border rounded-3 p-2 mb-3">
-                                        <div class="d-flex gap-2 flex-wrap">
-                                            <input type="text" class="form-control form-control-sm flex-grow-1" id="noteTitle" placeholder="Nouvelle note / tâche..." style="min-width:160px;">
-                                            <input type="date" class="form-control form-control-sm" id="noteDueDate" style="max-width:150px;">
-                                            <select class="form-select form-select-sm" id="notePriority" style="max-width:120px;">
-                                                <option value="LOW">Basse</option>
-                                                <option value="NORMAL" selected>Normale</option>
-                                                <option value="HIGH">Haute</option>
-                                            </select>
-                                            <button class="btn btn-sm btn-primary" id="noteAddBtn"><i class="bi bi-plus-lg"></i> Ajouter</button>
+                        <div class="col-xl-7 tk-main-col">
+                            <div class="tk-card">
+                                <div class="tk-card-head">
+                                    <span class="tk-head-ic tk-head-ic-soft"><i class="bi bi-journal-text"></i></span>
+                                    <div class="flex-grow-1"><h5>Mes tâches &amp; notes</h5><small id="tkListSub">Tout ce qui vous attend, trié par urgence</small></div>
+                                </div>
+                                <div class="tk-card-body">
+                                    <div class="tk-composer">
+                                        <div class="tk-composer-row">
+                                            <i class="bi bi-plus-circle-dotted tk-composer-ic"></i>
+                                            <input type="text" class="tk-composer-input" id="noteTitle" placeholder="Ajouter une note ou une tâche… (Entrée pour valider)">
+                                            <button class="tk-btn tk-btn-primary tk-btn-sm" id="noteAddBtn"><i class="bi bi-plus-lg"></i> Ajouter</button>
+                                        </div>
+                                        <div class="tk-composer-opts">
+                                            <div class="tk-quickdates" data-target="noteDueDate">
+                                                <button type="button" data-days="0"><i class="bi bi-sun"></i> Aujourd'hui</button>
+                                                <button type="button" data-days="1"><i class="bi bi-sunrise"></i> Demain</button>
+                                                <button type="button" data-days="7"><i class="bi bi-calendar-week"></i> +7 j</button>
+                                            </div>
+                                            <input type="date" class="form-control form-control-sm tk-input tk-date" id="noteDueDate">
+                                            <select class="d-none" id="notePriority"><option value="LOW">Basse</option><option value="NORMAL" selected>Normale</option><option value="HIGH">Haute</option></select>
+                                            <div class="tk-prio tk-prio-sm ms-auto" data-target="notePriority">
+                                                <button type="button" data-p="LOW">Basse</button><button type="button" data-p="NORMAL" class="active">Normale</button><button type="button" data-p="HIGH">Haute</button>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div id="notesList"><p class="text-muted text-center">Chargement…</p></div>
+                                    <div class="tk-filters" id="tkFilters">
+                                        <button type="button" class="active" data-f="all">Toutes</button>
+                                        <button type="button" data-f="today">Aujourd'hui</button>
+                                        <button type="button" data-f="late">En retard</button>
+                                        <button type="button" data-f="high">Priorité haute</button>
+                                        <button type="button" data-f="assigned">Assignées</button>
+                                    </div>
+
+                                    <div id="notesList"><div class="tk-skeleton"></div><div class="tk-skeleton"></div></div>
                                 </div>
                             </div>
                         </div>

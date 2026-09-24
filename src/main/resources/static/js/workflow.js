@@ -448,6 +448,75 @@
 
     var PRIORITY_LABELS = { LOW: "Basse", NORMAL: "Normale", HIGH: "Haute" };
 
+    var taskFilter = "all";
+
+    function tkToast(message, error) {
+        var t = document.getElementById("tkToast");
+        if (!t) {
+            t = document.createElement("div");
+            t.id = "tkToast";
+            t.className = "tk-toast";
+            document.body.appendChild(t);
+        }
+        t.textContent = message;
+        t.classList.toggle("error", !!error);
+        t.classList.add("show");
+        clearTimeout(tkToast.timer);
+        tkToast.timer = setTimeout(function () { t.classList.remove("show"); }, 2800);
+    }
+
+    function tkCountUp(id, target) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var start = Number(el.getAttribute("data-value") || 0), t0 = null;
+        el.setAttribute("data-value", target);
+        if (start === target) { el.textContent = target; return; }
+        function step(ts) {
+            if (!t0) t0 = ts;
+            var k = Math.min(1, (ts - t0) / 600);
+            el.textContent = Math.round(start + (target - start) * (1 - Math.pow(1 - k, 3)));
+            if (k < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+    }
+
+    function tkConfetti(fromEl) {
+        if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        var r = fromEl.getBoundingClientRect();
+        var colors = ["#00A651", "#0057B8", "#f59f00", "#7ee2b0", "#e45d6a"];
+        for (var i = 0; i < 14; i++) {
+            var c = document.createElement("span");
+            c.className = "tk-confetti";
+            c.style.left = (r.left + r.width / 2) + "px";
+            c.style.top = (r.top + r.height / 2) + "px";
+            c.style.background = colors[i % colors.length];
+            c.style.setProperty("--dx", (Math.random() * 160 - 80) + "px");
+            c.style.setProperty("--dy", (Math.random() * -120 - 20) + "px");
+            c.style.setProperty("--r", (Math.random() * 540) + "deg");
+            document.body.appendChild(c);
+            setTimeout(function (el) { el.remove(); }.bind(null, c), 950);
+        }
+    }
+
+    function renderTaskHero(total, done, overdue, todayCount) {
+        var pct = total ? Math.round(done / total * 100) : 0;
+        var ring = document.getElementById("tkRingFg");
+        if (ring) ring.style.strokeDashoffset = String(314.16 * (1 - pct / 100));
+        setText("tkRingPct", pct + "%");
+        var now = new Date();
+        var hour = now.getHours();
+        setText("tkToday", now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }));
+        setText("tkGreeting", (hour < 12 ? "Bonjour" : hour < 18 ? "Bon après-midi" : "Bonsoir") + " — vos tâches & notes");
+        var open = total - done;
+        setText("tkHeroText", !total ? "Rien de prévu pour l'instant : ajoutez une note ou une tâche ci-dessous."
+            : overdue ? overdue + " tâche" + (overdue > 1 ? "s" : "") + " en retard à traiter en priorité, " + open + " ouverte" + (open > 1 ? "s" : "") + " au total."
+            : todayCount ? todayCount + " tâche" + (todayCount > 1 ? "s" : "") + " pour aujourd'hui. Vous êtes dans les temps 👍"
+            : open ? open + " tâche" + (open > 1 ? "s" : "") + " ouverte" + (open > 1 ? "s" : "") + ", aucune en retard. Bravo !"
+            : "Tout est terminé — excellent travail ! 🎉");
+        var late = document.querySelector(".tk-stat-late");
+        if (late) late.classList.toggle("has-late", overdue > 0);
+    }
+
     function renderNotes(tasks) {
         tasksCache = tasks || [];
         var container = document.getElementById("notesList");
@@ -456,18 +525,42 @@
         var doneCount = tasksCache.length - openCount;
         var todayIso = new Date().toISOString().slice(0, 10);
         var overdueCount = tasksCache.filter(function (t) { return t.status !== "DONE" && t.dueDate && t.dueDate < todayIso; }).length;
-        setText("wfTaskStatOpen", openCount);
-        setText("wfTaskStatOverdue", overdueCount);
-        setText("wfTaskStatDone", doneCount);
+        var todayCount = tasksCache.filter(function (t) { return t.status !== "DONE" && t.dueDate === todayIso; }).length;
+        tkCountUp("wfTaskStatOpen", openCount);
+        tkCountUp("wfTaskStatOverdue", overdueCount);
+        tkCountUp("wfTaskStatDone", doneCount);
+        renderTaskHero(tasksCache.length, doneCount, overdueCount, todayCount);
+
+        var isAssigned = function (t) { return t.createdByUsername && t.assignedToUsername && t.createdByUsername !== t.assignedToUsername || !!t.assignedToTeamCode; };
+        var FILTERS = {
+            all: function () { return true; },
+            today: function (t) { return t.dueDate === todayIso; },
+            late: function (t) { return t.status !== "DONE" && t.dueDate && t.dueDate < todayIso; },
+            high: function (t) { return t.priority === "HIGH"; },
+            assigned: isAssigned
+        };
+        var filterBar = document.getElementById("tkFilters");
+        if (filterBar) {
+            Array.prototype.forEach.call(filterBar.querySelectorAll("[data-f]"), function (b) {
+                var key = b.getAttribute("data-f");
+                var n = tasksCache.filter(function (t) { return t.status !== "DONE" && FILTERS[key](t); }).length;
+                var label = b.getAttribute("data-label") || b.textContent;
+                b.setAttribute("data-label", label);
+                b.innerHTML = escapeHtml(label) + (key !== "all" && n ? ' <span class="n">' + n + '</span>' : "");
+                b.classList.toggle("active", key === taskFilter);
+            });
+        }
 
         if (!tasksCache.length) {
-            container.innerHTML = '<div class="wf-empty-state"><i class="bi bi-emoji-smile"></i>Aucune tâche pour l\'instant — profitez-en ! 🎉</div>';
+            container.innerHTML = '<div class="tk-empty"><div class="tk-empty-art"><i class="bi bi-cup-hot"></i></div>' +
+                '<b>Aucune tâche pour l\'instant</b>Profitez-en ! 🎉 Ajoutez une note ci-dessus quand vous en avez besoin.</div>';
             updateOverviewAndBadges();
             return;
         }
 
-        var open = tasksCache.filter(function (t) { return t.status !== "DONE"; });
-        var done = tasksCache.filter(function (t) { return t.status === "DONE"; });
+        var filtered = tasksCache.filter(FILTERS[taskFilter] || FILTERS.all);
+        var open = filtered.filter(function (t) { return t.status !== "DONE"; });
+        var done = filtered.filter(function (t) { return t.status === "DONE"; });
 
         var overdue = open.filter(function (t) { return t.dueDate && t.dueDate < todayIso; });
         var today = open.filter(function (t) { return t.dueDate === todayIso; });
@@ -492,27 +585,52 @@
         if (done.length) {
             html += '<div class="wf-task-group-title" id="wfDoneToggle" style="cursor:pointer;">' +
                 '<i class="bi bi-check-circle-fill text-success"></i> Terminées (' + done.length + ') <i class="bi bi-chevron-down small ms-1"></i></div>' +
-                '<div id="wfDoneGroup">' + taskGroupHtml("", done, todayIso, true) + '</div>';
+                '<div id="wfDoneGroup"><div class="tk-done-inner">' + taskGroupHtml("", done, todayIso, true) + '</div></div>';
+        }
+        if (!html) {
+            html = '<div class="tk-empty"><div class="tk-empty-art"><i class="bi bi-funnel"></i></div><b>Rien dans ce filtre</b>Choisissez « Toutes » pour tout revoir.</div>';
         }
 
         container.innerHTML = html;
+        Array.prototype.forEach.call(container.querySelectorAll(".wf-task-card"), function (card, i) {
+            card.style.animationDelay = Math.min(i * 45, 450) + "ms";
+        });
 
         var doneToggle = document.getElementById("wfDoneToggle");
-        if (doneToggle) doneToggle.addEventListener("click", function () { document.getElementById("wfDoneGroup").classList.toggle("wf-show"); });
+        if (doneToggle) doneToggle.addEventListener("click", function () {
+            document.getElementById("wfDoneGroup").classList.toggle("wf-show");
+            doneToggle.classList.toggle("open");
+        });
 
         Array.prototype.forEach.call(container.querySelectorAll(".wf-task-check"), function (btn) {
             btn.addEventListener("click", function () {
-                postJson("/api/workflow/tasks/" + btn.getAttribute("data-id") + "/toggle-done").then(loadNotes)
-                    .catch(function (e) { alert("Erreur : " + e.message); });
+                var card = btn.closest(".wf-task-card");
+                var completing = card && !card.classList.contains("wf-done");
+                if (completing) {
+                    card.classList.add("completing");
+                    btn.innerHTML = '<i class="bi bi-check-lg small"></i>';
+                    tkConfetti(btn);
+                }
+                postJson("/api/workflow/tasks/" + btn.getAttribute("data-id") + "/toggle-done")
+                    .then(function () {
+                        if (completing) tkToast("Bravo, tâche terminée ✓");
+                        setTimeout(loadNotes, completing ? 380 : 0);
+                    })
+                    .catch(function (e) { if (card) card.classList.remove("completing"); tkToast("Erreur : " + e.message, true); });
             });
         });
         Array.prototype.forEach.call(container.querySelectorAll(".delete-task-btn"), function (btn) {
             btn.addEventListener("click", function () {
                 if (!confirm("Supprimer cette note ?")) return;
+                var card = btn.closest(".wf-task-card");
                 fetch("/api/workflow/tasks/" + btn.getAttribute("data-id"), { method: "DELETE", credentials: "same-origin" })
                     .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); })
-                    .then(loadNotes)
-                    .catch(function (e) { alert("Erreur : " + e.message); });
+                    .then(function () {
+                        if (card) card.classList.add("removing");
+                        tkToast("Note supprimée");
+                        setTimeout(loadNotes, 320);
+                    })
+                    .catch(function (e) { tkToast("Erreur : " + e.message, true); });
             });
         });
         updateOverviewAndBadges();
@@ -522,6 +640,17 @@
         var html = titleHtml && !skipGroupTitle ? '<div class="wf-task-group-title">' + titleHtml + '</div>' : "";
         html += tasks.map(function (t) { return taskCardHtml(t, todayIso); }).join("");
         return html;
+    }
+
+    /** « Aujourd'hui », « Demain », « Hier », sinon « mar. 29 sept. » — sans heure pour une échéance. */
+    function friendlyDue(iso, todayIso) {
+        var day = String(iso).slice(0, 10);
+        var diff = Math.round((new Date(day + "T00:00:00") - new Date(todayIso + "T00:00:00")) / 86400000);
+        if (diff === 0) return "Aujourd'hui";
+        if (diff === 1) return "Demain";
+        if (diff === -1) return "Hier";
+        var label = new Date(day + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
+        return diff < 0 ? label + " (" + (-diff) + " j de retard)" : label;
     }
 
     function taskCardHtml(t, todayIso) {
@@ -534,7 +663,7 @@
             ? '<span class="wf-task-chip wf-chip-origin"><i class="bi bi-person-fill"></i> ' + escapeHtml(t.createdByName || t.createdByUsername) + '</span>'
             : (t.assignedToTeamCode ? '<span class="wf-task-chip wf-chip-team"><i class="bi bi-people-fill"></i> ' + escapeHtml(t.assignedToTeamCode) + '</span>' : "");
         var dueChip = t.dueDate
-            ? '<span class="wf-task-chip ' + (isOverdue ? "wf-chip-overdue" : "wf-chip-due") + '"><i class="bi bi-calendar-event"></i> ' + escapeHtml(formatDate(t.dueDate)) + '</span>'
+            ? '<span class="wf-task-chip ' + (isOverdue ? "wf-chip-overdue" : "wf-chip-due") + '"><i class="bi bi-calendar-event"></i> ' + escapeHtml(friendlyDue(t.dueDate, todayIso)) + '</span>'
             : "";
         var prioChip = prio === "HIGH" ? '<span class="wf-task-chip wf-chip-prio-high"><i class="bi bi-flag-fill"></i> Haute</span>'
             : (prio === "LOW" ? '<span class="wf-task-chip wf-chip-prio-low"><i class="bi bi-flag"></i> Basse</span>' : "");
@@ -570,20 +699,100 @@
         });
     }
 
+    /** Pastilles « Aujourd'hui / Demain / +7 j » et sélecteurs de priorité en boutons (select caché conservé). */
+    function wireTaskPickers(root) {
+        Array.prototype.forEach.call(root.querySelectorAll(".tk-quickdates"), function (group) {
+            var input = document.getElementById(group.getAttribute("data-target"));
+            if (!input) return;
+            Array.prototype.forEach.call(group.querySelectorAll("[data-days]"), function (b) {
+                b.addEventListener("click", function () {
+                    var d = new Date();
+                    d.setDate(d.getDate() + Number(b.getAttribute("data-days")));
+                    var iso = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+                    var already = b.classList.contains("active");
+                    input.value = already ? "" : iso;
+                    syncQuickDates(group, input);
+                });
+            });
+            input.addEventListener("change", function () { syncQuickDates(group, input); });
+        });
+        Array.prototype.forEach.call(root.querySelectorAll(".tk-prio"), function (group) {
+            var select = document.getElementById(group.getAttribute("data-target"));
+            if (!select) return;
+            Array.prototype.forEach.call(group.querySelectorAll("[data-p]"), function (b) {
+                b.addEventListener("click", function () { select.value = b.getAttribute("data-p"); syncPrio(group, select); });
+            });
+        });
+    }
+
+    function syncQuickDates(group, input) {
+        Array.prototype.forEach.call(group.querySelectorAll("[data-days]"), function (b) {
+            var d = new Date();
+            d.setDate(d.getDate() + Number(b.getAttribute("data-days")));
+            var iso = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+            b.classList.toggle("active", input.value === iso);
+        });
+    }
+
+    function syncPrio(group, select) {
+        Array.prototype.forEach.call(group.querySelectorAll("[data-p]"), function (b) {
+            b.classList.toggle("active", b.getAttribute("data-p") === select.value);
+        });
+    }
+
+    function resetTaskPickers(root) {
+        Array.prototype.forEach.call(root.querySelectorAll(".tk-quickdates"), function (group) {
+            var input = document.getElementById(group.getAttribute("data-target"));
+            if (input) syncQuickDates(group, input);
+        });
+        Array.prototype.forEach.call(root.querySelectorAll(".tk-prio"), function (group) {
+            var select = document.getElementById(group.getAttribute("data-target"));
+            if (select) syncPrio(group, select);
+        });
+    }
+
     function wireNotes() {
-        document.getElementById("noteAddBtn").addEventListener("click", function () {
-            var title = document.getElementById("noteTitle").value.trim();
+        var pane = document.getElementById("wfPaneTasks");
+        if (pane) wireTaskPickers(pane);
+
+        var filterBar = document.getElementById("tkFilters");
+        if (filterBar) filterBar.addEventListener("click", function (e) {
+            var b = e.target.closest("[data-f]");
+            if (!b) return;
+            taskFilter = b.getAttribute("data-f");
+            renderNotes(tasksCache);
+        });
+
+        function addNote() {
+            var titleInput = document.getElementById("noteTitle");
+            var title = titleInput.value.trim();
             var dueDate = document.getElementById("noteDueDate").value || null;
             var priority = document.getElementById("notePriority").value;
-            if (!title) return;
+            if (!title) {
+                var composer = titleInput.closest(".tk-composer");
+                if (composer) { composer.classList.remove("shake"); void composer.offsetWidth; composer.classList.add("shake"); }
+                titleInput.focus();
+                return;
+            }
+            var btn = document.getElementById("noteAddBtn");
+            btn.disabled = true;
             postJson("/api/workflow/tasks", { title: title, dueDate: dueDate, priority: priority })
                 .then(function () {
-                    document.getElementById("noteTitle").value = "";
+                    titleInput.value = "";
                     document.getElementById("noteDueDate").value = "";
                     document.getElementById("notePriority").value = "NORMAL";
+                    if (pane) resetTaskPickers(pane);
+                    tkToast("Note ajoutée ✓");
                     loadNotes();
+                    titleInput.focus();
                 })
-                .catch(function (e) { alert("Erreur : " + e.message); });
+                .catch(function (e) { tkToast("Erreur : " + e.message, true); })
+                .then(function () { btn.disabled = false; });
+        }
+
+        document.getElementById("noteAddBtn").addEventListener("click", addNote);
+        document.getElementById("noteTitle").addEventListener("keydown", function (e) {
+            if (e.key === "Enter") { e.preventDefault(); addNote(); }
         });
     }
 
@@ -605,9 +814,23 @@
 
         getJson("/api/users/directory").then(function (users) { allUsers = users; }).catch(function (e) { console.error(e); });
 
+        function updateTarget() {
+            var box = document.getElementById("tkAssignTarget");
+            if (!box) return;
+            var html = individualSelect.value
+                ? '<i class="bi bi-person-check"></i> Tâche pour <b>' + escapeHtml(individualSelect.selectedOptions[0].textContent) + '</b> uniquement'
+                : teamSelect.value
+                    ? '<i class="bi bi-people-fill"></i> Tâche pour <b>toute l\'équipe ' + escapeHtml(teamSelect.selectedOptions[0].textContent) + '</b>'
+                    : '<i class="bi bi-person-check"></i> Tâche pour <b>vous-même</b>';
+            box.innerHTML = html;
+            box.classList.remove("flash"); void box.offsetWidth; box.classList.add("flash");
+        }
+        individualSelect.addEventListener("change", updateTarget);
+
         teamSelect.addEventListener("change", function () {
             var team = teamSelect.value;
             individualSelect.innerHTML = '<option value="">— Toute l\'équipe —</option>';
+            updateTarget();
             if (!team) return;
             allUsers.filter(function (u) { return u.activity === team; }).forEach(function (u) {
                 var opt = document.createElement("option");
@@ -633,11 +856,14 @@
 
             postJson("/api/workflow/tasks", payload)
                 .then(function () {
-                    resultBox.innerHTML = '<span class="text-success">Tâche assignée — notification envoyée.</span>';
+                    resultBox.innerHTML = "";
+                    tkToast("Tâche assignée — notification envoyée ✓");
                     document.getElementById("taskAssignTitle").value = "";
                     document.getElementById("taskAssignDescription").value = "";
                     document.getElementById("taskAssignDueDate").value = "";
                     document.getElementById("taskAssignPriority").value = "NORMAL";
+                    var assignCard = document.getElementById("taskAssignCard");
+                    if (assignCard) resetTaskPickers(assignCard);
                     loadNotes();
                 })
                 .catch(function (e) { resultBox.innerHTML = '<span class="text-danger">Erreur : ' + e.message + '</span>'; });

@@ -7,9 +7,9 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/translator.css}">
     <style>
-        .tr-wrap { max-width: 980px; margin: 0 auto; }
-        .tr-card { background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:1rem; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.04); }
+        .tr-card { background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:1.2rem; overflow:hidden; box-shadow:0 18px 44px rgba(20,40,90,.10); }
         .tr-langbar { display:flex; align-items:center; padding:.6rem 1rem; border-bottom:1px solid rgba(0,0,0,.06); gap:.5rem; }
         .tr-lang-select { border:none; background:transparent; font-weight:500; color:#5f6368; font-size:.95rem; padding:.3rem .5rem; border-radius:.4rem; cursor:pointer; }
         .tr-lang-select:hover { background:#f1f3f4; }
@@ -57,20 +57,41 @@
         <div th:replace="~{fragments/header :: header}"></div>
         <main id="page-content">
             <div class="container-fluid py-3">
-                <div class="tr-wrap">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                            <h1 class="h4 mb-1"><i class="bi bi-translate"></i> Traducteur &amp; correcteur</h1>
-                            <p class="text-muted mb-0" id="trSubtitle">Traduction instantanée entre n'importe quelle paire de langues — sans IA générative, plusieurs moteurs en repli (voir <code>docs/TRANSLATION_OFFLINE_SETUP.md</code>).</p>
-                            <div class="small mt-1 text-muted" id="trProviders"></div>
+                <div class="tr-wrap" id="trWrap">
+                    <section class="tr-hero mb-3" th:style="'--tr-hero-img:url(' + @{/images/login-hero-agent.jpg} + ')'">
+                        <div class="tr-hero-photo" aria-hidden="true"></div>
+                        <div class="tr-hero-bubbles" aria-hidden="true">
+                            <span style="--x:58%;--y:18%;--d:0s">Bonjour 👋</span>
+                            <span style="--x:70%;--y:62%;--d:-2s">Hello!</span>
+                            <span style="--x:47%;--y:70%;--d:-4s">Olá</span>
+                            <span style="--x:80%;--y:30%;--d:-6s">Hola</span>
+                            <span style="--x:62%;--y:42%;--d:-8s">مرحبا</span>
+                            <span style="--x:88%;--y:78%;--d:-3s">Akwaaba</span>
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" id="diagnoseBtn"><i class="bi bi-heart-pulse"></i> Diagnostiquer la connexion</button>
-                    </div>
+                        <div class="tr-hero-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+                        <div class="tr-hero-copy">
+                            <span class="tr-eyebrow"><i class="bi bi-headset"></i> Au service du client, dans sa langue</span>
+                            <h1><span class="tr-hero-icon"><i class="bi bi-translate"></i></span> Traducteur &amp; correcteur</h1>
+                            <p id="trSubtitle">Traduction instantanée entre n'importe quelle paire de langues — sans IA générative, plusieurs moteurs en repli (voir <code>docs/TRANSLATION_OFFLINE_SETUP.md</code>).</p>
+                            <div class="tr-hero-meta">
+                                <span class="small" id="trProviders"></span>
+                                <button type="button" class="tr-hero-btn" id="diagnoseBtn"><i class="bi bi-heart-pulse"></i> Diagnostiquer la connexion</button>
+                            </div>
+                        </div>
+                    </section>
 
-                    <ul class="nav nav-tabs mb-3" id="trTopTabs">
-                        <li class="nav-item"><button type="button" class="nav-link active" id="trTabTranslateBtn"><i class="bi bi-translate"></i> Traduction</button></li>
-                        <li class="nav-item"><button type="button" class="nav-link" id="trTabSpellcheckBtn"><i class="bi bi-spellcheck"></i> Correcteur</button></li>
-                    </ul>
+                    <div class="tr-tabsbar mb-3">
+                        <ul class="nav tr-tabs" id="trTopTabs">
+                            <li class="nav-item"><button type="button" class="nav-link active" id="trTabTranslateBtn"><i class="bi bi-translate"></i> Traduction</button></li>
+                            <li class="nav-item"><button type="button" class="nav-link" id="trTabSpellcheckBtn"><i class="bi bi-spellcheck"></i> Correcteur</button></li>
+                        </ul>
+                        <div class="ms-auto d-flex align-items-center gap-2">
+                            <span class="tr-expand-hint" id="trExpandHint">Échap pour réduire</span>
+                            <button type="button" class="tr-expand-btn" id="trExpandBtn" title="Agrandir l'outil (plein écran)" aria-pressed="false">
+                                <i class="bi bi-arrows-fullscreen"></i> <span>Agrandir</span>
+                            </button>
+                        </div>
+                    </div>
 
                     <div id="diagnoseResult" class="mb-3" style="display:none;"></div>
 
@@ -166,5 +187,6 @@
 <script th:src="@{/js/session.js}"></script>
 <script th:src="@{/js/translator.js}"></script>
 <script th:src="@{/js/spellcheck.js}"></script>
+<script th:src="@{/js/translator-ui.js}"></script>
 </body>
 </html>
