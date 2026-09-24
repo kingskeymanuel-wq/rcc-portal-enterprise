@@ -54,10 +54,18 @@ public class CourseController {
     public CourseResponse uploadImage(@PathVariable Integer courseId,
                                       @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
                                       @AuthenticationPrincipal AuthenticatedUser requester) {
-        if (requester == null || !"admin".equalsIgnoreCase(requester.role())) {
-            throw com.ecobank.rccportal.util.ApiException.forbidden("Only an administrator can upload images.");
-        }
+        // La QA contrôle la Formation de bout en bout (studio de création) : elle pose aussi la vignette.
+        requireQaOrAdmin(requester);
         return courseService.updateCourseImage(courseId, file);
+    }
+
+    /** Vidéo du cours téléversée (mp4/m4v/mov/webm) — remplace le lien vidéo du cours. */
+    @PostMapping(value = "/{courseId}/video", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public CourseResponse uploadVideo(@PathVariable Integer courseId,
+                                      @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+                                      @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireQaOnly(requester);
+        return courseService.updateCourseVideo(courseId, file);
     }
 
     /** Fichier joint au cours (PDF, Word...) — même équipe que le contenu, donc réservé QA. */

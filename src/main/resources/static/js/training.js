@@ -7,7 +7,6 @@
     var currentCourseId = null;
     var currentQuestions = [];
     var currentProfile = null;
-    var newCourseContentEditor = null;
     /** true tant qu'un agent a un questionnaire ouvert et non soumis — voir renderCourseForm /
      * submitCourseBtn — pour ne pas rafraîchir "Mes cours" sous ses pieds pendant qu'il répond. */
     var attemptInProgress = false;
@@ -164,7 +163,7 @@
         var addBtn = $("addCourseToCategoryBtn");
         if (currentProfile === "QA" || currentProfile === "ADMIN" || currentProfile === "FORMATEUR") {
             addBtn.style.display = "";
-            addBtn.onclick = function () { prefillCourseFormForCategory(category); };
+            addBtn.onclick = function () { window.RccCourseStudio.open({ category: category }); };
         } else {
             addBtn.style.display = "none";
         }
@@ -181,26 +180,6 @@
         }).catch(function () {});
     }
 
-    /** Verrouille la thématique du formulaire "Créer un cours" sur la rubrique déjà ouverte —
-     *  évite à QA de retaper le nom exact de la rubrique et risquer une faute de frappe qui
-     *  créerait une nouvelle rubrique en double au lieu de rattacher le cours à la bonne. */
-    function prefillCourseFormForCategory(category) {
-        var categoryField = $("newCourseCategory");
-        var hint = $("createCourseCategoryHint");
-        categoryField.value = category === "Général" ? "" : category;
-        categoryField.readOnly = true;
-        hint.style.display = "";
-        hint.innerHTML = '<i class="bi bi-info-circle"></i> Ce cours sera ajouté à la rubrique <strong>' + escapeHtml(category) + '</strong>. ' +
-            '<a href="#" id="unlockCourseCategoryLink">Changer de rubrique</a>';
-        $("unlockCourseCategoryLink").addEventListener("click", function (evt) {
-            evt.preventDefault();
-            categoryField.readOnly = false;
-            hint.style.display = "none";
-        });
-        $("newCourseTitle").scrollIntoView({ behavior: "smooth", block: "center" });
-        $("newCourseTitle").focus();
-    }
-
     $("courseCategoryBackBtn").addEventListener("click", function () {
         currentCourseCategory = null;
         $("courseCategoryDetailCard").style.display = "none";
@@ -212,7 +191,17 @@
         var coursesInCategory = coursesCache.filter(function (c) { return courseCategoryLabel(c) === category; });
 
         if (!coursesInCategory.length) {
-            table.innerHTML = '<tr><td colspan="5" class="text-muted text-center">Aucun cours dans cette rubrique.</td></tr>';
+            var canCreate = currentProfile === "QA" || currentProfile === "ADMIN" || currentProfile === "FORMATEUR";
+            table.innerHTML = '<tr><td colspan="5" class="p-0"><div class="ef-empty-rubric">' +
+                '<div class="ef-empty-art"><i class="bi bi-journal-plus"></i></div>' +
+                '<h5>' + (canCreate ? "Cette rubrique attend son premier cours" : "Aucun cours dans cette rubrique pour l'instant") + '</h5>' +
+                '<p>' + (canCreate
+                    ? "Ouvrez le studio de création : titre, contenu ou plan type, vidéo, document et évaluation — avec l'aperçu de ce que verront les agents."
+                    : "La QA prépare de nouveaux contenus. Revenez bientôt !") + '</p>' +
+                (canCreate ? '<button type="button" class="ef-btn ef-btn-primary" id="emptyRubricCreateBtn"><i class="bi bi-magic"></i> Créer le premier cours</button>' : "") +
+                '</div></td></tr>';
+            var emptyBtn = $("emptyRubricCreateBtn");
+            if (emptyBtn) emptyBtn.addEventListener("click", function () { window.RccCourseStudio.open({ category: category }); });
             return;
         }
 
@@ -346,36 +335,16 @@
 
     function openEditCourse(courseId) {
         var course = coursesCache.filter(function (c) { return c.courseId === courseId; })[0];
-        if (!course) return;
-
-        var newTitle = prompt("Titre du cours :", course.title);
-        if (newTitle === null) return;
-        var newDescription = prompt("Description :", course.description || "");
-        if (newDescription === null) return;
-        var newContent = prompt("Contenu :", course.content || "");
-        if (newContent === null) return;
-        var newVideoUrl = prompt("Lien vidéo (optionnel) :", course.videoUrl || "");
-        if (newVideoUrl === null) return;
-        var newCategory = prompt("Thématique (laisser vide = Général) :", course.category || "");
-        if (newCategory === null) return;
-        var newMandatory = confirm("Ce cours doit-il être obligatoire ? (OK = oui, Annuler = non)");
-
-        sendJson("/api/courses/" + courseId, "PUT", {
-            title: newTitle.trim(),
-            description: newDescription.trim() || null,
-            content: newContent.trim() || null,
-            videoUrl: newVideoUrl.trim() || null,
-            category: newCategory.trim() || "",
-            type: course.type,
-            mandatory: newMandatory
-        }).then(function () {
-            currentCourseCategory = null;
-            $("courseCategoryDetailCard").style.display = "none";
-            $("courseCategoriesCard").style.display = "";
-            loadMyCoursesTable();
-            loadQaCourseSelects();
-        }).catch(function (e) { alert("Erreur : " + e.message); });
+        if (course) window.RccCourseStudio.open({ course: course });
     }
+
+    // Après création / modification dans le studio : on reste sur la rubrique ouverte, mise à jour.
+    document.addEventListener("rcc:course-saved", function () {
+        loadQaCourseSelects();
+        loadMyCoursesTable();
+    });
+    var studioBtn = $("openCourseStudioBtn");
+    if (studioBtn) studioBtn.addEventListener("click", function () { window.RccCourseStudio.open({}); });
 
     function deleteCourse(courseId) {
         var course = coursesCache.filter(function (c) { return c.courseId === courseId; })[0];
@@ -406,7 +375,7 @@
         $("videoModalTitle").textContent = title || "Vidéo";
         var body = $("videoModalBody");
         var embedUrl = toEmbedUrl(url);
-        var isDirectFile = /\.(mp4|webm|ogg)(\?.*)?$/i.test(url);
+        var isDirectFile = /\.(mp4|webm|ogg|m4v|mov)(\?.*)?$/i.test(url);
 
         videoProgressCourseId = courseId || null;
         videoMaxReachedSeconds = 0;
@@ -622,131 +591,6 @@
 
     // ===== Espace QA/admin : création de cours =====
 
-    function loadCourseServiceOptions() {
-        // Liste alignée sur les équipes de l'onglet Shift (dbo.Teams) — pas sur les services
-        // du référentiel Procédures — pour que l'assignation d'un cours corresponde à
-        // l'équipe réelle de l'agent (User.activity).
-        getJson("/api/teams").then(function (teams) {
-            var select = $("newCourseService");
-            teams.forEach(function (t) {
-                var opt = document.createElement("option");
-                opt.value = t.code;
-                opt.textContent = t.label;
-                select.appendChild(opt);
-            });
-        }).catch(function () {});
-    }
-
-    $("createCourseBtn").addEventListener("click", function () {
-        var title = $("newCourseTitle").value.trim();
-        if (!title) { alert("Le titre est obligatoire."); return; }
-        var fileInput = $("newCourseFile");
-        var pendingFile = fileInput.files[0];
-
-        var chosenType = $("newCourseType").value;
-        var chosenCategory = $("newCourseCategory").value.trim() || "Général";
-        sendJson("/api/courses", "POST", {
-            title: title,
-            description: $("newCourseDescription").value.trim() || null,
-            content: newCourseContentEditor ? (newCourseContentEditor.getHtml().trim() || null) : null,
-            videoUrl: $("newCourseVideoUrl").value.trim() || null,
-            type: chosenType,
-            teamCode: $("newCourseService").value || null,
-            category: $("newCourseCategory").value.trim() || null,
-            mandatory: $("newCourseMandatory").checked
-        }).then(function (created) {
-            var afterCreate = function () {
-                $("newCourseTitle").value = "";
-                $("newCourseDescription").value = "";
-                if (newCourseContentEditor) newCourseContentEditor.setHtml("");
-                $("newCourseVideoUrl").value = "";
-                $("newCourseFile").value = "";
-                $("newCourseService").value = "";
-                $("newCourseCategory").value = "";
-                $("newCourseCategory").readOnly = false;
-                $("createCourseCategoryHint").style.display = "none";
-                $("newCourseMandatory").checked = false;
-                loadQaCourseSelects();
-                loadMyCoursesTable();
-                // Le formateur voulait une évaluation notée — on lui ouvre directement la
-                // gestion des questions pour cette rubrique, sans qu'il ait à la rechercher ailleurs.
-                if (chosenType === "STANDARD") {
-                    openCourseQuestionsEditor(chosenCategory, created.title);
-                }
-            };
-            if (!pendingFile) { afterCreate(); return; }
-
-            var formData = new FormData();
-            formData.append("file", pendingFile);
-            fetch("/api/courses/" + created.courseId + "/file", { method: "POST", credentials: "same-origin", body: formData })
-                .then(afterCreate)
-                .catch(function (e) { alert("Cours créé, mais l'import du fichier a échoué : " + e.message); afterCreate(); });
-        }).catch(function (e) { alert("Erreur : " + e.message); });
-    });
-
-    // ===== Questions de l'évaluation — mêmes questions que le Centre d'Évaluation (jeux),
-    //       taguées avec la catégorie de la rubrique, pas un système séparé pour la Formation =====
-
-    var courseQuestionsForCategory = null;
-
-    function openCourseQuestionsEditor(category, title) {
-        courseQuestionsForCategory = category;
-        $("courseQuestionsForTitle").textContent = title;
-        $("courseQuestionsCard").style.display = "";
-        $("courseQuestionsCard").scrollIntoView({ behavior: "smooth", block: "center" });
-        refreshCourseQuestionsList();
-    }
-
-    function refreshCourseQuestionsList() {
-        if (!courseQuestionsForCategory) return;
-        getJson("/api/quiz-questions?category=" + encodeURIComponent(courseQuestionsForCategory)).then(function (questions) {
-            var list = $("courseQuestionsList");
-            if (!questions.length) {
-                list.innerHTML = '<p class="text-muted small mb-0">Aucune question pour l\'instant — ajoutez-en une ci-dessous.</p>';
-                return;
-            }
-            list.innerHTML = questions.map(function (q, i) {
-                return '<div class="border rounded p-2 mb-2 small"><strong>' + (i + 1) + '. ' + escapeHtml(q.questionText) + '</strong>' +
-                    '<ul class="mb-0 mt-1">' + (q.options || []).map(function (opt, idx) {
-                        var isCorrect = idx === q.correctOptionIndex;
-                        return '<li' + (isCorrect ? ' class="text-success fw-semibold"' : '') + '>' + escapeHtml(opt) +
-                            (isCorrect ? ' ✓' : '') + '</li>';
-                    }).join("") + '</ul></div>';
-            }).join("");
-        }).catch(function () {});
-    }
-
-    $("addCourseQuestionBtn").addEventListener("click", function () {
-        if (!courseQuestionsForCategory) return;
-        var questionText = $("newQuestionText").value.trim();
-        if (!questionText) { alert("L'intitulé de la question est obligatoire."); return; }
-
-        var optionInputs = Array.prototype.slice.call($("newQuestionOptions").querySelectorAll("input[type=text]"));
-        var options = optionInputs.map(function (inp) { return inp.value.trim(); }).filter(Boolean);
-        if (options.length < 2) { alert("Au moins 2 réponses sont nécessaires."); return; }
-
-        var checked = document.querySelector('input[name="newQuestionCorrect"]:checked');
-        var correctOptionIndex = checked ? Number(checked.value) : 0;
-        if (correctOptionIndex >= options.length) correctOptionIndex = 0; // repli si une réponse vide a été sautée
-
-        // Va dans la même banque que le Centre d'Évaluation (jeux) — taguée avec la
-        // catégorie/rubrique, pas dans un système séparé propre à la Formation.
-        sendJson("/api/quiz-questions", "POST", {
-            questionText: questionText, type: "MCQ", difficulty: "MEDIUM", category: courseQuestionsForCategory,
-            options: options, correctOptionIndex: correctOptionIndex, points: 10, active: true
-        }).then(function () {
-            $("newQuestionText").value = "";
-            optionInputs.forEach(function (inp) { inp.value = ""; });
-            document.querySelector('input[name="newQuestionCorrect"][value="0"]').checked = true;
-            refreshCourseQuestionsList();
-        }).catch(function (e) { alert("Erreur : " + e.message); });
-    });
-
-    $("doneCourseQuestionsBtn").addEventListener("click", function () {
-        courseQuestionsForCategory = null;
-        $("courseQuestionsCard").style.display = "none";
-    });
-
     // ===== Espace QA/admin : sélecteurs de cours (résultats) =====
 
     function loadQaCourseSelects() {
@@ -870,9 +714,6 @@
 
     // ===== Init =====
 
-    var contentEditorEl = document.getElementById("newCourseContentEditor");
-    if (contentEditorEl) newCourseContentEditor = window.RccRichText.create(contentEditorEl, "");
-
     window.RccSession.init().then(function (session) {
         if (session) {
             currentProfile = session.profile;
@@ -890,7 +731,6 @@
     loadFormationBanner();
     loadMyCoursesTable();
     loadQaCourseSelects();
-    loadCourseServiceOptions();
     loadResultsTeamOptions();
 
     // Lien direct depuis la recherche globale (session.js) — ouvre le cours exact par ID

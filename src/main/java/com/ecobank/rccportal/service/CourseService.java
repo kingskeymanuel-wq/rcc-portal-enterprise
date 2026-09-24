@@ -57,11 +57,26 @@ public class CourseService {
         this.objectMapper = objectMapper;
     }
 
-    /** Upload réel de la vignette — réservé à l'administrateur (voir CourseController). */
+    /** Upload réel de la vignette — QA ou administrateur (voir CourseController). */
     @Transactional
     public CourseResponse updateCourseImage(Integer courseId, org.springframework.web.multipart.MultipartFile file) {
         Course course = findCourse(courseId);
         course.setImageUrl(imageStorageService.store(file));
+        return toResponse(courseRepository.save(course));
+    }
+
+    /** Vidéo téléversée depuis le studio de création : stockée comme les vidéos Mon RCC. */
+    @Transactional
+    public CourseResponse updateCourseVideo(Integer courseId, org.springframework.web.multipart.MultipartFile file) {
+        Course course = findCourse(courseId);
+        String name = file == null ? null : file.getOriginalFilename();
+        String type = file == null ? null : file.getContentType();
+        boolean video = (name != null && name.toLowerCase().matches(".*\\.(mp4|m4v|mov|webm)$"))
+                || (type != null && type.toLowerCase().startsWith("video/"));
+        if (!video) {
+            throw ApiException.badRequest("Ce fichier n'est pas une vidéo (formats acceptés : mp4, m4v, mov, webm).");
+        }
+        course.setVideoUrl(imageStorageService.store(file));
         return toResponse(courseRepository.save(course));
     }
 

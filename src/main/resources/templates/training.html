@@ -10,6 +10,7 @@
           rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <link rel="stylesheet" th:href="@{/css/formation.css}">
+    <link rel="stylesheet" th:href="@{/css/course-studio.css}">
 </head>
 <body>
 <div class="layout">
@@ -344,58 +345,16 @@
 
                     <div class="row g-4">
                         <div class="col-lg-6">
-                            <div class="ef-card mb-4">
-                                <div class="ef-card-title"><i class="bi bi-plus-circle"></i> Créer un cours</div>
-                                <div class="alert alert-primary py-2 px-3 small mb-2" id="createCourseCategoryHint" style="display:none;"></div>
-                                <input type="text" class="form-control mb-2" id="newCourseTitle" placeholder="Titre">
-                                <textarea class="form-control mb-2" id="newCourseDescription" rows="2" placeholder="Description courte"></textarea>
-                                <input type="text" class="form-control mb-2" id="newCourseCategory" placeholder="Thématique (ex. COMPTE, TRANSFERT... — laisser vide = Général)">
-                                <label class="form-label small mb-1">Contenu du cours <span class="text-muted fw-normal">(facultatif)</span></label>
-                                <div id="newCourseContentEditor" class="mb-2"></div>
-                                <input type="text" class="form-control mb-2" id="newCourseVideoUrl" placeholder="Lien vidéo (optionnel)">
-                                <label class="form-label small mb-1">Fichier joint (PDF, Word... — optionnel)</label>
-                                <input type="file" class="form-control mb-2" id="newCourseFile">
-                                <label class="form-label small mb-1">Type de cours</label>
-                                <select class="form-select mb-2" id="newCourseType">
-                                    <option value="SELF_ASSESSMENT" selected>Auto-diagnostic (échelle 1-5, non noté)</option>
-                                    <option value="STANDARD">Évaluation notée (questions à choix multiples, avec score)</option>
-                                </select>
-                                <select class="form-select mb-2" id="newCourseService">
-                                    <option value="">— Générique (assigné à toutes les équipes) —</option>
-                                </select>
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" id="newCourseMandatory">
-                                    <label class="form-check-label" for="newCourseMandatory">Obligatoire</label>
-                                </div>
-                                <p class="small ef-muted mb-2"><i class="bi bi-info-circle"></i> Le cours est créé en <b>brouillon</b> : publiez-le dans « Publication des cours » quand il est prêt.</p>
-                                <button class="ef-btn ef-btn-primary w-100" id="createCourseBtn">Créer le cours</button>
-                            </div>
-
-                            <!-- Questions de l'évaluation — visible après la création d'un cours "Évaluation notée". -->
-                            <div class="ef-card mb-4" id="courseQuestionsCard" style="display:none;">
-                                <div class="ef-card-title">Questions de l'évaluation — <span id="courseQuestionsForTitle"></span></div>
-                                <div id="courseQuestionsList" class="mb-3"></div>
-                                <input type="text" class="form-control mb-2" id="newQuestionText" placeholder="Intitulé de la question">
-                                <div id="newQuestionOptions">
-                                    <div class="input-group mb-2">
-                                        <span class="input-group-text"><input type="radio" name="newQuestionCorrect" value="0" checked></span>
-                                        <input type="text" class="form-control" placeholder="Réponse 1 (cocher si correcte)">
-                                    </div>
-                                    <div class="input-group mb-2">
-                                        <span class="input-group-text"><input type="radio" name="newQuestionCorrect" value="1"></span>
-                                        <input type="text" class="form-control" placeholder="Réponse 2">
-                                    </div>
-                                    <div class="input-group mb-2">
-                                        <span class="input-group-text"><input type="radio" name="newQuestionCorrect" value="2"></span>
-                                        <input type="text" class="form-control" placeholder="Réponse 3">
-                                    </div>
-                                    <div class="input-group mb-2">
-                                        <span class="input-group-text"><input type="radio" name="newQuestionCorrect" value="3"></span>
-                                        <input type="text" class="form-control" placeholder="Réponse 4">
-                                    </div>
-                                </div>
-                                <button class="btn btn-outline-primary w-100 mb-2" id="addCourseQuestionBtn">Ajouter la question</button>
-                                <button class="btn btn-link w-100" id="doneCourseQuestionsBtn">Terminer — fermer cette évaluation</button>
+                            <div class="ef-studio-cta mb-4">
+                                <span class="ef-eyebrow">STUDIO DE CRÉATION</span>
+                                <h4>Créez un cours complet en 5 étapes</h4>
+                                <p>Contenu rédigé ou plan type, vidéo, document, évaluation notée — avec l'aperçu exact de ce que verront les agents.</p>
+                                <ul>
+                                    <li><i class="bi bi-check2-circle"></i> Vignette, vidéo et document en glisser-déposer</li>
+                                    <li><i class="bi bi-check2-circle"></i> Questions de la rubrique gérées dans le studio</li>
+                                    <li><i class="bi bi-check2-circle"></i> Brouillon ou publication immédiate</li>
+                                </ul>
+                                <button type="button" class="ef-btn ef-btn-light" id="openCourseStudioBtn"><i class="bi bi-magic"></i> Nouveau cours</button>
                             </div>
 
                             <div class="ef-card mb-4">
@@ -525,6 +484,7 @@
 <script th:src="@{/js/rcc-api.js}"></script>
 <script th:src="@{/js/richtext-editor.js}"></script>
 <script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/course-studio.js}"></script>
 <script th:src="@{/js/training.js}"></script>
 <script th:src="@{/js/training-schedule.js}"></script>
 <script th:src="@{/js/formation.js}"></script>
