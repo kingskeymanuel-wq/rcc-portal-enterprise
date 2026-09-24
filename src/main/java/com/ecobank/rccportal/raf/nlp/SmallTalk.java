@@ -35,7 +35,8 @@ public final class SmallTalk {
     private static final List<Rule> RULES = List.of(
             rule(Kind.HOW_ARE_YOU, 8, "comment (vas|va) tu|comment tu vas|comment (ca|sa) va|comment allez vous|vous allez bien|tu vas bien|"
                     + "la forme raf|quoi de neuf|how are you|how r u|hows it going|como estas|como vai|tudo bem"),
-            whole(Kind.HOW_ARE_YOU, "(" + HELLO + " )?(raf )?((ca|sa) va|cv|la forme|ca roule)( raf| toi| bien| et toi)?"),
+            whole(Kind.HOW_ARE_YOU, "et toi( raf)?|et vous|and you|e tu|y tu"),
+            whole(Kind.HOW_ARE_YOU, "(" + HELLO + " )?(raf )?((ca|sa) va|cv|la forme|ca roule)( raf| toi| bien)?"),
             rule(Kind.MOOD_BAD, 10, "je suis (fatigue|fatiguee|creve|crevee|epuise|epuisee|stresse|stressee|deborde|debordee|decourage|decouragee|triste|"
                     + "enerve|enervee|a bout)|(ca|sa) va pas|pas (trop|tres) bien|pas la forme|journee (difficile|compliquee|dure|chargee)|"
                     + "j en ai marre|ras le bol|i m tired|i am tired|i m stressed|bad day"),
@@ -78,5 +79,33 @@ public final class SmallTalk {
 
     public static boolean isConversational(String normalized) {
         return detect(normalized) != null;
+    }
+
+    private static final Pattern REPLY_GOOD = Pattern.compile("^(oui|ouais|oui oui|oui ca va|oui merci|oui et toi|moi aussi|pareil|ca va|"
+            + "plutot bien|pas mal|tranquille|ras|yes|yeah|sim|si)( merci)?( et toi)?$");
+    private static final Pattern REPLY_BAD = Pattern.compile("^(non|pas vraiment|pas trop|non pas trop|non pas vraiment|bof|no|not really|nao|no mucho)( et toi)?$");
+
+    /**
+     * Comme {@link #detect(String)}, mais en tenant compte de la réplique précédente : après
+     * « comment vas-tu ? » (ou un bonjour de RAF qui demande comment ça va), un simple « oui »,
+     * « pareil » ou « non pas trop » est une réponse d'humeur, pas une commande.
+     */
+    public static Kind detect(String normalized, String previousUserMessage) {
+        Kind direct = detect(normalized);
+        if (direct != null || normalized == null || previousUserMessage == null) return direct;
+        Kind previous = detect(com.ecobank.rccportal.util.SearchText.normalize(previousUserMessage));
+        if (previous != Kind.HOW_ARE_YOU && previous != Kind.GREETING && previous != Kind.MOOD_GOOD && previous != Kind.MOOD_BAD) return null;
+        String n = normalized.trim();
+        if (REPLY_GOOD.matcher(n).matches()) return Kind.MOOD_GOOD;
+        if (REPLY_BAD.matcher(n).matches()) return Kind.MOOD_BAD;
+        return null;
+    }
+
+    /** Contexte de dialogue : message précédent de l'utilisateur s'il s'agissait de conversation. */
+    public static Kind detect(com.ecobank.rccportal.raf.RafModels.RafRequest request) {
+        var state = request.state();
+        String previous = state != null && state.lastIntent() == com.ecobank.rccportal.raf.RafModels.RafIntent.SMALL_TALK
+                ? state.lastQuestion() : null;
+        return detect(request.normalized(), previous);
     }
 }

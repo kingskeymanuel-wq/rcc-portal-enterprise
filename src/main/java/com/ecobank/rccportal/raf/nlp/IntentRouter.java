@@ -99,7 +99,7 @@ public class IntentRouter {
         Map<RafIntent, Double> raw = new EnumMap<>(RafIntent.class);
         Map<RafIntent, List<String>> evidence = new EnumMap<>(RafIntent.class);
 
-        SmallTalk.Kind talk = SmallTalk.detect(request.normalized());
+        SmallTalk.Kind talk = SmallTalk.detect(request);
         if (GREETINGS.contains(request.normalized()) || talk != null) {
             add(raw, evidence, RafIntent.SMALL_TALK, 3.0, "dialogue" + (talk != null ? " (" + talk.name().toLowerCase() + ")" : ""));
         }

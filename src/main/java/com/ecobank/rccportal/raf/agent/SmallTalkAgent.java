@@ -63,7 +63,8 @@ public class SmallTalkAgent implements RafAgent {
         if (routerScore < 0.5) return AgentAnswer.notFound(id(), RafIntent.SMALL_TALK, "pas une formule de dialogue");
         String lang = request.lang();
         boolean en = "en".equals(lang);
-        SmallTalk.Kind kind = SmallTalk.detect(request.normalized());
+        SmallTalk.Kind kind = SmallTalk.detect(request);
+        boolean asksBack = request.normalized().matches(".*(et toi|et vous|and you)( raf)?$");
         if (kind == null) {
             // Routé ici par le mot-clé « aide » / « que sais-tu faire » : présentation des capacités.
             kind = SmallTalk.Kind.CAPABILITIES;
@@ -82,18 +83,20 @@ public class SmallTalkAgent implements RafAgent {
                         new RafSuggestion("💡 Que sais-tu faire ?", "que sais tu faire", null));
             }
             case MOOD_GOOD -> {
-                text = en ? "Great to hear! 🙌 What can I help you with — a procedure, an SLA, a customer email?"
+                String back = asksBack ? (en ? "I'm great too, thanks! " : "Moi aussi ça va très bien, merci ! ") : "";
+                text = back + (en ? "Great to hear! 🙌 What can I help you with — a procedure, an SLA, a customer email?"
                         : pick(List.of("Content de l'entendre ! 🙌 Sur quoi je peux t'aider : une procédure, un délai SLA, un mail client ?",
                                 "Top ! Alors on attaque ? Dis-moi le cas client ou la procédure qui t'intéresse.",
-                                "Parfait, on garde cette énergie 💪 ! Qu'est-ce que je peux faire pour toi ?"), request);
+                                "Parfait, on garde cette énergie 💪 ! Qu'est-ce que je peux faire pour toi ?"), request));
                 chips = few();
             }
             case MOOD_BAD -> {
-                text = en ? "Hang in there 💙 — tough days happen. Take a short breather if you can, then tell me the case: I'll find the procedure and the right words for the customer."
+                String back = asksBack ? (en ? "I'm fine, thanks. " : "Moi ça va, merci. ") : "";
+                text = back + (en ? "Hang in there 💙 — tough days happen. Take a short breather if you can, then tell me the case: I'll find the procedure and the right words for the customer."
                         : pick(List.of("Courage 💙, ce genre de journée arrive à tout le monde. Si tu peux, prends 2 minutes pour souffler, "
                                         + "puis dis-moi le cas qui te bloque : je te trouve la procédure et les bons mots pour le client.",
                                 "Je comprends, certaines journées sont lourdes. Tu n'es pas seul(e) : dis-moi ce qui coince et on le règle ensemble, étape par étape.",
-                                "Respire un bon coup 😮‍💨. Un client difficile ? Je peux te donner la fiche appel (quoi dire, quoi faire, délai) pour gagner du temps."), request);
+                                "Respire un bon coup 😮‍💨. Un client difficile ? Je peux te donner la fiche appel (quoi dire, quoi faire, délai) pour gagner du temps."), request));
                 chips = List.of(new RafSuggestion("📞 Client mécontent", "que dire à un client mécontent", null),
                         new RafSuggestion("🗓 Ma pause / planning", "mon planning aujourd'hui", null),
                         new RafSuggestion("📋 Procédure guidée", "procédure opposition carte", null));

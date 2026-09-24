@@ -283,4 +283,19 @@ class RafOrchestratorTest {
         }
         assertTrue(ask("bonjour procédure opposition carte").explanation().toLowerCase().contains("opposition"));
     }
+
+    @Test
+    void dialogueFollowsTheThreadOfTheConversation() {
+        ask("comment vas tu");
+        var yes = ask("oui et toi");
+        assertTrue(yes.explanation().startsWith("Moi aussi"), yes.explanation());
+        ask("salut raf");
+        var no = ask("non pas trop");
+        assertEquals("LOCAL", no.source());
+        assertFalse(no.explanation().contains("rien trouvé"));
+        assertTrue(ask("ça va et toi").explanation().startsWith("Moi aussi"));
+        var unknown = ask("tu fais quoi ce soir ?");
+        assertEquals("LOCAL", unknown.source(), unknown.explanation());
+        assertEquals(0, gapLog.recent().size());
+    }
 }

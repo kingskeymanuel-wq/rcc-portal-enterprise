@@ -111,7 +111,7 @@ public class RafOrchestrator {
 
         // Une phrase de conversation (« comment vas-tu », « ok », « merci ») n'est jamais la suite
         // elliptique de la question précédente.
-        String expanded = com.ecobank.rccportal.raf.nlp.SmallTalk.isConversational(request.normalized())
+        String expanded = com.ecobank.rccportal.raf.nlp.SmallTalk.detect(request) != null
                 ? null : followUps.expandEllipsis(request);
         if (expanded != null) {
             RafEntities previous = state.lastEntities();
@@ -502,6 +502,14 @@ public class RafOrchestrator {
     }
 
     private RalphSearchResponse nothingFound(RafRequest request, List<IntentScore> ranked, List<RafAgentTrace> traces) {
+        if (request.terms().isEmpty() && request.normalized().split(" ").length <= 6) {
+            // Aucun mot métier : c'est une phrase de conversation que RAF ne connaît pas encore.
+            // On relance la discussion au lieu d'un « rien trouvé » froid (et ce n'est pas une lacune QA).
+            String md = RafText.get(request.lang(), "chat.fallback");
+            remember(request, new RafDialogueState(RafIntent.SMALL_TALK, request.question(), request.entities(), null, null, List.of()), md);
+            return new RalphSearchResponse(md, List.of(), "LOCAL", List.of(), 60, List.of("Dialogue"), RafIntent.SMALL_TALK.name(), traces,
+                    SmallTalkAgent.starters().subList(0, 4), null, false, List.of("phrase de conversation sans mot métier"));
+        }
         String best = ranked.isEmpty() ? null : ranked.get(0).intent().name();
         gapLog.record(request.question(), best);
         String md = RafText.get(request.lang(), "nothing", request.question()) + "\n\n" + RafText.get(request.lang(), "nothing.tip");

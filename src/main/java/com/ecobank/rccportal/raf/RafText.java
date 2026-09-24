@@ -16,6 +16,7 @@ public final class RafText {
     private static final Map<String, Map<String, String>> TEXTS = Map.of(
             "fr", Map.ofEntries(
                     Map.entry("hello", "Bonjour ! Je suis RAF, ton assistant RCC. Je réponds uniquement à partir des données du portail : procédures, SLA, glossaire, agences, modèles de mail, ton planning…"),
+                    Map.entry("chat.fallback", "Je ne suis pas sûr d'avoir bien compris 🤔 On discute, ou tu cherches une info précise ? Donne-moi un mot-clé (carte, GAB, SLA, RIB, agence…) ou choisis une piste ci-dessous."),
                     Map.entry("thanks", "Avec plaisir ! Autre chose ?"),
                     Map.entry("bye", "À bientôt !"),
                     Map.entry("howareyou", "Tout va bien, merci ! Sur quoi je t'aide ?"),
@@ -53,6 +54,7 @@ public final class RafText {
                     Map.entry("dataFrench", "Les contenus du portail sont affichés dans leur langue d'origine (français).")),
             "en", Map.ofEntries(
                     Map.entry("hello", "Hello! I'm RAF, your RCC assistant. I only answer from portal data: procedures, SLAs, glossary, branches, mail templates, your schedule…"),
+                    Map.entry("chat.fallback", "I'm not sure I got that 🤔 Are we chatting, or are you looking for something specific? Give me a keyword (card, ATM, SLA, branch…) or pick a topic below."),
                     Map.entry("thanks", "You're welcome! Anything else?"),
                     Map.entry("bye", "See you soon!"),
                     Map.entry("howareyou", "All good, thanks! What can I help with?"),
@@ -90,6 +92,7 @@ public final class RafText {
                     Map.entry("dataFrench", "Portal content is shown in its original language (French).")),
             "pt", Map.ofEntries(
                     Map.entry("hello", "Olá! Sou o RAF, o seu assistente RCC. Respondo apenas com dados do portal: procedimentos, SLA, glossário, agências, modelos de e-mail, o seu horário…"),
+                    Map.entry("chat.fallback", "Não tenho a certeza de ter percebido 🤔 Estamos a conversar ou procura uma informação? Dê-me uma palavra-chave (cartão, ATM, SLA, agência…) ou escolha abaixo."),
                     Map.entry("thanks", "De nada! Mais alguma coisa?"),
                     Map.entry("bye", "Até breve!"),
                     Map.entry("howareyou", "Tudo bem, obrigado! Em que posso ajudar?"),
@@ -127,6 +130,7 @@ public final class RafText {
                     Map.entry("dataFrench", "O conteúdo do portal é apresentado na língua original (francês).")),
             "es", Map.ofEntries(
                     Map.entry("hello", "¡Hola! Soy RAF, tu asistente RCC. Solo respondo con datos del portal: procedimientos, SLA, glosario, agencias, plantillas de correo, tu horario…"),
+                    Map.entry("chat.fallback", "No estoy seguro de haberte entendido 🤔 ¿Charlamos o buscas algo concreto? Dame una palabra clave (tarjeta, cajero, SLA, agencia…) o elige abajo."),
                     Map.entry("thanks", "¡De nada! ¿Algo más?"),
                     Map.entry("bye", "¡Hasta pronto!"),
                     Map.entry("howareyou", "¡Todo bien, gracias! ¿En qué te ayudo?"),
