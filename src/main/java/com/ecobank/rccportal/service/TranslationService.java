@@ -186,13 +186,16 @@ public class TranslationService {
             if (cached != null) return cached;
         }
 
-        List<String> failures = new ArrayList<>();
+        // Sources utilisables pour ce texte, dans l'ordre de préférence.
+        List<String> failures = java.util.Collections.synchronizedList(new ArrayList<>());
+        List<Provider> candidates = new ArrayList<>();
+        List<String> sources = new ArrayList<>();
         for (Provider provider : orderedProviders()) {
             if (!provider.isConfigured()) continue;
             Long retryAt = unreachableUntil.get(provider.id());
             if (retryAt != null && retryAt > System.currentTimeMillis()) {
-                // Source injoignable il y a peu : on ne fait pas attendre l'agent un nouveau délai réseau.
-                failures.add(provider.label() + " : injoignable (nouvel essai dans "
+                // Source injoignable/trop lente il y a peu : on ne fait pas attendre l'agent un nouveau délai.
+                failures.add(provider.label() + " : indisponible (nouvel essai dans "
                         + Math.max(1, (retryAt - System.currentTimeMillis()) / 1000) + " s)");
                 continue;
             }
@@ -207,31 +210,26 @@ public class TranslationService {
                 failures.add(provider.label() + " : langue source non détectable automatiquement pour ce texte");
                 continue;
             }
-            try {
-                TranslationResult result = provider.translate(text, sourceForCall, target);
-                if (result == null || result.translatedText() == null || result.translatedText().isBlank()) {
-                    throw new IllegalStateException("réponse vide");
-                }
-                String detectedLang = result.detectedSourceLang() != null ? canonical(result.detectedSourceLang())
-                        : ("auto".equals(sourceForCall) ? detected : sourceForCall);
-                TranslationResult finalResult = new TranslationResult(result.translatedText(), detectedLang, provider.label());
-                synchronized (cache) {
-                    cache.put(key, finalResult);
-                }
-                return finalResult;
-            } catch (Exception e) {
-                String reason = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-                if (isUnreachable(e)) {
-                    unreachableUntil.put(provider.id(), System.currentTimeMillis() + UNREACHABLE_RETRY_MS);
-                    if (e.getMessage() == null) {
-                        reason = "injoignable depuis ce serveur (réseau ou pare-feu, " + e.getClass().getSimpleName() + ")";
-                    }
-                } else {
-                    unreachableUntil.remove(provider.id());
-                }
-                log.warn("[TRANSLATE] {} a échoué ({} → {}) : {}", provider.label(), sourceForCall, target, reason);
-                failures.add(provider.label() + " : " + reason);
+            candidates.add(provider);
+            sources.add(sourceForCall);
+        }
+
+        // Course « relais » : la source préférée part seule ; si elle n'a pas répondu en
+        // HEDGE_DELAY_MS (ou échoue), la suivante part EN PARALLÈLE et la première bonne réponse
+        // gagne. Avant : chaque source lente faisait attendre jusqu'au délai complet (12 s) avant
+        // d'essayer la suivante — d'où des traductions de 20-30 s.
+        TranslationResult won = race(text, target, detected, candidates, sources, failures);
+        if (won != null) {
+            synchronized (cache) {
+                cache.put(key, won);
             }
+            return won;
+        }
+
+        // Dernier recours hors-ligne : formules courantes de la relation client.
+        String phrase = CommonPhrases.lookup(text, "auto".equals(source) ? detected : source, target);
+        if (phrase != null) {
+            return new TranslationResult(phrase, "auto".equals(source) ? detected : source, "Glossaire RCC (hors-ligne)");
         }
 
         if (failures.isEmpty()) {
@@ -243,6 +241,115 @@ public class TranslationService {
                 : "";
         throw ApiException.serviceUnavailable("La traduction a échoué sur toutes les sources disponibles — "
                 + String.join(" ; ", failures) + "." + hint);
+    }
+
+    /** Délai avant de lancer la source suivante en parallèle quand la précédente tarde. */
+    static final long HEDGE_DELAY_MS = 2500;
+    /** Source trop lente (délai dépassé) : écartée un moment pour ne pas ralentir les agents. */
+    private static final long SLOW_RETRY_MS = 60 * 1000L;
+
+    private static final java.util.concurrent.ExecutorService RACE_POOL = java.util.concurrent.Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "translate-race");
+        t.setDaemon(true);
+        return t;
+    });
+
+    private record Attempt(Provider provider, String source, TranslationResult result, Exception error) {
+    }
+
+    private TranslationResult race(String text, String target, String detected, List<Provider> candidates,
+                                   List<String> sources, List<String> failures) {
+        if (candidates.isEmpty()) return null;
+        java.util.concurrent.ExecutorCompletionService<Attempt> ecs = new java.util.concurrent.ExecutorCompletionService<>(RACE_POOL);
+        List<java.util.concurrent.Future<Attempt>> running = new ArrayList<>();
+        int launched = 0;
+        int finished = 0;
+        long deadline = System.currentTimeMillis() + (Math.max(1, timeoutSeconds) + 5) * 1000L;
+        try {
+            running.add(submit(ecs, candidates.get(0), sources.get(0), text, target));
+            launched = 1;
+            while (finished < launched) {
+                long left = deadline - System.currentTimeMillis();
+                if (left <= 0) break;
+                long wait = launched < candidates.size() ? Math.min(HEDGE_DELAY_MS, left) : left;
+                java.util.concurrent.Future<Attempt> done = ecs.poll(wait, java.util.concurrent.TimeUnit.MILLISECONDS);
+                if (done == null) {
+                    if (launched < candidates.size()) {
+                        running.add(submit(ecs, candidates.get(launched), sources.get(launched), text, target));
+                        launched++;
+                    }
+                    continue;
+                }
+                finished++;
+                Attempt a = done.get();
+                if (a.error() == null) {
+                    unreachableUntil.remove(a.provider().id());
+                    TranslationResult r = a.result();
+                    String detectedLang = r.detectedSourceLang() != null && !r.detectedSourceLang().isBlank()
+                            ? canonical(r.detectedSourceLang())
+                            : ("auto".equals(a.source()) ? detected : a.source());
+                    return new TranslationResult(r.translatedText(), detectedLang, a.provider().label());
+                }
+                recordFailure(a, target, failures);
+                if (launched < candidates.size()) {
+                    running.add(submit(ecs, candidates.get(launched), sources.get(launched), text, target));
+                    launched++;
+                }
+            }
+            for (int i = 0; i < launched; i++) {
+                if (!running.get(i).isDone()) failures.add(candidates.get(i).label() + " : aucune réponse dans le délai imparti");
+            }
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (java.util.concurrent.ExecutionException e) {
+            failures.add(String.valueOf(e.getCause()));
+            return null;
+        } finally {
+            running.forEach(f -> f.cancel(true)); // les requêtes perdantes sont abandonnées
+        }
+    }
+
+    private java.util.concurrent.Future<Attempt> submit(java.util.concurrent.ExecutorCompletionService<Attempt> ecs,
+                                                        Provider provider, String sourceForCall, String text, String target) {
+        return ecs.submit(() -> {
+            try {
+                TranslationResult result = provider.translate(text, sourceForCall, target);
+                if (result == null || result.translatedText() == null || result.translatedText().isBlank()) {
+                    throw new IllegalStateException("réponse vide");
+                }
+                return new Attempt(provider, sourceForCall, result, null);
+            } catch (Exception e) {
+                return new Attempt(provider, sourceForCall, null, e);
+            }
+        });
+    }
+
+    private void recordFailure(Attempt a, String target, List<String> failures) {
+        Exception e = a.error();
+        String reason = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+        if (isUnreachable(e)) {
+            unreachableUntil.put(a.provider().id(), System.currentTimeMillis() + UNREACHABLE_RETRY_MS);
+            if (e.getMessage() == null) {
+                reason = "injoignable depuis ce serveur (réseau ou pare-feu, " + e.getClass().getSimpleName() + ")";
+            }
+        } else if (isTimeout(e)) {
+            unreachableUntil.put(a.provider().id(), System.currentTimeMillis() + SLOW_RETRY_MS);
+            reason = "trop lente (aucune réponse en " + timeoutSeconds + " s)";
+        } else {
+            unreachableUntil.remove(a.provider().id());
+        }
+        log.warn("[TRANSLATE] {} a échoué ({} → {}) : {}", a.provider().label(), a.source(), target, reason);
+        failures.add(a.provider().label() + " : " + reason);
+    }
+
+    static boolean isTimeout(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof java.net.http.HttpTimeoutException || t instanceof java.net.SocketTimeoutException
+                    || t instanceof java.util.concurrent.TimeoutException) return true;
+        }
+        return false;
     }
 
     /** Teste chaque source indépendamment — bouton « Diagnostiquer la connexion ». */

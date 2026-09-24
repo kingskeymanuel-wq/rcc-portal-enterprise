@@ -97,15 +97,15 @@ class LibreTranslateProviderTest {
     @Test
     void stoppedServerGivesActionableError() {
         server.stop(0);
-        ApiException e = assertThrows(ApiException.class, () -> service.translate("Bonjour", "fr", "en"));
+        ApiException e = assertThrows(ApiException.class, () -> service.translate("Bonjour Paul", "fr", "en"));
         assertTrue(e.getMessage().contains("LibreTranslate est-il démarré"), e.getMessage());
     }
 
     @Test
     void unreachableServerIsSkippedInsteadOfWaitingAgain() {
         server.stop(0);
-        assertThrows(ApiException.class, () -> service.translate("Bonjour", "fr", "en"));
-        ApiException second = assertThrows(ApiException.class, () -> service.translate("Bonsoir", "fr", "en"));
+        assertThrows(ApiException.class, () -> service.translate("Bonjour Paul", "fr", "en"));
+        ApiException second = assertThrows(ApiException.class, () -> service.translate("Bonsoir Paul", "fr", "en"));
         assertTrue(second.getMessage().contains("nouvel essai dans"), second.getMessage());
     }
 

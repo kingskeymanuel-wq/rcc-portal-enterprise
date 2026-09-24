@@ -544,7 +544,7 @@
                     .then(function (result) { resultBox.value = result.translated; })
                     .catch(function (e) {
                         var message = e.message || "";
-                        try { var parsed = JSON.parse(message); message = parsed.message || message; } catch (ignore) {}
+                        try { var parsed = JSON.parse(message); message = (parsed.error && parsed.error.message) || parsed.message || message; } catch (ignore) {}
                         resultBox.value = "";
                         alert("Traduction impossible : " + message);
                     })

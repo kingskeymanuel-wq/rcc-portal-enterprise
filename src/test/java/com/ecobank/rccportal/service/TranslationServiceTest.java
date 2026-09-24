@@ -73,7 +73,7 @@ class TranslationServiceTest {
 
     @Test
     void noProviderConfiguredIsReportedClearly() {
-        ApiException e = assertThrows(ApiException.class, () -> service.translate("Bonjour", "fr", "en"));
+        ApiException e = assertThrows(ApiException.class, () -> service.translate("Bonjour Paul", "fr", "en"));
         assertTrue(e.getMessage().contains("Aucune source de traduction"));
     }
 

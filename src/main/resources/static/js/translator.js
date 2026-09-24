@@ -71,7 +71,13 @@
 
     function parseError(e) {
         var message = (e && e.message) || "";
-        try { var parsed = JSON.parse(message); message = parsed.message || parsed.error || message; } catch (ignore) {}
+        try {
+            // Corps d'erreur du portail : {"error":{"code","message"}} — avant, « [object Object] ».
+            var parsed = JSON.parse(message);
+            var err = parsed && parsed.error;
+            message = (err && typeof err === "object" ? err.message : err) || parsed.message || message;
+        } catch (ignore) {}
+        if (typeof message !== "string") message = JSON.stringify(message);
         return message || "erreur inconnue";
     }
 
