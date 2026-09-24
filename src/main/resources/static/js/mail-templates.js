@@ -43,7 +43,22 @@
             renderSearch();
             populateAdminSelectors();
             if (currentTeamCode) renderTeamDetail(currentTeamCode);
+            openDeepLinkedTemplate();
         }).catch(function (e) { console.error(e); });
+    }
+
+    /** Lien direct « /mail-templates?template=12 » (Portail Agence → Escalades) : ouvre le masque. */
+    var deepLinkDone = false;
+    function openDeepLinkedTemplate() {
+        if (deepLinkDone) return;
+        deepLinkDone = true;
+        var id = Number(new URLSearchParams(window.location.search).get("template"));
+        if (!id) return;
+        var template = (overviewCache.templates || []).find(function (t) { return t.id === id; });
+        if (!template) return;
+        var category = (overviewCache.categories || []).find(function (c) { return c.id === template.categoryId; });
+        if (category && category.team) selectTeam(category.team);
+        setTimeout(function () { openUseTemplate(id); }, 150);
     }
 
     function categoriesForTeam(teamCode) {

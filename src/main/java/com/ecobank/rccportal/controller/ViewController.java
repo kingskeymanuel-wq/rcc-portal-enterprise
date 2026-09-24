@@ -166,4 +166,11 @@ public class ViewController {
     public String translator() {
         return "translator";
     }
+
+    /** Portail Agence — caissiers et gestionnaires clientèle : mêmes référentiels que le RCC
+     *  (cartographie des cas, procédures, base de connaissances, cartes, escalades) + outils locaux. */
+    @GetMapping("/agence")
+    public String agencePortal() {
+        return "agence";
+    }
 }

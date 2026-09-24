@@ -39,7 +39,7 @@
         "reinitialisation": "réinitialisation", "deverrouillage": "déverrouillage", "deverouillage": "déverrouillage", "desactivation": "désactivation",
         "creation": "création", "verification": "vérification", "releve": "relevé", "generale": "générale", "deplafonnement": "déplafonnement",
         "telephonique": "téléphonique", "a": "à", "delai": "délai", "validite": "validité", "cout": "coût", "recus": "reçus", "emission": "émission",
-        "disponibilite": "disponibilité", "correspondante": "correspondante", "mise": "mise", "jeton": "jeton" };
+        "disponibilite": "disponibilité", "confrere": "confrère", "correspondante": "correspondante", "mise": "mise", "jeton": "jeton" };
 
     function pretty(title) {
         var words = title.toLowerCase().split(/(\s+|\/|\(|\)|,|\|)/);

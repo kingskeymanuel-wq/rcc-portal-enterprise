@@ -25,23 +25,27 @@
                 <i class="bi bi-calendar2-week"></i>
                 <span data-i18n="nav.excelliam">Portail Excelliam</span>
             </a>
-            <a th:href="@{/mon-rcc}" data-roles="AGENT,QA,ADMIN,RH,SUPERVISOR,TEAM_LEADER">
+            <a th:href="@{/agence}" data-roles="AGENCE,ADMIN,QA">
+                <i class="bi bi-shop-window"></i>
+                <span data-i18n="nav.agence">Portail Agence</span>
+            </a>
+            <a th:href="@{/mon-rcc}" data-roles="AGENT,QA,ADMIN,RH,SUPERVISOR,TEAM_LEADER,AGENCE">
                 <i class="bi bi-chat-square-heart-fill"></i>
                 <span data-i18n="nav.monrcc">MON RCC</span>
             </a>
-            <a th:href="@{/translator}" data-roles="AGENT,QA,QA_SUPERVISOR,ADMIN,RH,SUPERVISOR,TEAM_LEADER,FORMATEUR">
+            <a th:href="@{/translator}" data-roles="AGENT,QA,QA_SUPERVISOR,ADMIN,RH,SUPERVISOR,TEAM_LEADER,FORMATEUR,AGENCE">
                 <i class="bi bi-translate"></i>
                 <span data-i18n="nav.translator">Traducteur &amp; correcteur</span>
             </a>
-            <a th:href="@{/procedures}" data-roles="AGENT,QA,ADMIN">
+            <a th:href="@{/procedures}" data-roles="AGENT,QA,ADMIN,AGENCE">
                 <i class="bi bi-list-check"></i>
                 <span data-i18n="nav.procedures">Procédure de traitement</span>
             </a>
-            <a th:href="@{/mail-templates}" data-roles="AGENT,QA,ADMIN">
+            <a th:href="@{/mail-templates}" data-roles="AGENT,QA,ADMIN,AGENCE">
                 <i class="bi bi-envelope-fill"></i>
                 <span data-i18n="nav.mailTemplates">Masques de mail</span>
             </a>
-            <a th:href="@{/knowledge}" data-roles="AGENT,QA,ADMIN">
+            <a th:href="@{/knowledge}" data-roles="AGENT,QA,ADMIN,AGENCE">
                 <i class="bi bi-book-fill"></i>
                 <span data-i18n="nav.knowledge">Knowledge Base</span>
             </a>

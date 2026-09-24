@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RCC Portal Enterprise — Portail Agence</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/case-mapping.css}">
+    <link rel="stylesheet" th:href="@{/css/agence.css}">
+</head>
+<body>
+<div class="layout">
+    <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+    <div class="content">
+        <div th:replace="~{fragments/header :: header}"></div>
+        <main id="page-content">
+            <div class="container-fluid ag-page">
+
+                <!-- ===== Bandeau ===== -->
+                <section class="ag-hero">
+                    <div class="ag-hero-bg" aria-hidden="true"><span></span><span></span><span></span></div>
+                    <div class="ag-hero-main">
+                        <span class="ag-chip"><i class="bi bi-shop-window"></i> Réseau d'agences Ecobank</span>
+                        <h2>Portail Agence</h2>
+                        <p id="agGreeting">Les mêmes référentiels que le Centre de Relation Client, pour un traitement uniforme en agence et au RCC.</p>
+                        <div class="ag-hero-controls">
+                            <div class="ag-mode" role="group" aria-label="Mon poste">
+                                <button type="button" data-mode="CAISSIER"><i class="bi bi-cash-coin"></i> Caissier</button>
+                                <button type="button" data-mode="GESTIONNAIRE"><i class="bi bi-person-vcard"></i> Gestionnaire</button>
+                            </div>
+                            <label class="ag-agency-pick">
+                                <i class="bi bi-geo-alt-fill"></i>
+                                <select id="agAgencySelect" aria-label="Mon agence"><option value="">Mon agence…</option></select>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="ag-hero-side">
+                        <div class="ag-clock"><div id="agClock">--:--</div><small id="agDate"></small></div>
+                        <div class="ag-privacy"><i class="bi bi-shield-lock-fill"></i> Outils sans conservation de données client</div>
+                    </div>
+                </section>
+
+                <!-- ===== Onglets ===== -->
+                <nav class="ag-tabs" id="agTabs" role="tablist">
+                    <button type="button" class="active" data-tab="accueil"><i class="bi bi-speedometer2"></i> Accueil</button>
+                    <button type="button" data-tab="cas"><i class="bi bi-diagram-3-fill"></i> Cartographie des cas</button>
+                    <button type="button" data-tab="recherche"><i class="bi bi-search"></i> Procédures &amp; KB</button>
+                    <button type="button" data-tab="cartes"><i class="bi bi-credit-card-2-front"></i> Cartes &amp; PIN</button>
+                    <button type="button" data-tab="agences"><i class="bi bi-bank2"></i> Agences &amp; GAB</button>
+                    <button type="button" data-tab="escalades"><i class="bi bi-envelope-paper"></i> Escalades</button>
+                    <button type="button" data-tab="transmission"><i class="bi bi-send-check"></i> Transmettre au RCC</button>
+                    <button type="button" data-tab="outils"><i class="bi bi-tools"></i> Boîte à outils</button>
+                </nav>
+
+                <!-- Accueil -->
+                <section class="ag-pane active" data-pane="accueil">
+                    <div class="ag-grid-tiles" id="agTiles"></div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-xl-7">
+                            <div class="ag-card">
+                                <div class="ag-card-title"><i class="bi bi-lightning-charge-fill"></i> Le client est devant moi : que fait-il ?</div>
+                                <div class="ag-quick-search">
+                                    <i class="bi bi-search"></i>
+                                    <input id="agQuickInput" type="search" placeholder="Ex. « carte avalée », « reset mobile app », « virement salaire »…">
+                                </div>
+                                <div id="agQuickResults" class="ag-quick-results"></div>
+                            </div>
+                        </div>
+                        <div class="col-xl-5">
+                            <div class="ag-card">
+                                <div class="ag-card-title"><i class="bi bi-credit-card-fill"></i> Cartes &amp; PIN — mon agence</div>
+                                <div id="agMyCards"><p class="text-muted small mb-0">Choisissez votre agence en haut de page.</p></div>
+                            </div>
+                            <div class="ag-card mt-3">
+                                <div class="ag-card-title"><i class="bi bi-arrow-repeat"></i> Traitement uniforme agence ↔ RCC</div>
+                                <ol class="ag-steps">
+                                    <li><b>Identifier</b> le cas dans la <a href="#" data-goto="cas">cartographie</a> (même Type / Catégorie / Sous-catégorie que le RCC).</li>
+                                    <li><b>Appliquer</b> la <a href="#" data-goto="recherche">procédure</a> en vigueur.</li>
+                                    <li><b>Résoudre</b> sur place si l'option FCR le permet, sinon <a href="#" data-goto="escalades">escalader</a> au back-office.</li>
+                                    <li><b>Passer le relais</b> au RCC avec une <a href="#" data-goto="transmission">fiche de transmission</a> masquée.</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Cartographie -->
+                <section class="ag-pane" data-pane="cas">
+                    <div class="ag-card ag-card-hero">
+                        <div>
+                            <div class="ag-card-title mb-1"><i class="bi bi-diagram-3-fill"></i> Cartographie des cas — référentiel commun RCC</div>
+                            <p class="text-muted mb-0">Les 122 cas classés comme au Centre de Relation Client : type d'incident, catégorie, sous-catégorie et option FCR. Même classification = même traitement, en agence comme au téléphone.</p>
+                        </div>
+                        <button type="button" class="cm-launch" id="agOpenCaseMap">
+                            <span class="cm-launch-ico"><i class="bi bi-diagram-3-fill"></i></span>
+                            <span>Ouvrir la cartographie<small>Recherche · fiche · copie CRM</small></span>
+                        </button>
+                    </div>
+                    <div class="ag-prod-grid" id="agProdGrid"></div>
+                </section>
+
+                <!-- Recherche unifiée -->
+                <section class="ag-pane" data-pane="recherche">
+                    <div class="ag-card">
+                        <div class="ag-card-title"><i class="bi bi-search"></i> Procédures, Base de connaissances et formations — la même source que le RCC</div>
+                        <form id="agSearchForm" class="ag-search-row">
+                            <input id="agSearchInput" type="search" class="form-control form-control-lg" placeholder="Ex. opposition carte, ouverture de compte, frais de transfert…">
+                            <button class="btn btn-primary btn-lg" type="submit"><i class="bi bi-search"></i> Rechercher</button>
+                        </form>
+                        <div class="ag-suggest" id="agSearchSuggest"></div>
+                        <div id="agSearchResults" class="mt-3"></div>
+                    </div>
+                </section>
+
+                <!-- Cartes -->
+                <section class="ag-pane" data-pane="cartes">
+                    <div class="ag-card">
+                        <div class="ag-card-title d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <span><i class="bi bi-credit-card-2-front"></i> Disponibilité des cartes et codes PIN par agence</span>
+                            <input id="agCardFilter" type="search" class="form-control form-control-sm" style="max-width:260px" placeholder="Filtrer (agence, code, type)…">
+                        </div>
+                        <div id="agCardsInfo" class="small text-muted mb-2"></div>
+                        <div id="agCardsTable" class="table-responsive"></div>
+                    </div>
+                </section>
+
+                <!-- Agences -->
+                <section class="ag-pane" data-pane="agences">
+                    <div class="ag-card">
+                        <div class="ag-card-title d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <span><i class="bi bi-bank2"></i> Agences Ecobank — orienter le client</span>
+                            <span class="d-flex gap-2">
+                                <input id="agBranchFilter" type="search" class="form-control form-control-sm" style="max-width:260px" placeholder="Ville, quartier, code (K27)…">
+                                <a class="btn btn-sm btn-outline-primary" th:href="@{/knowledge}"><i class="bi bi-map"></i> Carte interactive</a>
+                            </span>
+                        </div>
+                        <div id="agBranches" class="ag-branch-grid"></div>
+                    </div>
+                </section>
+
+                <!-- Escalades -->
+                <section class="ag-pane" data-pane="escalades">
+                    <div class="ag-card">
+                        <div class="ag-card-title"><i class="bi bi-envelope-paper"></i> Escalades back-office — les mêmes tableaux que le RCC</div>
+                        <p class="text-muted small">Reset PIN, DSD GAB, linkage Mobile Money… Ouvrez le masque pour le remplir : il se copie en vrai tableau dans Outlook.</p>
+                        <div id="agEscalations" class="ag-esc-grid"></div>
+                    </div>
+                </section>
+
+                <!-- Transmission RCC -->
+                <section class="ag-pane" data-pane="transmission">
+                    <div class="row g-3">
+                        <div class="col-xl-6">
+                            <div class="ag-card">
+                                <div class="ag-card-title"><i class="bi bi-send-check"></i> Fiche de transmission au RCC</div>
+                                <p class="text-muted small">Rien n'est enregistré : la fiche est générée dans votre navigateur. Les numéros de compte, de carte, de téléphone et les e-mails sont <b>masqués automatiquement</b>.</p>
+                                <div class="row g-2">
+                                    <div class="col-md-6"><label class="form-label small">Motif (cartographie)</label>
+                                        <select id="agTrCase" class="form-select"></select></div>
+                                    <div class="col-md-6"><label class="form-label small">Urgence</label>
+                                        <select id="agTrUrgency" class="form-select">
+                                            <option>Normale</option><option>Haute — client en agence</option><option>Critique — fraude / blocage</option>
+                                        </select></div>
+                                    <div class="col-md-6"><label class="form-label small">Référence client (masquée)</label>
+                                        <input id="agTrRef" class="form-control" placeholder="Ex. n° de compte — sera masqué"></div>
+                                    <div class="col-md-6"><label class="form-label small">Canal de rappel souhaité</label>
+                                        <select id="agTrChannel" class="form-select"><option>Appel</option><option>E-mail</option><option>Retour en agence</option><option>WhatsApp / Rafiki</option></select></div>
+                                    <div class="col-12"><label class="form-label small">Ce qui a été fait en agence</label>
+                                        <textarea id="agTrDone" class="form-control" rows="3" placeholder="Vérifications, pièces contrôlées, opérations tentées…"></textarea></div>
+                                    <div class="col-12"><label class="form-label small">Ce que le RCC doit faire</label>
+                                        <textarea id="agTrAsk" class="form-control" rows="3" placeholder="Action attendue, délai annoncé au client…"></textarea></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-6">
+                            <div class="ag-card">
+                                <div class="ag-card-title"><i class="bi bi-eye"></i> Aperçu (données sensibles masquées)</div>
+                                <pre id="agTrPreview" class="ag-preview"></pre>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button type="button" class="btn btn-primary" id="agTrCopy"><i class="bi bi-clipboard-check"></i> Copier la fiche</button>
+                                    <a class="btn btn-outline-primary" id="agTrMail" href="#"><i class="bi bi-envelope"></i> Ouvrir dans Outlook</a>
+                                    <button type="button" class="btn btn-outline-secondary" id="agTrReset"><i class="bi bi-eraser"></i> Effacer</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Boîte à outils -->
+                <section class="ag-pane" data-pane="outils">
+                    <div class="ag-privacy-band"><i class="bi bi-shield-check"></i>
+                        <div><b>Outils 100 % locaux.</b> Les calculs se font dans votre navigateur : rien n'est envoyé au serveur ni enregistré, aucune donnée client n'est modifiée.</div></div>
+                    <div class="ag-tool-nav" id="agToolNav"></div>
+                    <div id="agToolBody"></div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/preferences.js}"></script>
+<script th:src="@{/js/rcc-api.js}"></script>
+<script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/case-mapping-data.js}"></script>
+<script th:src="@{/js/case-mapping.js}"></script>
+<script th:src="@{/js/agence-tools.js}"></script>
+<script th:src="@{/js/agence.js}"></script>
+</body>
+</html>

@@ -775,6 +775,10 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         seedServiceIfMissing("FORMATEUR", "Formateur", "Conçoit les formations et crée les évaluations du Centre de Formation", 15);
         seedServiceIfMissing("COMMUNICATION", "Communication", "Habilité à publier des actualités sur MON RCC", 16);
         seedServiceIfMissing("SUPERVISEUR_QA", "Superviseur Qualité Assurance", "Supervision de toutes les écoutes, évaluations et formations Quality Assurance", 17);
+        // Réseau d'agences : caissiers et gestionnaires clientèle — atterrissage sur le Portail
+        // Agence (/agence), mêmes référentiels que le RCC pour un traitement uniforme.
+        seedServiceIfMissing("AGENCE_CAISSIER", "Agence — Caissier", "Caissier en agence : opérations de guichet, assistance client", 18);
+        seedServiceIfMissing("AGENCE_GESTIONNAIRE", "Agence — Gestionnaire clientèle", "Gestionnaire de clientèle en agence : conseil, comptes, cartes, crédits", 19);
 
         createIfMissing("USERS", """
                 CREATE TABLE dbo.USERS (

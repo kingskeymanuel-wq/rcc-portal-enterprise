@@ -173,6 +173,9 @@ public class UserService {
                 put("AGENT_INBOUND", "/dashboard");
                 put("AGENT_INBOUND_MAIL", "/dashboard");
                 put("AGENT_CIB", "/dashboard");
+                put("AGENCE_CAISSIER", "/agence");
+                put("AGENCE_GESTIONNAIRE", "/agence");
+                put("AGENCE", "/agence");
             }};
 
     /** Repli — voir commentaire sur son usage dans teamStatus(). Clés = noms de Rôle réels. */

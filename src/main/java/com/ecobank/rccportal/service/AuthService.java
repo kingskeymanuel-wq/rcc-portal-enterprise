@@ -1010,6 +1010,9 @@ public class AuthService {
                 put("AGENT_OUTBOUND", "AGENT");
                 put("AGENT_INBOUND_MAIL", "AGENT");
                 put("AGENT_CIB", "AGENT");
+                put("AGENCE_CAISSIER", "AGENCE");
+                put("AGENCE_GESTIONNAIRE", "AGENCE");
+                put("AGENCE", "AGENCE");
             }};
 
     private String getPrimaryRole(User user) {

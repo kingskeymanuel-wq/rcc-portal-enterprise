@@ -26,6 +26,7 @@ window.RccSession = (function () {
         EXCELLIAM: "Excelliam (Prestataire Planning)",
         SUPERVISOR: "Superviseur",
         TEAM_LEADER: "Team Leader",
+        AGENCE: "Agence (Caissier / Gestionnaire)",
         AGENT: "Agent"
     };
 
@@ -54,6 +55,7 @@ window.RccSession = (function () {
         if (user.role && user.role.toUpperCase() === "EXCELLIAM") return "EXCELLIAM";
         if (user.role && user.role.toUpperCase() === "SUPERVISOR") return "SUPERVISOR";
         if (user.role && user.role.toUpperCase() === "TEAM_LEADER") return "TEAM_LEADER";
+        if (user.role && user.role.toUpperCase() === "AGENCE") return "AGENCE";
         if (user.service && user.service.toUpperCase().replace(/_/g, " ") === "SUPERVISEUR QA") return "QA_SUPERVISOR";
         if (user.service && user.service.toLowerCase().replace(/_/g, " ") === "quality assurance") return "QA";
         if (user.service && user.service.toUpperCase() === "FORMATEUR") return "FORMATEUR";
@@ -363,7 +365,7 @@ window.RccSession = (function () {
 
     // Profils qui n'ont pas de shift personnel à pointer — ils reçoivent un bouton
     // Déconnexion à la place du widget de suivi de shift dans la barre latérale.
-    var NO_SHIFT_PROFILES = ["TEAM_LEADER", "SUPERVISOR", "RH", "EXCELLIAM", "ADMIN", "QA", "QA_SUPERVISOR", "FORMATEUR"];
+    var NO_SHIFT_PROFILES = ["AGENCE", "TEAM_LEADER", "SUPERVISOR", "RH", "EXCELLIAM", "ADMIN", "QA", "QA_SUPERVISOR", "FORMATEUR"];
 
     /** Remplace le contenu du widget de shift par un simple bouton Déconnexion. */
     function wireSidebarLogoutButton(shiftWidget) {
