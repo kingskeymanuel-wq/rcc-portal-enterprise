@@ -24,6 +24,23 @@ public class BranchAgent implements RafAgent {
         this.catalog = catalog;
     }
 
+    /** Disponibilité cartes / PIN cochée par les agences (optionnelle). */
+    private com.ecobank.rccportal.service.CardAgencyStatusService cards;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setCards(com.ecobank.rccportal.service.CardAgencyStatusService cards) {
+        this.cards = cards;
+    }
+
+    private static final java.util.regex.Pattern CODE = java.util.regex.Pattern.compile("\\(([A-Z]{1,3}\\d{1,4})\\)\\s*$");
+
+    static String cardLine(com.ecobank.rccportal.dto.CardAgencyDtos.AgencyRow r) {
+        java.util.function.Function<String, String> lbl = st -> "OK".equals(st) ? "✅ disponible" : "FAIBLE".equals(st) ? "⚠️ stock faible" : "❌ rupture";
+        return "💳 Cartes : " + lbl.apply(r.cardStatus()) + " · Codes PIN : " + lbl.apply(r.pinStatus())
+                + (r.cardTypes() != null && !r.cardTypes().isEmpty() ? " · " + String.join(", ", r.cardTypes()) : "")
+                + (r.reportDate() != null ? " _(màj " + r.reportDate().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM")) + ")_" : "");
+    }
+
     public String id() { return "branch"; }
 
     public String label() { return "Agences Ecobank"; }
@@ -65,11 +82,19 @@ public class BranchAgent implements RafAgent {
         String where = city != null ? city : country != null ? countryLabel(data, country) : null;
         StringBuilder md = new StringBuilder("**🏦 ").append(matches.size()).append(" agence(s)")
                 .append(where != null ? " — " + where : "").append("**\n");
+        java.util.Map<String, java.util.Map<String, com.ecobank.rccportal.dto.CardAgencyDtos.AgencyRow>> cardCache = new java.util.HashMap<>();
         for (BranchDoc b : matches.stream().limit(5).toList()) {
             md.append("\n• **").append(b.name()).append("**").append(b.city() != null ? " (" + b.city() + ")" : "");
             if (b.address() != null && !b.address().isBlank()) md.append("\n  ").append(b.address());
             if (b.openingHours() != null && !b.openingHours().isBlank()) md.append("\n  🕘 ").append(b.openingHours());
             if (b.phone() != null && !b.phone().isBlank()) md.append("\n  ☎ ").append(b.phone());
+            java.util.regex.Matcher code = CODE.matcher(b.name() == null ? "" : b.name().toUpperCase(Locale.ROOT));
+            if (cards != null && b.countryCode() != null && code.find()) {
+                try {
+                    var row = cardCache.computeIfAbsent(b.countryCode(), cards::currentByCode).get(code.group(1));
+                    if (row != null) md.append("\n  ").append(cardLine(row));
+                } catch (RuntimeException ignored) { /* disponibilité indisponible : réponse sans cette ligne */ }
+            }
             if (b.latitude() != null && b.longitude() != null) {
                 md.append("\n  🗺 https://www.openstreetmap.org/?mlat=").append(b.latitude()).append("&mlon=").append(b.longitude())
                         .append("#map=17/").append(b.latitude()).append("/").append(b.longitude());

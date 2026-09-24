@@ -18,7 +18,7 @@ public final class CardAgencyDtos {
 
     /** Point du jour demandé (par défaut le plus récent) + dates disponibles pour l'historique. */
     public record AgencyReport(String countryCode, LocalDate reportDate, List<LocalDate> dates, List<AgencyRow> rows,
-                               List<String> allCardTypes) {}
+                               List<String> allCardTypes, boolean current) {}
 
     public record AgencyRowRequest(
             @NotBlank @Size(max = 2) String countryCode,

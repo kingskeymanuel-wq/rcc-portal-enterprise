@@ -16,4 +16,6 @@ public interface CardAgencyStatusRepository extends JpaRepository<CardAgencyStat
     Optional<CardAgencyStatus> findByCountryCodeIgnoreCaseAndReportDateAndAgencyIgnoreCase(String countryCode, LocalDate reportDate, String agency);
 
     long countByCountryCodeIgnoreCase(String countryCode);
+
+    Optional<CardAgencyStatus> findFirstByCountryCodeIgnoreCaseAndReportDateAndAgencyCodeIgnoreCase(String countryCode, LocalDate reportDate, String agencyCode);
 }

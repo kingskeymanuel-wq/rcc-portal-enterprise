@@ -49,6 +49,7 @@
 .ca-card-types span { font-size: .68rem; font-weight: 800; background: #eaf2ff; color: #0057b8; border-radius: 999px; padding: 2px 9px; transition: all .2s; }
 .ca-card-types span.hl { background: #0057b8; color: #fff; }
 .ca-card-types em { font-size: .74rem; color: #8a93a3; }
+.ca-upd { font-size: .7rem; color: #8792a3; margin-top: .45rem; }
 .ca-note { font-size: .76rem; color: #4a5568; background: #f7f9fc; border-radius: 10px; padding: .35rem .55rem; }
 .ca-empty { grid-column: 1 / -1; text-align: center; color: #8a93a3; padding: 1.6rem 1rem; font-size: .85rem; }
 .ca-empty i { display: block; font-size: 2rem; color: #b6c2d3; margin-bottom: .4rem; }

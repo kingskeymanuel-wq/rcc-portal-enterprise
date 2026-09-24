@@ -100,11 +100,14 @@ window.CardAgencyReport = (function () {
         var r = state.report;
         if (!r) return;
         var dateSel = root.querySelector("#caDate");
-        dateSel.innerHTML = (r.dates || []).map(function (d) {
-            return '<option value="' + d + '"' + (d === r.reportDate ? " selected" : "") + '>Point du ' + frDate(d) + '</option>';
-        }).join("") || '<option>Aucun point</option>';
+        dateSel.innerHTML = ((r.dates || []).length ? '<option value=""' + (r.current ? " selected" : "") + '>Situation actuelle</option>' : "") +
+            ((r.dates || []).map(function (d) {
+                return '<option value="' + d + '"' + (!r.current && d === r.reportDate ? " selected" : "") + '>Point du ' + frDate(d) + '</option>';
+            }).join("") || '<option>Aucun point</option>');
         dateSel.disabled = !(r.dates || []).length;
-        root.querySelector("#caTitle").textContent = r.reportDate ? "Situation au " + frDate(r.reportDate, true) : "Aucun point transmis pour cette filiale";
+        // Situation actuelle = dernière mise à jour de CHAQUE agence (point QA ou coche de l'agence elle-même).
+        root.querySelector("#caTitle").textContent = !r.reportDate ? "Aucun point transmis pour cette filiale"
+            : r.current ? "Situation actuelle — dernière mise à jour de chaque agence" : "Situation au " + frDate(r.reportDate, true);
 
         var rows = r.rows || [];
         var ready = rows.filter(function (x) { return x.cardStatus === "OK" && x.pinStatus === "OK"; }).length;
@@ -151,6 +154,7 @@ window.CardAgencyReport = (function () {
                 '<div class="ca-status">' + pill("Carte", x.cardStatus, "bi-credit-card-2-front") + pill("Code PIN", x.pinStatus, "bi-key") + '</div>' +
                 '<div class="ca-card-types">' + ((x.cardTypes || []).map(function (t) { return '<span class="' + (t === state.type ? "hl" : "") + '">' + esc(t) + '</span>'; }).join("") || '<em>Gammes non précisées</em>') + '</div>' +
                 (x.note ? '<div class="ca-note"><i class="bi bi-info-circle"></i> ' + esc(x.note) + '</div>' : "") +
+                '<div class="ca-upd"><i class="bi bi-clock-history"></i> Mis à jour le ' + frDate(x.reportDate) + (x.updatedBy ? " par " + esc(x.updatedBy) : "") + '</div>' +
                 '</article>';
         }).join("") : '<div class="ca-empty"><i class="bi bi-search"></i><b>Aucune agence ne correspond</b>Modifiez la recherche ou le filtre de carte.</div>';
         Array.prototype.forEach.call(grid.querySelectorAll("[data-edit]"), function (b) {
@@ -159,7 +163,7 @@ window.CardAgencyReport = (function () {
         Array.prototype.forEach.call(grid.querySelectorAll("[data-del]"), function (b) {
             b.addEventListener("click", function () {
                 if (!confirm("Supprimer cette agence du point ?")) return;
-                request("DELETE", "/api/card-availability/agencies/" + b.getAttribute("data-del")).then(function () { toast("Agence retirée du point"); fetchReport(state.report.reportDate); })
+                request("DELETE", "/api/card-availability/agencies/" + b.getAttribute("data-del")).then(function () { toast("Agence retirée du point"); fetchReport(state.report.current ? null : state.report.reportDate); })
                     .catch(function (e) { toast("Erreur : " + e.message, true); });
             });
         });
@@ -253,7 +257,7 @@ window.CardAgencyReport = (function () {
         request(id ? "PUT" : "POST", "/api/card-availability/agencies" + (id ? "/" + id : ""), body).then(function () {
             editModal.hide();
             toast("Agence enregistrée ✓");
-            fetchReport(body.reportDate);
+            fetchReport(state.report && state.report.current ? null : body.reportDate);
         }).catch(function (e) { m.querySelector("[data-err]").textContent = e.message; });
     }
 
@@ -276,7 +280,7 @@ window.CardAgencyReport = (function () {
                         warn.innerHTML = (res.warnings || []).map(function (w) { return '<div class="text-warning-emphasis"><i class="bi bi-exclamation-triangle"></i> ' + esc(w) + '</div>'; }).join("");
                         if (res.imported) {
                             toast(res.imported + " agence" + (res.imported > 1 ? "s" : "") + " importée" + (res.imported > 1 ? "s" : "") + " ✓");
-                            fetchReport(res.reportDate);
+                            fetchReport(null);
                             if (!(res.warnings || []).length) pasteModal.hide();
                         } else {
                             m.querySelector("[data-err]").textContent = "Aucune ligne importée.";

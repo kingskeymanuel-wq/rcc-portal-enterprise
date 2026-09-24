@@ -112,13 +112,14 @@ class CardAgencyStatusServiceTest {
     }
 
     @Test
-    void reportSelectsLatestDateByDefault() {
+    void reportShowsTheLatestUpdateOfEveryAgencyByDefault() {
         CardAgencyStatus a = CardAgencyStatus.builder().countryCode("CI").reportDate(LocalDate.of(2026, 9, 24)).agency("NIANGON").cardStatus("OK").pinStatus("OK").cardTypes("GOLD, MX").build();
         CardAgencyStatus b = CardAgencyStatus.builder().countryCode("CI").reportDate(LocalDate.of(2026, 9, 20)).agency("AGHIEN").cardStatus("RUPTURE").pinStatus("OK").cardTypes("CLASSIC").build();
         when(repo.findByCountryCodeIgnoreCaseOrderByReportDateDescAgencyAsc("CI")).thenReturn(List.of(a, b));
         AgencyReport report = service.report("CI", null);
         assertEquals(LocalDate.of(2026, 9, 24), report.reportDate());
-        assertEquals(1, report.rows().size());
+        assertTrue(report.current());
+        assertEquals(2, report.rows().size()); // Aghien (point du 20/09) reste visible à côté de Niangon (24/09)
         assertEquals(List.of("CLASSIC", "GOLD", "MX"), report.allCardTypes());
         assertEquals(1, service.report("CI", LocalDate.of(2026, 9, 20)).rows().size());
     }

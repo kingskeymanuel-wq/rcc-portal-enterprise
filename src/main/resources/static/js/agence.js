@@ -60,7 +60,8 @@
         var tiles = [
             { tab: "cas", icon: "bi-diagram-3-fill", color: "#0057B8", title: "Cartographie des cas", sub: CASES.length + " cas, même classement que le RCC" },
             { tab: "recherche", icon: "bi-journal-text", color: "#00838F", title: "Procédures & KB", sub: "La procédure en vigueur, en un mot-clé" },
-            { tab: "cartes", icon: "bi-credit-card-2-front-fill", color: "#E0435B", title: "Cartes & PIN", sub: "Disponibilité par agence" },
+            { tab: "dispo", icon: "bi-check2-square", color: "#E0435B", title: "Mon agence & cartes", sub: "Cocher la disponibilité du jour" },
+            { tab: "cartes", icon: "bi-credit-card-2-front-fill", color: "#AD1457", title: "Cartes & PIN", sub: "Toutes les agences" },
             { tab: "escalades", icon: "bi-envelope-paper-fill", color: "#2E7D32", title: "Escalades", sub: "Reset PIN, DSD GAB, linkage…" },
             { tab: "transmission", icon: "bi-send-check-fill", color: "#6A1B9A", title: "Transmettre au RCC", sub: "Fiche masquée, prête à envoyer" },
             { tab: "agences", icon: "bi-bank2", color: "#F57C00", title: "Agences & GAB", sub: "Orienter le client" }
@@ -110,21 +111,56 @@
     function loadBranches() {
         return getJson("/api/bank-branches?country=" + COUNTRY).then(function (list) {
             branches = list || [];
-            var sel = $("agAgencySelect");
-            sel.innerHTML = '<option value="">Mon agence…</option>' + branches
-                .slice().sort(function (a, b) { return (a.name || "").localeCompare(b.name || ""); })
-                .map(function (b) { return '<option value="' + b.id + '">' + esc(b.name) + '</option>'; }).join("");
-            if (prefs.agencyId) sel.value = String(prefs.agencyId);
-            renderMyCards();
+            renderAgencyBox();
             return branches;
         }).catch(function () { branches = []; });
     }
-    $("agAgencySelect").addEventListener("change", function (e) {
-        prefs.agencyId = e.target.value ? Number(e.target.value) : null; savePrefs();
-        renderMyCards();
-    });
 
-    function myBranch() { return branches.filter(function (b) { return b.id === prefs.agencyId; })[0] || null; }
+    // ── Mon agence (rattachement côté serveur : chaque agent a SON agence) ──
+    var me = null;
+    var sendJson = RccApi.sendJson;
+
+    function loadMe() {
+        return getJson("/api/agence/me").then(function (m) {
+            me = m;
+            renderAgencyBox();
+            renderMyCards();
+            if (loaded.dispo) renderDispo();
+            return m;
+        }).catch(function () { me = null; renderAgencyBox(); });
+    }
+
+    function myBranch() { return me && me.branch ? me.branch : null; }
+
+    function renderAgencyBox() {
+        var box = $("agAgencyBox");
+        if (!box) return;
+        if (me && me.branch) {
+            box.innerHTML = '<span class="ag-agency-badge" title="' + (me.canChoose ? "Vous pouvez changer (administration)" : "Modifiable uniquement par l'administration") + '">' +
+                '<i class="bi bi-geo-alt-fill"></i> ' + esc(me.branch.name) + ' <i class="bi bi-lock-fill ag-lock"></i></span>' +
+                (me.canChoose ? ' <button type="button" class="btn btn-sm btn-light" id="agChangeAgency">Changer</button>' : "");
+            var ch = $("agChangeAgency");
+            if (ch) ch.addEventListener("click", function () { me = Object.assign({}, me, { branch: null, assigned: false }); renderAgencyBox(); });
+            return;
+        }
+        if (me && me.canChoose) {
+            box.innerHTML = '<label class="ag-agency-pick"><i class="bi bi-geo-alt-fill"></i><select id="agAgencySelect" aria-label="Mon agence"><option value="">Choisir mon agence…</option>' +
+                branches.slice().sort(function (a, b) { return (a.name || "").localeCompare(b.name || ""); })
+                    .map(function (b) { return '<option value="' + b.id + '">' + esc(b.name) + '</option>'; }).join("") +
+                '</select></label> <button type="button" class="btn btn-warning btn-sm fw-bold" id="agConfirmAgency"><i class="bi bi-check2-circle"></i> Confirmer</button>';
+            $("agConfirmAgency").addEventListener("click", function () {
+                var id = Number($("agAgencySelect").value);
+                if (!id) { alert("Choisissez votre agence dans la liste."); return; }
+                var name = $("agAgencySelect").selectedOptions[0].textContent;
+                if (!confirm("Confirmer « " + name + " » comme VOTRE agence ?\n\nCe choix est définitif : seul l'administrateur pourra le modifier.")) return;
+                sendJson("/api/agence/me/agency", "PUT", { branchId: id }).then(function (m) {
+                    me = m; renderAgencyBox(); renderMyCards(); if (loaded.dispo) renderDispo();
+                }).catch(function (e) { alert("Erreur : " + e.message); });
+            });
+            return;
+        }
+        box.innerHTML = '<span class="ag-agency-badge muted"><i class="bi bi-eye"></i> Consultation (aucune agence rattachée)</span>';
+    }
 
     function renderBranches() {
         var q = fold($("agBranchFilter").value).trim();
@@ -134,8 +170,9 @@
         $("agBranches").innerHTML = list.length ? list.map(function (b, i) {
             var code = agencyCode(b.name);
             var maps = b.latitude != null ? "https://www.google.com/maps/dir/?api=1&destination=" + b.latitude + "," + b.longitude : null;
-            return '<div class="ag-branch' + (b.id === prefs.agencyId ? " mine" : "") + '" style="animation-delay:' + Math.min(i, 20) * 25 + 'ms">' +
-                '<div class="ag-branch-top"><span class="ag-branch-code">' + esc(code || "—") + '</span>' + (b.id === prefs.agencyId ? '<span class="ag-mine-badge">Mon agence</span>' : "") + '</div>' +
+            var isMine = myBranch() && myBranch().id === b.id;
+            return '<div class="ag-branch' + (isMine ? " mine" : "") + '" style="animation-delay:' + Math.min(i, 20) * 25 + 'ms">' +
+                '<div class="ag-branch-top"><span class="ag-branch-code">' + esc(code || "—") + '</span>' + (isMine ? '<span class="ag-mine-badge">Mon agence</span>' : "") + '</div>' +
                 '<div class="ag-branch-name">' + esc((b.name || "").replace(/\s*\([A-Z]{1,3}\d{1,4}\)\s*$/, "")) + '</div>' +
                 '<div class="ag-branch-city"><i class="bi bi-geo-alt"></i> ' + esc(b.city || "") + '</div>' +
                 (b.openingHours ? '<div class="ag-branch-meta"><i class="bi bi-clock"></i> ' + esc(b.openingHours) + '</div>' : "") +
@@ -161,26 +198,106 @@
     function renderMyCards() {
         var box = $("agMyCards");
         var b = myBranch();
-        if (!b) { box.innerHTML = '<p class="text-muted small mb-0">Choisissez votre agence en haut de page.</p>'; return; }
-        var code = agencyCode(b.name);
-        var run = function () {
-            var rows = cardReport && cardReport.rows ? cardReport.rows.filter(function (r) {
-                return (code && r.agencyCode && r.agencyCode.toUpperCase() === code) || fold(b.name).indexOf(fold(r.agency).trim()) !== -1;
-            }) : [];
-            if (!rows.length) {
-                box.innerHTML = '<p class="small mb-1"><b>' + esc(b.name) + '</b></p><p class="text-muted small mb-0">Pas de point cartes pour cette agence' +
-                    (cardReport && cardReport.reportDate ? " au " + new Date(cardReport.reportDate).toLocaleDateString("fr-FR") : "") + '.</p>';
-                return;
-            }
-            var r = rows[0];
-            box.innerHTML = '<div class="ag-mycard"><div><small class="text-muted">Point du ' + new Date(r.reportDate).toLocaleDateString("fr-FR") + '</small>' +
-                '<div class="fw-bold">' + esc(b.name) + '</div></div>' +
-                '<div class="ag-mycard-row"><span>Cartes</span>' + statusChip(r.cardStatus) + '</div>' +
-                '<div class="ag-mycard-row"><span>Codes PIN</span>' + statusChip(r.pinStatus) + '</div>' +
-                '<div class="ag-types">' + (r.cardTypes || []).map(function (t) { return '<span>' + esc(t) + '</span>'; }).join("") + '</div></div>';
-        };
-        if (cardReport === null) loadCards().then(run); else run();
+        if (!b) { box.innerHTML = '<p class="text-muted small mb-0">Confirmez votre agence en haut de page.</p>'; return; }
+        var r = me.cards;
+        if (!r) {
+            box.innerHTML = '<p class="small mb-1"><b>' + esc(b.name) + '</b></p><p class="text-muted small mb-2">Aucune disponibilité publiée pour votre agence.</p>' +
+                '<a href="#" data-goto="dispo" class="btn btn-sm btn-primary"><i class="bi bi-check2-square"></i> Cocher la disponibilité</a>';
+            return;
+        }
+        box.innerHTML = '<div class="ag-mycard"><div><small class="text-muted">Mis à jour le ' + new Date(r.reportDate).toLocaleDateString("fr-FR") + (r.updatedBy ? " par " + esc(r.updatedBy) : "") + '</small>' +
+            '<div class="fw-bold">' + esc(b.name) + '</div></div>' +
+            '<div class="ag-mycard-row"><span>Cartes</span>' + statusChip(r.cardStatus) + '</div>' +
+            '<div class="ag-mycard-row"><span>Codes PIN</span>' + statusChip(r.pinStatus) + '</div>' +
+            '<div class="ag-types">' + (r.cardTypes || []).map(function (t) { return '<span>' + esc(t) + '</span>'; }).join("") + '</div>' +
+            '<a href="#" data-goto="dispo" class="small mt-1"><i class="bi bi-pencil"></i> Mettre à jour</a></div>';
     }
+
+    // ── Onglet « Mon agence & cartes » : coche de disponibilité + coordonnées ──
+    var dispo = { card: null, pin: null, types: [] };
+
+    function renderDispo() {
+        var b = myBranch();
+        $("agDispoLocked").hidden = !!b;
+        $("agDispoMain").hidden = !b;
+        if (!b) {
+            $("agDispoLocked").innerHTML = '<div class="ag-card-title"><i class="bi bi-geo-alt"></i> Votre agence n\'est pas encore définie</div>' +
+                '<p class="mb-0 text-muted">' + (me && me.canChoose ? "Choisissez-la en haut de page puis confirmez : vous pourrez ensuite cocher la disponibilité des cartes et tenir à jour ses coordonnées."
+                    : "Seuls les agents d'agence rattachés à une agence peuvent publier sa disponibilité. Demandez votre rattachement à l'administration.") + '</p>';
+            return;
+        }
+        $("agDispoName").textContent = b.name;
+        var r = me.cards;
+        dispo.card = r ? r.cardStatus : null;
+        dispo.pin = r ? r.pinStatus : null;
+        dispo.types = r && r.cardTypes ? r.cardTypes.slice() : [];
+        $("agDispoLast").innerHTML = r ? '<i class="bi bi-clock-history"></i> Dernière publication : ' + new Date(r.reportDate).toLocaleDateString("fr-FR") + (r.updatedBy ? " — " + esc(r.updatedBy) : "") : '<span class="text-warning">Jamais publiée</span>';
+        $("agDispoNote").value = r && r.note ? r.note : "";
+        document.querySelectorAll(".ag-seg").forEach(function (seg) {
+            var key = seg.dataset.seg;
+            seg.querySelectorAll("button").forEach(function (btn) {
+                btn.classList.toggle("on", dispo[key] === btn.dataset.v);
+                btn.disabled = !me.canEdit;
+            });
+        });
+        $("agTypesPick").innerHTML = (me.cardTypeChoices || []).map(function (t) {
+            return '<button type="button" class="' + (dispo.types.indexOf(t) !== -1 ? "on" : "") + '" data-t="' + esc(t) + '"' + (me.canEdit ? "" : " disabled") + '>' +
+                '<i class="bi ' + (dispo.types.indexOf(t) !== -1 ? "bi-check-square-fill" : "bi-square") + '"></i> ' + esc(t) + '</button>';
+        }).join("");
+        $("agTypesPick").querySelectorAll("[data-t]").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                var t = btn.dataset.t, i = dispo.types.indexOf(t);
+                if (i === -1) dispo.types.push(t); else dispo.types.splice(i, 1);
+                btn.classList.toggle("on", i === -1);
+                btn.querySelector("i").className = "bi " + (i === -1 ? "bi-check-square-fill" : "bi-square");
+            });
+        });
+        $("agDispoSave").disabled = !me.canEdit;
+        $("agBrPhone").value = b.phone || "";
+        $("agBrEmail").value = b.email || "";
+        $("agBrHours").value = b.openingHours || "";
+        $("agBrManager").value = b.managerName || "";
+        $("agBrAddress").innerHTML = b.address ? '<i class="bi bi-geo"></i> ' + esc(b.address) : "";
+        ["agBrPhone", "agBrEmail", "agBrHours", "agBrManager", "agBrSave", "agDispoNote"].forEach(function (id) { $(id).disabled = !me.canEdit; });
+    }
+
+    document.querySelectorAll(".ag-seg").forEach(function (seg) {
+        seg.querySelectorAll("button").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                dispo[seg.dataset.seg] = btn.dataset.v;
+                seg.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === btn); });
+            });
+        });
+    });
+
+    function flash(el, ok, text) {
+        el.className = "small " + (ok ? "text-success fw-semibold" : "text-danger");
+        el.innerHTML = (ok ? '<i class="bi bi-check-circle-fill"></i> ' : '<i class="bi bi-exclamation-triangle-fill"></i> ') + esc(text);
+    }
+
+    $("agDispoSave").addEventListener("click", function () {
+        var msg = $("agDispoMsg");
+        if (!dispo.card || !dispo.pin) { flash(msg, false, "Cochez l'état des cartes ET des codes PIN."); return; }
+        var btn = $("agDispoSave");
+        btn.disabled = true;
+        sendJson("/api/agence/me/availability", "PUT", { cardStatus: dispo.card, pinStatus: dispo.pin, cardTypes: dispo.types, note: $("agDispoNote").value })
+            .then(function (row) {
+                me.cards = row;
+                cardReport = null; // la vue « toutes les agences » sera rechargée
+                flash(msg, true, "Publié — visible sur tout le site (Base de connaissances, Portail Agence, RAF).");
+                renderDispo(); renderMyCards();
+                if (loaded.cartes) loadCards().then(renderCards);
+            })
+            .catch(function (e) { flash(msg, false, e.message); })
+            .then(function () { btn.disabled = !me.canEdit; });
+    });
+
+    $("agBrSave").addEventListener("click", function () {
+        var msg = $("agBrMsg");
+        sendJson("/api/agence/me/branch", "PUT", { phone: $("agBrPhone").value, email: $("agBrEmail").value, openingHours: $("agBrHours").value, managerName: $("agBrManager").value })
+            .then(function (b) { me.branch = b; flash(msg, true, "Coordonnées enregistrées."); renderAgencyBox(); })
+            .catch(function (e) { flash(msg, false, e.message); });
+    });
 
     function renderCards() {
         var q = fold($("agCardFilter").value).trim();
@@ -354,6 +471,7 @@
 
     var LOADERS = {
         accueil: function () {},
+        dispo: renderDispo,
         cas: renderProducts,
         recherche: function () {},
         cartes: function () { (cardReport ? Promise.resolve() : loadCards()).then(renderCards); },
@@ -376,6 +494,7 @@
 
     renderTiles();
     loadBranches();
+    loadMe();
     loaded.accueil = true;
     var start = prefs.tab && document.querySelector('.ag-pane[data-pane="' + prefs.tab + '"]') ? prefs.tab : "accueil";
     if (start !== "accueil") showTab(start);

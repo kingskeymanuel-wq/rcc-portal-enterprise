@@ -67,11 +67,57 @@ public class CardAgencyStatusService {
         String country = country(countryCode);
         List<CardAgencyStatus> all = repository.findByCountryCodeIgnoreCaseOrderByReportDateDescAgencyAsc(country);
         List<LocalDate> dates = all.stream().map(CardAgencyStatus::getReportDate).distinct().toList();
-        LocalDate selected = date != null && dates.contains(date) ? date : (dates.isEmpty() ? null : dates.get(0));
-        List<AgencyRow> rows = all.stream().filter(s -> s.getReportDate().equals(selected)).map(CardAgencyStatusService::toRow).toList();
         TreeSet<String> types = new TreeSet<>();
         all.forEach(s -> types.addAll(splitTypes(s.getCardTypes())));
-        return new AgencyReport(country, selected, dates, rows, new ArrayList<>(types));
+        if (date != null && dates.contains(date)) {
+            List<AgencyRow> rows = all.stream().filter(s -> s.getReportDate().equals(date)).map(CardAgencyStatusService::toRow).toList();
+            return new AgencyReport(country, date, dates, rows, new ArrayList<>(types), false);
+        }
+        // Situation ACTUELLE : la dernière mise à jour de chaque agence (point QA ou coche de l'agence
+        // elle-même) — une agence qui coche aujourd'hui ne fait pas disparaître les autres.
+        List<AgencyRow> rows = latest(all).stream().map(CardAgencyStatusService::toRow)
+                .sorted(java.util.Comparator.comparing(AgencyRow::agency, String.CASE_INSENSITIVE_ORDER)).toList();
+        return new AgencyReport(country, dates.isEmpty() ? null : dates.get(0), dates, rows, new ArrayList<>(types), true);
+    }
+
+    /** Clé d'agence : son code (K27) s'il existe, sinon son nom. */
+    static String agencyKey(CardAgencyStatus s) {
+        return s.getAgencyCode() != null && !s.getAgencyCode().isBlank()
+                ? "#" + s.getAgencyCode().trim().toUpperCase(Locale.ROOT)
+                : s.getAgency().trim().toUpperCase(Locale.ROOT);
+    }
+
+    /** Dernière ligne par agence (la liste d'entrée est triée par date décroissante). */
+    static List<CardAgencyStatus> latest(List<CardAgencyStatus> sortedDesc) {
+        java.util.LinkedHashMap<String, CardAgencyStatus> byAgency = new java.util.LinkedHashMap<>();
+        for (CardAgencyStatus s : sortedDesc) {
+            CardAgencyStatus kept = byAgency.get(agencyKey(s));
+            if (kept == null || s.getReportDate().isAfter(kept.getReportDate())
+                    || (s.getReportDate().equals(kept.getReportDate()) && s.getUpdatedAt() != null && kept.getUpdatedAt() != null
+                        && s.getUpdatedAt().isAfter(kept.getUpdatedAt()))) {
+                byAgency.put(agencyKey(s), s);
+            }
+        }
+        return new ArrayList<>(byAgency.values());
+    }
+
+    /** Situation actuelle d'une agence par son code (portail agence, RAF). */
+    @Transactional(readOnly = true)
+    public java.util.Optional<AgencyRow> currentFor(String countryCode, String agencyCode) {
+        if (agencyCode == null || agencyCode.isBlank()) return java.util.Optional.empty();
+        String code = agencyCode.trim().toUpperCase(Locale.ROOT);
+        return latest(repository.findByCountryCodeIgnoreCaseOrderByReportDateDescAgencyAsc(country(countryCode))).stream()
+                .filter(s -> code.equalsIgnoreCase(s.getAgencyCode())).findFirst().map(CardAgencyStatusService::toRow);
+    }
+
+    /** Situation actuelle de toutes les agences d'une filiale, indexée par code agence. */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, AgencyRow> currentByCode(String countryCode) {
+        java.util.Map<String, AgencyRow> out = new java.util.HashMap<>();
+        for (CardAgencyStatus s : latest(repository.findByCountryCodeIgnoreCaseOrderByReportDateDescAgencyAsc(country(countryCode)))) {
+            if (s.getAgencyCode() != null && !s.getAgencyCode().isBlank()) out.put(s.getAgencyCode().trim().toUpperCase(Locale.ROOT), toRow(s));
+        }
+        return out;
     }
 
     @Transactional
@@ -79,13 +125,17 @@ public class CardAgencyStatusService {
         String country = country(request.countryCode());
         String[] agency = splitAgency(request.agency());
         String code = request.agencyCode() != null && !request.agencyCode().isBlank() ? request.agencyCode().trim().toUpperCase() : agency[1];
+        // Même agence le même jour (repérée par son code d'abord) : mise à jour, jamais de doublon.
         CardAgencyStatus row = id != null
                 ? repository.findById(id).orElseThrow(() -> ApiException.notFound("Ligne introuvable."))
-                : repository.findByCountryCodeIgnoreCaseAndReportDateAndAgencyIgnoreCase(country, request.reportDate(), agency[0])
+                : (code != null && !code.isBlank()
+                        ? repository.findFirstByCountryCodeIgnoreCaseAndReportDateAndAgencyCodeIgnoreCase(country, request.reportDate(), code)
+                        : java.util.Optional.<CardAgencyStatus>empty())
+                        .or(() -> repository.findByCountryCodeIgnoreCaseAndReportDateAndAgencyIgnoreCase(country, request.reportDate(), agency[0]))
                         .orElseGet(CardAgencyStatus::new);
         row.setCountryCode(country);
         row.setReportDate(request.reportDate());
-        row.setAgency(agency[0]);
+        if (row.getAgency() == null || id != null) row.setAgency(agency[0]); // on garde le libellé déjà publié
         row.setAgencyCode(code);
         row.setCardStatus(status(request.cardStatus()));
         row.setPinStatus(status(request.pinStatus()));

@@ -185,3 +185,30 @@
 /* La colonne de contenu peut rétrécir sous la largeur de la barre d'onglets (défilante). */
 .layout > .content { min-width: 0; }
 .ag-tabs { max-width: 100%; }
+
+/* Mon agence (rattachement serveur) */
+.ag-agency-box { display: inline-flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.ag-agency-badge { display: inline-flex; align-items: center; gap: .45rem; padding: .5rem 1rem; border-radius: 999px; background: #fff; color: var(--ag-ink); font-weight: 700; box-shadow: 0 6px 16px rgba(0, 0, 0, .15); }
+.ag-agency-badge > .bi-geo-alt-fill { color: #E0435B; }
+.ag-agency-badge .ag-lock { color: #9AA7B8; font-size: .8rem; }
+.ag-agency-badge.muted { background: rgba(255, 255, 255, .16); color: #fff; box-shadow: none; }
+.ag-lock-card { border-left: 4px solid #FFB300; }
+
+/* Coche de disponibilité */
+.ag-dispo-block { margin-bottom: 1.1rem; }
+.ag-dispo-label { display: block; font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--ag-muted); margin-bottom: .45rem; }
+.ag-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+.ag-seg button { border: 2px solid #E3EAF5; background: #fff; border-radius: 1rem; padding: .8rem .5rem; font-weight: 800; color: #5A6780; transition: all .2s ease; }
+.ag-seg button:hover:not(:disabled) { transform: translateY(-2px); }
+.ag-seg button.ok.on { border-color: #2E9E5B; background: #E8F5E9; color: #1B7A3E; box-shadow: 0 8px 18px rgba(46, 158, 91, .25); }
+.ag-seg button.low.on { border-color: #F59E0B; background: #FFF3E0; color: #C25700; box-shadow: 0 8px 18px rgba(245, 158, 11, .25); }
+.ag-seg button.out.on { border-color: #E53935; background: #FDECEA; color: #C62828; box-shadow: 0 8px 18px rgba(229, 57, 53, .22); }
+.ag-seg button.on { animation: agPop .3s ease; }
+.ag-types-pick { display: flex; flex-wrap: wrap; gap: .45rem; }
+.ag-types-pick button { border: 1.5px solid #DCE4F0; background: #fff; border-radius: 999px; padding: .35rem .85rem; font-weight: 700; font-size: .82rem; color: #33415C; transition: all .2s ease; }
+.ag-types-pick button.on { border-color: var(--ag-blue); background: #E3F2FD; color: var(--ag-blue); }
+.ag-last { font-size: .78rem; font-weight: 600; color: var(--ag-muted); }
+.ag-publish { border: 0; border-radius: 999px; background: linear-gradient(135deg, var(--ag-blue), var(--ag-green)); box-shadow: 0 10px 22px rgba(0, 87, 184, .3); }
+.ag-publish:hover { transform: translateY(-2px); }
+@media (max-width: 575px) { .ag-seg { grid-template-columns: 1fr; } }
+@keyframes agPop { 0% { transform: scale(.95); } 60% { transform: scale(1.04); } 100% { transform: scale(1); } }

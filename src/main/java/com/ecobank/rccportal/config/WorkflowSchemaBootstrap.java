@@ -563,6 +563,16 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
                     CONSTRAINT PK_RccNotificationReads PRIMARY KEY (NotificationId, UserId)
                 )
                 """);
+        // Portail Agence : chaque agent d'agence est rattaché à UNE agence (BankBranches) — son
+        // propre portail. Aucune donnée client ici : uniquement l'identifiant de l'agent et de l'agence.
+        createIfMissing("UserAgency", """
+                CREATE TABLE dbo.UserAgency (
+                    UserId BIGINT NOT NULL PRIMARY KEY,
+                    BranchId BIGINT NOT NULL,
+                    AssignedBy NVARCHAR(200) NULL,
+                    AssignedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+                )
+                """);
 
         createIfMissing("SiteSettings", """
                 CREATE TABLE dbo.SiteSettings (

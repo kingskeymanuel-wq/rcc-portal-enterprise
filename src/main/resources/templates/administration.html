@@ -217,6 +217,20 @@
                     </div>
                 </div>
 
+                <!-- Portail Agence : rattachement agent ↔ agence (chaque agent d'agence a SON agence). -->
+                <div class="card dashboard-card shadow-sm mb-4" id="agencyAssignCard">
+                    <div class="card-body">
+                        <h6 class="card-title mb-1"><i class="bi bi-shop-window"></i> Portail Agence — rattachement des agents à leur agence</h6>
+                        <p class="text-muted small mb-2">Un agent d'agence choisit son agence une seule fois ; ensuite, seul l'administrateur peut la changer ici. Il ne peut publier la disponibilité des cartes et les coordonnées que de SON agence.</p>
+                        <form class="row g-2 align-items-end mb-3" id="agAssignForm">
+                            <div class="col-md-4"><label class="form-label small">Identifiant de l'agent</label><input class="form-control form-control-sm" id="agAssignUser" placeholder="ex. akone" required></div>
+                            <div class="col-md-5"><label class="form-label small">Agence</label><select class="form-select form-select-sm" id="agAssignBranch"></select></div>
+                            <div class="col-md-3"><button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-link-45deg"></i> Rattacher</button></div>
+                        </form>
+                        <div id="agAssignList" class="table-responsive small"></div>
+                    </div>
+                </div>
+
                 <!-- Détection de doublons — même nom complet. Ne supprime rien automatiquement :
                      l'admin choisit lequel garder, via le bouton Supprimer de la fiche détaillée. -->
                 <div class="card dashboard-card shadow-sm mb-4">
@@ -809,6 +823,7 @@
 <script th:src="@{/js/session.js}"></script>
 <script th:src="@{/js/users.js}"></script>
 <script th:src="@{/js/administration.js}"></script>
+<script th:src="@{/js/admin-agency.js}"></script>
 
 </body>
 </html>

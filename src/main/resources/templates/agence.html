@@ -30,10 +30,7 @@
                                 <button type="button" data-mode="CAISSIER"><i class="bi bi-cash-coin"></i> Caissier</button>
                                 <button type="button" data-mode="GESTIONNAIRE"><i class="bi bi-person-vcard"></i> Gestionnaire</button>
                             </div>
-                            <label class="ag-agency-pick">
-                                <i class="bi bi-geo-alt-fill"></i>
-                                <select id="agAgencySelect" aria-label="Mon agence"><option value="">Mon agence…</option></select>
-                            </label>
+                            <div id="agAgencyBox" class="ag-agency-box"></div>
                         </div>
                     </div>
                     <div class="ag-hero-side">
@@ -45,6 +42,7 @@
                 <!-- ===== Onglets ===== -->
                 <nav class="ag-tabs" id="agTabs" role="tablist">
                     <button type="button" class="active" data-tab="accueil"><i class="bi bi-speedometer2"></i> Accueil</button>
+                    <button type="button" data-tab="dispo"><i class="bi bi-check2-square"></i> Mon agence &amp; cartes</button>
                     <button type="button" data-tab="cas"><i class="bi bi-diagram-3-fill"></i> Cartographie des cas</button>
                     <button type="button" data-tab="recherche"><i class="bi bi-search"></i> Procédures &amp; KB</button>
                     <button type="button" data-tab="cartes"><i class="bi bi-credit-card-2-front"></i> Cartes &amp; PIN</button>
@@ -81,6 +79,68 @@
                                     <li><b>Résoudre</b> sur place si l'option FCR le permet, sinon <a href="#" data-goto="escalades">escalader</a> au back-office.</li>
                                     <li><b>Passer le relais</b> au RCC avec une <a href="#" data-goto="transmission">fiche de transmission</a> masquée.</li>
                                 </ol>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Mon agence : disponibilité des cartes + coordonnées -->
+                <section class="ag-pane" data-pane="dispo">
+                    <div id="agDispoLocked" class="ag-card ag-lock-card" hidden></div>
+                    <div id="agDispoMain" class="row g-3">
+                        <div class="col-xl-7">
+                            <div class="ag-card">
+                                <div class="ag-card-title d-flex justify-content-between flex-wrap gap-2">
+                                    <span><i class="bi bi-check2-square"></i> Disponibilité du jour — <span id="agDispoName">mon agence</span></span>
+                                    <span id="agDispoLast" class="ag-last"></span>
+                                </div>
+                                <p class="text-muted small">Cochez l'état réel de votre agence : il est publié immédiatement sur <b>tout le site</b> (Base de connaissances, Portail Agence de toutes les agences, RAF) pour que le RCC oriente correctement les clients.</p>
+                                <div class="ag-dispo-block">
+                                    <div class="ag-dispo-label"><i class="bi bi-credit-card-2-front"></i> Cartes physiques</div>
+                                    <div class="ag-seg" data-seg="card">
+                                        <button type="button" data-v="OK" class="ok"><i class="bi bi-check-circle-fill"></i> Disponibles</button>
+                                        <button type="button" data-v="FAIBLE" class="low"><i class="bi bi-exclamation-triangle-fill"></i> Stock faible</button>
+                                        <button type="button" data-v="RUPTURE" class="out"><i class="bi bi-x-octagon-fill"></i> Rupture</button>
+                                    </div>
+                                </div>
+                                <div class="ag-dispo-block">
+                                    <div class="ag-dispo-label"><i class="bi bi-key"></i> Codes PIN</div>
+                                    <div class="ag-seg" data-seg="pin">
+                                        <button type="button" data-v="OK" class="ok"><i class="bi bi-check-circle-fill"></i> Disponibles</button>
+                                        <button type="button" data-v="FAIBLE" class="low"><i class="bi bi-exclamation-triangle-fill"></i> Stock faible</button>
+                                        <button type="button" data-v="RUPTURE" class="out"><i class="bi bi-x-octagon-fill"></i> Rupture</button>
+                                    </div>
+                                </div>
+                                <div class="ag-dispo-block">
+                                    <div class="ag-dispo-label"><i class="bi bi-stack"></i> Gammes disponibles en agence</div>
+                                    <div class="ag-types-pick" id="agTypesPick"></div>
+                                </div>
+                                <div class="ag-dispo-block">
+                                    <label class="ag-dispo-label" for="agDispoNote"><i class="bi bi-chat-left-text"></i> Remarque pour le RCC (facultatif)</label>
+                                    <input id="agDispoNote" class="form-control" maxlength="200" placeholder="Ex. livraison attendue jeudi, retrait sur rendez-vous…">
+                                    <div class="small text-muted mt-1"><i class="bi bi-shield-lock"></i> Aucune donnée client ici : une remarque contenant un n° de compte, un téléphone ou un e-mail est refusée.</div>
+                                </div>
+                                <div class="d-flex align-items-center gap-3 flex-wrap">
+                                    <button type="button" class="btn btn-primary btn-lg ag-publish" id="agDispoSave"><i class="bi bi-broadcast"></i> Publier sur tout le site</button>
+                                    <span id="agDispoMsg" class="small"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-5">
+                            <div class="ag-card">
+                                <div class="ag-card-title"><i class="bi bi-building"></i> Coordonnées de mon agence</div>
+                                <p class="text-muted small">Informations de l'agence (pas du client) affichées aux agents du RCC et sur la carte des agences.</p>
+                                <div class="row g-2">
+                                    <div class="col-12"><label class="form-label small">Téléphone de l'agence</label><input id="agBrPhone" class="form-control" maxlength="40"></div>
+                                    <div class="col-12"><label class="form-label small">E-mail de l'agence</label><input id="agBrEmail" type="email" class="form-control" maxlength="150"></div>
+                                    <div class="col-12"><label class="form-label small">Horaires d'ouverture</label><input id="agBrHours" class="form-control" maxlength="150" placeholder="Lun–Ven 08h00–16h00, Sam 09h00–12h00"></div>
+                                    <div class="col-12"><label class="form-label small">Chef d'agence / responsable</label><input id="agBrManager" class="form-control" maxlength="150"></div>
+                                </div>
+                                <div class="small text-muted mt-2" id="agBrAddress"></div>
+                                <div class="d-flex align-items-center gap-3 mt-3">
+                                    <button type="button" class="btn btn-outline-primary" id="agBrSave"><i class="bi bi-save"></i> Enregistrer</button>
+                                    <span id="agBrMsg" class="small"></span>
+                                </div>
                             </div>
                         </div>
                     </div>
