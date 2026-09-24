@@ -27,7 +27,39 @@
     }
     function safeNumber(v) { return typeof v === "number" && isFinite(v) ? v : 0; }
     function normalizeStatus(u) { return u && u.active === false ? "INACTIF" : "ACTIF"; }
-    function teamKey(u) { return u.activity || u.service || "Sans équipe"; }
+    /** Libellé d'équipe normalisé : « INBOUND_VOICE », « Inbound voice » et « INBOUND VOICE » = une seule équipe. */
+    function normTeam(raw) {
+        var t = String(raw || "").replace(/[_\s]+/g, " ").trim();
+        return t ? t.toUpperCase() : "SANS ÉQUIPE";
+    }
+    function teamKey(u) { return normTeam(u.activity || u.service); }
+
+    var TEAM_COLORS = ["#0057b8", "#10a36a", "#7357d8", "#f59e0b", "#0d7f86", "#e45d6a", "#2f7de1", "#c2185b", "#5e6a7d", "#00897b"];
+    function teamColor(name) {
+        var h = 0;
+        for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+        return TEAM_COLORS[h % TEAM_COLORS.length];
+    }
+    function initials(name) {
+        var parts = String(name || "?").replace(/[()/_-]/g, " ").split(/\s+/).filter(Boolean);
+        return ((parts[0] || "?").charAt(0) + (parts[1] ? parts[1].charAt(0) : (parts[0] || "").charAt(1) || "")).toUpperCase();
+    }
+    function countUp(node, target, suffix) {
+        if (!node) return;
+        suffix = suffix || "";
+        if (typeof target !== "number" || !isFinite(target)) { node.textContent = target; return; }
+        var start = Number(node.getAttribute("data-value") || 0), t0 = null;
+        node.setAttribute("data-value", target);
+        if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { node.textContent = target + suffix; return; }
+        function step(ts) {
+            if (!t0) t0 = ts;
+            var k = Math.min(1, (ts - t0) / 800);
+            node.textContent = Math.round(start + (target - start) * (1 - Math.pow(1 - k, 3))) + suffix;
+            if (k < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+    }
+    function emptyHtml(icon, text) { return '<div class="hr-empty"><i class="bi ' + icon + '"></i>' + text + '</div>'; }
 
     function api(url) {
         return getJson(url).catch(function (e) {
@@ -61,11 +93,19 @@
         var onLeave = leaves.filter(function (x) { return String(x.status || "").toUpperCase() === "APPROVED" && x.periodFrom && x.periodTo; });
         var activeTraining = formations.filter(function (f) { return !f.status || !["ARCHIVED", "CLOSED", "TERMINEE"].includes(String(f.status).toUpperCase()); });
 
-        el("kpiEmployees").textContent = employees.length;
-        el("kpiEmployeesTrend").textContent = activeEmployees.length + " actifs · données RCC";
-        el("kpiLeave").textContent = onLeave.length;
-        el("kpiPending").textContent = pending.length + " demande(s) en attente";
-        el("kpiTraining").textContent = activeTraining.length;
+        countUp(el("kpiEmployees"), employees.length);
+        el("kpiEmployeesTrend").textContent = activeEmployees.length + " actifs · " + (employees.length - activeEmployees.length) + " inactifs";
+        var bar = el("kpiActiveBar");
+        if (bar) setTimeout(function () { bar.style.width = (employees.length ? activeEmployees.length / employees.length * 100 : 0) + "%"; }, 80);
+        countUp(el("kpiLeave"), onLeave.length);
+        el("kpiPending").textContent = pending.length + " demande" + (pending.length > 1 ? "s" : "") + " en attente";
+        countUp(el("kpiTraining"), activeTraining.length);
+        var perfValues = (Array.isArray(reporting) ? reporting : []).map(function (r) { return r.performanceGlobale; }).filter(function (v) { return v != null; });
+        var avgPerf = perfValues.length ? perfValues.reduce(function (a, b) { return a + Number(b); }, 0) / perfValues.length : null;
+        el("kpiPerformance").textContent = avgPerf === null ? "—" : avgPerf.toFixed(1) + "%";
+        el("kpiPerformanceSub").textContent = avgPerf === null ? "Aucun KPI importé ce mois" : perfValues.length + " agent" + (perfValues.length > 1 ? "s" : "") + " mesuré" + (perfValues.length > 1 ? "s" : "");
+        if (el("tabCountPeople")) el("tabCountPeople").textContent = employees.length || "";
+        if (el("tabCountLeave")) el("tabCountLeave").textContent = pending.length || "";
 
         var progress = activeTraining.filter(function (f) { return typeof f.myProgressPercent === "number"; });
         var avgProgress = progress.length ? progress.reduce(function (a, f) { return a + f.myProgressPercent; }, 0) / progress.length : null;
@@ -75,42 +115,55 @@
     function renderTeams() {
         var counts = {};
         employees.forEach(function (u) {
-            var team = u.activity || u.service || "Sans équipe";
+            var team = teamKey(u);
             counts[team] = (counts[team] || 0) + 1;
         });
         var rows = Object.keys(counts).map(function (team) { return { team: team, count: counts[team] }; })
             .sort(function (a, b) { return b.count - a.count; });
         var max = rows.length ? rows[0].count : 1;
-        el("teamBars").innerHTML = rows.length ? rows.slice(0, 10).map(function (r) {
-            return '<div class="team-row"><span title="' + escapeHtml(r.team) + '">' + escapeHtml(r.team) + '</span><div class="team-track"><div class="team-fill" style="width:' + ((r.count / max) * 100).toFixed(1) + '%"></div></div><b>' + r.count + '</b></div>';
-        }).join("") : '<div class="text-muted small">Aucune donnée d’équipe.</div>';
+        el("teamBars").innerHTML = rows.length ? rows.slice(0, 8).map(function (r) {
+            return '<div class="team-row" data-team="' + escapeHtml(r.team) + '" role="button" tabindex="0"><span title="' + escapeHtml(r.team) + '">' + escapeHtml(r.team) + '</span><b>' + r.count + '</b>' +
+                '<div class="team-track"><div class="team-fill" data-w="' + ((r.count / max) * 100).toFixed(1) + '" style="background:linear-gradient(90deg,' + teamColor(r.team) + ',#10a36a)"></div></div></div>';
+        }).join("") + (rows.length > 8 ? '<div class="team-more">+ ' + (rows.length - 8) + ' autres équipes — onglet Collaborateurs</div>' : "")
+            : emptyHtml("bi-people", "Aucune donnée d’équipe.");
+        Array.prototype.forEach.call(el("teamBars").querySelectorAll(".team-row"), function (row) {
+            row.addEventListener("click", function () { openTeamRoster(row.getAttribute("data-team")); });
+        });
+        requestAnimationFrame(function () {
+            Array.prototype.forEach.call(el("teamBars").querySelectorAll(".team-fill"), function (f) { f.style.width = f.getAttribute("data-w") + "%"; });
+        });
     }
 
     function renderLeaves() {
         var pending = leaves.filter(function (x) { return String(x.status || "").toUpperCase() === "PENDING"; }).length;
         var approved = leaves.filter(function (x) { return String(x.status || "").toUpperCase() === "APPROVED"; }).length;
         var rejected = leaves.filter(function (x) { return String(x.status || "").toUpperCase() === "REJECTED"; }).length;
-        el("leavePending").textContent = pending;
-        el("leaveApproved").textContent = approved;
-        el("leaveRejected").textContent = rejected;
-        el("leaveTable").innerHTML = leaves.length ? leaves.slice(0, 6).map(function (r) {
+        countUp(el("leavePending"), pending);
+        countUp(el("leaveApproved"), approved);
+        countUp(el("leaveRejected"), rejected);
+        var LABELS = { PENDING: "En attente", APPROVED: "Approuvé", REJECTED: "Refusé" };
+        el("leaveTable").innerHTML = leaves.length ? leaves.slice(0, 12).map(function (r) {
             var cls = String(r.status || "").toUpperCase() === "APPROVED" ? "status-approved" : String(r.status || "").toUpperCase() === "REJECTED" ? "status-rejected" : "status-pending";
-            var label = String(r.status || "PENDING").toUpperCase();
-            return '<div class="mini-row"><span><b>' + escapeHtml(val(r.requestedByName || r.requestedByUsername)) + '</b><br><small>' + escapeHtml(val(r.title || r.type)) + '</small></span><span class="status-pill ' + cls + '">' + escapeHtml(label) + '</span></div>';
-        }).join("") : '<div class="text-muted small">Aucune demande de congé.</div>';
+            var status = String(r.status || "PENDING").toUpperCase();
+            var who = val(r.requestedByName || r.requestedByUsername);
+            var period = r.periodFrom ? formatDate(r.periodFrom) + " → " + formatDate(r.periodTo) : "";
+            return '<div class="mini-row"><span class="d-flex align-items-center gap-2 min-w-0"><span class="tt-avatar" style="width:34px;height:34px;border-radius:11px;font-size:.72rem;background:' + teamColor(who) + '">' + escapeHtml(initials(who)) + '</span>' +
+                '<span class="min-w-0"><b>' + escapeHtml(who) + '</b><br><small class="text-muted">' + escapeHtml(val(r.title || r.type)) + (period ? " · " + escapeHtml(period) : "") + '</small></span></span>' +
+                '<span class="status-pill ' + cls + '">' + escapeHtml(LABELS[status] || status) + '</span></div>';
+        }).join("") : emptyHtml("bi-calendar2-check", "Aucune demande de congé pour l'instant.");
     }
 
     function renderSync(sync) {
         if (!sync || sync.__error) {
-            el("syncStatus").innerHTML = '<div class="sync-state"><i class="sync-dot warn"></i><b>Statut indisponible</b></div><div class="text-muted">' + escapeHtml(sync && sync.__error ? sync.__error : "—") + '</div>';
+            el("syncStatus").innerHTML = '<span class="hr-chip"><i class="sync-dot warn"></i> Statut de synchronisation indisponible</span>';
             return;
         }
         var warn = !!sync.dataStaleWarning;
-        el("syncStatus").innerHTML = '<div class="sync-state"><i class="sync-dot ' + (warn ? "warn" : "") + '"></i><b>' + (warn ? "Attention : données à actualiser" : "Données synchronisées") + '</b></div>' +
-            '<div class="sync-item"><span>Dernier import KPI</span><b>' + escapeHtml(formatDateTime(sync.lastKpiImportAt)) + '</b></div>' +
-            '<div class="sync-item"><span>Dernier import planning</span><b>' + escapeHtml(formatDateTime(sync.lastScheduleImportAt)) + '</b></div>' +
-            '<div class="sync-item"><span>Imports aujourd’hui</span><b>' + safeNumber(sync.totalImportsToday) + '</b></div>' +
-            '<div class="sync-item"><span>Entrées KPI</span><b>' + safeNumber(sync.totalKpiEntries) + '</b></div>';
+        el("syncStatus").innerHTML =
+            '<span class="hr-chip"><i class="sync-dot ' + (warn ? "warn" : "") + '"></i> ' + (warn ? "Données à actualiser" : "Données synchronisées") + '</span>' +
+            '<span class="hr-chip" title="Dernier import KPI"><i class="bi bi-bar-chart"></i> KPI <b>' + escapeHtml(formatDateTime(sync.lastKpiImportAt)) + '</b></span>' +
+            '<span class="hr-chip" title="Dernier import planning"><i class="bi bi-calendar-week"></i> Planning <b>' + escapeHtml(formatDateTime(sync.lastScheduleImportAt)) + '</b></span>' +
+            '<span class="hr-chip" title="Entrées KPI"><i class="bi bi-database"></i> <b>' + safeNumber(sync.totalKpiEntries).toLocaleString("fr-FR") + '</b> entrées · ' + safeNumber(sync.totalImportsToday) + ' import(s) aujourd’hui</span>';
     }
 
     function formatDateTime(v) {
@@ -119,13 +172,27 @@
     }
 
     function renderTeamGrid() {
-        var counts = {};
-        employees.forEach(function (u) { var t = teamKey(u); counts[t] = (counts[t] || 0) + 1; });
-        var teams = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
-        el("employeeTeamGrid").innerHTML = teams.length ? teams.map(function (t) {
-            return '<div class="team-tile" data-team="' + escapeHtml(t) + '" role="button" tabindex="0">' +
-                '<i class="bi bi-people-fill"></i><div><b>' + escapeHtml(t) + '</b><span>' + counts[t] + ' collaborateur' + (counts[t] > 1 ? "s" : "") + '</span></div></div>';
-        }).join("") : '<div class="text-muted small">Aucune équipe.</div>';
+        var groups = {};
+        employees.forEach(function (u) { var t = teamKey(u); (groups[t] = groups[t] || []).push(u); });
+        var q = ((el("teamSearch") && el("teamSearch").value) || "").trim().toUpperCase();
+        var teams = Object.keys(groups).filter(function (t) { return !q || t.indexOf(q) !== -1; })
+            .sort(function (a, b) { return groups[b].length - groups[a].length; });
+        el("employeeTeamGrid").innerHTML = teams.length ? teams.map(function (t, i) {
+            var members = groups[t];
+            var active = members.filter(function (u) { return normalizeStatus(u) === "ACTIF"; }).length;
+            var faces = members.slice(0, 4).map(function (u) {
+                var name = val(u.fullName, u.username);
+                return u.photoUrl
+                    ? '<span style="background-image:url(\'' + escapeHtml(u.photoUrl) + '\')" title="' + escapeHtml(name) + '"></span>'
+                    : '<span style="background:' + teamColor(name) + '" title="' + escapeHtml(name) + '">' + escapeHtml(initials(name)) + '</span>';
+            }).join("");
+            return '<div class="team-tile" data-team="' + escapeHtml(t) + '" role="button" tabindex="0" style="animation-delay:' + Math.min(i * 35, 500) + 'ms">' +
+                '<i class="bi bi-chevron-right tt-go"></i>' +
+                '<div class="tt-top"><span class="tt-avatar" style="background:' + teamColor(t) + '">' + escapeHtml(initials(t)) + '</span>' +
+                '<div class="min-w-0"><b>' + escapeHtml(t) + '</b><span class="tt-sub">' + members.length + ' collaborateur' + (members.length > 1 ? "s" : "") + ' · ' + active + ' actif' + (active > 1 ? "s" : "") + '</span></div></div>' +
+                '<div class="tt-faces">' + faces + (members.length > 4 ? '<em>+' + (members.length - 4) + '</em>' : "") + '</div>' +
+                '<div class="tt-bar" title="Part d\'actifs"><i style="width:' + (members.length ? active / members.length * 100 : 0) + '%"></i></div></div>';
+        }).join("") : emptyHtml("bi-search", "Aucune équipe ne correspond.");
         Array.prototype.forEach.call(el("employeeTeamGrid").querySelectorAll(".team-tile"), function (tile) {
             tile.addEventListener("click", function () { openTeamRoster(tile.getAttribute("data-team")); });
             tile.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tile.click(); } });
@@ -404,7 +471,7 @@
             var p = typeof f.myProgressPercent === "number" ? f.myProgressPercent : null;
             return '<div class="training-item"><div class="training-title">' + escapeHtml(val(f.title)) + '</div><div class="training-meta">' + escapeHtml(val(f.category, "Formation")) + ' · ' + escapeHtml(formatDate(f.scheduledDate)) + (f.mandatory ? ' · Obligatoire' : '') + '</div>' +
                 (p !== null ? '<div class="progress"><div class="progress-bar" role="progressbar" style="width:' + Math.max(0, Math.min(100, p)) + '%"></div></div><div class="training-meta mt-1">' + p + '% de progression</div>' : '') + '</div>';
-        }).join("") || '<div class="text-muted small">Aucune formation disponible.</div>';
+        }).join("") || emptyHtml("bi-mortarboard", "Aucune formation programmée pour l'instant.");
     }
 
     function renderFollowup() {
@@ -412,32 +479,52 @@
         el("followupList").innerHTML = scoped.slice(0, 6).map(function (t) {
             var icon = t.category === "QA_COACHING" ? "bi-patch-check" : "bi-clock-history";
             return '<div class="activity-item"><div class="activity-icon"><i class="bi ' + icon + '"></i></div><div><div class="training-title">' + escapeHtml(val(t.assignedToName || t.assignedToUsername)) + '</div><div class="training-meta">' + escapeHtml(val(t.description, t.category)) + '</div><div class="activity-meta">' + escapeHtml(val(t.relatedDate)) + ' · ' + escapeHtml(val(t.status)) + '</div></div></div>';
-        }).join("") || '<div class="text-muted small">Aucune action de suivi récente.</div>';
+        }).join("") || emptyHtml("bi-clipboard2-check", "Aucune action de suivi récente.");
     }
 
     function renderPerformance() {
         var rows = Array.isArray(reporting) ? reporting : [];
         var grouped = {};
         rows.forEach(function (r) {
-            var key = r.activity || r.serviceName || "Sans équipe";
+            var key = normTeam(r.activity || r.serviceName);
             if (!grouped[key]) grouped[key] = { quality: [], performance: [], presence: [] };
             if (r.avgQualityScore != null) grouped[key].quality.push(Number(r.avgQualityScore));
             if (r.performanceGlobale != null) grouped[key].performance.push(Number(r.performanceGlobale));
             if (r.presenceRate != null) grouped[key].presence.push(Number(r.presenceRate));
         });
-        var labels = Object.keys(grouped).slice(0, 12);
-        var avg = function (a) { return a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : 0; };
-        var data = labels.map(function (k) { return Number(avg(grouped[k].performance).toFixed(1)); });
-        var quality = labels.map(function (k) { return Number(avg(grouped[k].quality).toFixed(1)); });
-        var presence = labels.map(function (k) { return Number(avg(grouped[k].presence).toFixed(1)); });
+        var avg = function (a) { return a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : null; };
+        // Seules les équipes qui ont réellement des indicateurs, les meilleures en haut.
+        var labels = Object.keys(grouped).filter(function (k) {
+            var g = grouped[k];
+            return g.performance.some(Boolean) || g.quality.some(Boolean) || g.presence.some(Boolean);
+        }).sort(function (a, b) { return (avg(grouped[b].performance) || 0) - (avg(grouped[a].performance) || 0); }).slice(0, 12);
+        var round = function (v) { return v === null ? null : Number(v.toFixed(1)); };
         var ctx = el("performanceChart");
         if (!ctx) return;
-        if (performanceChart) performanceChart.destroy();
-        performanceChart = new Chart(ctx, { type: "bar", data: { labels: labels, datasets: [
-            { label: "Performance globale", data: data, borderWidth: 1 },
-            { label: "Qualité moyenne", data: quality, borderWidth: 1 },
-            { label: "Présence", data: presence, borderWidth: 1 }
-        ] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { position: "bottom" } } } });
+        if (performanceChart) { performanceChart.destroy(); performanceChart = null; }
+        el("chartEmpty").classList.toggle("d-none", labels.length > 0);
+        ctx.style.visibility = labels.length ? "" : "hidden";
+        if (!labels.length || typeof Chart === "undefined") return;
+        el("chartWrap").style.minHeight = Math.max(300, labels.length * 58 + 70) + "px";
+        var ds = function (label, key, color) {
+            return { label: label, data: labels.map(function (k) { return round(avg(grouped[k][key])); }), backgroundColor: color, borderRadius: 6, barPercentage: .78, categoryPercentage: .72, maxBarThickness: 18 };
+        };
+        performanceChart = new Chart(ctx, {
+            type: "bar",
+            data: { labels: labels, datasets: [ds("Performance globale", "performance", "#0057b8"), ds("Qualité moyenne", "quality", "#10a36a"), ds("Présence", "presence", "#f59e0b")] },
+            options: {
+                indexAxis: "y", responsive: true, maintainAspectRatio: false,
+                animation: { duration: 900, easing: "easeOutQuart" },
+                scales: {
+                    x: { beginAtZero: true, max: 100, grid: { color: "rgba(113,128,150,.12)" }, ticks: { callback: function (v) { return v + "%"; }, color: "#8090a3" } },
+                    y: { grid: { display: false }, ticks: { color: "#33415c", font: { weight: "700" } } }
+                },
+                plugins: {
+                    legend: { position: "top", align: "end", labels: { usePointStyle: true, pointStyle: "rectRounded", color: "#4a5568" } },
+                    tooltip: { callbacks: { label: function (c) { return c.dataset.label + " : " + (c.raw == null ? "—" : c.raw + "%"); } } }
+                }
+            }
+        });
     }
 
     function exportEmployees() {
@@ -472,7 +559,34 @@
         if (!employees.length && results[0] && results[0].__error) showError("Impossible de charger le périmètre RH : " + results[0].__error);
         renderKpis(); renderTeams(); renderLeaves(); renderSync(results[6]); renderEmployees(); renderTeamGrid(); renderTraining(); renderFollowup(); renderHrFollowupKpis(); renderPerformance(); renderControlBadges();
         el("hrLoading").classList.add("d-none"); el("hrApp").classList.remove("d-none");
+        requestAnimationFrame(moveInk);
         el("lastRefresh").textContent = "Actualisé à " + new Date().toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"});
+    }
+
+    function moveInk() {
+        var nav = el("hrTabs"), active = nav && nav.querySelector("button.active"), ink = nav && nav.querySelector(".hr-tabs-ink");
+        if (!active || !ink) return;
+        ink.style.left = active.offsetLeft + "px";
+        ink.style.width = active.offsetWidth + "px";
+    }
+
+    function showTab(name) {
+        Array.prototype.forEach.call(el("hrTabs").querySelectorAll("[data-tab]"), function (b) { b.classList.toggle("active", b.getAttribute("data-tab") === name); });
+        Array.prototype.forEach.call(document.querySelectorAll(".hr-pane"), function (p) { p.classList.toggle("active", p.getAttribute("data-pane") === name); });
+        moveInk();
+        if (name === "overview" && performanceChart) performanceChart.resize();
+        try { history.replaceState(null, "", "#" + name); } catch (e) { /* ignore */ }
+    }
+
+    function wireTabs() {
+        Array.prototype.forEach.call(el("hrTabs").querySelectorAll("[data-tab]"), function (b) {
+            b.addEventListener("click", function () { showTab(b.getAttribute("data-tab")); });
+        });
+        window.addEventListener("resize", moveInk);
+        var hash = (location.hash || "").replace("#", "");
+        var legacy = { employees: "people", followup: "growth", training: "growth", leave: "leave" };
+        hash = legacy[hash] || hash;
+        if (["overview", "people", "leave", "growth"].indexOf(hash) !== -1) showTab(hash);
     }
 
     function init() {
@@ -486,9 +600,11 @@
         el("refreshHrBtn").addEventListener("click", loadAll);
         el("hrMonth").addEventListener("change", loadAll);
         el("employeeSearch").addEventListener("input", renderEmployees);
+        el("teamSearch").addEventListener("input", renderTeamGrid);
+        el("openLeaveControlBtn").addEventListener("click", function () { openControlDetail("leave"); });
+        wireTabs();
         el("employeeStatus").addEventListener("change", renderEmployees);
         el("exportEmployeesBtn").addEventListener("click", exportEmployees);
-        el("openLegacyBtn").addEventListener("click", function () { document.getElementById("employeesBody").closest(".hr-card").scrollIntoView({behavior:"smooth", block:"start"}); });
 
         el("viewByTeamBtn").addEventListener("click", function () {
             el("viewByTeamBtn").classList.add("active"); el("viewListBtn").classList.remove("active");
