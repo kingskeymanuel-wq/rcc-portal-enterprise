@@ -33,7 +33,8 @@ import java.util.regex.Pattern;
 public class AgencyPortalService {
 
     public record AgencyMe(BankBranchResponse branch, AgencyRow cards, boolean assigned, boolean canChoose,
-                           boolean canEdit, String assignedBy, List<String> cardTypeChoices) {}
+                           boolean canEdit, String assignedBy, List<String> cardTypeChoices,
+                           AtmStatusService.AtmStatus atm, List<String> atmServiceChoices) {}
 
     public record AvailabilityRequest(String cardStatus, String pinStatus, List<String> cardTypes, String note) {}
 
@@ -52,9 +53,11 @@ public class AgencyPortalService {
     private final BankBranchRepository branchRepository;
     private final CardAgencyStatusService cardService;
     private final DataProtectionService dataProtection;
+    private final AtmStatusService atmService;
 
     public AgencyPortalService(JdbcTemplate jdbc, UserRepository userRepository, BankBranchRepository branchRepository,
-                               CardAgencyStatusService cardService, DataProtectionService dataProtection) {
+                               CardAgencyStatusService cardService, DataProtectionService dataProtection, AtmStatusService atmService) {
+        this.atmService = atmService;
         this.jdbc = jdbc;
         this.userRepository = userRepository;
         this.branchRepository = branchRepository;
@@ -93,15 +96,16 @@ public class AgencyPortalService {
         Map<String, Object> a = assignmentOf(user.getId());
         boolean staff = isAgencyStaff(requester) || isAdmin(requester);
         if (a == null) {
-            return new AgencyMe(null, null, false, staff, false, null, STANDARD_CARD_TYPES);
+            return new AgencyMe(null, null, false, staff, false, null, STANDARD_CARD_TYPES, null, AtmStatusService.SERVICES);
         }
         BankBranch branch = branchRepository.findById(((Number) a.get("BranchId")).longValue()).orElse(null);
-        if (branch == null) return new AgencyMe(null, null, false, staff, false, null, STANDARD_CARD_TYPES);
+        if (branch == null) return new AgencyMe(null, null, false, staff, false, null, STANDARD_CARD_TYPES, null, AtmStatusService.SERVICES);
         AgencyRow cards = cardService.currentFor(branch.getCountryCode(), agencyCode(branch.getName())).orElse(null);
         java.util.LinkedHashSet<String> types = new java.util.LinkedHashSet<>(STANDARD_CARD_TYPES);
         if (cards != null && cards.cardTypes() != null) types.addAll(cards.cardTypes());
         return new AgencyMe(BankBranchResponse.from(branch), cards, true, isAdmin(requester), staff,
-                a.get("AssignedBy") == null ? null : a.get("AssignedBy").toString(), List.copyOf(types));
+                a.get("AssignedBy") == null ? null : a.get("AssignedBy").toString(), List.copyOf(types),
+                atmService.current(branch.getCountryCode(), agencyCode(branch.getName())).orElse(null), AtmStatusService.SERVICES);
     }
 
     /** Premier rattachement par l'agent lui-même ; ensuite, seul l'administrateur peut changer. */
@@ -180,6 +184,24 @@ public class AgencyPortalService {
         String who = (requester.name() != null ? requester.name() : requester.username()) + " (agence " + code + ")";
         return cardService.save(null, new AgencyRowRequest(branch.getCountryCode(), LocalDate.now(), label, code,
                 request.cardStatus(), request.pinStatus(), types, note == null || note.isEmpty() ? null : note), who);
+    }
+
+    /** L'agence publie l'état de ses GAB — visible partout sur le site. */
+    @Transactional
+    public AtmStatusService.AtmStatus updateMyAtm(AuthenticatedUser requester, AtmStatusService.AtmRequest request) {
+        BankBranch branch = myBranchForEdit(requester);
+        String code = agencyCode(branch.getName());
+        if (code == null) throw ApiException.badRequest("Votre agence n'a pas de code agence (Kxx) : contactez l'administration.");
+        String note = request.note() == null ? null : request.note().trim();
+        if (note != null && !note.isEmpty()) {
+            if (note.length() > 200) throw ApiException.badRequest("Remarque trop longue (200 caractères maximum).");
+            if (dataProtection.containsSensitiveData(note)) {
+                throw ApiException.badRequest("La remarque ne doit contenir aucune donnée client (numéro de compte, téléphone, e-mail).");
+            }
+        }
+        String who = (requester.name() != null ? requester.name() : requester.username()) + " (agence " + code + ")";
+        return atmService.save(branch.getCountryCode(), code, branch.getName(),
+                new AtmStatusService.AtmRequest(request.status(), request.services(), request.gabTotal(), request.gabWorking(), note), who);
     }
 
     /** Coordonnées de l'agence (pas du client) : téléphone, e-mail, horaires, responsable. */

@@ -212,3 +212,6 @@
 .ag-publish:hover { transform: translateY(-2px); }
 @media (max-width: 575px) { .ag-seg { grid-template-columns: 1fr; } }
 @keyframes agPop { 0% { transform: scale(.95); } 60% { transform: scale(1.04); } 100% { transform: scale(1); } }
+
+.ag-seg-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 767px) { .ag-seg-4 { grid-template-columns: repeat(2, 1fr); } }

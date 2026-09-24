@@ -42,10 +42,10 @@
                 <!-- ===== Onglets ===== -->
                 <nav class="ag-tabs" id="agTabs" role="tablist">
                     <button type="button" class="active" data-tab="accueil"><i class="bi bi-speedometer2"></i> Accueil</button>
-                    <button type="button" data-tab="dispo"><i class="bi bi-check2-square"></i> Mon agence &amp; cartes</button>
+                    <button type="button" data-tab="dispo"><i class="bi bi-check2-square"></i> Mon agence, cartes &amp; GAB</button>
                     <button type="button" data-tab="cas"><i class="bi bi-diagram-3-fill"></i> Cartographie des cas</button>
                     <button type="button" data-tab="recherche"><i class="bi bi-search"></i> Procédures &amp; KB</button>
-                    <button type="button" data-tab="cartes"><i class="bi bi-credit-card-2-front"></i> Cartes &amp; PIN</button>
+                    <button type="button" data-tab="cartes"><i class="bi bi-credit-card-2-front"></i> Cartes, PIN &amp; GAB</button>
                     <button type="button" data-tab="agences"><i class="bi bi-bank2"></i> Agences &amp; GAB</button>
                     <button type="button" data-tab="escalades"><i class="bi bi-envelope-paper"></i> Escalades</button>
                     <button type="button" data-tab="transmission"><i class="bi bi-send-check"></i> Transmettre au RCC</button>
@@ -68,7 +68,7 @@
                         </div>
                         <div class="col-xl-5">
                             <div class="ag-card">
-                                <div class="ag-card-title"><i class="bi bi-credit-card-fill"></i> Cartes &amp; PIN — mon agence</div>
+                                <div class="ag-card-title"><i class="bi bi-credit-card-fill"></i> Cartes, PIN &amp; GAB — mon agence</div>
                                 <div id="agMyCards"><p class="text-muted small mb-0">Choisissez votre agence en haut de page.</p></div>
                             </div>
                             <div class="ag-card mt-3">
@@ -125,6 +125,37 @@
                                     <span id="agDispoMsg" class="small"></span>
                                 </div>
                             </div>
+                            <div class="ag-card mt-3">
+                                <div class="ag-card-title d-flex justify-content-between flex-wrap gap-2">
+                                    <span><i class="bi bi-cash-coin"></i> Disponibilité des GAB de mon agence</span>
+                                    <span id="agAtmLast" class="ag-last"></span>
+                                </div>
+                                <div class="ag-dispo-block">
+                                    <div class="ag-dispo-label"><i class="bi bi-activity"></i> État des GAB</div>
+                                    <div class="ag-seg ag-seg-4" data-atm="status">
+                                        <button type="button" data-v="EN_SERVICE" class="ok"><i class="bi bi-check-circle-fill"></i> En service</button>
+                                        <button type="button" data-v="PARTIEL" class="low"><i class="bi bi-exclamation-circle-fill"></i> Service partiel</button>
+                                        <button type="button" data-v="SANS_BILLETS" class="low"><i class="bi bi-cash"></i> Sans billets</button>
+                                        <button type="button" data-v="HORS_SERVICE" class="out"><i class="bi bi-x-octagon-fill"></i> Hors service</button>
+                                    </div>
+                                </div>
+                                <div class="ag-dispo-block row g-2">
+                                    <div class="col-6"><label class="ag-dispo-label" for="agAtmTotal"><i class="bi bi-hash"></i> Nombre de GAB</label><input id="agAtmTotal" type="number" min="0" max="50" class="form-control"></div>
+                                    <div class="col-6"><label class="ag-dispo-label" for="agAtmWorking"><i class="bi bi-check2"></i> Dont en service</label><input id="agAtmWorking" type="number" min="0" max="50" class="form-control"></div>
+                                </div>
+                                <div class="ag-dispo-block">
+                                    <div class="ag-dispo-label"><i class="bi bi-ui-checks"></i> Services disponibles au GAB</div>
+                                    <div class="ag-types-pick" id="agAtmServices"></div>
+                                </div>
+                                <div class="ag-dispo-block">
+                                    <label class="ag-dispo-label" for="agAtmNote"><i class="bi bi-chat-left-text"></i> Remarque (facultatif)</label>
+                                    <input id="agAtmNote" class="form-control" maxlength="200" placeholder="Ex. intervention technicien prévue à 14h, recharge en cours…">
+                                </div>
+                                <div class="d-flex align-items-center gap-3 flex-wrap">
+                                    <button type="button" class="btn btn-primary ag-publish" id="agAtmSave"><i class="bi bi-broadcast"></i> Publier l'état des GAB</button>
+                                    <span id="agAtmMsg" class="small"></span>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-xl-5">
                             <div class="ag-card">
@@ -178,7 +209,7 @@
                 <section class="ag-pane" data-pane="cartes">
                     <div class="ag-card">
                         <div class="ag-card-title d-flex justify-content-between align-items-center flex-wrap gap-2">
-                            <span><i class="bi bi-credit-card-2-front"></i> Disponibilité des cartes et codes PIN par agence</span>
+                            <span><i class="bi bi-credit-card-2-front"></i> Disponibilité des cartes, codes PIN et GAB par agence</span>
                             <input id="agCardFilter" type="search" class="form-control form-control-sm" style="max-width:260px" placeholder="Filtrer (agence, code, type)…">
                         </div>
                         <div id="agCardsInfo" class="small text-muted mb-2"></div>

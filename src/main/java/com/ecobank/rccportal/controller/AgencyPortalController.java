@@ -16,9 +16,23 @@ import java.util.Map;
 public class AgencyPortalController {
 
     private final AgencyPortalService service;
+    private final com.ecobank.rccportal.service.AtmStatusService atmService;
 
-    public AgencyPortalController(AgencyPortalService service) {
+    public AgencyPortalController(AgencyPortalService service, com.ecobank.rccportal.service.AtmStatusService atmService) {
         this.service = service;
+        this.atmService = atmService;
+    }
+
+    /** Disponibilité des GAB de toutes les agences d'une filiale (consultation, tout agent connecté). */
+    @GetMapping("/atm")
+    public List<com.ecobank.rccportal.service.AtmStatusService.AtmStatus> atm(@RequestParam(defaultValue = "CI") String country) {
+        return atmService.list(country);
+    }
+
+    @PutMapping("/me/atm")
+    public com.ecobank.rccportal.service.AtmStatusService.AtmStatus myAtm(@RequestBody com.ecobank.rccportal.service.AtmStatusService.AtmRequest body,
+                                                                          @AuthenticationPrincipal AuthenticatedUser requester) {
+        return service.updateMyAtm(requester, body);
     }
 
     @GetMapping("/me")

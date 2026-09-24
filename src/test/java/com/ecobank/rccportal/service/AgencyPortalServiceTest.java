@@ -64,7 +64,7 @@ class AgencyPortalServiceTest {
                 .thenReturn(alreadyAssigned ? List.of(Map.of("BranchId", 3L)) : List.of());
         when(cards.findByCountryCodeIgnoreCaseOrderByReportDateDescAgencyAsc(anyString())).thenReturn(List.of());
         when(cards.save(any())).thenAnswer(i -> i.getArgument(0));
-        AgencyPortalService svc = new AgencyPortalService(jdbc, users, branches, new CardAgencyStatusService(cards), new DataProtectionService());
+        AgencyPortalService svc = new AgencyPortalService(jdbc, users, branches, new CardAgencyStatusService(cards), new DataProtectionService(), new AtmStatusService(jdbc));
         return new Fixture(svc, jdbc, cards);
     }
 
@@ -94,6 +94,17 @@ class AgencyPortalServiceTest {
 
         assertThrows(ApiException.class, () -> fixture(false).svc().updateMyAvailability(STAFF,
                 new AgencyPortalService.AvailabilityRequest("OK", "OK", List.of(), null))); // pas encore d'agence
+    }
+
+    @Test
+    void atmStatusIsPublishedForMyAgencyWithoutClientData() {
+        Fixture f = fixture(true);
+        var atm = f.svc().updateMyAtm(STAFF, new AtmStatusService.AtmRequest("SANS_BILLETS", List.of("DEPOT"), 2, 2, "Recharge prévue à 14h"));
+        assertEquals("SANS_BILLETS", atm.status());
+        assertEquals("K27", atm.agencyCode());
+        ApiException e = assertThrows(ApiException.class, () -> f.svc().updateMyAtm(STAFF,
+                new AtmStatusService.AtmRequest("EN_SERVICE", List.of(), null, null, "client joignable au 0102030405")));
+        assertTrue(e.getMessage().contains("aucune donnée client"));
     }
 
     @Test

@@ -201,7 +201,8 @@
         if (!b) { box.innerHTML = '<p class="text-muted small mb-0">Confirmez votre agence en haut de page.</p>'; return; }
         var r = me.cards;
         if (!r) {
-            box.innerHTML = '<p class="small mb-1"><b>' + esc(b.name) + '</b></p><p class="text-muted small mb-2">Aucune disponibilité publiée pour votre agence.</p>' +
+            box.innerHTML = '<p class="small mb-1"><b>' + esc(b.name) + '</b></p><p class="text-muted small mb-2">Aucune disponibilité cartes publiée pour votre agence.</p>' +
+                '<div class="ag-mycard-row mb-2"><span>GAB</span>' + atmChip(me.atm) + '</div>' +
                 '<a href="#" data-goto="dispo" class="btn btn-sm btn-primary"><i class="bi bi-check2-square"></i> Cocher la disponibilité</a>';
             return;
         }
@@ -209,9 +210,82 @@
             '<div class="fw-bold">' + esc(b.name) + '</div></div>' +
             '<div class="ag-mycard-row"><span>Cartes</span>' + statusChip(r.cardStatus) + '</div>' +
             '<div class="ag-mycard-row"><span>Codes PIN</span>' + statusChip(r.pinStatus) + '</div>' +
+            '<div class="ag-mycard-row"><span>GAB</span>' + atmChip(me.atm) + '</div>' +
             '<div class="ag-types">' + (r.cardTypes || []).map(function (t) { return '<span>' + esc(t) + '</span>'; }).join("") + '</div>' +
             '<a href="#" data-goto="dispo" class="small mt-1"><i class="bi bi-pencil"></i> Mettre à jour</a></div>';
     }
+
+    // ── GAB ─────────────────────────────────────────────────────────────────
+    var ATM = { EN_SERVICE: ["ok", "En service"], PARTIEL: ["low", "Service partiel"], SANS_BILLETS: ["low", "Sans billets"], HORS_SERVICE: ["out", "Hors service"] };
+    var ATM_SERVICES = { RETRAIT: "Retrait", DEPOT: "Dépôt", SANS_CARTE: "Retrait sans carte", SOLDE: "Consultation de solde", PIN: "Changement de PIN", VISA_MASTERCARD: "Cartes Visa / Mastercard" };
+    var atmList = null;
+    function atmChip(a) {
+        if (!a) return '<span class="ag-st unk">Non renseigné</span>';
+        var st = ATM[a.status] || ["unk", a.status];
+        return '<span class="ag-st ' + st[0] + '">' + esc(st[1]) + (a.gabTotal != null && a.gabWorking != null ? " · " + a.gabWorking + "/" + a.gabTotal : "") + '</span>';
+    }
+    function loadAtm() {
+        return getJson("/api/agence/atm?country=" + COUNTRY).then(function (l) { atmList = l || []; return atmList; }).catch(function () { atmList = []; return atmList; });
+    }
+    function atmFor(code) {
+        return (atmList || []).filter(function (a) { return code && a.agencyCode && a.agencyCode.toUpperCase() === code.toUpperCase(); })[0] || null;
+    }
+    var atmForm = { status: null, services: [] };
+
+    function renderAtmForm() {
+        var a = me && me.atm;
+        atmForm.status = a ? a.status : null;
+        atmForm.services = a && a.services ? a.services.slice() : [];
+        $("agAtmLast").innerHTML = a && a.updatedAt ? '<i class="bi bi-clock-history"></i> ' + new Date(a.updatedAt).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) + (a.updatedBy ? " — " + esc(a.updatedBy) : "")
+            : '<span class="text-warning">Jamais publié</span>';
+        document.querySelectorAll('[data-atm="status"] button').forEach(function (btn) {
+            btn.classList.toggle("on", atmForm.status === btn.dataset.v);
+            btn.disabled = !me.canEdit;
+        });
+        $("agAtmTotal").value = a && a.gabTotal != null ? a.gabTotal : "";
+        $("agAtmWorking").value = a && a.gabWorking != null ? a.gabWorking : "";
+        $("agAtmNote").value = a && a.note ? a.note : "";
+        $("agAtmServices").innerHTML = (me.atmServiceChoices || Object.keys(ATM_SERVICES)).map(function (k) {
+            var on = atmForm.services.indexOf(k) !== -1;
+            return '<button type="button" class="' + (on ? "on" : "") + '" data-s="' + k + '"' + (me.canEdit ? "" : " disabled") + '><i class="bi ' + (on ? "bi-check-square-fill" : "bi-square") + '"></i> ' + esc(ATM_SERVICES[k] || k) + '</button>';
+        }).join("");
+        $("agAtmServices").querySelectorAll("[data-s]").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                var k = btn.dataset.s, i = atmForm.services.indexOf(k);
+                if (i === -1) atmForm.services.push(k); else atmForm.services.splice(i, 1);
+                btn.classList.toggle("on", i === -1);
+                btn.querySelector("i").className = "bi " + (i === -1 ? "bi-check-square-fill" : "bi-square");
+            });
+        });
+        ["agAtmTotal", "agAtmWorking", "agAtmNote", "agAtmSave"].forEach(function (id) { $(id).disabled = !me.canEdit; });
+    }
+
+    document.querySelectorAll('[data-atm="status"] button').forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            atmForm.status = btn.dataset.v;
+            document.querySelectorAll('[data-atm="status"] button').forEach(function (x) { x.classList.toggle("on", x === btn); });
+            // Raccourcis logiques : hors service → 0 en service ; en service → tous en service.
+            var total = $("agAtmTotal").value;
+            if (btn.dataset.v === "HORS_SERVICE") $("agAtmWorking").value = 0;
+            if (btn.dataset.v === "EN_SERVICE" && total !== "") $("agAtmWorking").value = total;
+        });
+    });
+
+    $("agAtmSave").addEventListener("click", function () {
+        var msg = $("agAtmMsg");
+        if (!atmForm.status) { flash(msg, false, "Choisissez l'état des GAB."); return; }
+        var total = $("agAtmTotal").value, working = $("agAtmWorking").value;
+        sendJson("/api/agence/me/atm", "PUT", {
+            status: atmForm.status, services: atmForm.services,
+            gabTotal: total === "" ? null : Number(total), gabWorking: working === "" ? null : Number(working), note: $("agAtmNote").value
+        }).then(function (a) {
+            me.atm = a;
+            atmList = null;
+            flash(msg, true, "Publié — visible sur tout le site.");
+            renderAtmForm(); renderMyCards();
+            if (loaded.cartes) Promise.all([loadCards(), loadAtm()]).then(renderCards);
+        }).catch(function (e) { flash(msg, false, e.message); });
+    });
 
     // ── Onglet « Mon agence & cartes » : coche de disponibilité + coordonnées ──
     var dispo = { card: null, pin: null, types: [] };
@@ -259,6 +333,7 @@
         $("agBrManager").value = b.managerName || "";
         $("agBrAddress").innerHTML = b.address ? '<i class="bi bi-geo"></i> ' + esc(b.address) : "";
         ["agBrPhone", "agBrEmail", "agBrHours", "agBrManager", "agBrSave", "agDispoNote"].forEach(function (id) { $(id).disabled = !me.canEdit; });
+        renderAtmForm();
     }
 
     document.querySelectorAll(".ag-seg").forEach(function (seg) {
@@ -301,16 +376,26 @@
 
     function renderCards() {
         var q = fold($("agCardFilter").value).trim();
-        var rows = cardReport && cardReport.rows ? cardReport.rows : [];
-        $("agCardsInfo").textContent = cardReport && cardReport.reportDate
-            ? "Point du " + new Date(cardReport.reportDate).toLocaleDateString("fr-FR") + " — mis à jour par la QA / la monétique."
-            : "Aucun point de disponibilité publié.";
-        var list = rows.filter(function (r) { return !q || fold([r.agency, r.agencyCode, (r.cardTypes || []).join(" ")].join(" ")).indexOf(q) !== -1; });
+        var rows = (cardReport && cardReport.rows ? cardReport.rows : []).map(function (r) { return { card: r, code: r.agencyCode, name: r.agency }; });
+        // Agences qui n'ont publié que l'état de leurs GAB.
+        (atmList || []).forEach(function (a) {
+            if (!rows.some(function (x) { return x.code && a.agencyCode && x.code.toUpperCase() === a.agencyCode.toUpperCase(); })) {
+                rows.push({ card: null, code: a.agencyCode, name: a.agency });
+            }
+        });
+        $("agCardsInfo").textContent = "Situation actuelle : dernière mise à jour de chaque agence (point QA ou publication de l'agence).";
+        var list = rows.filter(function (x) {
+            return !q || fold([x.name, x.code, x.card ? (x.card.cardTypes || []).join(" ") : ""].join(" ")).indexOf(q) !== -1;
+        });
         var mine = myBranch() ? agencyCode(myBranch().name) : null;
-        $("agCardsTable").innerHTML = list.length ? '<table class="table table-hover align-middle ag-table"><thead><tr><th>Agence</th><th>Code</th><th>Cartes</th><th>PIN</th><th>Types disponibles</th></tr></thead><tbody>' +
-            list.map(function (r) {
-                return '<tr class="' + (mine && r.agencyCode === mine ? "mine" : "") + '"><td class="fw-semibold">' + esc(r.agency) + '</td><td>' + esc(r.agencyCode || "") + '</td><td>' + statusChip(r.cardStatus) +
-                    '</td><td>' + statusChip(r.pinStatus) + '</td><td>' + (r.cardTypes || []).map(function (t) { return '<span class="ag-type">' + esc(t) + '</span>'; }).join(" ") + '</td></tr>';
+        $("agCardsTable").innerHTML = list.length ? '<table class="table table-hover align-middle ag-table"><thead><tr><th>Agence</th><th>Code</th><th>Cartes</th><th>PIN</th><th>GAB</th><th>Types disponibles</th><th>Mis à jour</th></tr></thead><tbody>' +
+            list.map(function (x) {
+                var r = x.card, a = atmFor(x.code);
+                var when = r ? new Date(r.reportDate).toLocaleDateString("fr-FR") : a && a.updatedAt ? new Date(a.updatedAt).toLocaleDateString("fr-FR") : "";
+                return '<tr class="' + (mine && x.code === mine ? "mine" : "") + '"><td class="fw-semibold">' + esc(x.name) + '</td><td>' + esc(x.code || "") + '</td>' +
+                    '<td>' + (r ? statusChip(r.cardStatus) : '<span class="ag-st unk">—</span>') + '</td><td>' + (r ? statusChip(r.pinStatus) : '<span class="ag-st unk">—</span>') + '</td>' +
+                    '<td>' + atmChip(a) + '</td><td>' + (r ? (r.cardTypes || []).map(function (t) { return '<span class="ag-type">' + esc(t) + '</span>'; }).join(" ") : "") + '</td>' +
+                    '<td class="small text-muted">' + esc(when) + '</td></tr>';
             }).join("") + '</tbody></table>' : '<p class="text-muted">Aucune ligne.</p>';
     }
     $("agCardFilter").addEventListener("input", renderCards);
@@ -474,7 +559,7 @@
         dispo: renderDispo,
         cas: renderProducts,
         recherche: function () {},
-        cartes: function () { (cardReport ? Promise.resolve() : loadCards()).then(renderCards); },
+        cartes: function () { Promise.all([cardReport ? null : loadCards(), atmList ? null : loadAtm()]).then(renderCards); },
         agences: function () { (branches.length ? Promise.resolve() : loadBranches()).then(renderBranches); },
         escalades: loadEscalations,
         transmission: function () { fillCaseSelect(); updateTransmission(); },

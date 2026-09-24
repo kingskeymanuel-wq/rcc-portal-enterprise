@@ -89,8 +89,10 @@ window.CardAgencyReport = (function () {
 
     function fetchReport(date) {
         root.querySelector("#caGrid").innerHTML = '<div class="ca-skel"></div><div class="ca-skel"></div><div class="ca-skel"></div>';
-        request("GET", "/api/card-availability/agencies?country=" + encodeURIComponent(state.country) + (date ? "&date=" + date : ""))
-            .then(function (r) { state.report = r; render(); })
+        // État des GAB publié par chaque agence (Portail Agence) — affiché sur la même fiche.
+        var atmReq = request("GET", "/api/agence/atm?country=" + encodeURIComponent(state.country)).catch(function () { return []; });
+        Promise.all([request("GET", "/api/card-availability/agencies?country=" + encodeURIComponent(state.country) + (date ? "&date=" + date : "")), atmReq])
+            .then(function (res) { state.report = res[0]; state.atm = res[1] || []; render(); })
             .catch(function (e) {
                 root.querySelector("#caGrid").innerHTML = '<div class="alert alert-warning small mb-0">Point par agence indisponible : ' + esc(e.message) + '</div>';
             });
@@ -151,7 +153,7 @@ window.CardAgencyReport = (function () {
                 (state.canEdit ? '<div class="ca-actions"><button type="button" class="btn btn-sm btn-light" data-edit="' + x.id + '" title="Modifier"><i class="bi bi-pencil"></i></button>' +
                     '<button type="button" class="btn btn-sm btn-light text-danger" data-del="' + x.id + '" title="Supprimer"><i class="bi bi-trash"></i></button></div>' : "") +
                 '</div>' +
-                '<div class="ca-status">' + pill("Carte", x.cardStatus, "bi-credit-card-2-front") + pill("Code PIN", x.pinStatus, "bi-key") + '</div>' +
+                '<div class="ca-status">' + pill("Carte", x.cardStatus, "bi-credit-card-2-front") + pill("Code PIN", x.pinStatus, "bi-key") + atmPill(x.agencyCode) + '</div>' +
                 '<div class="ca-card-types">' + ((x.cardTypes || []).map(function (t) { return '<span class="' + (t === state.type ? "hl" : "") + '">' + esc(t) + '</span>'; }).join("") || '<em>Gammes non précisées</em>') + '</div>' +
                 (x.note ? '<div class="ca-note"><i class="bi bi-info-circle"></i> ' + esc(x.note) + '</div>' : "") +
                 '<div class="ca-upd"><i class="bi bi-clock-history"></i> Mis à jour le ' + frDate(x.reportDate) + (x.updatedBy ? " par " + esc(x.updatedBy) : "") + '</div>' +
@@ -167,6 +169,16 @@ window.CardAgencyReport = (function () {
                     .catch(function (e) { toast("Erreur : " + e.message, true); });
             });
         });
+    }
+
+    var ATM_LABEL = { EN_SERVICE: ["ok", "bi-check-circle-fill", "En service"], PARTIEL: ["low", "bi-exclamation-triangle-fill", "Partiel"],
+        SANS_BILLETS: ["low", "bi-cash", "Sans billets"], HORS_SERVICE: ["out", "bi-x-octagon-fill", "Hors service"] };
+    function atmPill(code) {
+        var a = (state.atm || []).filter(function (x) { return code && x.agencyCode && x.agencyCode.toUpperCase() === String(code).toUpperCase(); })[0];
+        if (!a) return "";
+        var s = ATM_LABEL[a.status] || ["low", "bi-question-circle", a.status];
+        return '<span class="ca-pill ' + s[0] + '" title="Publié par l\'agence' + (a.updatedAt ? " le " + new Date(a.updatedAt).toLocaleString("fr-FR") : "") + '"><i class="bi bi-cash-coin"></i> GAB <b><i class="bi ' + s[1] + '"></i> ' + s[2] +
+            (a.gabTotal != null && a.gabWorking != null ? " " + a.gabWorking + "/" + a.gabTotal : "") + '</b></span>';
     }
 
     function pill(label, status, icon) {

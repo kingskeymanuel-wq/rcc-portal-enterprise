@@ -41,6 +41,21 @@ public class BranchAgent implements RafAgent {
                 + (r.reportDate() != null ? " _(màj " + r.reportDate().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM")) + ")_" : "");
     }
 
+    private com.ecobank.rccportal.service.AtmStatusService atms;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setAtms(com.ecobank.rccportal.service.AtmStatusService atms) {
+        this.atms = atms;
+    }
+
+    static String atmLine(com.ecobank.rccportal.service.AtmStatusService.AtmStatus a) {
+        String icon = "EN_SERVICE".equals(a.status()) ? "✅" : "HORS_SERVICE".equals(a.status()) ? "❌" : "⚠️";
+        return "🏧 GAB : " + icon + " " + com.ecobank.rccportal.service.AtmStatusService.label(a.status())
+                + (a.gabTotal() != null && a.gabWorking() != null ? " (" + a.gabWorking() + "/" + a.gabTotal() + " en service)" : "")
+                + (a.services() != null && !a.services().isEmpty() ? " · " + String.join(", ", a.services()).toLowerCase(Locale.ROOT).replace('_', ' ') : "")
+                + (a.updatedAt() != null ? " _(màj " + a.updatedAt().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM HH:mm")) + ")_" : "");
+    }
+
     public String id() { return "branch"; }
 
     public String label() { return "Agences Ecobank"; }
@@ -93,6 +108,7 @@ public class BranchAgent implements RafAgent {
                 try {
                     var row = cardCache.computeIfAbsent(b.countryCode(), cards::currentByCode).get(code.group(1));
                     if (row != null) md.append("\n  ").append(cardLine(row));
+                    if (atms != null) atms.current(b.countryCode(), code.group(1)).ifPresent(a -> md.append("\n  ").append(atmLine(a)));
                 } catch (RuntimeException ignored) { /* disponibilité indisponible : réponse sans cette ligne */ }
             }
             if (b.latitude() != null && b.longitude() != null) {

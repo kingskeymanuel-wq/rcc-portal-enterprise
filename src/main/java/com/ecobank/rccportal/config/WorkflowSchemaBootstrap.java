@@ -565,6 +565,24 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
                 """);
         // Portail Agence : chaque agent d'agence est rattaché à UNE agence (BankBranches) — son
         // propre portail. Aucune donnée client ici : uniquement l'identifiant de l'agent et de l'agence.
+        // Disponibilité des GAB, cochée par chaque agence (état courant, une ligne par agence).
+        // Aucune donnée client : état du parc de GAB et services disponibles uniquement.
+        createIfMissing("AtmAgencyStatus", """
+                CREATE TABLE dbo.AtmAgencyStatus (
+                    Id BIGINT IDENTITY PRIMARY KEY,
+                    CountryCode NVARCHAR(2) NOT NULL,
+                    AgencyCode NVARCHAR(20) NOT NULL,
+                    Agency NVARCHAR(170) NOT NULL,
+                    Status NVARCHAR(20) NOT NULL,
+                    Services NVARCHAR(200) NULL,
+                    GabTotal INT NULL,
+                    GabWorking INT NULL,
+                    Note NVARCHAR(200) NULL,
+                    UpdatedBy NVARCHAR(200) NULL,
+                    UpdatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    CONSTRAINT UQ_AtmAgencyStatus UNIQUE (CountryCode, AgencyCode)
+                )
+                """);
         createIfMissing("UserAgency", """
                 CREATE TABLE dbo.UserAgency (
                     UserId BIGINT NOT NULL PRIMARY KEY,
