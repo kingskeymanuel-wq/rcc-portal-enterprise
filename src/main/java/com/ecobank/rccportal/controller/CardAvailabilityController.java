@@ -24,9 +24,53 @@ import java.util.List;
 public class CardAvailabilityController {
 
     private final CardAvailabilityService service;
+    private final com.ecobank.rccportal.service.CardAgencyStatusService agencyService;
 
-    public CardAvailabilityController(CardAvailabilityService service) {
+    public CardAvailabilityController(CardAvailabilityService service,
+                                      com.ecobank.rccportal.service.CardAgencyStatusService agencyService) {
         this.service = service;
+        this.agencyService = agencyService;
+    }
+
+    // ── Point de disponibilité par agence (DATE | AGENCE | CARTE | CODE | TYPE DE CARTE) ──
+
+    @GetMapping("/agencies")
+    public com.ecobank.rccportal.dto.CardAgencyDtos.AgencyReport agencies(@RequestParam String country,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate date) {
+        return agencyService.report(country, date);
+    }
+
+    @PostMapping("/agencies")
+    public com.ecobank.rccportal.dto.CardAgencyDtos.AgencyRow createAgencyRow(@Valid @RequestBody com.ecobank.rccportal.dto.CardAgencyDtos.AgencyRowRequest request,
+                                                                             @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireQaOrAdmin(requester);
+        return agencyService.save(null, request, who(requester));
+    }
+
+    @PutMapping("/agencies/{id}")
+    public com.ecobank.rccportal.dto.CardAgencyDtos.AgencyRow updateAgencyRow(@PathVariable Long id,
+                                                                             @Valid @RequestBody com.ecobank.rccportal.dto.CardAgencyDtos.AgencyRowRequest request,
+                                                                             @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireQaOrAdmin(requester);
+        return agencyService.save(id, request, who(requester));
+    }
+
+    @DeleteMapping("/agencies/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteAgencyRow(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireQaOrAdmin(requester);
+        agencyService.delete(id);
+    }
+
+    @PostMapping("/agencies/paste")
+    public com.ecobank.rccportal.dto.CardAgencyDtos.PasteResult pasteAgencies(@Valid @RequestBody com.ecobank.rccportal.dto.CardAgencyDtos.PasteRequest request,
+                                                                             @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireQaOrAdmin(requester);
+        return agencyService.importPaste(request, who(requester));
+    }
+
+    private static String who(AuthenticatedUser requester) {
+        return requester.name() != null ? requester.name() : requester.username();
     }
 
     @GetMapping

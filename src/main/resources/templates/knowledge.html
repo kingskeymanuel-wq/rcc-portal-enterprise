@@ -10,6 +10,7 @@
          carte réelle, interactive, sans dépendance à Google Maps (aucune clé API requise). -->
     <link rel="stylesheet" th:href="@{/vendor/leaflet/leaflet.min.css}">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/knowledge-extras.css}">
     <style>
         .bank-map-canvas { height: 420px; border-radius: 12px; z-index: 1; }
         /* Fond neutre quadrillé si les tuiles ne chargent pas (réseau) — les marqueurs restent lisibles. */
@@ -481,6 +482,8 @@
 <script th:src="@{/js/richtext-editor.js}"></script>
 <script th:src="@{/vendor/leaflet/leaflet.min.js}"></script>
 <script th:src="@{/js/bank-map.js}"></script>
+<script th:src="@{/js/other-banks.js}"></script>
+<script th:src="@{/js/card-agency.js}"></script>
 <script th:src="@{/js/card-availability.js}"></script>
 <script th:src="@{/js/knowledge.js}"></script>
 </body>

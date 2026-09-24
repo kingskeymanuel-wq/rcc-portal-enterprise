@@ -336,6 +336,25 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
                 )
                 """);
 
+        // Point de disponibilité des cartes par agence (tableau quotidien de la filiale).
+        createIfMissing("CardAgencyStatus", """
+                CREATE TABLE dbo.CardAgencyStatus (
+                    CardAgencyStatusId BIGINT IDENTITY(1,1) PRIMARY KEY,
+                    CountryCode NVARCHAR(2) NOT NULL,
+                    ReportDate DATE NOT NULL,
+                    Agency NVARCHAR(150) NOT NULL,
+                    AgencyCode NVARCHAR(20) NULL,
+                    CardStatus NVARCHAR(20) NOT NULL,
+                    PinStatus NVARCHAR(20) NOT NULL,
+                    CardTypes NVARCHAR(400) NULL,
+                    Note NVARCHAR(500) NULL,
+                    UpdatedBy NVARCHAR(150) NULL,
+                    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    UpdatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    CONSTRAINT UQ_CardAgencyStatus UNIQUE (CountryCode, ReportDate, Agency)
+                )
+                """);
+
         // Certificats de formation — demandés par l'agent (parcours terminé / évaluation réussie),
         // validés ou refusés par QA, vérifiables par leur numéro.
         createIfMissing("TrainingCertificates", """

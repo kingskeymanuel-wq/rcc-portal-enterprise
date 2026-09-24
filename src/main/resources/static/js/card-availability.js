@@ -66,6 +66,7 @@ window.CardAvailability = (function () {
             root.querySelector(".card-av-city-filter").value = "";
             Array.prototype.forEach.call(root.querySelectorAll(".card-av-qa"), function (el) { el.style.display = state.canEdit ? "" : "none"; });
             body.innerHTML = '<div class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm"></span> Chargement…</div>';
+            if (window.CardAgencyReport) window.CardAgencyReport.load(country, state.canEdit);
             return request("GET", "/api/card-availability?country=" + encodeURIComponent(country)).then(function (data) {
                 state.data = data;
                 state.cells = {};

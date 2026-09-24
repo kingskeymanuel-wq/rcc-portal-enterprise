@@ -221,17 +221,26 @@ window.BankMap = (function () {
                     (b.openingHours ? '<div class="small text-muted"><i class="bi bi-clock"></i> ' + escapeHtml(b.openingHours) + '</div>' : "") +
                     noCoords +
                     '</div>' +
+                    '<div class="d-flex gap-1">' +
+                    (window.OtherBanks && b.latitude != null ? '<button class="btn btn-sm btn-outline-primary bank-branch-street-btn" data-idx="' + idx + '" title="Détails & visite de rue"><i class="bi bi-person-walking"></i></button>' : "") +
                     (canEdit ? '<button class="btn btn-sm btn-outline-secondary bank-branch-edit-btn" data-idx="' + idx + '"><i class="bi bi-pencil"></i></button>' : "") +
+                    '</div>' +
                     '</div></div></div>';
             }).join("");
 
             Array.prototype.forEach.call(listBox.querySelectorAll(".bank-branch-card"), function (card) {
                 card.addEventListener("click", function (evt) {
-                    if (evt.target.closest(".bank-branch-edit-btn")) return;
+                    if (evt.target.closest(".bank-branch-edit-btn") || evt.target.closest(".bank-branch-street-btn")) return;
                     Array.prototype.forEach.call(listBox.querySelectorAll(".bank-branch-card"), function (c) {
                         c.classList.toggle("active", c === card);
                     });
                     focusBranch(branches[Number(card.getAttribute("data-idx"))]);
+                });
+            });
+            Array.prototype.forEach.call(listBox.querySelectorAll(".bank-branch-street-btn"), function (btn) {
+                btn.addEventListener("click", function (evt) {
+                    evt.stopPropagation();
+                    window.OtherBanks.openBranch(branches[Number(btn.getAttribute("data-idx"))]);
                 });
             });
             Array.prototype.forEach.call(listBox.querySelectorAll(".bank-branch-edit-btn"), function (btn) {
@@ -255,7 +264,12 @@ window.BankMap = (function () {
             branches.forEach(function (b) {
                 if (b.latitude == null || b.longitude == null) return;
                 var marker = L.marker([b.latitude, b.longitude], { icon: icon(), title: b.name }).addTo(map);
-                marker.bindPopup(branchPopupHtml(b));
+                marker.bindPopup(branchPopupHtml(b) + (window.OtherBanks
+                    ? '<button type="button" class="btn btn-sm btn-primary mt-2 bank-branch-street-btn"><i class="bi bi-person-walking"></i> Détails &amp; visite de rue</button>' : ""));
+                marker.on("popupopen", function (e) {
+                    var btn = e.popup.getElement().querySelector(".bank-branch-street-btn");
+                    if (btn) btn.addEventListener("click", function () { window.OtherBanks.openBranch(b); });
+                });
                 markers.push({ marker: marker, branch: b });
             });
             fitToMarkers();
@@ -281,6 +295,7 @@ window.BankMap = (function () {
                 allBranches = results[0] || [];
                 renderCityChips(results[1] || []);
                 render();
+                if (window.OtherBanks) window.OtherBanks.attach(map, root, countryCode);
                 setStatus(allBranches.length ? "" : "Aucune agence enregistrée pour cette filiale pour le moment.");
             }).catch(function (e) {
                 if (seq !== requestSeq) return;
