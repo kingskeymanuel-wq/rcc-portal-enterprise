@@ -95,8 +95,11 @@ graph:
 # Google Programmable Search. Wikipédia (gratuit, sans clé) sert de filet de sécurité.
 # Diagnostic (IT) : GET /api/ralph/search/diagnose
 websearch:
-  enabled: ${WEBSEARCH_ENABLED:false}
-  provider-order: ${WEBSEARCH_PROVIDER_ORDER:searxng,brave,tavily,google,wikipedia}
+  enabled: ${WEBSEARCH_ENABLED:true}
+  # « ecobank » = DuckDuckGo limité à ecobank.com (pages officielles d'abord), « duckduckgo » =
+  # web général — tous deux GRATUITS et SANS CLÉ. Les moteurs à clé restent prioritaires s'ils sont configurés.
+  provider-order: ${WEBSEARCH_PROVIDER_ORDER:searxng,brave,tavily,google,ecobank,duckduckgo,wikipedia}
+  free-web-enabled: ${WEBSEARCH_FREE_WEB_ENABLED:true}
   language: ${WEBSEARCH_LANGUAGE:fr}
   result-count: ${WEBSEARCH_RESULT_COUNT:5}
   timeout-seconds: ${WEBSEARCH_TIMEOUT_SECONDS:10}

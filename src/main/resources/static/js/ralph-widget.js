@@ -197,7 +197,7 @@
         badge.style.maxWidth = "85%";
         badge.style.margin = "2px 0 4px";
         badge.textContent = source === "WEB"
-            ? "🌐 Réponse complétée par une recherche web (aucune procédure interne trouvée)."
+            ? "🌐 Réponse tirée d'une recherche web (hors portail) — source externe à vérifier."
             : "🌐 Réponse complétée par des sources web en plus des procédures internes.";
         thread.appendChild(badge);
     }

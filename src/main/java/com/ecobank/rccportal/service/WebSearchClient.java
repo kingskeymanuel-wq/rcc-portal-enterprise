@@ -159,6 +159,7 @@ public class WebSearchClient {
             case "google" -> notBlank(properties.getGoogle().getKey()) && notBlank(properties.getGoogle().getCx());
             case "bing" -> notBlank(properties.getBing().getKey());
             case "wikipedia" -> properties.getWikipedia().isEnabled();
+            case "ecobank", "duckduckgo" -> properties.isFreeWebEnabled();
             default -> false;
         };
     }
@@ -171,6 +172,8 @@ public class WebSearchClient {
             case "google" -> google(query);
             case "bing" -> bing(query);
             case "wikipedia" -> wikipedia(query);
+            case "ecobank" -> duckDuckGo("site:ecobank.com " + query);
+            case "duckduckgo" -> duckDuckGo(query);
             default -> List.of();
         };
     }
@@ -233,6 +236,93 @@ public class WebSearchClient {
                     host + "/wiki/" + URLEncoder.encode(title.replace(' ', '_'), StandardCharsets.UTF_8).replace("+", "_")));
         }
         return results;
+    }
+
+    private static final java.util.regex.Pattern DDG_RESULT = java.util.regex.Pattern.compile(
+            "<a[^>]*class=\"result__a\"[^>]*href=\"([^\"]+)\"[^>]*>(.*?)</a>(.*?)(?=<a[^>]*class=\"result__a\"|$)",
+            java.util.regex.Pattern.DOTALL);
+    private static final java.util.regex.Pattern DDG_SNIPPET = java.util.regex.Pattern.compile(
+            "class=\"result__snippet\"[^>]*>(.*?)</(?:a|div|td)>", java.util.regex.Pattern.DOTALL);
+
+    /**
+     * DuckDuckGo (version HTML légère) — GRATUIT et SANS CLÉ : de vrais résultats web, pas
+     * seulement Wikipédia. Utilisé aussi avec « site:ecobank.com » pour privilégier les pages
+     * officielles d'Ecobank. Page de contrôle anti-robot ⇒ liste vide (moteur suivant).
+     */
+    List<WebSearchResultItem> duckDuckGo(String query) throws Exception {
+        String region = "fr".equals(lang()) ? "fr-fr" : "wt-wt";
+        HttpRequest request = HttpRequest.newBuilder(URI.create("https://html.duckduckgo.com/html/"))
+                .timeout(Duration.ofSeconds(Math.max(3, properties.getTimeoutSeconds())))
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) RCC-Portal/1.0")
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .header("Accept-Language", lang())
+                .POST(HttpRequest.BodyPublishers.ofString("q=" + enc(query) + "&kl=" + region, StandardCharsets.UTF_8))
+                .build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        if (response.statusCode() / 100 != 2) throw new IllegalStateException("HTTP " + response.statusCode());
+        return parseDuckDuckGo(response.body(), count());
+    }
+
+    static List<WebSearchResultItem> parseDuckDuckGo(String html, int max) {
+        List<WebSearchResultItem> results = new ArrayList<>();
+        if (html == null) return results;
+        java.util.regex.Matcher m = DDG_RESULT.matcher(html);
+        while (m.find() && results.size() < max) {
+            String href = m.group(1).replace("&amp;", "&");
+            int u = href.indexOf("uddg=");
+            if (u >= 0) {
+                String encoded = href.substring(u + 5);
+                int amp = encoded.indexOf('&');
+                href = java.net.URLDecoder.decode(amp >= 0 ? encoded.substring(0, amp) : encoded, StandardCharsets.UTF_8);
+            }
+            if (href.startsWith("//")) href = "https:" + href;
+            // Publicités DuckDuckGo et liens non web écartés.
+            if (!(href.startsWith("https://") || href.startsWith("http://")) || href.contains("duckduckgo.com/y.js")) continue;
+            java.util.regex.Matcher sm = DDG_SNIPPET.matcher(m.group(3));
+            String snippet = sm.find() ? cleanSnippet(sm.group(1)) : "";
+            String title = cleanSnippet(m.group(2));
+            if (title.isEmpty()) continue;
+            results.add(new WebSearchResultItem(title, snippet, href));
+        }
+        return results;
+    }
+
+    /**
+     * Recherche « large » pour RAF : d'abord les pages OFFICIELLES Ecobank, puis le web général,
+     * sans doublon — RAF n'est plus limité aux contenus du portail.
+     */
+    public List<WebSearchResultItem> searchWide(String query) {
+        if (!isConfigured() || query == null || query.isBlank()) return List.of();
+        String cacheKey = "wide|" + query.trim().toLowerCase(Locale.ROOT);
+        synchronized (cache) {
+            CacheEntry entry = cache.get(cacheKey);
+            if (entry != null && entry.expiresAt() > System.currentTimeMillis()) return entry.results();
+        }
+        List<WebSearchResultItem> merged = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        if (isProviderConfigured("ecobank")) {
+            try {
+                for (WebSearchResultItem r : callProvider("ecobank", query.trim())) {
+                    if (merged.size() >= 2) break;
+                    if (seen.add(r.url())) merged.add(r);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return List.of();
+            } catch (Exception e) {
+                log.warn("Recherche web : ecobank.com a échoué pour « {} » : {}", query, e.getMessage());
+            }
+        }
+        for (WebSearchResultItem r : search(query)) {
+            if (merged.size() >= count()) break;
+            if (seen.add(r.url())) merged.add(r);
+        }
+        if (!merged.isEmpty() && properties.getCacheMinutes() > 0) {
+            synchronized (cache) {
+                cache.put(cacheKey, new CacheEntry(System.currentTimeMillis() + properties.getCacheMinutes() * 60_000L, merged));
+            }
+        }
+        return merged;
     }
 
     private JsonNode getJson(HttpRequest.Builder builder) throws Exception {

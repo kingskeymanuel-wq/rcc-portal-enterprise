@@ -21,9 +21,11 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "websearch")
 public class WebSearchProperties {
 
-    private boolean enabled = false;
+    private boolean enabled = true;
     /** Ordre d'essai (identifiants : searxng, brave, tavily, google, bing, wikipedia). */
-    private String providerOrder = "searxng,brave,tavily,google,wikipedia";
+    private String providerOrder = "searxng,brave,tavily,google,ecobank,duckduckgo,wikipedia";
+    /** Moteurs gratuits sans clé (DuckDuckGo, et DuckDuckGo limité à ecobank.com). */
+    private boolean freeWebEnabled = true;
     /** Langue préférée des résultats (code ISO 639-1). */
     private String language = "fr";
     private int resultCount = 5;

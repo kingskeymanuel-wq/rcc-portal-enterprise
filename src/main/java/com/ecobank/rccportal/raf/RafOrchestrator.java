@@ -72,6 +72,39 @@ public class RafOrchestrator {
         this.clock = clock;
     }
 
+    /** Recherche au-delà du portail (web, pages officielles Ecobank) — optionnelle. */
+    private RafWebResearch web;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setWebResearch(RafWebResearch web) {
+        this.web = web;
+    }
+
+    private boolean webAvailable() {
+        return web != null && web.available();
+    }
+
+    /** Réponse tirée du web ; {@code null} si rien trouvé et {@code quiet} (repli silencieux). */
+    private RalphSearchResponse webAnswer(RafRequest request, String query, boolean nothingInternal, boolean quiet) {
+        List<com.ecobank.rccportal.dto.WebSearchResultItem> results = webAvailable() ? web.search(query) : List.of();
+        if (results.isEmpty()) {
+            if (quiet) return null;
+            String md = "fr".equals(request.lang())
+                    ? "🌐 Je n'ai rien trouvé sur le web pour « " + query + " » (ou l'accès à Internet est bloqué depuis le serveur — l'IT peut le vérifier via le diagnostic de recherche web)."
+                    : "🌐 Nothing found on the web for “" + query + "” (or Internet access is blocked from the server).";
+            remember(request, new RafDialogueState(null, request.question(), request.entities(), null, null, List.of()), md);
+            return new RalphSearchResponse(md, List.of(), "NONE", List.of(), 10, List.of("Web"), "WEB", List.of(),
+                    SmallTalkAgent.starters().subList(0, 3), null, false, List.of("recherche web sans résultat"));
+        }
+        String md = RafWebResearch.markdown(query, results, nothingInternal, request.lang());
+        remember(request, new RafDialogueState(null, request.question(), request.entities(), null, null, List.of()), md);
+        boolean official = results.stream().anyMatch(r -> r.url() != null && r.url().contains("ecobank.com"));
+        return new RalphSearchResponse(md, List.of(), "WEB", results, official ? 60 : 45,
+                List.of(official ? "Web (site officiel Ecobank)" : "Web"), "WEB", List.of(),
+                List.of(), null, false,
+                List.of("recherche externe (question assainie, sans données client) : " + results.size() + " résultat(s)"));
+    }
+
     /** Liste des agents (id, libellé) — page d'aide / widget. */
     public List<Map<String, String>> capabilities() {
         return agents.stream().map(a -> Map.of("id", a.id(), "label", a.label())).toList();
@@ -103,6 +136,13 @@ public class RafOrchestrator {
                 replyLang, username, entities, state, command, now);
 
         String cmd = followUps.resolveCommand(request);
+        if (cmd != null && cmd.startsWith("raf:web:")) {
+            return webAnswer(request, cmd.substring("raf:web:".length()), false, false);
+        }
+        String explicitWeb = cmd == null ? RafWebResearch.explicitQuery(sanitized) : null;
+        if (explicitWeb != null && webAvailable()) {
+            return webAnswer(request, explicitWeb, false, false);
+        }
         if (cmd != null) {
             if (cmd.startsWith("raf:ask:")) return handle(cmd.substring("raf:ask:".length()), username, lang, null);
             RalphSearchResponse commanded = handleCommand(request.withCommand(cmd), cmd);
@@ -248,6 +288,11 @@ public class RafOrchestrator {
         }
 
         if (!clarification) suggestions = withNextSteps(request, primary, secondary, suggestions);
+        if (!clarification && primary.intent() != RafIntent.SMALL_TALK && webAvailable()) {
+            suggestions = new ArrayList<>(suggestions);
+            suggestions.add(new RafSuggestion("fr".equals(request.lang()) ? "🌐 Chercher aussi sur le web" : "🌐 Search the web too",
+                    request.question(), "raf:web:" + request.question()));
+        }
 
         int confidence = primary.intent() == RafIntent.SMALL_TALK ? 90 : clarification ? 40
                 : (int) Math.min(95, Math.round(100 * primaryScore) + (secondary.isEmpty() ? 0 : 5));
@@ -512,6 +557,11 @@ public class RafOrchestrator {
         }
         String best = ranked.isEmpty() ? null : ranked.get(0).intent().name();
         gapLog.record(request.question(), best);
+        // Rien dans le portail : RAF va chercher ailleurs au lieu de s'arrêter là.
+        if (webAvailable()) {
+            RalphSearchResponse fromWeb = webAnswer(request, request.question(), true, true);
+            if (fromWeb != null) return fromWeb;
+        }
         String md = RafText.get(request.lang(), "nothing", request.question()) + "\n\n" + RafText.get(request.lang(), "nothing.tip");
         remember(request, new RafDialogueState(null, request.question(), request.entities(), null, null, List.of()), md);
         return new RalphSearchResponse(md, List.of(), "NONE", List.of(), 10, List.of(), null, traces,
