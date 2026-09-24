@@ -97,6 +97,7 @@
         .mrcc-wallpaper-swatch:hover { transform: scale(1.08); }
         .mrcc-wallpaper-swatch.active { border-color: var(--eco-blue); }
     </style>
+    <link rel="stylesheet" th:href="@{/css/mon-rcc.css}">
 </head>
 <body>
 <div class="layout">
@@ -106,16 +107,28 @@
         <main id="page-content">
             <div class="container-fluid">
 
-                <div id="monRccHeroBanner" class="mb-4" style="display:none;height:220px;border-radius:1rem;background-size:cover;background-position:center;"></div>
-
-                <div class="welcome-banner">
-                    <div>
+                <section class="mrcc-hero" aria-label="MON RCC">
+                    <div id="monRccHeroBanner" class="mrcc-hero-bg"></div>
+                    <div class="mrcc-hero-overlay"></div>
+                    <span class="mrcc-bubble b1" aria-hidden="true"><i class="bi bi-chat-heart-fill"></i></span>
+                    <span class="mrcc-bubble b2" aria-hidden="true"><i class="bi bi-heart-fill"></i></span>
+                    <span class="mrcc-bubble b3" aria-hidden="true"><i class="bi bi-megaphone-fill"></i></span>
+                    <span class="mrcc-bubble b4" aria-hidden="true"><i class="bi bi-star-fill"></i></span>
+                    <span class="mrcc-bubble b5" aria-hidden="true"><i class="bi bi-people-fill"></i></span>
+                    <div class="mrcc-hero-content">
+                        <span class="mrcc-hero-chip"><i class="bi bi-stars"></i> La communauté RCC</span>
                         <h2>MON RCC</h2>
-                        <p class="text-muted">Fil d'actualité et messagerie interne</p>
+                        <p>Fil d'actualité et messagerie interne — partagez, réagissez, restez connectés.</p>
+                        <div class="mrcc-hero-stats">
+                            <span class="mrcc-stat"><i class="bi bi-file-earmark-richtext"></i> <b id="mrccStatPosts">–</b> publications</span>
+                            <span class="mrcc-stat"><i class="bi bi-heart-fill"></i> <b id="mrccStatLikes">–</b> J'aime</span>
+                            <span class="mrcc-stat"><i class="bi bi-eye-fill"></i> <b id="mrccStatViews">–</b> vues</span>
+                        </div>
                     </div>
-                </div>
+                </section>
 
-                <ul class="nav nav-tabs mb-4" id="monRccTabs">
+                <ul class="nav nav-tabs mb-4 mrcc-tabs" id="monRccTabs" role="tablist">
+                    <span class="mrcc-tab-ink" aria-hidden="true"></span>
                     <li class="nav-item">
                         <button class="nav-link active" data-tab="feed" type="button">
                             <i class="bi bi-images"></i> Fil d'actualité
@@ -135,14 +148,11 @@
 
                 <!-- ===== Fil d'actualité ===== -->
                 <div id="feedPane">
-                    <div class="card dashboard-card shadow-sm mb-4">
-                        <div class="card-body">
-                            <h6 class="card-title mb-2"><i class="bi bi-people"></i> Communautés</h6>
-                            <div id="communitiesList" class="d-flex flex-wrap gap-2"></div>
-                        </div>
+                  <div class="mrcc-grid">
+                    <div class="mrcc-main">
+                    <div class="mrcc-card mrcc-stories-card">
+                        <div class="d-flex gap-3 mb-4 pb-2" id="storiesBar" style="overflow-x:auto;"></div>
                     </div>
-
-                    <div class="d-flex gap-3 mb-4 pb-2" id="storiesBar" style="overflow-x:auto;"></div>
 
                     <!-- Création de story — vrai fichier, pas un lien -->
                     <div class="modal fade" id="storyModal" tabindex="-1">
@@ -219,6 +229,19 @@
                     <div id="postsContainer">
                         <p class="text-muted text-center">Chargement…</p>
                     </div>
+                    </div>
+
+                    <aside class="mrcc-aside">
+                        <div class="mrcc-card">
+                            <div class="mrcc-card-title"><span class="mrcc-ico"><i class="bi bi-people-fill"></i></span> Communautés</div>
+                            <div id="communitiesList" class="d-flex flex-wrap gap-2"></div>
+                        </div>
+                        <div class="mrcc-card" id="mrccTrendCard" style="animation-delay:.1s">
+                            <div class="mrcc-card-title"><span class="mrcc-ico" style="background:linear-gradient(135deg,#FFB300,#FF6F3C)"><i class="bi bi-fire"></i></span> Tendances</div>
+                            <div id="mrccTrendList"><p class="text-muted small mb-0">Chargement…</p></div>
+                        </div>
+                    </aside>
+                  </div>
                 </div>
 
                 <!-- ===== Messagerie ===== -->

@@ -580,11 +580,78 @@
         sendJson("/api/mail-templates/" + templateId + "/fill", "POST", { values: values }).then(function (result) {
             $("filledSubject").value = result.subject;
             $("filledBody").value = result.body;
+            renderRichPreview(result.body);
         }).catch(function (e) { console.error(e); });
 
         if (!$("filledRecipientTo").getAttribute("data-user-edited")) {
             $("filledRecipientTo").value = resolveDefaultRecipient();
         }
+    }
+
+    // ===================== TABLEAUX D'ESCALADE =====================
+    // Corps au format « === TITRE === » suivi de lignes « LIBELLÉ : valeur » → vrai tableau HTML
+    // (en-tête coloré comme les tableaux Excel d'escalade) collable dans Outlook.
+
+    var TABLE_TITLE = /^===\s*(.+?)\s*===\s*$/;
+    var TABLE_ROW = /^([^:\n]{2,60}?)\s*:\s*(.*)$/;
+
+    function hasTable(body) {
+        return (body || "").split("\n").some(function (l) { return TABLE_TITLE.test(l.trim()); });
+    }
+
+    function bodyToHtml(body) {
+        var lines = (body || "").split("\n");
+        var html = [];
+        var i = 0;
+        var cell = "border:1px solid #1f1f1f;padding:3px 8px;font:12px Calibri,Arial,sans-serif;";
+        while (i < lines.length) {
+            var m = TABLE_TITLE.exec(lines[i].trim());
+            if (m) {
+                var title = m[1];
+                var head = /DSD|RÉCLAMATION|RECLAMATION|GAB/i.test(title) ? "#F4806B" : "#D9EAD3";
+                var rows = [];
+                i++;
+                while (i < lines.length && lines[i].trim() && TABLE_ROW.test(lines[i].trim())) {
+                    var r = TABLE_ROW.exec(lines[i].trim());
+                    rows.push('<tr><td style="' + cell + 'font-weight:bold;width:45%;">' + escapeHtml(r[1]) + '</td>' +
+                        '<td style="' + cell + (/AUTHENTIFI/i.test(r[2]) ? "text-align:center;" : "") + '">' + escapeHtml(r[2]) + '</td></tr>');
+                    i++;
+                }
+                html.push('<table style="border-collapse:collapse;min-width:420px;margin:6px 0 10px;">' +
+                    '<tr><th colspan="2" style="' + cell + 'background:' + head + ';text-align:center;font-weight:bold;">' + escapeHtml(title) + '</th></tr>' +
+                    rows.join("") + '</table>');
+                continue;
+            }
+            html.push(lines[i].trim() ? '<div style="font:13px Calibri,Arial,sans-serif;">' + escapeHtml(lines[i]) + '</div>' : '<div>&nbsp;</div>');
+            i++;
+        }
+        return html.join("");
+    }
+
+    function bodyToText(body) {
+        return (body || "").replace(/^===\s*(.+?)\s*===\s*$/gm, "$1");
+    }
+
+    function renderRichPreview(body) {
+        var wrap = $("mtRichWrap");
+        if (!wrap) return;
+        var show = hasTable(body);
+        wrap.hidden = !show;
+        if (show) $("mtRichPreview").innerHTML = bodyToHtml(body);
+    }
+
+    /** Copie riche (tableau HTML) si possible, texte sinon. */
+    function copyMail(subjectToo) {
+        var body = $("filledBody").value;
+        var plain = (subjectToo ? $("filledSubject").value + "\n\n" : "") + bodyToText(body);
+        if (hasTable(body) && window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+            var html = '<div>' + (subjectToo ? '<div style="font:bold 13px Calibri,Arial,sans-serif;">' + escapeHtml($("filledSubject").value) + '</div><div>&nbsp;</div>' : "") + bodyToHtml(body) + '</div>';
+            return navigator.clipboard.write([new ClipboardItem({
+                "text/html": new Blob([html], { type: "text/html" }),
+                "text/plain": new Blob([plain], { type: "text/plain" })
+            })]).catch(function () { return navigator.clipboard.writeText(plain); });
+        }
+        return navigator.clipboard.writeText(plain);
     }
 
     $("sendFilledMailBtn").addEventListener("click", function () {
@@ -597,14 +664,19 @@
 
         var mailto = "mailto:" + encodeURIComponent(to) + "?subject=" + encodeURIComponent(subject);
         if (cc) mailto += "&cc=" + encodeURIComponent(cc);
-        mailto += "&body=" + encodeURIComponent(body);
+        if (hasTable(body)) {
+            // Outlook n'accepte que du texte via mailto : le tableau est copié, l'agent le colle (Ctrl+V).
+            copyMail(false).catch(function () {});
+            mailto += "&body=" + encodeURIComponent(bodyToText(body));
+        } else {
+            mailto += "&body=" + encodeURIComponent(body);
+        }
 
         window.location.href = mailto;
     });
 
     $("copyFilledMailBtn").addEventListener("click", function () {
-        var text = $("filledSubject").value + "\n\n" + $("filledBody").value;
-        navigator.clipboard.writeText(text).then(function () {
+        copyMail(true).then(function () {
             var btn = $("copyFilledMailBtn");
             var original = btn.innerHTML;
             btn.innerHTML = '<i class="bi bi-check-lg"></i> Copié';

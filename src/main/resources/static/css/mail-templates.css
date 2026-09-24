@@ -196,3 +196,12 @@ mark.mt-hl { background: #fff1b8; padding: 0 1px; border-radius: 3px; }
 @media (prefers-reduced-motion: reduce) {
     .mt-hero, .mt-hero-art i, .mt-hero-icon, .mt-unc-icon, .mt-team-card, .mt-category-card, .mt-tpl, .mt-unc-item, .mt-empty-state .mt-empty-art, .mt-detail-head { animation: none !important; }
 }
+
+/* ── Aperçu des tableaux d'escalade ─────────────────────────────── */
+.mt-rich-wrap { margin-top: 14px; border: 1px solid rgba(46,125,50,.25); border-radius: 14px; overflow: hidden; animation: mtRichIn .35s ease both; }
+.mt-rich-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 8px 14px; background: linear-gradient(90deg, rgba(46,125,50,.12), rgba(46,125,50,.02)); font-weight: 600; font-size: .85rem; color: #2E7D32; }
+.mt-rich-hint { font-weight: 400; color: #6b7280; font-size: .78rem; }
+.mt-rich-preview { background: #fff; color: #111; padding: 12px 16px; max-height: 320px; overflow: auto; }
+.mt-rich-preview table { max-width: 100%; }
+@keyframes mtRichIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .mt-rich-wrap { animation: none; } }

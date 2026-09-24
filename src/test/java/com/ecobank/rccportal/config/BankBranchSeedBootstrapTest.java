@@ -29,30 +29,41 @@ class BankBranchSeedBootstrapTest {
         new BankBranchSeedBootstrap(repository, new ObjectMapper()).run();
 
         ArgumentCaptor<BankBranch> saved = ArgumentCaptor.forClass(BankBranch.class);
-        verify(repository, times(29)).save(saved.capture());
+        verify(repository, times(75)).save(saved.capture());
         List<BankBranch> branches = saved.getAllValues();
 
         // Les 20 filiales de knowledge-countries.json, mêmes codes à 2 lettres.
         Set<String> countries = branches.stream().map(BankBranch::getCountryCode).collect(Collectors.toSet());
         assertEquals(Set.of("CI", "BF", "BJ", "BI", "CD", "CF", "CG", "CM", "CV", "GA",
                 "GN", "GQ", "GW", "ML", "MZ", "NE", "SN", "ST", "TD", "TG"), countries);
-        assertEquals(10, branches.stream().filter(b -> "CI".equals(b.getCountryCode())).count());
+        assertEquals(56, branches.stream().filter(b -> "CI".equals(b.getCountryCode())).count());
+        // Liste officielle des agences CI (K01…K57) : chaque code une seule fois.
+        List<String> codes = branches.stream().map(b -> BankBranchSeedBootstrap.agencyCode(b.getName())).filter(java.util.Objects::nonNull).toList();
+        assertEquals(56, codes.size());
+        assertEquals(56, new java.util.HashSet<>(codes).size());
         assertTrue(branches.stream().allMatch(b -> b.getLatitude() != null && b.getLongitude() != null && b.isActive()));
     }
 
     @Test
-    void run_skipsCountriesAlreadyFilled() {
+    void run_upgradesAnExistingCountryWithoutDuplicates() {
         BankBranchRepository repository = mock(BankBranchRepository.class);
-        when(repository.existsByCountryCodeIgnoreCase(anyString())).thenReturn(false);
-        when(repository.existsByCountryCodeIgnoreCase("CI")).thenReturn(true);
+        when(repository.existsByCountryCodeIgnoreCase(anyString())).thenReturn(true);
+        BankBranch aboisso = BankBranch.builder().countryCode("CI").city("Aboisso").name("Agence Aboisso").active(true).build();
+        BankBranch ena = BankBranch.builder().countryCode("CI").city("Abidjan").name("Agence Cocody — ENA").active(true).build();
+        BankBranch niangon = BankBranch.builder().countryCode("CI").city("Abidjan").name("Agence Yop Niangon (K27)").active(true).build();
+        when(repository.findByCountryCodeIgnoreCaseOrderByCityAscNameAsc("CI")).thenReturn(new java.util.ArrayList<>(List.of(aboisso, ena, niangon)));
 
         new BankBranchSeedBootstrap(repository, new ObjectMapper()).run();
 
         ArgumentCaptor<BankBranch> saved = ArgumentCaptor.forClass(BankBranch.class);
-        // Filiale déjà remplie : seules les agences « ensure » absentes sont ajoutées (Niangon, Aghien, Bel Air, Bouaké).
-        verify(repository, times(23)).save(saved.capture());
-        List<String> ci = saved.getAllValues().stream().filter(b -> "CI".equals(b.getCountryCode())).map(BankBranch::getName).toList();
-        assertEquals(List.of("Agence Niangon (K27)", "Agence Aghien (K10)", "Agence Yopougon Bel Air (K45)", "Agence Bouaké (K02)"), ci);
+        verify(repository, atLeastOnce()).save(saved.capture());
+        List<BankBranch> all = saved.getAllValues();
+        assertEquals("Agence Aboisso (K24)", aboisso.getName());                 // renommée, pas recréée
+        assertFalse(ena.isActive());                                            // hors liste officielle
+        assertTrue(all.stream().noneMatch(b -> b != niangon && "K27".equals(BankBranchSeedBootstrap.agencyCode(b.getName()))));
+        assertEquals(1, all.stream().filter(b -> "K24".equals(BankBranchSeedBootstrap.agencyCode(b.getName()))).count());
+        // 56 agences officielles − Niangon déjà là − Aboisso renommée = 54 créations, + 1 renommage + 1 désactivation.
+        assertEquals(56, all.size());
     }
 
     @Test

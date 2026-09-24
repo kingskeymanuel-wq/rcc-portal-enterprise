@@ -1,67 +1,5 @@
 [
   {
-    "countryCode": "CI",
-    "city": "Abidjan",
-    "name": "Ecobank Plateau — Siège",
-    "address": "Avenue Houdaille, Immeuble Ecobank, Plateau, 01 BP 4107 Abidjan 01",
-    "latitude": 5.319,
-    "longitude": -4.021,
-    "phone": "+225 27 22 40 02 00",
-    "openingHours": "Lun–Ven 08h00–16h00",
-    "branchType": "Siège"
-  },
-  {
-    "countryCode": "CI",
-    "city": "Abidjan",
-    "name": "Agence Adjamé — Forum des marchés",
-    "address": "Forum des marchés, Mosquée Adjamé, 03 BP 2475 Abidjan 03",
-    "latitude": 5.35,
-    "longitude": -4.033,
-    "openingHours": "Lun–Ven 08h00–16h00",
-    "branchType": "Agence"
-  },
-  {
-    "countryCode": "CI",
-    "city": "Abidjan",
-    "name": "Agence Abobo — Gare",
-    "address": "Au sein de la Gare d'Abobo",
-    "latitude": 5.4189,
-    "longitude": -4.0206,
-    "openingHours": "Lun–Ven 08h00–16h00",
-    "branchType": "Agence"
-  },
-  {
-    "countryCode": "CI",
-    "city": "Abidjan",
-    "name": "Agence Cocody — ENA",
-    "address": "Face ENA, Boulevard des Martyrs, Cocody",
-    "latitude": 5.35,
-    "longitude": -3.967,
-    "phone": "22 40 40 61",
-    "openingHours": "Lun–Ven 08h00–16h00",
-    "branchType": "Agence"
-  },
-  {
-    "countryCode": "CI",
-    "city": "Aboisso",
-    "name": "Agence Aboisso",
-    "address": "Voie principale, face Palais de Justice, Sud Comoé",
-    "latitude": 5.467,
-    "longitude": -3.207,
-    "openingHours": "Lun–Ven 08h00–16h00",
-    "branchType": "Agence"
-  },
-  {
-    "countryCode": "CI",
-    "city": "San-Pédro",
-    "name": "Agence San-Pédro",
-    "address": "Rue des Banques, Immeuble ADK, BP 1247",
-    "latitude": 4.7485,
-    "longitude": -6.6363,
-    "openingHours": "Lun–Ven 08h00–16h00",
-    "branchType": "Agence"
-  },
-  {
     "countryCode": "BF",
     "city": "Ouagadougou",
     "name": "Ecobank Burkina Faso — repère centre-ville",
@@ -276,6 +214,593 @@
     "longitude": -5.0302,
     "phone": "+225 27 31 65 69 11",
     "openingHours": "Lun–Ven 08h00–15h00, Sam 09h00–12h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Principale — Plateau (K01)",
+    "address": "Plateau, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.319,
+    "longitude": -4.021,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true,
+    "replaces": [
+      "Ecobank Plateau — Siège"
+    ]
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Treichville Marché (K03)",
+    "address": "Treichville, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.299,
+    "longitude": -4.008,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence II Plateaux (K04)",
+    "address": "Cocody II Plateaux, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.369,
+    "longitude": -3.996,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Adjamé (K05)",
+    "address": "Adjamé, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.35,
+    "longitude": -4.033,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true,
+    "replaces": [
+      "Agence Adjamé — Forum des marchés"
+    ]
+  },
+  {
+    "countryCode": "CI",
+    "city": "San-Pédro",
+    "name": "Agence San-Pédro (K06)",
+    "address": "Centre-ville, San-Pédro — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 4.7485,
+    "longitude": -6.6363,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true,
+    "replaces": [
+      "Agence San-Pédro"
+    ]
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Plateau Sud (K07)",
+    "address": "Plateau, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.315,
+    "longitude": -4.018,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Yopougon (K08)",
+    "address": "Yopougon, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.336,
+    "longitude": -4.076,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Sotra Vridi (K09)",
+    "address": "Vridi, Port-Bouët, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.26,
+    "longitude": -4.002,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Cocody Anono (K11)",
+    "address": "Cocody Riviera Anono, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.357,
+    "longitude": -3.978,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Abobo (K12)",
+    "address": "Abobo, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.417,
+    "longitude": -4.02,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Daloa",
+    "name": "Agence Daloa (K13)",
+    "address": "Centre-ville, Daloa — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 6.877,
+    "longitude": -6.45,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Koumassi (K14)",
+    "address": "Koumassi, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.295,
+    "longitude": -3.955,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Cocody Saint-Jean (K15)",
+    "address": "Cocody Saint-Jean, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.335,
+    "longitude": -3.992,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Grand-Bassam",
+    "name": "Agence Bassam (K16)",
+    "address": "Grand-Bassam, Grand-Bassam — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.201,
+    "longitude": -3.738,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Marcory (K17)",
+    "address": "Marcory, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.304,
+    "longitude": -3.983,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Gagnoa",
+    "name": "Agence Gagnoa (K18)",
+    "address": "Centre-ville, Gagnoa — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 6.1319,
+    "longitude": -5.9506,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Soubré",
+    "name": "Agence Soubré (K19)",
+    "address": "Centre-ville, Soubré — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.785,
+    "longitude": -6.608,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "San-Pédro",
+    "name": "Agence San-Pédro Bardot (K20)",
+    "address": "Quartier Bardot, San-Pédro — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 4.756,
+    "longitude": -6.656,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Adzopé",
+    "name": "Agence Adzopé (K21)",
+    "address": "Centre-ville, Adzopé — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 6.107,
+    "longitude": -3.86,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abengourou",
+    "name": "Agence Abengourou (K22)",
+    "address": "Centre-ville, Abengourou — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 6.7297,
+    "longitude": -3.4964,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Bondoukou",
+    "name": "Agence Bondoukou (K23)",
+    "address": "Centre-ville, Bondoukou — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 8.04,
+    "longitude": -2.8,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Aboisso",
+    "name": "Agence Aboisso (K24)",
+    "address": "Centre-ville, Aboisso — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.468,
+    "longitude": -3.207,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true,
+    "replaces": [
+      "Agence Aboisso"
+    ]
+  },
+  {
+    "countryCode": "CI",
+    "city": "Méagui",
+    "name": "Agence Méagui (K25)",
+    "address": "Centre-ville, Méagui — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.403,
+    "longitude": -6.557,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Rosiers (K26)",
+    "address": "Cocody Riviera Les Rosiers, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.379,
+    "longitude": -3.957,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Treichville Arras (K28)",
+    "address": "Treichville Arras, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.296,
+    "longitude": -4.012,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Marcory Fulgence (K29)",
+    "address": "Marcory, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.299,
+    "longitude": -3.98,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Port-Bouët (K30)",
+    "address": "Port-Bouët, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.256,
+    "longitude": -3.929,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Marcory Marché (K31)",
+    "address": "Marcory, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.302,
+    "longitude": -3.987,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Angré Djibi (K32)",
+    "address": "Cocody Angré Djibi, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.404,
+    "longitude": -3.987,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Noé",
+    "name": "Agence Noé (K33)",
+    "address": "Noé (frontière Ghana), Noé — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.283,
+    "longitude": -2.8,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Cocody Saint-Pierre (K34)",
+    "address": "Cocody, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.342,
+    "longitude": -3.987,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Marcory Zone 4 (K35)",
+    "address": "Marcory Zone 4, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.294,
+    "longitude": -3.996,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Abobo Samaké (K36)",
+    "address": "Abobo Samaké, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.429,
+    "longitude": -4.015,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Cocody Cité des Arts (K37)",
+    "address": "Cocody Cité des Arts, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.352,
+    "longitude": -4.001,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Yamoussoukro",
+    "name": "Agence Yamoussoukro (K38)",
+    "address": "Centre-ville, Yamoussoukro — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 6.8276,
+    "longitude": -5.2893,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Yopougon Sideci (K39)",
+    "address": "Yopougon Sideci, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.329,
+    "longitude": -4.087,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Figayo (K40)",
+    "address": "Yopougon Figayo, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.354,
+    "longitude": -4.083,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence ONUCI (K41)",
+    "address": "Sebroko, Attécoubé, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.337,
+    "longitude": -4.043,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Marcory Zone 3 (K42)",
+    "address": "Marcory Zone 3, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.298,
+    "longitude": -4.0,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Abobo Gare Inter (K43)",
+    "address": "Abobo Gare, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.423,
+    "longitude": -4.018,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true,
+    "replaces": [
+      "Agence Abobo — Gare"
+    ]
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Cocody Vallon (K44)",
+    "address": "Cocody II Plateaux Vallon, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.365,
+    "longitude": -3.989,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Abatta (K46)",
+    "address": "Abatta, route de Bingerville, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.362,
+    "longitude": -3.928,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Plateau CCIA (K47)",
+    "address": "Plateau, Tour CCIA, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.3265,
+    "longitude": -4.0205,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Adjamé 220 Logements (K48)",
+    "address": "Adjamé 220 Logements, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.358,
+    "longitude": -4.024,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Korhogo",
+    "name": "Agence Korhogo (K49)",
+    "address": "Centre-ville, Korhogo — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 9.458,
+    "longitude": -5.629,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Issia",
+    "name": "Agence Issia (K50)",
+    "address": "Centre-ville, Issia — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 6.492,
+    "longitude": -6.586,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Abobo Santé (K51)",
+    "address": "Abobo, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.41,
+    "longitude": -4.023,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Duékoué",
+    "name": "Agence Duékoué (K52)",
+    "address": "Centre-ville, Duékoué — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 6.741,
+    "longitude": -7.349,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Vavoua",
+    "name": "Agence Vavoua (K53)",
+    "address": "Centre-ville, Vavoua — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 7.382,
+    "longitude": -6.478,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Plateau Dokui (K55)",
+    "address": "Abobo / Plateau Dokui, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.395,
+    "longitude": -3.995,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Abidjan",
+    "name": "Agence Nouveau Siège (K56)",
+    "address": "Plateau, Abidjan — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 5.3215,
+    "longitude": -4.016,
+    "openingHours": "Lun–Ven 08h00–16h00",
+    "branchType": "Agence",
+    "ensure": true
+  },
+  {
+    "countryCode": "CI",
+    "city": "Man",
+    "name": "Agence Man (K57)",
+    "address": "Centre-ville, Man — position approximative du quartier, adresse exacte à confirmer",
+    "latitude": 7.4125,
+    "longitude": -7.5538,
+    "openingHours": "Lun–Ven 08h00–16h00",
     "branchType": "Agence",
     "ensure": true
   }

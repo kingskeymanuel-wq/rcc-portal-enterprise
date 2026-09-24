@@ -914,6 +914,7 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
                 )
                 """);
         seedOutboundMailTemplatesIfMissing();
+        seedEscalationMailTemplates();
 
         createIfMissing("SalesJourneys", """
                 CREATE TABLE dbo.SalesJourneys (
@@ -1648,6 +1649,101 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
                 name, code);
         log.info("[TeamSetup] Service '{}' ({}) créé pour le formulaire de première connexion.", name, code);
     }
+
+    /**
+     * Masques d'ESCALADE (tableaux envoyés aux équipes back-office : reset PIN, DSD GAB,
+     * linkage Orange Money…). Chaque masque = un mail. Format du corps :
+     * « === TITRE === » puis des lignes « LIBELLÉ : [BALISE] » — l'écran « Utiliser » les copie
+     * sous forme de VRAI tableau (en-tête coloré) collable dans Outlook. Additif : n'ajoute
+     * que les masques absents (même sujet), sans toucher à ceux modifiés par la QA.
+     */
+    private void seedEscalationMailTemplates() {
+        try {
+            Integer categoryId = jdbcTemplate.query("SELECT CategoryId FROM dbo.MailTemplateCategories WHERE Code = 'ESCALADE'",
+                    rs -> rs.next() ? rs.getInt(1) : null);
+            if (categoryId == null) {
+                jdbcTemplate.update("INSERT INTO dbo.MailTemplateCategories (Code, Label, IconGlyph, AccentColor, SortOrder, Team) "
+                        + "VALUES ('ESCALADE', 'Escalades back-office', 'bi-table', '#2E7D32', 0, 'EMAIL')");
+                categoryId = jdbcTemplate.queryForObject("SELECT CategoryId FROM dbo.MailTemplateCategories WHERE Code = 'ESCALADE'", Integer.class);
+            }
+            int added = 0;
+            for (String[] t : ESCALATION_TEMPLATES) {
+                Integer exists = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM dbo.MailTemplates WHERE CategoryId = ? AND Subject = ?", Integer.class, categoryId, t[0]);
+                if (exists != null && exists > 0) continue;
+                jdbcTemplate.update("INSERT INTO dbo.MailTemplates (CategoryId, Subject, Body, RecipientType, IsSystemTemplate) VALUES (?, ?, ?, 'person', 1)",
+                        categoryId, t[0], t[1]);
+                added++;
+            }
+            if (added > 0) log.info("[Masques] {} masque(s) d'escalade back-office ajouté(s).", added);
+        } catch (Exception e) {
+            log.warn("[Masques] Masques d'escalade non semés : {}", e.getMessage());
+        }
+    }
+
+    private static final String ESCALATION_SIGNATURE = "\n\nCordialement,\n[NOM_AGENT]\nRelation Client Centre — Ecobank";
+
+    static final String[][] ESCALATION_TEMPLATES = {
+            {"RESET PIN APPLICATION MOBILE — [NOM_DU_CLIENT]",
+                    "Bonjour Team,\n\nMerci de prendre en charge la demande de reset PIN de l'application mobile du client ci-dessous svp.\n\n"
+                            + "=== RESET PIN APPLICATION MOBILE ===\n"
+                            + "NOM DU CLIENT : [NOM_DU_CLIENT]\n"
+                            + "NUMÉRO DE COMPTE : [NUMERO_DE_COMPTE]\n"
+                            + "ADRESSE EMAIL : [ADRESSE_EMAIL]\n"
+                            + "CONTACT : [CONTACT]\n"
+                            + "QUESTION DE SÉCURITÉ : AUTHENTIFIÉ" + ESCALATION_SIGNATURE},
+            {"DSD GAB ECOBANK — [NOM_DU_CLIENT]",
+                    "Bonjour Team,\n\nMerci de prendre en charge la réclamation ci-dessous qui a fait un débit à tort sur un guichet ECOBANK.\n"
+                            + "Prière effectuer les vérifications s'il vous plaît.\n\n"
+                            + "=== DSD GAB ECOBANK ===\n"
+                            + "NOM DU CLIENT : [NOM_DU_CLIENT]\n"
+                            + "NUMÉRO DE COMPTE : [NUMERO_DE_COMPTE]\n"
+                            + "NUMÉRO DE CARTE : [NUMERO_DE_CARTE]\n"
+                            + "TYPE DE CARTE : [TYPE_DE_CARTE]\n"
+                            + "LIEU : [LIEU]\n"
+                            + "DATE : [DATE]\n"
+                            + "MONTANT DE LA TRANSACTION : [MONTANT_TRANSACTION]\n"
+                            + "RÉFÉRENCE : [REFERENCE]\n"
+                            + "CONTACT : [CONTACT]\n"
+                            + "CLIENT : AUTHENTIFIÉ" + ESCALATION_SIGNATURE},
+            {"RESET PIN CODE ATM CARD — [NOM_DU_CLIENT]",
+                    "Bonjour Team,\n\nMerci de prendre en charge la demande de reset PIN code de la carte magnétique du client ci-dessous svp.\n\n"
+                            + "=== RESET PIN CODE ATM CARD ===\n"
+                            + "NOM DU CLIENT : [NOM_DU_CLIENT]\n"
+                            + "PIN MASQUÉ : [PIN_MASQUE]\n"
+                            + "NUMÉRO DE COMPTE : [NUMERO_DE_COMPTE]\n"
+                            + "ADRESSE EMAIL : [ADRESSE_EMAIL]\n"
+                            + "CONTACT : [CONTACT]\n"
+                            + "TYPE DE CARTE : [TYPE_DE_CARTE]\n"
+                            + "QUESTION DE SÉCURITÉ : AUTHENTIFIÉ" + ESCALATION_SIGNATURE},
+            {"RESET PIN CODE CARTE PRÉPAYÉE — [NOM_DU_CLIENT]",
+                    "Bonjour Team,\n\nMerci de prendre en charge la demande de reset PIN code de la carte prépayée du client ci-dessous svp.\n\n"
+                            + "=== RESET PIN CODE CARTE PRÉPAYÉE ===\n"
+                            + "NOM DU CLIENT : [NOM_DU_CLIENT]\n"
+                            + "PIN MASQUÉ : [PIN_MASQUE]\n"
+                            + "ID CARTE : [ID_CARTE]\n"
+                            + "ADRESSE EMAIL : [ADRESSE_EMAIL]\n"
+                            + "CONTACT : [CONTACT]\n"
+                            + "QUESTION DE SÉCURITÉ : AUTHENTIFIÉ" + ESCALATION_SIGNATURE},
+            {"AJOUT DE COMPTE MOBILE APP — [NOM_DU_CLIENT]",
+                    "Bonjour Team,\n\nMerci de prendre en charge la demande d'ajout de compte sur l'application mobile du client ci-dessous svp.\n\n"
+                            + "=== AJOUT DE COMPTE MOBILE APP ===\n"
+                            + "NOM DU CLIENT : [NOM_DU_CLIENT]\n"
+                            + "NUMÉRO DE COMPTE : [NUMERO_DE_COMPTE]\n"
+                            + "COMPTE À AJOUTER : [COMPTE_A_AJOUTER]\n"
+                            + "ADRESSE EMAIL : [ADRESSE_EMAIL]\n"
+                            + "CONTACT : [CONTACT]\n"
+                            + "QUESTION DE SÉCURITÉ : AUTHENTIFIÉ" + ESCALATION_SIGNATURE},
+            {"LINKAGE MMH ORANGE MONEY — [NOM_DU_CLIENT]",
+                    "Bonjour Team,\n\nMerci de prendre en charge la demande de linkage Mobile Money (Orange Money) du client ci-dessous svp.\n\n"
+                            + "=== LINKAGE MMH ORANGE MONEY ===\n"
+                            + "NOM DU CLIENT : [NOM_DU_CLIENT]\n"
+                            + "NUMÉRO DE COMPTE : [NUMERO_DE_COMPTE]\n"
+                            + "NUMÉRO ORANGE : [NUMERO_ORANGE]\n"
+                            + "CLÉ D'ACTIVATION : [CLE_ACTIVATION]\n"
+                            + "CONTACT : [CONTACT]\n"
+                            + "QUESTION DE SÉCURITÉ : AUTHENTIFIÉ" + ESCALATION_SIGNATURE},
+    };
 
     /**
      * 3 catégories de masques dédiées à l'équipe Outbound (Digitalisation, Prêt, Assurance),

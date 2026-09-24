@@ -215,6 +215,11 @@
 
                 <label class="form-label small text-uppercase text-muted">Corps</label>
                 <textarea class="form-control mb-0 mt-filled-body" id="filledBody" rows="9" readonly></textarea>
+                <div id="mtRichWrap" class="mt-rich-wrap" hidden>
+                    <div class="mt-rich-head"><i class="bi bi-table"></i> Aperçu du mail tel qu'il sera collé dans Outlook
+                        <span class="mt-rich-hint">« Copier » copie le vrai tableau — collez-le avec Ctrl+V</span></div>
+                    <div id="mtRichPreview" class="mt-rich-preview"></div>
+                </div>
             </div>
             <div class="modal-footer">
                 <span class="mt-progress-label me-auto" id="mtFillProgress"></span>

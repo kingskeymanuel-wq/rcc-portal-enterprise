@@ -27,12 +27,24 @@
 
     // ===== Onglets =====
 
+    /** Pastille animée sous l'onglet actif. */
+    function moveTabInk() {
+        var ink = document.querySelector("#monRccTabs .mrcc-tab-ink");
+        var active = document.querySelector("#monRccTabs .nav-link.active");
+        if (!ink || !active) return;
+        ink.style.width = active.offsetWidth + "px";
+        ink.style.transform = "translateX(" + active.parentElement.offsetLeft + "px)";
+    }
+
     function wireTabs() {
         var tabs = document.querySelectorAll("#monRccTabs .nav-link");
+        setTimeout(moveTabInk, 60);
+        window.addEventListener("resize", moveTabInk);
         Array.prototype.forEach.call(tabs, function (tab) {
             tab.addEventListener("click", function () {
                 Array.prototype.forEach.call(tabs, function (t) { t.classList.remove("active"); });
                 tab.classList.add("active");
+                moveTabInk();
                 var target = tab.getAttribute("data-tab");
                 document.getElementById("feedPane").style.display = target === "feed" ? "" : "none";
                 document.getElementById("chatPane").style.display = target === "chat" ? "" : "none";
@@ -63,6 +75,115 @@
                 'style="object-fit:cover;">';
         }
         return '<div class="' + cls + '">' + initials(label) + '</div>';
+    }
+
+    function relativeTime(iso) {
+        if (!iso) return "";
+        var diff = (Date.now() - new Date(iso).getTime()) / 1000;
+        if (diff < 60) return "à l'instant";
+        if (diff < 3600) return "il y a " + Math.floor(diff / 60) + " min";
+        if (diff < 86400) return "il y a " + Math.floor(diff / 3600) + " h";
+        if (diff < 7 * 86400) { var d = Math.floor(diff / 86400); return "il y a " + d + " jour" + (d > 1 ? "s" : ""); }
+        return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+    }
+
+    function toast(message) {
+        var t = document.createElement("div");
+        t.className = "mrcc-toast";
+        t.textContent = message;
+        document.body.appendChild(t);
+        setTimeout(function () { t.remove(); }, 2300);
+    }
+
+    var hashScrolled = false;
+    var SAVED_KEY = "mrcc.savedPosts";
+    function savedIds() {
+        try { return JSON.parse(localStorage.getItem(SAVED_KEY) || "[]"); } catch (e) { return []; }
+    }
+    function isSaved(id) { return savedIds().indexOf(String(id)) !== -1; }
+    function toggleSaved(id) {
+        var ids = savedIds(), i = ids.indexOf(String(id));
+        if (i === -1) ids.push(String(id)); else ids.splice(i, 1);
+        try { localStorage.setItem(SAVED_KEY, JSON.stringify(ids)); } catch (e) { /* stockage indisponible */ }
+        return i === -1;
+    }
+
+    /** J'aime instantané (animation), puis synchronisation avec le serveur. */
+    function toggleLike(btn) {
+        var liked = !btn.classList.contains("liked");
+        btn.classList.toggle("liked", liked);
+        btn.querySelector("i").className = "bi " + (liked ? "bi-heart-fill" : "bi-heart");
+        sendJson("POST", "/api/mon-rcc/posts/" + btn.getAttribute("data-id") + "/like")
+            .then(function () { setTimeout(loadPosts, 450); })
+            .catch(function (e) { alert("Erreur : " + e.message); loadPosts(); });
+    }
+
+    /** Apparition en fondu des publications au défilement. */
+    function revealOnScroll(container) {
+        var cards = container.querySelectorAll(".mrcc-reveal");
+        if (!("IntersectionObserver" in window)) {
+            Array.prototype.forEach.call(cards, function (c) { c.classList.add("in"); });
+            return;
+        }
+        var io = new IntersectionObserver(function (entries) {
+            entries.forEach(function (e) {
+                if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+            });
+        }, { threshold: 0.08 });
+        Array.prototype.forEach.call(cards, function (c, i) {
+            c.style.transitionDelay = Math.min(i, 4) * 70 + "ms";
+            io.observe(c);
+        });
+        // Filet de sécurité : jamais de publication invisible (onglet masqué, impression, capture…).
+        setTimeout(function () {
+            Array.prototype.forEach.call(cards, function (c) { c.classList.add("in"); });
+        }, 1200);
+    }
+
+    function countUp(el, value) {
+        if (!el) return;
+        var start = Number(el.getAttribute("data-v") || 0), t0 = null;
+        el.setAttribute("data-v", value);
+        function step(ts) {
+            if (!t0) t0 = ts;
+            var k = Math.min(1, (ts - t0) / 800);
+            el.textContent = Math.round(start + (value - start) * (1 - Math.pow(1 - k, 3))).toLocaleString("fr-FR");
+            if (k < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+    }
+
+    /** Chiffres du bandeau + « Tendances » (publications les plus aimées). */
+    function updateFeedInsights(posts) {
+        var likes = 0, views = 0;
+        posts.forEach(function (p) { likes += p.likeCount || 0; views += p.viewCount || 0; });
+        countUp(document.getElementById("mrccStatPosts"), posts.length);
+        countUp(document.getElementById("mrccStatLikes"), likes);
+        countUp(document.getElementById("mrccStatViews"), views);
+
+        var list = document.getElementById("mrccTrendList");
+        if (!list) return;
+        var top = posts.slice().sort(function (a, b) {
+            return ((b.likeCount || 0) * 3 + (b.commentCount || 0) * 2 + (b.viewCount || 0) / 50)
+                - ((a.likeCount || 0) * 3 + (a.commentCount || 0) * 2 + (a.viewCount || 0) / 50);
+        }).slice(0, 3);
+        if (!top.length) { list.innerHTML = '<p class="text-muted small mb-0">Aucune publication pour le moment.</p>'; return; }
+        list.innerHTML = top.map(function (p, i) {
+            var tmp = document.createElement("div");
+            tmp.innerHTML = p.content || "";
+            var text = (tmp.textContent || "").trim() || (p.imageUrl ? "Photo / vidéo" : "Publication");
+            return '<div class="mrcc-trend" data-id="' + p.id + '" style="animation-delay:' + (i * 80) + 'ms">' +
+                '<span class="mrcc-trend-rank">' + (i + 1) + '</span>' +
+                '<div class="mrcc-trend-text"><span>' + escapeHtml(text) + '</span>' +
+                '<small>' + escapeHtml(p.authorLabel || "") + ' · <i class="bi bi-heart-fill text-danger"></i> ' + (p.likeCount || 0) +
+                ' · <i class="bi bi-chat"></i> ' + (p.commentCount || 0) + '</small></div></div>';
+        }).join("");
+        Array.prototype.forEach.call(list.querySelectorAll(".mrcc-trend"), function (row) {
+            row.addEventListener("click", function () {
+                var card = document.querySelector('#postsContainer [data-post-id="' + row.getAttribute("data-id") + '"]');
+                if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
+            });
+        });
     }
 
     function renderPosts(posts, containerId) {
@@ -98,19 +219,20 @@
                 : '<div class="ig-post-comments-link toggle-comments-btn" data-id="' + p.id + '">Ajouter un commentaire...</div>';
 
             return "" +
-                '<div class="ig-post" data-post-id="' + p.id + '">' +
+                '<div class="ig-post mrcc-reveal' + (p.imageUrl ? "" : " ig-post-textonly") + '" id="post-' + p.id + '" data-post-id="' + p.id + '">' +
                 '<div class="ig-post-header">' +
                 '<div class="d-flex align-items-center">' +
                 avatarHtml(p.authorPhotoUrl, p.authorLabel) +
-                '<span class="ig-name">' + escapeHtml(p.authorLabel) + '</span>' +
+                '<div><span class="ig-name">' + escapeHtml(p.authorLabel) + '</span>' +
+                '<span class="mrcc-post-meta"><i class="bi bi-globe2"></i> ' + relativeTime(p.publishedAt) + '</span></div>' +
                 '</div>' + modButtons +
                 '</div>' +
                 image +
                 '<div class="ig-post-actions">' +
                 '<button class="like-btn' + (p.likedByMe ? " liked" : "") + '" data-id="' + p.id + '"><i class="bi ' + likeIconClass + '"></i></button>' +
                 '<button class="toggle-comments-btn" data-id="' + p.id + '"><i class="bi bi-chat"></i></button>' +
-                '<button class="share-btn"><i class="bi bi-send"></i></button>' +
-                '<button class="ig-bookmark"><i class="bi bi-bookmark"></i></button>' +
+                '<button class="share-btn" data-id="' + p.id + '" title="Copier le lien"><i class="bi bi-send"></i></button>' +
+                '<button class="ig-bookmark' + (isSaved(p.id) ? " saved" : "") + '" data-id="' + p.id + '" title="Enregistrer"><i class="bi ' + (isSaved(p.id) ? "bi-bookmark-fill" : "bi-bookmark") + '"></i></button>' +
                 '</div>' +
                 likesLine +
                 '<div class="ig-post-caption"><span class="ig-name">' + escapeHtml(p.authorLabel) + '</span> ' +
@@ -122,12 +244,45 @@
         }).join("");
 
         Array.prototype.forEach.call(container.querySelectorAll(".like-btn"), function (btn) {
-            btn.addEventListener("click", function () {
-                sendJson("POST", "/api/mon-rcc/posts/" + btn.getAttribute("data-id") + "/like")
-                    .then(loadPosts)
-                    .catch(function (e) { alert("Erreur : " + e.message); });
+            btn.addEventListener("click", function () { toggleLike(btn); });
+        });
+        // Double-clic sur la photo : J'aime + grand cœur animé (comme sur les réseaux sociaux).
+        Array.prototype.forEach.call(container.querySelectorAll(".ig-post-image"), function (media) {
+            media.addEventListener("dblclick", function () {
+                var card = media.closest(".ig-post");
+                var burst = document.createElement("i");
+                burst.className = "bi bi-heart-fill mrcc-burst";
+                media.appendChild(burst);
+                setTimeout(function () { burst.remove(); }, 900);
+                var btn = card.querySelector(".like-btn");
+                if (btn && !btn.classList.contains("liked")) toggleLike(btn);
             });
         });
+        Array.prototype.forEach.call(container.querySelectorAll(".share-btn"), function (btn) {
+            btn.addEventListener("click", function () {
+                var url = location.origin + "/mon-rcc#post-" + btn.getAttribute("data-id");
+                (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject())
+                    .then(function () { toast("Lien de la publication copié"); })
+                    .catch(function () { prompt("Copiez le lien :", url); });
+            });
+        });
+        Array.prototype.forEach.call(container.querySelectorAll(".ig-bookmark"), function (btn) {
+            btn.addEventListener("click", function () {
+                var saved = toggleSaved(btn.getAttribute("data-id"));
+                btn.classList.toggle("saved", saved);
+                btn.querySelector("i").className = "bi " + (saved ? "bi-bookmark-fill" : "bi-bookmark");
+                toast(saved ? "Publication enregistrée" : "Retirée des enregistrements");
+            });
+        });
+        revealOnScroll(container);
+        if ((containerId || "postsContainer") === "postsContainer") {
+            updateFeedInsights(posts);
+            if (!hashScrolled && /^#post-\d+$/.test(location.hash)) {
+                hashScrolled = true;
+                var target = document.getElementById(location.hash.slice(1));
+                if (target) setTimeout(function () { target.scrollIntoView({ behavior: "smooth", block: "center" }); }, 300);
+            }
+        }
         Array.prototype.forEach.call(container.querySelectorAll(".toggle-comments-btn"), function (btn) {
             btn.addEventListener("click", function () { toggleComments(btn.getAttribute("data-id")); });
         });
@@ -211,18 +366,28 @@
             var followed = results[1];
             var isAdmin = currentProfile === "ADMIN";
 
-            document.getElementById("communitiesList").innerHTML = communitiesCache.map(function (c) {
+            var PALETTE = ["#0057B8", "#0F9D6C", "#E0435B", "#7B3FE4", "#FF8A00", "#0097A7", "#5C6BC0"];
+            var ICONS = { inbound: "bi-telephone-inbound-fill", outbound: "bi-telephone-outbound-fill", reseau: "bi-share-fill",
+                social: "bi-share-fill", mail: "bi-envelope-fill", qualit: "bi-award-fill", coach: "bi-award-fill", support: "bi-tools", it: "bi-cpu-fill" };
+            function iconFor(label) {
+                var l = (label || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                for (var k in ICONS) if (l.indexOf(k) !== -1) return ICONS[k];
+                return "bi-people-fill";
+            }
+            document.getElementById("communitiesList").innerHTML = communitiesCache.map(function (c, i) {
                 var isFollowed = followed.indexOf(c.communityKey) !== -1;
                 var adminActions = isAdmin
-                    ? ' <i class="bi bi-pencil-square edit-community-icon" data-id="' + c.id + '" title="Modifier" style="cursor:pointer;"></i>' +
-                      ' <i class="bi bi-trash text-danger delete-community-icon" data-id="' + c.id + '" title="Supprimer" style="cursor:pointer;"></i>'
+                    ? '<span class="mrcc-comm-admin"><i class="bi bi-pencil-square edit-community-icon" data-id="' + c.id + '" title="Modifier" style="cursor:pointer;"></i>' +
+                      '<i class="bi bi-trash text-danger delete-community-icon" data-id="' + c.id + '" title="Supprimer" style="cursor:pointer;"></i></span>'
                     : "";
-                return '<span class="d-inline-flex align-items-center gap-1">' +
-                    '<button type="button" class="btn btn-sm ' + (isFollowed ? "btn-primary" : "btn-outline-secondary") +
+                var color = PALETTE[i % PALETTE.length];
+                return '<div class="mrcc-comm" style="animation-delay:' + (i * 60) + 'ms">' +
+                    '<span class="mrcc-comm-ico" style="background:linear-gradient(135deg,' + color + ',' + color + 'bb)"><i class="bi ' + iconFor(c.label) + '"></i></span>' +
+                    '<span class="mrcc-comm-name" title="' + escapeHtml(c.label) + '">' + escapeHtml(c.label) + '</span>' + adminActions +
+                    '<button type="button" class="btn btn-sm ' + (isFollowed ? "btn-primary" : "btn-outline-primary") +
                     ' community-btn" data-key="' + c.communityKey + '" data-followed="' + isFollowed + '">' +
-                    (isFollowed ? '<i class="bi bi-check-lg"></i> ' : '<i class="bi bi-plus-lg"></i> ') +
-                    escapeHtml(c.label) + '</button>' + adminActions + '</span>';
-            }).join(" ") + (isAdmin ? ' <button type="button" class="btn btn-sm btn-outline-primary" id="newCommunityBtn"><i class="bi bi-plus-lg"></i> Nouvelle communauté</button>' : "");
+                    (isFollowed ? '<i class="bi bi-check-lg"></i> Abonné' : '<i class="bi bi-plus-lg"></i> Suivre') + '</button></div>';
+            }).join("") + (isAdmin ? '<button type="button" class="btn btn-sm btn-outline-primary w-100" id="newCommunityBtn"><i class="bi bi-plus-lg"></i> Nouvelle communauté</button>' : "");
 
             if (isAdmin) {
                 document.getElementById("newCommunityBtn").addEventListener("click", function () {
@@ -455,22 +620,21 @@
             return res.ok ? res.json() : [];
         }).then(function (articles) {
             var section = document.getElementById("monRccNewsSection");
-            if (!articles.length) { section.innerHTML = ""; return; }
+            if (!articles.length) { section.innerHTML = ""; section.classList.remove("mrcc-card"); return; }
+            section.classList.add("mrcc-card");
             var canManage = currentProfile === "ADMIN" || currentProfile === "QA";
-            section.innerHTML = '<h6 class="mb-3"><i class="bi bi-newspaper"></i> Actualités Ecobank</h6>' +
-                '<div class="d-flex gap-4 pb-2 flex-wrap justify-content-center">' +
-                articles.slice(0, 6).map(function (a) {
-                    var img = a.imageUrl
-                        ? '<div style="height:620px;background:url(\'' + a.imageUrl + '\') center center/cover no-repeat;border-radius:1rem 1rem 0 0;"></div>'
-                        : '<div style="height:620px;background:linear-gradient(135deg,var(--eco-blue),#0F9D6C);border-radius:1rem 1rem 0 0;"></div>';
+            section.innerHTML = '<div class="mrcc-card-title"><span class="mrcc-ico"><i class="bi bi-newspaper"></i></span> Actualités Ecobank</div>' +
+                '<div class="mrcc-news-track">' +
+                articles.slice(0, 6).map(function (a, i) {
+                    var img = a.imageUrl ? '<div class="mrcc-news-img" style="background-image:url(\'' + a.imageUrl + '\')"></div>' : "";
                     var adminBtns = canManage
-                        ? '<div class="d-flex gap-2 justify-content-center mt-2">' +
-                          '<button class="btn btn-sm btn-outline-secondary edit-news-mon-rcc-btn" data-id="' + a.newsId + '"><i class="bi bi-pencil"></i> Modifier</button>' +
-                          '<button class="btn btn-sm btn-outline-danger delete-news-mon-rcc-btn" data-id="' + a.newsId + '"><i class="bi bi-trash"></i> Supprimer</button>' +
+                        ? '<div class="d-flex gap-2 mt-2">' +
+                          '<button class="btn btn-sm btn-light edit-news-mon-rcc-btn" data-id="' + a.newsId + '"><i class="bi bi-pencil"></i> Modifier</button>' +
+                          '<button class="btn btn-sm btn-danger delete-news-mon-rcc-btn" data-id="' + a.newsId + '"><i class="bi bi-trash"></i></button>' +
                           '</div>'
                         : "";
-                    return '<div class="ig-post text-center" style="width:min(1100px,100%);flex-shrink:0;overflow:hidden;">' + img +
-                        '<div class="p-4"><div class="fw-bold" style="font-size:1.5rem;">' + escapeHtml(a.title) + '</div>' + adminBtns + '</div></div>';
+                    return '<div class="mrcc-news-card" style="animation-delay:' + (i * 80) + 'ms">' + img +
+                        '<div class="mrcc-news-body"><span class="mrcc-news-tag">Ecobank</span><div class="fw-bold">' + escapeHtml(a.title) + '</div>' + adminBtns + '</div></div>';
                 }).join("") + '</div>';
 
             Array.prototype.forEach.call(section.querySelectorAll(".delete-news-mon-rcc-btn"), function (btn) {
