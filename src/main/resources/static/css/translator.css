@@ -1,4 +1,52 @@
-/* Traducteur & correcteur — bandeau conseiller animé + mode agrandi. */
+/* Traducteur & correcteur — fond de page animé, bandeau conseiller animé + mode agrandi. */
+
+/* ── Fond de page animé (toute la zone de contenu, derrière l'outil) ── */
+.tr-page { position: relative; overflow: hidden; min-height: calc(100vh - 70px); isolation: isolate; }
+.tr-page-inner { position: relative; z-index: 1; }
+.tr-bg { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+    background: linear-gradient(160deg, #f5f8fd 0%, #eef4fc 45%, #f3faf7 100%); }
+.tr-bg-blob { position: absolute; border-radius: 50%; filter: blur(60px); opacity: .55; animation: trBlob 26s ease-in-out infinite; }
+.tr-bg-blob-1 { width: 520px; height: 520px; left: -140px; top: 280px; background: radial-gradient(circle, #9cc8ff, transparent 70%); }
+.tr-bg-blob-2 { width: 460px; height: 460px; right: -120px; top: 520px; background: radial-gradient(circle, #9fe6c3, transparent 70%); animation-delay: -9s; }
+.tr-bg-blob-3 { width: 380px; height: 380px; left: 38%; bottom: -160px; background: radial-gradient(circle, #c9b8ff, transparent 70%); animation-delay: -17s; opacity: .4; }
+@keyframes trBlob { 0%, 100% { transform: translate(0, 0) scale(1); } 33% { transform: translate(60px, -40px) scale(1.12); } 66% { transform: translate(-40px, 50px) scale(.92); } }
+/* Le conseiller en filigrane en bas à droite de la page, qui « respire » */
+.tr-bg-photo { position: absolute; right: -40px; bottom: -30px; width: min(46vw, 620px); aspect-ratio: 700 / 623;
+    background: var(--tr-bg-img) center top / cover no-repeat; opacity: .16; filter: saturate(.9);
+    -webkit-mask-image: radial-gradient(ellipse at 60% 45%, #000 38%, transparent 72%); mask-image: radial-gradient(ellipse at 60% 45%, #000 38%, transparent 72%);
+    animation: trBreathe 14s ease-in-out infinite alternate; }
+@keyframes trBreathe { from { transform: scale(1) translateY(0); opacity: .13; } to { transform: scale(1.05) translateY(-12px); opacity: .2; } }
+.tr-bg-grid { position: absolute; inset: 0; background-image: radial-gradient(rgba(0, 87, 184, .09) 1.2px, transparent 1.2px); background-size: 26px 26px;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 30%, #000 70%, transparent 100%); mask-image: linear-gradient(180deg, transparent 0%, #000 30%, #000 70%, transparent 100%);
+    animation: trGrid 40s linear infinite; }
+@keyframes trGrid { to { background-position: 26px 26px; } }
+/* Lettres de différents alphabets qui montent lentement */
+.tr-bg-glyphs span { position: absolute; left: var(--l); bottom: -60px; font-size: var(--s); font-weight: 800; color: rgba(0, 87, 184, .11);
+    animation: trGlyph var(--t) linear infinite; animation-delay: var(--d); }
+.tr-bg-glyphs span:nth-child(even) { color: rgba(0, 166, 81, .12); }
+@keyframes trGlyph { 0% { transform: translateY(0) rotate(0); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-115vh) rotate(25deg); opacity: 0; } }
+/* Bulles de conversation qui apparaissent et disparaissent autour de l'outil */
+.tr-bg-chats span { position: absolute; left: var(--x); top: var(--y); display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap;
+    background: rgba(255, 255, 255, .85); border: 1px solid #e3ecf9; color: #33415c; font-size: .78rem; font-weight: 700;
+    border-radius: 16px 16px 16px 4px; padding: .4rem .8rem; box-shadow: 0 12px 28px rgba(30, 41, 80, .08);
+    opacity: 0; animation: trChat 20s ease-in-out infinite; animation-delay: var(--d); }
+.tr-bg-chats span i { color: #0057B8; }
+.tr-bg-chats span:nth-child(even) { border-radius: 16px 16px 4px 16px; }
+.tr-bg-chats span:nth-child(even) i { color: #00A651; }
+@keyframes trChat { 0%, 100% { opacity: 0; transform: translateY(16px) scale(.9); } 6%, 22% { opacity: .95; transform: translateY(0) scale(1); } 30% { opacity: 0; transform: translateY(-14px) scale(.95); } }
+.tr-page .tr-card { background: rgba(255, 255, 255, .94); backdrop-filter: blur(6px); }
+.tr-page .tr-pane-right { background: rgba(248, 249, 252, .9); }
+html[data-theme="dark"] .tr-bg { background: linear-gradient(160deg, #0f1522, #111a2b 50%, #0f1c1a); }
+html[data-theme="dark"] .tr-bg-photo { opacity: .08; }
+html[data-theme="dark"] .tr-bg-chats span { background: rgba(26, 34, 51, .85); border-color: #2a3448; color: #cfd8e6; }
+html[data-theme="dark"] .tr-page .tr-card { background: rgba(26, 34, 51, .94); }
+@media (max-width: 1100px) { .tr-bg-chats { display: none; } }
+@media (max-width: 768px) { .tr-bg-photo { width: 90vw; opacity: .1; } .tr-bg-glyphs span:nth-child(n+6) { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+    .tr-bg-blob, .tr-bg-photo, .tr-bg-grid, .tr-bg-glyphs span, .tr-bg-chats span { animation: none !important; }
+    .tr-bg-glyphs, .tr-bg-chats { display: none; }
+}
+
 .tr-wrap { max-width: 1040px; margin: 0 auto; transition: max-width .35s ease; }
 
 .tr-hero { position: relative; overflow: hidden; border-radius: 26px; min-height: 230px; color: #fff; display: flex; align-items: center;

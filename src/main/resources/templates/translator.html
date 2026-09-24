@@ -55,8 +55,33 @@
     <div th:replace="~{fragments/sidebar :: sidebar}"></div>
     <div class="content">
         <div th:replace="~{fragments/header :: header}"></div>
-        <main id="page-content">
-            <div class="container-fluid py-3">
+        <main id="page-content" class="tr-page">
+            <div class="tr-bg" aria-hidden="true" th:style="'--tr-bg-img:url(' + @{/images/login-hero-agent.jpg} + ')'">
+                <div class="tr-bg-blob tr-bg-blob-1"></div>
+                <div class="tr-bg-blob tr-bg-blob-2"></div>
+                <div class="tr-bg-blob tr-bg-blob-3"></div>
+                <div class="tr-bg-photo"></div>
+                <div class="tr-bg-grid"></div>
+                <div class="tr-bg-glyphs">
+                    <span style="--l:4%;--s:2.6rem;--t:26s;--d:0s">A</span>
+                    <span style="--l:13%;--s:1.8rem;--t:31s;--d:-9s">文</span>
+                    <span style="--l:22%;--s:2.2rem;--t:24s;--d:-4s">ع</span>
+                    <span style="--l:31%;--s:1.6rem;--t:29s;--d:-15s">é</span>
+                    <span style="--l:42%;--s:2.4rem;--t:34s;--d:-7s">Ω</span>
+                    <span style="--l:53%;--s:1.9rem;--t:27s;--d:-19s">ñ</span>
+                    <span style="--l:64%;--s:2.3rem;--t:32s;--d:-2s">ß</span>
+                    <span style="--l:73%;--s:1.7rem;--t:25s;--d:-12s">ç</span>
+                    <span style="--l:82%;--s:2.5rem;--t:30s;--d:-22s">あ</span>
+                    <span style="--l:92%;--s:2rem;--t:28s;--d:-5s">Ж</span>
+                </div>
+                <div class="tr-bg-chats">
+                    <span style="--x:6%;--y:62%;--d:0s"><i class="bi bi-chat-dots-fill"></i> Merci pour votre patience</span>
+                    <span style="--x:70%;--y:58%;--d:-5s"><i class="bi bi-chat-heart-fill"></i> Thank you for calling</span>
+                    <span style="--x:12%;--y:86%;--d:-10s"><i class="bi bi-chat-quote-fill"></i> Obrigado!</span>
+                    <span style="--x:78%;--y:84%;--d:-15s"><i class="bi bi-chat-text-fill"></i> ¿En qué puedo ayudarle?</span>
+                </div>
+            </div>
+            <div class="container-fluid py-3 tr-page-inner">
                 <div class="tr-wrap" id="trWrap">
                     <section class="tr-hero mb-3" th:style="'--tr-hero-img:url(' + @{/images/login-hero-agent.jpg} + ')'">
                         <div class="tr-hero-photo" aria-hidden="true"></div>
