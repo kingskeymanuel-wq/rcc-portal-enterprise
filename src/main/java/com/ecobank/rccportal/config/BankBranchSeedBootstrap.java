@@ -39,7 +39,7 @@ public class BankBranchSeedBootstrap implements CommandLineRunner {
 
     private record BranchSeed(String countryCode, String city, String name, String address,
                                Double latitude, Double longitude, String phone, String email,
-                               String openingHours, String managerName, String branchType) {}
+                               String openingHours, String managerName, String branchType, Boolean ensure) {}
 
     private final BankBranchRepository branchRepository;
     private final ObjectMapper objectMapper;
@@ -72,6 +72,7 @@ public class BankBranchSeedBootstrap implements CommandLineRunner {
         if (seeds.isEmpty()) return 0;
 
         Set<String> alreadySeeded = new HashSet<>(); // évite N requêtes existsBy... pour un même pays répété dans le fichier
+        Set<String> seededNow = new HashSet<>();     // filiales entièrement créées pendant ce passage
         int created = 0;
         for (BranchSeed s : seeds) {
             String code = s.countryCode().toUpperCase();
@@ -100,7 +101,22 @@ public class BankBranchSeedBootstrap implements CommandLineRunner {
                         .build());
                 created++;
             }
+            seededNow.add(code);
             alreadySeeded.add(code);
+        }
+        // Agences marquées "ensure" : ajoutées même si la filiale a déjà des agences (ex. agences CI
+        // du point de disponibilité des cartes), une seule fois — jamais si une agence du même nom existe.
+        for (BranchSeed s : seeds) {
+            if (!Boolean.TRUE.equals(s.ensure())) continue;
+            String code = s.countryCode().toUpperCase();
+            if (seededNow.contains(code)) continue; // déjà insérée avec toute la filiale ci-dessus
+            if (branchRepository.existsByCountryCodeIgnoreCaseAndNameIgnoreCase(code, s.name())) continue;
+            branchRepository.save(BankBranch.builder()
+                    .countryCode(code).city(s.city()).name(s.name()).address(s.address())
+                    .latitude(s.latitude()).longitude(s.longitude()).phone(s.phone()).email(s.email())
+                    .openingHours(s.openingHours()).managerName(s.managerName()).branchType(s.branchType())
+                    .active(true).build());
+            created++;
         }
         return created;
     }

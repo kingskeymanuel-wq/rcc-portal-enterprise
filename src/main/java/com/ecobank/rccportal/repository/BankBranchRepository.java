@@ -16,4 +16,6 @@ public interface BankBranchRepository extends JpaRepository<BankBranch, Long> {
     long countByCountryCodeIgnoreCaseAndActiveTrue(String countryCode);
 
     boolean existsByCountryCodeIgnoreCase(String countryCode);
+
+    boolean existsByCountryCodeIgnoreCaseAndNameIgnoreCase(String countryCode, String name);
 }
