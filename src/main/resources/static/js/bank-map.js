@@ -56,8 +56,36 @@ window.BankMap = (function () {
 
     /** Crée une carte Leaflet + fond de tuiles ; onTilesUnavailable(raison) est appelé si le
      *  fond est désactivé ("disabled") ou ne se charge pas ("error"), onTilesOk dès la 1re tuile. */
+    /** Fond de carte VECTORIEL LOCAL (frontières des pays, /vendor/world) posé sous les tuiles :
+     *  sur un serveur sans Internet, la carte reste lisible (pays, Côte d'Ivoire en évidence)
+     *  même si aucune tuile OpenStreetMap ne charge. */
+    var worldPromise = null;
+    function addOfflineBase(leafletMap) {
+        if (!window.topojson || !window.fetch) return;
+        if (!worldPromise) {
+            worldPromise = fetch("/vendor/world/countries-50m.json").then(function (r) { return r.json(); })
+                .then(function (topo) { return window.topojson.feature(topo, topo.objects.countries); })
+                .catch(function () { return null; });
+        }
+        if (!leafletMap.getPane("offlineBase")) {
+            leafletMap.createPane("offlineBase");
+            leafletMap.getPane("offlineBase").style.zIndex = 150; // sous les tuiles (200)
+        }
+        worldPromise.then(function (geo) {
+            if (!geo) return;
+            L.geoJSON(geo, {
+                pane: "offlineBase", interactive: false,
+                style: function (f) {
+                    var ci = String(f.id) === "384"; // Côte d'Ivoire (code ISO numérique)
+                    return { color: "#9FB3C8", weight: ci ? 1.6 : 0.7, fillColor: ci ? "#FFE8C2" : "#F4F7FB", fillOpacity: 1 };
+                }
+            }).addTo(leafletMap);
+        });
+    }
+
     function createLeafletMap(element, options, onTilesUnavailable, onTilesOk) {
         var leafletMap = L.map(element, options);
+        addOfflineBase(leafletMap);
         if (!tileUrl) {
             onTilesUnavailable("disabled");
             return leafletMap;

@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>RCC Portal Enterprise — Knowledge Base</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}" rel="stylesheet">
+    <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
     <!-- Onglet « Agences / Carte » — Leaflet (copie locale /vendor/leaflet, pas de CDN) + OpenStreetMap :
          carte réelle, interactive, sans dépendance à Google Maps (aucune clé API requise). -->
     <link rel="stylesheet" th:href="@{/vendor/leaflet/leaflet.min.css}">
@@ -474,13 +474,14 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/vendor/bootstrap/js/bootstrap.bundle.min.js}"></script>
 <script th:src="@{/js/preferences.js}"></script>
 <script th:src="@{/js/rcc-api.js}"></script>
 <script th:src="@{/js/session.js}"></script>
 <script th:src="@{/js/external-tools.js}"></script>
 <script th:src="@{/js/richtext-editor.js}"></script>
 <script th:src="@{/vendor/leaflet/leaflet.min.js}"></script>
+<script th:src="@{/vendor/world/topojson-client.min.js}"></script>
 <script th:src="@{/js/bank-map.js}"></script>
 <script th:src="@{/js/branch-viewer.js}"></script>
 <script th:src="@{/js/card-agency.js}"></script>

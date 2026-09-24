@@ -226,7 +226,7 @@
                 ' procedure-country-tab-btn" data-code="">Toutes</button>';
             var countryBtns = countries.map(function (c) {
                 var active = currentProcedureCountry === c.countryCode ? "btn-primary" : "btn-outline-secondary";
-                var flagImg = '<img src="https://flagcdn.com/20x15/' + c.countryCode.toLowerCase() + '.png" ' +
+                var flagImg = '<img src="/vendor/flags/' + c.countryCode.toLowerCase() + '.svg" ' +
                     'width="20" height="15" alt="" class="me-1" style="vertical-align:-2px;border-radius:2px;">';
                 return '<button type="button" class="btn btn-sm ' + active + ' procedure-country-tab-btn" data-code="' + c.countryCode + '">' +
                     flagImg + escapeHtml(c.countryCode) + '</button>';

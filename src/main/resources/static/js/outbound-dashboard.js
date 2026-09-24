@@ -75,19 +75,19 @@
     }
 
     /** Bibliothèque de photos de couverture prédéfinies (façon Microsoft Forms, voir les
-     *  captures fournies) — URLs Unsplash stables (format court, taille fixe via ?w=/h=/fit=
-     *  pour un rendu identique dans chaque tuile), pas de fichier à héberger côté portail.
+     *  captures fournies) — illustrations LOCALES (/images/covers), affichées même sur un
+     *  serveur sans accès Internet.
      *  Le Team Leader clique une miniature à la création ; coverImageUrl reste éditable en base
      *  pour une URL externe si besoin, cette liste n'est qu'un raccourci pratique. */
     var CAMPAIGN_COVER_LIBRARY = [
-        { label: "Bureau chaleureux", url: "https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=400&h=260&fit=crop" },
-        { label: "Montgolfières", url: "https://images.unsplash.com/photo-1507608616759-54f48f0af0ee?w=400&h=260&fit=crop" },
-        { label: "Café / discussion", url: "https://images.unsplash.com/photo-1521017432531-fbd92d768814?w=400&h=260&fit=crop" },
-        { label: "Réunion d'équipe", url: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=400&h=260&fit=crop" },
-        { label: "Finances / épargne", url: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400&h=260&fit=crop" },
-        { label: "Carte bancaire", url: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400&h=260&fit=crop" },
-        { label: "Famille / scolaire", url: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=260&fit=crop" },
-        { label: "Nature apaisante", url: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=260&fit=crop" }
+        { label: "Bureau chaleureux", url: "/images/covers/bureau.svg" },
+        { label: "Montgolfières", url: "/images/covers/montgolfieres.svg" },
+        { label: "Café / discussion", url: "/images/covers/cafe.svg" },
+        { label: "Réunion d'équipe", url: "/images/covers/equipe.svg" },
+        { label: "Finances / épargne", url: "/images/covers/epargne.svg" },
+        { label: "Carte bancaire", url: "/images/covers/carte.svg" },
+        { label: "Famille / scolaire", url: "/images/covers/famille.svg" },
+        { label: "Nature apaisante", url: "/images/covers/nature.svg" }
     ];
 
     var selectedCoverUrl = null;

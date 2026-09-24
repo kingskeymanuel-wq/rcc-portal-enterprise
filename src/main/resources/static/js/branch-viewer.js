@@ -23,6 +23,32 @@ window.BranchViewer = (function () {
 
     var modal = null, modalEl = null;
 
+    /** Serveur ou poste sans Internet : on le détecte une fois (petite image Google, 3 s max)
+     *  et on remplace les vues en ligne par une fiche locale au lieu d'un cadre vide. */
+    var internet = null;
+    function internetReachable() {
+        if (internet) return internet;
+        internet = new Promise(function (resolve) {
+            if (navigator.onLine === false) { resolve(false); return; }
+            var img = new Image(), done = false;
+            var finish = function (ok) { if (!done) { done = true; resolve(ok); } };
+            img.onload = function () { finish(true); };
+            img.onerror = function () { finish(false); };
+            setTimeout(function () { finish(false); }, 3000);
+            img.src = "https://www.google.com/favicon.ico?_=" + Date.now();
+        });
+        return internet;
+    }
+
+    function offlinePanel(b, what) {
+        var coords = Number(b.lat).toFixed(5) + ", " + Number(b.lng).toFixed(5);
+        return '<div class="ob-route-empty ob-offline"><i class="bi bi-wifi-off"></i><b>' + esc(what) + ' indisponible sans accès Internet</b>' +
+            '<span>' + esc(b.name) + (b.address ? '<br>' + esc(b.address) : "") + (b.city ? '<br>' + esc(b.city) : "") + '</span>' +
+            '<span class="small">Coordonnées GPS : <b>' + coords + '</b> — à communiquer au client (Google Maps, WhatsApp…)' +
+            (b.phone ? '<br>Téléphone : <b>' + esc(b.phone) + '</b>' : "") + '</span>' +
+            '<button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="navigator.clipboard && navigator.clipboard.writeText(\'' + coords + '\')"><i class="bi bi-clipboard"></i> Copier les coordonnées</button></div>';
+    }
+
     function streetViewUrl(b) {
         return "https://maps.google.com/maps?layer=c&cbll=" + b.lat + "," + b.lng + "&cbp=11,0,0,0,0&output=svembed";
     }
@@ -111,9 +137,14 @@ window.BranchViewer = (function () {
         if (from.indexOf(",") === -1 && !/abidjan|c[oô]te d.ivoire|bouak|yamoussoukro|san.p[ée]dro/i.test(from) && current.city) from += ", " + current.city;
         routeFrom = from;
         setRouteMsg("");
-        document.getElementById("obFrame").innerHTML = '<div class="ob-loading"><span class="spinner-border"></span><span>Calcul de l\'itinéraire…</span></div>' +
-            '<iframe src="' + routeUrl(from, current, routeMode) + '" allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade" ' +
-            'onload="this.previousElementSibling && this.previousElementSibling.remove()"></iframe>';
+        var target = current;
+        internetReachable().then(function (ok) {
+            if (target !== current) return;
+            document.getElementById("obFrame").innerHTML = !ok ? offlinePanel(current, "L'itinéraire") :
+                '<div class="ob-loading"><span class="spinner-border"></span><span>Calcul de l\'itinéraire…</span></div>' +
+                '<iframe src="' + routeUrl(from, current, routeMode) + '" allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade" ' +
+                'onload="this.previousElementSibling && this.previousElementSibling.remove()"></iframe>';
+        });
     }
 
     function showView(v) {
@@ -131,9 +162,15 @@ window.BranchViewer = (function () {
             setTimeout(function () { document.getElementById("obRouteFrom").focus(); }, 50);
             return;
         }
-        frame.innerHTML = '<div class="ob-loading"><span class="spinner-border"></span><span>Chargement de la ' + (v === "street" ? "visite de rue" : "carte") + '…</span></div>' +
-            '<iframe src="' + (v === "street" ? streetViewUrl(current) : osmEmbed(current)) + '" allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade" ' +
-            'onload="this.previousElementSibling && this.previousElementSibling.remove()"></iframe>';
+        frame.innerHTML = '<div class="ob-loading"><span class="spinner-border"></span><span>Chargement de la ' + (v === "street" ? "visite de rue" : "carte") + '…</span></div>';
+        var target = current;
+        internetReachable().then(function (ok) {
+            if (target !== current) return;
+            frame.innerHTML = !ok ? offlinePanel(current, v === "street" ? "La visite de rue" : "Le plan en ligne") :
+                '<div class="ob-loading"><span class="spinner-border"></span><span>Chargement de la ' + (v === "street" ? "visite de rue" : "carte") + '…</span></div>' +
+                '<iframe src="' + (v === "street" ? streetViewUrl(current) : osmEmbed(current)) + '" allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade" ' +
+                'onload="this.previousElementSibling && this.previousElementSibling.remove()"></iframe>';
+        });
         document.getElementById("obHint").style.display = v === "street" ? "" : "none";
     }
 

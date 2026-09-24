@@ -58,7 +58,7 @@ public class CampaignSeedBootstrap implements CommandLineRunner {
                     .targetService(null)
                     .iconClass("bi-credit-card-fill")
                     .colorFrom("#0057B8").colorTo("#00A651")
-                    .coverImageUrl("https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400&h=260&fit=crop")
+                    .coverImageUrl("/images/covers/carte.svg")
                     .fieldsJson(serialize(List.of(
                             new CampaignFieldDto("f1", "Le client est-il intéressé par la carte ?", "RADIO",
                                     List.of("Oui", "Non", "À rappeler plus tard"), true),
@@ -74,7 +74,7 @@ public class CampaignSeedBootstrap implements CommandLineRunner {
                     .targetService("TELEVENTE")
                     .iconClass("bi-mortarboard-fill")
                     .colorFrom("#7B2CBF").colorTo("#F72585")
-                    .coverImageUrl("https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=260&fit=crop")
+                    .coverImageUrl("/images/covers/famille.svg")
                     .fieldsJson(serialize(List.of(
                             new CampaignFieldDto("f1", "Type de prêt souhaité", "SELECT",
                                     List.of("Scolaire", "Consommation", "Les deux"), true),
@@ -93,7 +93,7 @@ public class CampaignSeedBootstrap implements CommandLineRunner {
                     .targetService("DIGITAL")
                     .iconClass("bi-phone-fill")
                     .colorFrom("#0096C7").colorTo("#48CAE4")
-                    .coverImageUrl("https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=400&h=260&fit=crop")
+                    .coverImageUrl("/images/covers/bureau.svg")
                     .fieldsJson(serialize(List.of(
                             new CampaignFieldDto("f1", "Le client utilise-t-il déjà l'appli mobile ?", "RADIO",
                                     List.of("Oui", "Non"), true),

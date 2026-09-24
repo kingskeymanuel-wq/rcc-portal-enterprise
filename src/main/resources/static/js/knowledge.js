@@ -503,7 +503,7 @@
      *  filtrée sur ce pays (currentCountryCode est déjà posé avant l'appel). */
     function openCountryModal(countryCode) {
         var country = countriesCache.filter(function (c) { return c.countryCode === countryCode; })[0];
-        var flagImg = '<img src="https://flagcdn.com/24x18/' + countryCode.toLowerCase() + '.png" ' +
+        var flagImg = '<img src="/vendor/flags/' + countryCode.toLowerCase() + '.svg" ' +
             'width="24" height="18" alt="" class="me-2" style="vertical-align:-3px;border-radius:2px;">';
         $("countryModalTitle").innerHTML = flagImg + escapeHtml(country ? country.label : countryCode);
 

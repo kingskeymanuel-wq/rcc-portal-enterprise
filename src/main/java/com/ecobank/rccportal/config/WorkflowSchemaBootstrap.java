@@ -947,6 +947,7 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
                 """);
         seedOutboundMailTemplatesIfMissing();
         seedEscalationMailTemplates();
+        migrateCoverImagesToLocal();
 
         createIfMissing("SalesJourneys", """
                 CREATE TABLE dbo.SalesJourneys (
@@ -1680,6 +1681,28 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
                         "VALUES (?, ?, 1, 0, 0, 0, 'En service')",
                 name, code);
         log.info("[TeamSetup] Service '{}' ({}) créé pour le formulaire de première connexion.", name, code);
+    }
+
+    /**
+     * Fonctionnement SANS Internet : les couvertures de campagnes semées autrefois pointaient vers
+     * images.unsplash.com — remplacées par les illustrations locales équivalentes (/images/covers).
+     */
+    private void migrateCoverImagesToLocal() {
+        String[][] map = {
+                {"photo-1497215728101-856f4ea42174", "bureau"}, {"photo-1507608616759-54f48f0af0ee", "montgolfieres"},
+                {"photo-1521017432531-fbd92d768814", "cafe"}, {"photo-1552664730-d307ca884978", "equipe"},
+                {"photo-1554224155-6726b3ff858f", "epargne"}, {"photo-1556742049-0cfed4f6a45d", "carte"},
+                {"photo-1503676260728-1c00da094a0b", "famille"}, {"photo-1441974231531-c6227db76b6e", "nature"}};
+        try {
+            int n = 0;
+            for (String[] m : map) {
+                n += jdbcTemplate.update("UPDATE dbo.Campaigns SET CoverImageUrl = ? WHERE CoverImageUrl LIKE ?",
+                        "/images/covers/" + m[1] + ".svg", "%images.unsplash.com/" + m[0] + "%");
+            }
+            if (n > 0) log.info("[Hors ligne] {} couverture(s) de campagne remplacée(s) par des images locales.", n);
+        } catch (Exception e) {
+            log.debug("[Hors ligne] Migration des couvertures ignorée : {}", e.getMessage());
+        }
     }
 
     /**

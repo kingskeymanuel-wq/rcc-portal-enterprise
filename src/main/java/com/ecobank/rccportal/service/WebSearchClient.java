@@ -57,6 +57,28 @@ public class WebSearchClient {
         }
     };
 
+    /** Moteurs injoignables (serveur sans Internet, pare-feu) → instant du prochain essai. */
+    private final Map<String, Long> unreachableUntil = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long UNREACHABLE_RETRY_MS = 2 * 60 * 1000L;
+
+    static boolean isUnreachable(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof java.net.ConnectException || t instanceof java.net.http.HttpConnectTimeoutException
+                    || t instanceof java.net.UnknownHostException || t instanceof java.net.NoRouteToHostException
+                    || t instanceof java.net.http.HttpTimeoutException) return true;
+        }
+        return false;
+    }
+
+    private boolean skipped(String provider) {
+        Long until = unreachableUntil.get(provider);
+        return until != null && until > System.currentTimeMillis();
+    }
+
+    private void markFailure(String provider, Exception e) {
+        if (isUnreachable(e)) unreachableUntil.put(provider, System.currentTimeMillis() + UNREACHABLE_RETRY_MS);
+    }
+
     public WebSearchClient(WebSearchProperties properties) {
         this.properties = properties;
     }
@@ -83,7 +105,7 @@ public class WebSearchClient {
         }
 
         for (String provider : orderedProviders()) {
-            if (!isProviderConfigured(provider)) continue;
+            if (!isProviderConfigured(provider) || skipped(provider)) continue; // injoignable il y a peu : pas de nouvelle attente
             try {
                 List<WebSearchResultItem> results = callProvider(provider, query.trim());
                 if (!results.isEmpty()) {
@@ -100,6 +122,7 @@ public class WebSearchClient {
                 Thread.currentThread().interrupt();
                 return List.of();
             } catch (Exception e) {
+                markFailure(provider, e);
                 log.warn("Recherche web : {} a échoué pour « {} » : {}", provider, query, e.getMessage());
             }
         }
@@ -122,6 +145,7 @@ public class WebSearchClient {
                 long start = System.currentTimeMillis();
                 try {
                     List<WebSearchResultItem> results = callProvider(provider, "Ecobank");
+                    unreachableUntil.remove(provider);
                     row.put("status", results.isEmpty() ? "VIDE" : "OK");
                     row.put("detail", results.size() + " résultat(s) en " + (System.currentTimeMillis() - start) + " ms.");
                 } catch (Exception e) {
@@ -300,7 +324,7 @@ public class WebSearchClient {
         }
         List<WebSearchResultItem> merged = new ArrayList<>();
         java.util.Set<String> seen = new java.util.HashSet<>();
-        if (isProviderConfigured("ecobank")) {
+        if (isProviderConfigured("ecobank") && !skipped("ecobank")) {
             try {
                 for (WebSearchResultItem r : callProvider("ecobank", query.trim())) {
                     if (merged.size() >= 2) break;
@@ -310,6 +334,7 @@ public class WebSearchClient {
                 Thread.currentThread().interrupt();
                 return List.of();
             } catch (Exception e) {
+                markFailure("ecobank", e);
                 log.warn("Recherche web : ecobank.com a échoué pour « {} » : {}", query, e.getMessage());
             }
         }
