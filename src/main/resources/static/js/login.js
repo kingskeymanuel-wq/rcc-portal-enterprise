@@ -20,6 +20,19 @@ const FETCH_TIMEOUT_MS = 20000;
 
 let challengeId = null;
 let otpModal = null;
+
+/**
+ * « Impossible de joindre le serveur » uniquement pour une vraie panne réseau (fetch rejeté).
+ * Toute autre erreur (script de la page non chargé, bug) est affichée telle quelle : sinon un
+ * simple fichier CSS/JS refusé passait pour un serveur injoignable.
+ */
+function networkErrorMessage(error) {
+  const msg = error && error.message ? String(error.message) : "";
+  if (error instanceof TypeError && /fetch|network|load failed/i.test(msg)) {
+    return "Impossible de joindre le serveur RCC.";
+  }
+  return "Erreur de la page de connexion (" + (msg || "inconnue") + "). Rechargez la page avec Ctrl+F5.";
+}
 let excelliamPasswordModal = null;
 
 /* ==========================================================
@@ -421,11 +434,7 @@ loginForm.addEventListener("submit", async function (event) {
 
     } else {
 
-      showError(
-
-          "Impossible de joindre le serveur RCC."
-
-      );
+      showError(networkErrorMessage(error));
 
     }
 
@@ -787,7 +796,7 @@ excelliamPasswordButton.addEventListener("click", async () => {
 
     } else {
 
-      showExcelliamPasswordError("Impossible de joindre le serveur RCC.");
+      showExcelliamPasswordError(networkErrorMessage(error));
 
     }
 

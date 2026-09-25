@@ -72,11 +72,19 @@ public class SecurityConfig {
                                 "/css/**",
                                 "/js/**",
                                 "/images/**",
+                                // Bibliothèques servies en local depuis la v182 (Bootstrap, icônes, polices,
+                                // cartes…) : indispensables dès la page de connexion, avant tout jeton.
+                                "/vendor/**",
                                 "/webjars/**",
                                 "/api/auth/**",
                                 "/api/dashboard/**",
                                 "/api/site-settings/public",
                                 "/actuator/**"
+                        ).permitAll()
+                        // Page de connexion : carrousel et cartes de présentation (lecture seule, avant jeton).
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                "/api/site-settings/login-hero-images",
+                                "/api/login-feature-cards/public"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
