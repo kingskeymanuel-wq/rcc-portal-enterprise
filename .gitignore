@@ -16,3 +16,7 @@ __pycache__/
 
 # Copies de travail temporaires des agents Claude Code
 .claude/worktrees/
+
+# Kit LibreTranslate hors ligne : binaires et modèles livrés à part (trop volumineux pour git)
+scripts/libretranslate-offline/wheels/
+scripts/libretranslate-offline/models/

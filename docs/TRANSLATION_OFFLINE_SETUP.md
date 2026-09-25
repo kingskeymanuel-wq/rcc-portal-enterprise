@@ -1,3 +1,9 @@
+> **Serveur sans Internet (recommandé)** : kit prêt à l'emploi dans `scripts/libretranslate-offline/`
+> (programmes Windows 64 bits + Python 3.11 fournis à part dans `rcc-libretranslate-offline-win64-py311.zip`).
+> 1. PC avec Internet : `1-telecharger-modeles.ps1` (modèles de langue) ;
+> 2. serveur : `2-installer-serveur.ps1` en administrateur (installation sans réseau + démarrage automatique).
+> Voir `scripts/libretranslate-offline/LISEZ-MOI.md`.
+
 # Traducteur, correcteur et recherche web — configuration des API
 
 ## Chaîne de traduction (par défaut)

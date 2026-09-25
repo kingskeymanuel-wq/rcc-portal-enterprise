@@ -12,6 +12,9 @@
     scripts/translate.py, qui recharge tout a chaque traduction) : traduction rapide, 100 %
     hors-ligne une fois les modeles telecharges, aucune donnee ne sort du serveur.
 
+    SERVEUR SANS INTERNET : utilisez plutot le kit scripts\libretranslate-offline
+    (1-telecharger-modeles.ps1 sur un PC connecte, puis 2-installer-serveur.ps1 sur le serveur).
+
     - Premier lancement : cree un environnement Python dedie, installe LibreTranslate et
       telecharge les modeles des langues de LT_LOAD_ONLY (acces internet necessaire CE jour-la,
       vers pypi.org et github.com / argos-net).
@@ -51,8 +54,9 @@ if (-not (Test-Path $ltExe)) {
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 
     # LibreTranslate depend de PyTorch : Python 3.10 ou 3.11 recommande (3.12+ peut echouer).
-    $pyParts = $Python.Split(" ")
-    & $pyParts[0] $pyParts[1..($pyParts.Length - 1)] -m venv $venv
+    $pyParts = @($Python.Split(" ") | Where-Object { $_ })
+    $pyFixed = @(); if ($pyParts.Length -gt 1) { $pyFixed = $pyParts[1..($pyParts.Length - 1)] }
+    & $pyParts[0] @($pyFixed + @("-m", "venv", $venv))
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path $venvPython)) {
         throw "Creation de l'environnement Python impossible. Installez Python 3.11 (python.org) ou passez -Python 'C:\chemin\python.exe'."
     }

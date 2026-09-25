@@ -26,7 +26,7 @@ des cas, base de connaissances, masques de mail, MON RCC, formation, QA, RH, pla
 | Fond de carte détaillé (rues) | fond vectoriel local (pays + marqueurs) | serveur de tuiles interne → `RCC_MAP_TILE_URL` (vide = fond local seul) |
 | Visite de rue / plan / itinéraire (fiche agence) | fiche locale : adresse + coordonnées GPS à copier | — |
 | Recherche web de RAF / barre de recherche | ignorée (moteur écarté 2 min après un échec, aucune attente) | SearXNG interne → `WEBSEARCH_SEARXNG_URL` |
-| Traduction | LibreTranslate local (recommandé) + glossaire hors ligne | `scripts/start-libretranslate.ps1` |
+| Traduction | LibreTranslate local (recommandé) + glossaire hors ligne | kit `scripts/libretranslate-offline` (installation sans Internet) |
 | Géocodage d'adresse (admin agences) | message + saisie lat/long ou clic sur la carte | — |
 | Teams / Outlook (Graph), Copilot, DeepL, Azure, Anthropic | désactivés tant que non configurés | clés dans `application-secrets.yml` |
 | Vidéos YouTube / Vimeo de formation | non lues | déposer les vidéos dans le portail (upload local) |
