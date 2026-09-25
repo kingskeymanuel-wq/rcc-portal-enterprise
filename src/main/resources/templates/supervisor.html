@@ -7,6 +7,7 @@
     <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}" rel="stylesheet">
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/qa-team.css}">
     <link rel="stylesheet" th:href="@{/css/support-requests.css}">
     <style>
         .sv-tab-nav .btn.nav-link { border: none; border-bottom: 3px solid transparent; border-radius: 0; color: #6b7280; font-weight: 600; padding: .75rem 1.1rem; }
@@ -75,6 +76,7 @@
                     <li class="nav-item"><button type="button" class="btn nav-link active" id="svTabReportingBtn"><i class="bi bi-diagram-3"></i> Reporting d'équipe</button></li>
                     <li class="nav-item"><button type="button" class="btn nav-link" id="svTabQaBtn"><i class="bi bi-patch-check"></i> Évaluations QA</button></li>
                     <li class="nav-item"><button type="button" class="btn nav-link" id="svTabCrmBtn"><i class="bi bi-telephone-outbound-fill"></i> CRM Outbound</button></li>
+                    <li class="nav-item"><button type="button" class="btn nav-link" id="svTabQaTeamBtn"><i class="bi bi-people-fill"></i> Équipe QA</button></li>
                 </ul>
 
                 <!-- ===================== REPORTING D'ÉQUIPE ===================== -->
@@ -108,6 +110,16 @@
                                 </div>
                             </div>
 
+                            <label class="form-label small mb-1">Indicateurs métier par équipe</label>
+                            <div class="tp-teams" id="svPerfTeams">
+                                <button type="button" class="on" data-sv-perf="">Tous les agents</button>
+                                <button type="button" data-sv-perf="INBOUND_VOICE"><i class="bi bi-headset"></i> Inbound Voix</button>
+                                <button type="button" data-sv-perf="INBOUND_MAIL"><i class="bi bi-envelope-at"></i> Inbound Mail / Rafiki</button>
+                                <button type="button" data-sv-perf="CIB"><i class="bi bi-briefcase"></i> CIB</button>
+                                <button type="button" data-sv-perf="OUTBOUND"><i class="bi bi-telephone-outbound"></i> Outbound</button>
+                            </div>
+                            <div id="svTeamPerf" style="display:none;"></div>
+                            <div id="svGenericReporting">
                             <div class="mb-3">
                                 <label class="form-label small mb-1">Équipe</label>
                                 <div class="d-flex flex-wrap gap-2" id="svTeamPicker"></div>
@@ -126,8 +138,14 @@
                                     <tbody id="svReportingBody"><tr><td colspan="9" class="text-center text-muted">Chargement…</td></tr></tbody>
                                 </table>
                             </div>
+                            </div>
                         </div>
                     </div>
+                </div>
+
+                <!-- ===================== ÉQUIPE QA ===================== -->
+                <div id="svPaneQaTeam" class="sv-tab-pane" style="display:none;">
+                    <div class="card dashboard-card shadow-sm mb-4"><div class="card-body" id="svQaTeamMount"></div></div>
                 </div>
 
                 <!-- ===================== ÉVALUATIONS QA ===================== -->
@@ -227,6 +245,8 @@
 <script th:src="@{/js/rcc-api.js}"></script>
 <script th:src="@{/js/session.js}"></script>
 <script th:src="@{/js/support-requests.js}"></script>
+<script th:src="@{/js/qa-team.js}"></script>
+<script th:src="@{/js/team-performance.js}"></script>
 <script th:src="@{/js/supervisor.js}"></script>
 </body>
 </html>

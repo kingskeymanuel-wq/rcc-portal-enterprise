@@ -256,6 +256,6 @@ public class QualityEvaluationService {
                 e.getFeedbackStatus(), e.getFeedbackDate(),
                 scoreDtos,
                 result.scorePercentage(), result.passed(), result.knockedOut(),
-                e.getCreatedAt(), e.getUpdatedAt());
+                e.getCreatedAt(), e.getUpdatedAt(), e.getChannel());
     }
 }

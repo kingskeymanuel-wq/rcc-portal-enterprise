@@ -8,6 +8,7 @@
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <link rel="stylesheet" th:href="@{/css/hr-portal.css}">
+    <link rel="stylesheet" th:href="@{/css/qa-team.css}">
     <style>
         .qas-kpi{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:.75rem;padding:1rem 1.25rem;display:flex;gap:12px;align-items:center}
         .qas-kpi i{font-size:1.4rem;color:#0057b8}
@@ -26,13 +27,14 @@
             <div class="container-fluid py-3">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <div>
-                        <h1 class="h4 mb-1">Superviseur Qualité Assurance</h1>
-                        <p class="text-muted mb-0">Vue d'ensemble des écoutes, des évaluations et des formations de toute la Quality Assurance.</p>
+                        <h1 class="h4 mb-1">Portail Head QA</h1>
+                        <p class="text-muted mb-0">Activité de chaque agent QA (écoutes, évaluations écrites, feedbacks, coachings, formations, contenus), puis le détail des écoutes et des formations.</p>
                     </div>
                     <button id="refreshBtn" class="btn btn-light border"><i class="bi bi-arrow-clockwise"></i> Actualiser</button>
                 </div>
 
                 <div id="qasError" class="alert alert-danger d-none"></div>
+                <div class="qas-card mb-3" id="qaTeamMount"></div>
 
                 <div class="row g-3 mb-3">
                     <div class="col-xl-3 col-md-6"><div class="qas-kpi"><i class="bi bi-headset"></i><div><span>Écoutes réalisées</span><strong id="kpiEvalCount">—</strong></div></div></div>
@@ -94,6 +96,8 @@
 <script th:src="@{/js/preferences.js}"></script>
 <script th:src="@{/js/rcc-api.js}"></script>
 <script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/qa-team.js}"></script>
 <script th:src="@{/js/qa-supervisor.js}"></script>
+<script>document.addEventListener("DOMContentLoaded", function () { RccQaTeam.mount(document.getElementById("qaTeamMount")); });</script>
 </body>
 </html>

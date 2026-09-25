@@ -71,8 +71,33 @@
     var TAB_DEFS = [
         { btn: "svTabReportingBtn", pane: "svPaneReporting", onShow: loadReporting },
         { btn: "svTabQaBtn", pane: "svPaneQa", onShow: loadQa },
-        { btn: "svTabCrmBtn", pane: "svPaneCrm", onShow: function () { loadCrmCampaigns(); } }
+        { btn: "svTabCrmBtn", pane: "svPaneCrm", onShow: function () { loadCrmCampaigns(); } },
+        { btn: "svTabQaTeamBtn", pane: "svPaneQaTeam", onShow: function () {
+            if (!qaTeamMounted && window.RccQaTeam) { qaTeamMounted = true; RccQaTeam.mount($("svQaTeamMount")); }
+        } }
     ];
+    var qaTeamMounted = false;
+
+    // ===================== INDICATEURS MÉTIER PAR ÉQUIPE =====================
+    // Inbound Voix, Inbound Mail / Rafiki, CIB et Outbound n'ont pas les mêmes indicateurs :
+    // chaque équipe a son tableau (voir TeamPerformanceService).
+    var svPerfTeam = "";
+    function loadTeamPerf() {
+        var generic = !svPerfTeam;
+        $("svGenericReporting").style.display = generic ? "" : "none";
+        $("svTeamPerf").style.display = generic ? "none" : "";
+        if (generic || !window.RccTeamPerf) return;
+        var period = computeSelectedPeriod();
+        RccTeamPerf.render($("svTeamPerf"), { team: svPerfTeam, month: period.month, from: period.from, to: period.to,
+            countryCode: $("svCountryFilter").value });
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("#svPerfTeams [data-sv-perf]"), function (b) {
+        b.addEventListener("click", function () {
+            svPerfTeam = b.getAttribute("data-sv-perf");
+            Array.prototype.forEach.call(document.querySelectorAll("#svPerfTeams [data-sv-perf]"), function (x) { x.classList.toggle("on", x === b); });
+            loadTeamPerf();
+        });
+    });
 
     function wireTabs() {
         TAB_DEFS.forEach(function (def) {
@@ -171,7 +196,7 @@
     }
 
     function wireReporting() {
-        $("svReportingApplyBtn").addEventListener("click", loadReporting);
+        $("svReportingApplyBtn").addEventListener("click", function () { loadReporting(); loadTeamPerf(); });
         $("svReportingSearch").addEventListener("input", renderReporting);
         $("svPeriodType").addEventListener("change", updatePeriodInputs);
         $("svMonthInput").value = currentMonthValue();

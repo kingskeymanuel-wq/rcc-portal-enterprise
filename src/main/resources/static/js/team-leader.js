@@ -78,6 +78,7 @@
             reportingCache = rows || [];
             renderReporting();
             updateHeaderStats();
+            renderTeamPerf();
         }).catch(function (e) {
             $("tlReportingBody").innerHTML = '<tr><td colspan="6" class="text-center text-danger">Erreur : ' + escapeHtml(e.message) + '</td></tr>';
         });
@@ -110,6 +111,27 @@
     }
 
     var agentsWithNewEvaluation = {}; // { username: true } — construit depuis les notifications non lues
+
+    /** Indicateurs propres à l'équipe du Team Leader (Voix : appels, DMT… ; Mail : mails, délai, SLA… ;
+     *  Outbound : appels émis, joints, RDV, ventes…) — voir team-performance.js. */
+    function renderTeamPerf() {
+        if (!window.RccTeamPerf || !myTeam) { $("tlGenericReporting").style.display = ""; return; }
+        RccTeamPerf.render($("tlTeamPerf"), {
+            month: $("tlReportingMonth").value || currentMonthValue(),
+            decorateName: function (r) {
+                return agentsWithNewEvaluation[r.username] ? ' <span class="badge bg-danger" title="Nouvelle écoute QA à consulter"><i class="bi bi-headset"></i></span>' : "";
+            },
+            onRowClick: function (username) {
+                var r = reportingCache.filter(function (x) { return x.username === username; })[0];
+                if (!r) return;
+                if (agentsWithNewEvaluation[username]) {
+                    sendJson("/api/mon-rcc/notifications/" + agentsWithNewEvaluation[username] + "/read", "POST").catch(function () {});
+                    delete agentsWithNewEvaluation[username];
+                }
+                openAgentDetail(r);
+            }
+        }).then(function (res) { if (!res) $("tlGenericReporting").style.display = ""; });
+    }
 
     function renderReporting() {
         var body = $("tlReportingBody");

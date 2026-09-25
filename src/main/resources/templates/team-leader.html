@@ -10,6 +10,7 @@
     <link rel="stylesheet" th:href="@{/css/support-requests.css}">
     <link rel="stylesheet" th:href="@{/css/excelliam-portal.css}">
     <link rel="stylesheet" th:href="@{/css/meetings.css}">
+    <link rel="stylesheet" th:href="@{/css/qa-team.css}">
     <style>
         .tl-tab-nav { gap: .35rem; padding: .7rem .8rem; background: #F5F8FC; border-radius: 1rem 1rem 0 0; }
         .tl-tab-nav .btn.nav-link { border: 0; border-radius: 999px; color: #4B5A70; font-weight: 700; font-size: .86rem; padding: .45rem .95rem; transition: background .2s ease, color .2s ease, box-shadow .2s ease; }
@@ -190,7 +191,8 @@
                                     <button class="btn btn-sm btn-primary w-100" id="tlReportingApplyBtn">Appliquer</button>
                                 </div>
                             </div>
-                            <div class="table-responsive">
+                            <div id="tlTeamPerf"></div>
+                            <div class="table-responsive" id="tlGenericReporting" style="display:none;">
                                 <table class="table table-hover align-middle table-sm">
                                     <thead><tr><th>Agent</th><th>Score QA</th><th>Score évaluation</th><th>Interactions</th><th id="tlReportingSalesHeader" style="display:none;">Ventes</th><th>Présence</th><th>Performance</th></tr></thead>
                                     <tbody id="tlReportingBody"><tr><td colspan="6" class="text-center text-muted">Chargement…</td></tr></tbody>
@@ -677,6 +679,7 @@
 <script th:src="@{/js/session.js}"></script>
 <script th:src="@{/js/support-requests.js}"></script>
 <script th:src="@{/js/meetings.js}"></script>
+<script th:src="@{/js/team-performance.js}"></script>
 <script th:src="@{/js/team-leader.js}"></script>
 </body>
 </html>

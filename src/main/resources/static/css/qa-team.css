@@ -1,0 +1,68 @@
+/* ===== Équipe QA (Portail Head QA / Superviseur) et performance par équipe ===== */
+.qt-toolbar { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: .8rem; margin-bottom: 1rem; }
+.qt-toolbar h5 { font-weight: 800; color: #122240; }
+.qt-tools { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+.qt-tools input { min-width: 220px; border-radius: 999px; }
+.qt-period { display: flex; padding: .2rem; border-radius: 999px; background: #EEF2F8; }
+.qt-period button { border: 0; background: transparent; border-radius: 999px; padding: .28rem .8rem; font-size: .78rem; font-weight: 700; color: #4B5A70; }
+.qt-period button.on { background: #0057B8; color: #fff; }
+.qt-loading { padding: 1.5rem; color: #6B7A90; }
+.qt-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .6rem; margin-bottom: 1rem; }
+.qt-kpi { display: flex; align-items: center; gap: .6rem; padding: .7rem .8rem; border-radius: 1rem; background: #fff; border: 1px solid #EEF1F5; box-shadow: 0 6px 16px rgba(0, 32, 84, .05); }
+.qt-kpi > span { width: 38px; height: 38px; flex-shrink: 0; border-radius: .8rem; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+.qt-kpi b { display: block; font-size: 1.25rem; font-weight: 800; color: #122240; line-height: 1.1; }
+.qt-kpi small { color: #6B7A90; font-size: .74rem; }
+.qt-chart-card { padding: .9rem 1rem; border-radius: 1rem; background: #fff; border: 1px solid #EEF1F5; margin-bottom: 1rem; }
+.qt-chart-card h6 { font-weight: 800; color: #122240; }
+.qt-chart { width: 100%; height: 120px; margin-top: .4rem; }
+.qt-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 .2rem 0 .5rem; }
+.qt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: .8rem; }
+.qt-card { text-align: left; width: 100%; min-width: 0; border: 1px solid #EEF1F5; background: #fff; border-radius: 1.1rem; padding: .9rem 1rem; box-shadow: 0 6px 16px rgba(0, 32, 84, .05); transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.qt-card:hover { transform: translateY(-2px); border-color: #BFD4F2; box-shadow: 0 12px 26px rgba(0, 32, 84, .1); }
+.qt-card-head { display: flex; align-items: center; gap: .7rem; }
+.qt-av { width: 42px; height: 42px; flex-shrink: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: .85rem; color: #fff; background: linear-gradient(135deg, #7B2FF7, #0057B8); }
+.qt-av.lg { width: 50px; height: 50px; background: rgba(255, 255, 255, .2); }
+.qt-card-who { flex: 1; min-width: 0; }
+.qt-card-who b { display: block; color: #122240; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qt-card-who small, .qt-card-score small { display: block; font-size: .72rem; color: #6B7A90; }
+.qt-card-score { text-align: right; flex-shrink: 0; }
+.qt-card-score b { font-size: 1.15rem; color: #0057B8; }
+.qt-bar { display: flex; height: 7px; border-radius: 999px; background: #EEF2F8; overflow: hidden; margin: .7rem 0 .55rem; }
+.qt-bar span { height: 100%; }
+.qt-chips { display: flex; flex-wrap: wrap; gap: .3rem; }
+.qt-chip { font-size: .74rem; padding: .15rem .55rem; border-radius: 999px; color: var(--c); background: color-mix(in srgb, var(--c) 9%, #fff); border: 1px solid color-mix(in srgb, var(--c) 22%, #fff); }
+.qt-chip b { margin: 0 .1rem 0 .2rem; }
+.qt-chip.zero { opacity: .45; }
+.qt-card-foot { display: flex; gap: .9rem; flex-wrap: wrap; align-items: center; margin-top: .6rem; font-size: .76rem; color: #6B7A90; }
+.qt-more { margin-left: auto; color: #0057B8; font-weight: 700; }
+.qt-modal .modal-content { border: 0; border-radius: 1.2rem; overflow: hidden; }
+.qt-modal-head { display: flex; align-items: center; gap: .8rem; padding: 1rem 1.2rem; color: #fff; background: linear-gradient(120deg, #1B1F6B, #7B2FF7 55%, #0057B8); }
+.qt-modal-head small { opacity: .85; }
+.qt-mini { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: .5rem; margin-bottom: 1rem; }
+.qt-mini > div { padding: .6rem; border-radius: .9rem; text-align: center; background: color-mix(in srgb, var(--c) 8%, #fff); color: var(--c); }
+.qt-mini b { display: block; font-size: 1.3rem; }
+.qt-mini small { color: #4B5A70; font-size: .72rem; }
+.qt-timeline { list-style: none; padding: 0; margin: 0; }
+.qt-timeline li { display: flex; gap: .7rem; align-items: flex-start; padding: .55rem 0; border-bottom: 1px dashed #E3EAF5; }
+.qt-timeline li > div { flex: 1; min-width: 0; }
+.qt-timeline b { display: block; font-size: .86rem; color: #122240; font-weight: 600; }
+.qt-timeline small { display: block; font-size: .76rem; color: #6B7A90; }
+.qt-timeline time { font-size: .74rem; color: #8A97AB; white-space: nowrap; }
+.qt-tl-ico { width: 30px; height: 30px; flex-shrink: 0; border-radius: .7rem; display: flex; align-items: center; justify-content: center; color: var(--c); background: color-mix(in srgb, var(--c) 12%, #fff); }
+
+/* Performance par équipe */
+.tp-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: .6rem; margin-bottom: .8rem; }
+.tp-head h6 { font-weight: 800; color: #122240; margin: 0; }
+.tp-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: .55rem; margin-bottom: 1rem; }
+.tp-tile { padding: .65rem .8rem; border-radius: .9rem; background: #fff; border: 1px solid #EEF1F5; box-shadow: 0 5px 14px rgba(0, 32, 84, .05); }
+.tp-tile small { display: block; color: #6B7A90; font-size: .72rem; }
+.tp-tile b { display: block; font-size: 1.2rem; font-weight: 800; color: #122240; }
+.tp-tile i.bi-arrow-down-short, .tp-tile i.bi-arrow-up-short { color: #8A97AB; }
+.tp-table th { font-size: .74rem; text-transform: uppercase; letter-spacing: .03em; color: #6B7A90; white-space: nowrap; }
+.tp-table td.tp-v { text-align: right; white-space: nowrap; }
+.tp-good { color: #0F7B4A; font-weight: 700; }
+.tp-bad { color: #C62828; font-weight: 700; }
+.tp-teams { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .9rem; }
+.tp-teams button { border: 1px solid #DCE4F0; background: #fff; border-radius: 999px; padding: .35rem .9rem; font-size: .82rem; font-weight: 700; color: #33415C; }
+.tp-teams button.on { background: linear-gradient(135deg, #0057B8, #0F9D6C); border-color: transparent; color: #fff; }
+@media (max-width: 575px) { .qt-grid { grid-template-columns: minmax(0, 1fr); } .qt-tools, .qt-tools input { width: 100%; } }

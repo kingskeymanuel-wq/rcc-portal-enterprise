@@ -15,5 +15,7 @@ public record QualityEvaluationResponse(
         String feedbackStatus, LocalDate feedbackDate,
         List<ScoreEntryDto> scores,
         double scorePercentage, boolean passed, boolean knockedOut,
-        LocalDateTime createdAt, LocalDateTime updatedAt) {
+        LocalDateTime createdAt, LocalDateTime updatedAt,
+        /* VOICE (écoute d'appel) | CHAT (évaluation écrite : mail, chat) */
+        String channel) {
 }
