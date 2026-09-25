@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -143,21 +144,27 @@ public class CampaignService {
             Sheet sheet = workbook.getSheetAt(0);
             Row headerRow = sheet.getRow(0);
             if (headerRow == null) throw ApiException.badRequest("Le fichier est vide.");
-            int lastCol = headerRow.getLastCellNum();
-            List<String> headers = new ArrayList<>();
-            for (int col = 0; col < lastCol; col++) headers.add(cellToString(headerRow.getCell(col)).trim());
+            List<String> headers = readHeaders(headerRow);
+            Set<Integer> filled = filledColumns(sheet, headers.size());
 
+            // Ligne d'exemple : la première ligne la plus remplie parmi les premières (un export
+            // Forms commence souvent par des appels sans réponse aux questions).
             Row sampleDataRow = null;
-            for (int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
+            int best = -1;
+            for (int rowIndex = 1; rowIndex <= Math.min(sheet.getLastRowNum(), 60); rowIndex++) {
                 Row candidate = sheet.getRow(rowIndex);
-                if (candidate != null) { sampleDataRow = candidate; break; }
+                if (candidate == null) continue;
+                int count = 0;
+                for (int col = 0; col < headers.size(); col++) if (!cellToString(candidate.getCell(col)).isBlank()) count++;
+                if (count > best) { best = count; sampleDataRow = candidate; }
             }
             List<String> sampleRow = new ArrayList<>();
-            for (int col = 0; col < lastCol; col++) {
-                sampleRow.add(sampleDataRow == null ? "" : cellToString(sampleDataRow.getCell(col)).trim());
+            for (int col = 0; col < headers.size(); col++) {
+                String v = sampleDataRow == null ? "" : cellToString(sampleDataRow.getCell(col));
+                sampleRow.add(v.length() > 60 ? v.substring(0, 60) + "…" : v);
             }
 
-            CampaignImportMappingDto suggested = buildSuggestedMapping(headers, fields);
+            CampaignImportMappingDto suggested = buildSuggestedMapping(headers, fields, filled);
             return new CampaignImportPreviewResponse(headers, sampleRow, suggested, fields);
         } catch (ApiException e) {
             throw e;
@@ -166,40 +173,120 @@ public class CampaignService {
         }
     }
 
-    /** Propose un mapping par défaut à partir des en-têtes réels du fichier fourni — l'utilisateur
-     *  peut ensuite tout corriger dans la modale avant de confirmer, ce n'est qu'une suggestion. */
-    private CampaignImportMappingDto buildSuggestedMapping(List<String> headers, List<CampaignFieldDto> fields) {
-        Integer nameCol = null, phoneCol = null, accountCol = null, agentCol = null;
-        Map<Integer, String> fieldCols = new LinkedHashMap<>();
-        for (int col = 0; col < headers.size(); col++) {
-            String h = normalizeForMatch(headers.get(col));
-            if (h.isBlank()) continue;
-            if (nameCol == null && (h.contains("nom") || h.contains("client") || h.contains("name") || h.contains("customer"))) { nameCol = col; continue; }
-            if (phoneCol == null && (h.contains("tel") || h.contains("phone") || h.contains("gsm") || (h.contains("numero") && h.contains("appel")))) { phoneCol = col; continue; }
-            if (accountCol == null && (h.contains("compte") || h.contains("account"))) { accountCol = col; continue; }
-            if (agentCol == null && (h.contains("agent") || h.contains("matricule") || h.contains("username"))) { agentCol = col; continue; }
-            String matchedFieldId = matchFieldByLabel(headers.get(col), fields);
-            if (matchedFieldId != null) fieldCols.put(col, matchedFieldId);
-        }
-        // Repli CIF pour la colonne compte, seulement si "compte/account" n'a matché nulle part —
-        // priorité au vrai numéro de compte quand les deux sont présents (ex. CustomerCif +
-        // AccountNumber dans le même fichier).
-        if (accountCol == null) {
-            for (int col = 0; col < headers.size(); col++) {
-                String h = normalizeForMatch(headers.get(col));
-                if (h.contains("cif")) { accountCol = col; break; }
+    private List<String> readHeaders(Row headerRow) {
+        List<String> headers = new ArrayList<>();
+        if (headerRow == null) return headers;
+        for (int col = 0; col < headerRow.getLastCellNum(); col++) headers.add(cellToString(headerRow.getCell(col)));
+        return headers;
+    }
+
+    /** Colonnes réellement renseignées sur les 200 premières lignes (un export Microsoft Forms
+     *  contient par ex. une colonne « Nom » toujours vide, à ne jamais prendre pour le nom du client). */
+    private Set<Integer> filledColumns(Sheet sheet, int columnCount) {
+        Set<Integer> filled = new java.util.HashSet<>();
+        for (int rowIndex = 1; rowIndex <= Math.min(sheet.getLastRowNum(), 200); rowIndex++) {
+            Row row = sheet.getRow(rowIndex);
+            if (row == null) continue;
+            for (int col = 0; col < columnCount; col++) {
+                if (filled.contains(col)) continue;
+                String v = cellToString(row.getCell(col));
+                if (!v.isBlank() && !v.equalsIgnoreCase("anonymous")) filled.add(col);
             }
         }
-        // Repli si rien n'a été identifié par mots-clés : ancienne disposition par défaut
-        // (A=nom, B=téléphone, C=compte) — mieux qu'un mapping vide sur un fichier sans en-têtes utiles.
+        return filled;
+    }
+
+    /** Métadonnées d'un export Microsoft Forms, jamais utiles à l'agent. */
+    private static final Set<String> FORMS_METADATA = Set.of("id", "heurededebut", "heuredefin", "adressedemessagerie",
+            "heuredeladernieremodification", "starttime", "completiontime", "email", "lastmodifiedtime", "name");
+
+    /** Propose un mapping par défaut à partir des en-têtes réels du fichier fourni — l'utilisateur
+     *  peut ensuite tout corriger dans la modale avant de confirmer, ce n'est qu'une suggestion. */
+    CampaignImportMappingDto buildSuggestedMapping(List<String> headers, List<CampaignFieldDto> fields, Set<Integer> filled) {
+        Integer nameCol = null, phoneCol = null, accountCol = null, agentCol = null, statusCol = null, dateCol = null;
+        int nameScore = 0;
+        for (int col = 0; col < headers.size(); col++) {
+            String h = normalizeForMatch(headers.get(col));
+            if (h.isBlank() || (filled != null && !filled.contains(col))) continue;
+            boolean shortHeader = h.length() <= 30;
+            boolean aboutAgent = h.contains("agent") || h.contains("conseiller") || h.contains("teleconseiller");
+            // Nom du client : « Nom du client » / « Client » / « Raison sociale » l'emportent sur un simple « Nom ».
+            if (shortHeader && !aboutAgent && !h.contains("agence")) {
+                int score = 0;
+                if (h.contains("nomduclient") || h.contains("nomclient") || h.contains("clientname") || h.contains("customername")
+                        || h.contains("raisonsociale") || h.contains("nomprenom") || h.contains("nometprenom")) score = 3;
+                else if (h.contains("client") || h.contains("customer")) score = 2;
+                else if (h.equals("nom") || h.equals("name") || h.startsWith("nom") || h.contains("fullname")) score = 1;
+                if (score > nameScore) { nameScore = score; nameCol = col; continue; }
+            }
+            if (!shortHeader) continue;
+            if (phoneCol == null && (h.contains("tel") || h.contains("phone") || h.contains("gsm") || h.contains("mobile")
+                    || h.contains("cellulaire") || (h.contains("numero") && h.contains("appel")))) { phoneCol = col; continue; }
+            if (accountCol == null && !h.contains("agence") && (h.contains("compte") || h.contains("account"))) { accountCol = col; continue; }
+            if (agentCol == null && (aboutAgent || h.contains("matricule") || h.contains("username"))) { agentCol = col; continue; }
+            if (statusCol == null && (h.contains("statut") || h.contains("status") || h.contains("resultat") || h.contains("issue"))) { statusCol = col; continue; }
+            if (dateCol == null && h.contains("date") && (h.contains("appel") || h.contains("call"))) { dateCol = col; }
+        }
+        if (accountCol == null) {
+            for (int col = 0; col < headers.size(); col++) {
+                if (normalizeForMatch(headers.get(col)).contains("cif")) { accountCol = col; break; }
+            }
+        }
+        // Repli si rien n'a été identifié par mots-clés : ancienne disposition par défaut (A=nom, B=téléphone, C=compte).
         if (nameCol == null && !headers.isEmpty()) nameCol = 0;
-        if (phoneCol == null && headers.size() > 1) phoneCol = 1;
-        if (accountCol == null && headers.size() > 2) accountCol = 2;
-        return new CampaignImportMappingDto(nameCol, phoneCol, accountCol, agentCol, fieldCols);
+        if (phoneCol == null && headers.size() > 1 && !Objects.equals(nameCol, 1)) phoneCol = 1;
+        if (accountCol == null && headers.size() > 2 && !Objects.equals(nameCol, 2)) accountCol = 2;
+
+        Set<Integer> used = new java.util.HashSet<>();
+        for (Integer c : java.util.Arrays.asList(nameCol, phoneCol, accountCol, agentCol, statusCol, dateCol)) if (c != null) used.add(c);
+        Map<Integer, String> fieldCols = matchFieldColumns(headers, fields, used);
+        return new CampaignImportMappingDto(nameCol, phoneCol, accountCol, agentCol, fieldCols, statusCol, dateCol, true, false);
+    }
+
+    /** Associe chaque question du modèle à la colonne la plus proche (libellé identique, ou mêmes
+     *  mots à 80 % — « Proposez le package. Le client est-il intéressé ? » ↔ « …Le cllient est il
+     *  interessé ? »). Une question ne reçoit qu'une colonne, la meilleure. */
+    Map<Integer, String> matchFieldColumns(List<String> headers, List<CampaignFieldDto> fields, Set<Integer> used) {
+        record Candidate(int col, String fieldId, double score) {}
+        List<Candidate> candidates = new ArrayList<>();
+        for (int col = 0; col < headers.size(); col++) {
+            if (used.contains(col) || headers.get(col).isBlank()) continue;
+            for (CampaignFieldDto f : fields) {
+                double score = labelSimilarity(headers.get(col), f.label());
+                if (score >= 0.79) candidates.add(new Candidate(col, f.id(), score));
+            }
+        }
+        candidates.sort(java.util.Comparator.comparingDouble(Candidate::score).reversed().thenComparingInt(Candidate::col));
+        Map<Integer, String> out = new LinkedHashMap<>();
+        Set<String> takenFields = new java.util.HashSet<>();
+        for (Candidate c : candidates) {
+            if (out.containsKey(c.col()) || takenFields.contains(c.fieldId())) continue;
+            out.put(c.col(), c.fieldId());
+            takenFields.add(c.fieldId());
+        }
+        return out;
+    }
+
+    double labelSimilarity(String header, String label) {
+        if (header == null || label == null) return 0;
+        String a = normalizeForMatch(header), b = normalizeForMatch(label);
+        if (a.isEmpty() || b.isEmpty()) return 0;
+        if (a.equals(b)) return 1.0;
+        Set<String> ta = tokens(header), tb = tokens(label);
+        if (Math.min(ta.size(), tb.size()) < 3) return 0;
+        long common = ta.stream().filter(tb::contains).count();
+        return (double) common / Math.min(ta.size(), tb.size()) * 0.999; // < 1 : un libellé identique passe toujours devant
+    }
+
+    private Set<String> tokens(String s) {
+        String noAccents = Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase();
+        Set<String> out = new java.util.LinkedHashSet<>();
+        for (String t : noAccents.split("[^a-z0-9]+")) if (t.length() >= 3) out.add(t);
+        return out;
     }
 
     @Transactional
-    public int importContacts(AuthenticatedUser requester, Integer campaignId, MultipartFile file, CampaignImportMappingDto mapping) {
+    public CampaignImportReport importContacts(AuthenticatedUser requester, Integer campaignId, MultipartFile file, CampaignImportMappingDto mapping) {
         requireCanManage(requester);
         campaignRepository.findById(campaignId)
                 .orElseThrow(() -> ApiException.notFound("Campagne introuvable."));
@@ -212,7 +299,7 @@ public class CampaignService {
      * personnelle pour cet agent ; chaque contact importé lui est assigné directement.
      */
     @Transactional
-    public int selfImportContacts(AuthenticatedUser requester, MultipartFile file, CampaignImportMappingDto mapping) {
+    public CampaignImportReport selfImportContacts(AuthenticatedUser requester, MultipartFile file, CampaignImportMappingDto mapping) {
         User agent = requireUser(requester);
         Campaign personalCampaign = campaignRepository.findAllByOrderByCreatedAtDesc().stream()
                 .filter(c -> c.getCreatedByUserId().equals(agent.getId()) && "Mes contacts".equals(c.getName()) && "ACTIVE".equals(c.getStatus()))
@@ -226,94 +313,153 @@ public class CampaignService {
         return readContactsFile(file, personalCampaign.getCampaignId(), mapping, agent.getId());
     }
 
-    private int readContactsFile(MultipartFile file, Integer campaignId, CampaignImportMappingDto mapping, Long forcedAgentUserId) {
+    private CampaignImportReport readContactsFile(MultipartFile file, Integer campaignId, CampaignImportMappingDto mapping, Long forcedAgentUserId) {
         if (file == null || file.isEmpty()) {
             throw ApiException.badRequest("Le fichier est requis.");
         }
         List<CampaignFieldDto> fields = campaignRepository.findById(campaignId)
                 .map(c -> deserializeFields(c.getFieldsJson()))
                 .orElse(List.of());
+        Map<String, CampaignFieldDto> fieldsById = new LinkedHashMap<>();
+        fields.forEach(f -> fieldsById.put(f.id(), f));
 
-        int imported = 0;
+        int imported = 0, skippedDup = 0, skippedRecall = 0, skippedNoName = 0, assigned = 0;
+        Map<String, Integer> statusCounts = new LinkedHashMap<>();
+        Map<String, Integer> matchedAgents = new java.util.TreeMap<>();
+        Map<String, Integer> unmatchedAgents = new java.util.TreeMap<>();
         try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
             Sheet sheet = workbook.getSheetAt(0);
-
-            Row headerRow = sheet.getRow(0);
-            List<String> headers = new ArrayList<>();
-            if (headerRow != null) {
-                int lastCol = headerRow.getLastCellNum();
-                for (int col = 0; col < lastCol; col++) headers.add(cellToString(headerRow.getCell(col)).trim());
-            }
+            List<String> headers = readHeaders(sheet.getRow(0));
 
             // Pas de mapping fourni (appel direct, ancien client) : on en déduit un à partir
             // des en-têtes du fichier lui-même, exactement comme le ferait la prévisualisation.
-            CampaignImportMappingDto effectiveMapping = mapping;
-            if (effectiveMapping == null) {
-                effectiveMapping = buildSuggestedMapping(headers, fields);
-            }
-            if (effectiveMapping.nameColumn() == null) {
+            CampaignImportMappingDto m = mapping;
+            if (m == null) m = buildSuggestedMapping(headers, fields, filledColumns(sheet, headers.size()));
+            if (m.nameColumn() == null) {
                 throw ApiException.badRequest("Impossible de déterminer la colonne du nom du client — précisez le mapping des colonnes.");
             }
-
-            int nameCol = effectiveMapping.nameColumn();
-            Integer phoneCol = effectiveMapping.phoneColumn();
-            Integer accountCol = effectiveMapping.accountColumn();
-            Integer agentCol = forcedAgentUserId != null ? null : effectiveMapping.agentColumn();
-            Map<Integer, String> fieldCols = effectiveMapping.fieldColumns() != null ? effectiveMapping.fieldColumns() : Map.of();
+            int nameCol = m.nameColumn();
+            Integer phoneCol = m.phoneColumn(), accountCol = m.accountColumn(), statusCol = m.statusColumn(), dateCol = m.callDateColumn();
+            Integer agentCol = forcedAgentUserId != null ? null : m.agentColumn();
+            Map<Integer, String> fieldCols = m.fieldColumns() != null ? m.fieldColumns() : Map.of();
+            boolean skipDuplicates = !Boolean.FALSE.equals(m.skipDuplicates());
+            boolean onlyToRecall = Boolean.TRUE.equals(m.onlyToRecall());
 
             // Toute colonne du fichier qui n'est NI le nom, NI le téléphone, NI le compte, NI
             // l'agent, NI une question du modèle de campagne — conservée telle quelle dans
-            // extraDataJson (clé = en-tête réel du fichier), pour qu'aucune donnée ne se perde,
-            // quel que soit le type de fichier d'appel importé (voir demande utilisateur).
+            // extraDataJson (clé = en-tête réel du fichier), pour qu'aucune donnée ne se perde
+            // (hors métadonnées d'un export Forms : ID, heures de début/fin, messagerie…).
             Set<Integer> mappedCols = new java.util.HashSet<>(fieldCols.keySet());
-            mappedCols.add(nameCol);
-            if (phoneCol != null) mappedCols.add(phoneCol);
-            if (accountCol != null) mappedCols.add(accountCol);
-            if (agentCol != null) mappedCols.add(agentCol);
+            for (Integer c : java.util.Arrays.asList(nameCol, phoneCol, accountCol, agentCol, statusCol, dateCol)) if (c != null) mappedCols.add(c);
             List<Integer> extraCols = new ArrayList<>();
             for (int col = 0; col < headers.size(); col++) {
-                if (!mappedCols.contains(col) && !headers.get(col).isBlank()) extraCols.add(col);
+                if (!mappedCols.contains(col) && !headers.get(col).isBlank() && !FORMS_METADATA.contains(normalizeForMatch(headers.get(col)))) extraCols.add(col);
+            }
+
+            AgentResolver agents = new AgentResolver(userRepository.findAll());
+            Set<String> existingKeys = new java.util.HashSet<>();
+            Map<String, Integer> lastRowByKey = new java.util.HashMap<>();
+            Map<String, Long> bestScoreByKey = new java.util.HashMap<>();
+            if (skipDuplicates) {
+                for (CampaignContact existing : campaignContactRepository.findByCampaignIdOrderByClientNameAsc(campaignId)) {
+                    existingKeys.add("M:" + normalizeForMatch(existing.getClientName()) + "|" + existing.getMaskedAccountNumber());
+                }
+                for (int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
+                    Row row = sheet.getRow(rowIndex);
+                    if (row == null) continue;
+                    String n = cellToString(row.getCell(nameCol));
+                    String acc = accountCol == null ? "" : cellToString(row.getCell(accountCol));
+                    if (looksSwapped(n, acc)) acc = n;
+                    String st = statusCol == null ? "PENDING" : mapPreviousStatus(cellToString(row.getCell(statusCol)));
+                    if ("SKIP".equals(st)) continue;
+                    String key = dedupeKey(acc, phoneCol == null ? List.of() : normalizePhones(cellToString(row.getCell(phoneCol))));
+                    if (key == null) continue;
+                    // Meilleur appel : joint/RDV avant non joint, puis le plus complet, puis le plus récent.
+                    int filledCount = 0;
+                    for (int col = 0; col < headers.size(); col++) if (!cellToString(row.getCell(col)).isBlank()) filledCount++;
+                    long score = STATUS_RANK.getOrDefault(st, 0) * 1_000_000L + filledCount * 10_000L + rowIndex;
+                    if (score > bestScoreByKey.getOrDefault(key, -1L)) { bestScoreByKey.put(key, score); lastRowByKey.put(key, rowIndex); }
+                }
             }
 
             for (int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
                 Row row = sheet.getRow(rowIndex);
                 if (row == null) continue;
 
-                String clientName = cellToString(row.getCell(nameCol)).trim();
-                if (clientName.isBlank()) continue;
-                String clientPhone = phoneCol == null ? "" : cellToString(row.getCell(phoneCol)).trim();
-                String rawAccountNumber = accountCol == null ? "" : cellToString(row.getCell(accountCol)).trim();
+                String clientName = cellToString(row.getCell(nameCol));
+                String rawAccountNumber = accountCol == null ? "" : cellToString(row.getCell(accountCol));
+                if (looksSwapped(clientName, rawAccountNumber)) { String t = clientName; clientName = rawAccountNumber; rawAccountNumber = t; }
+                if (clientName.isBlank()) { if (rowHasData(row, headers.size())) skippedNoName++; continue; }
+                String masked = maskAccountNumber(rawAccountNumber);
+                List<String> phones = phoneCol == null ? List.of() : normalizePhones(cellToString(row.getCell(phoneCol)));
+
+                String previousStatusLabel = statusCol == null ? "" : cellToString(row.getCell(statusCol));
+                String mapped = statusCol == null ? "PENDING" : mapPreviousStatus(previousStatusLabel);
+                if ("SKIP".equals(mapped)) { skippedDup++; continue; }
+                if (skipDuplicates) {
+                    // Même compte (ou, sans compte, même téléphone) rappelé plusieurs fois : on garde
+                    // le DERNIER appel du fichier ; un contact déjà présent dans la campagne n'est pas recréé.
+                    String key = dedupeKey(rawAccountNumber, phones);
+                    if (key != null && lastRowByKey.getOrDefault(key, rowIndex) != rowIndex) { skippedDup++; continue; }
+                    // Réimport du même fichier : contact déjà dans la campagne (seul le compte masqué y est conservé).
+                    if (masked != null && existingKeys.contains("M:" + normalizeForMatch(clientName) + "|" + masked)) { skippedDup++; continue; }
+                }
+                if (onlyToRecall && !("RED".equals(mapped) || "PENDING".equals(mapped))) { skippedRecall++; continue; }
 
                 Long agentUserId = forcedAgentUserId;
                 if (agentUserId == null && agentCol != null) {
-                    String agentIdentifier = cellToString(row.getCell(agentCol)).trim();
+                    String agentIdentifier = cellToString(row.getCell(agentCol));
                     if (!agentIdentifier.isBlank()) {
-                        User agent = userRepository.findFirstByUsernameIgnoreCase(agentIdentifier).orElse(null);
-                        if (agent != null) agentUserId = agent.getId();
+                        User agent = agents.resolve(agentIdentifier);
+                        if (agent != null) {
+                            agentUserId = agent.getId();
+                            matchedAgents.merge(agentIdentifier.toUpperCase(), 1, Integer::sum);
+                        } else {
+                            unmatchedAgents.merge(agentIdentifier.toUpperCase(), 1, Integer::sum);
+                        }
                     }
                 }
+                if (agentUserId != null) assigned++;
 
                 Map<String, String> prefilledAnswers = new LinkedHashMap<>();
                 for (Map.Entry<Integer, String> entry : fieldCols.entrySet()) {
-                    String value = cellToString(row.getCell(entry.getKey())).trim();
-                    if (!value.isBlank()) prefilledAnswers.put(entry.getValue(), value);
+                    CampaignFieldDto field = fieldsById.get(entry.getValue());
+                    String value = field != null && "DATE".equals(field.type())
+                            ? cellToIsoDate(row.getCell(entry.getKey()))
+                            : cellToString(row.getCell(entry.getKey()));
+                    if (value.isBlank()) continue;
+                    prefilledAnswers.put(entry.getValue(), field != null ? matchOption(field, value) : value);
                 }
 
                 Map<String, String> extraData = new LinkedHashMap<>();
+                if (phones.size() > 1) extraData.put("Autres numéros", String.join(" / ", phones.subList(1, phones.size())));
                 for (Integer col : extraCols) {
-                    String value = cellToString(row.getCell(col)).trim();
-                    if (!value.isBlank()) extraData.put(headers.get(col), value);
+                    String value = cellToString(row.getCell(col));
+                    if (!value.isBlank() && !value.equalsIgnoreCase("anonymous")) extraData.put(headers.get(col), value);
                 }
+
+                LocalDateTime previousCall = dateCol == null ? null : cellToDateTime(row.getCell(dateCol));
+                String notes = null;
+                if (!previousStatusLabel.isBlank()) {
+                    String by = agentCol == null ? "" : cellToString(row.getCell(agentCol));
+                    notes = "Appel précédent : " + previousStatusLabel
+                            + (previousCall != null ? " le " + previousCall.toLocalDate().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "")
+                            + (!by.isBlank() ? " (" + by + ")" : "");
+                }
+                String status = onlyToRecall ? "PENDING" : mapped;
+                statusCounts.merge(status, 1, Integer::sum);
 
                 campaignContactRepository.save(CampaignContact.builder()
                         .campaignId(campaignId)
                         .agentUserId(agentUserId)
-                        .clientName(clientName)
-                        .clientPhone(blankToNull(clientPhone))
-                        .maskedAccountNumber(maskAccountNumber(rawAccountNumber))
-                        .answersJson(prefilledAnswers.isEmpty() ? null : serializeAnswers(prefilledAnswers))
-                        .extraDataJson(extraData.isEmpty() ? null : serializeAnswers(extraData))
-                        .callStatus("PENDING")
+                        .clientName(limit(clientName, 200))
+                        .clientPhone(phones.isEmpty() ? null : phones.get(0))
+                        .maskedAccountNumber(masked)
+                        .answersJson(serializeLimited(prefilledAnswers))
+                        .extraDataJson(serializeLimited(extraData))
+                        .notes(limit(notes, 1000))
+                        .lastCalledAt(onlyToRecall || "PENDING".equals(status) ? null : previousCall)
+                        .callStatus(status)
                         .build());
                 imported++;
             }
@@ -322,23 +468,109 @@ public class CampaignService {
         } catch (Exception e) {
             throw ApiException.badRequest("Fichier illisible : " + e.getMessage());
         }
-        return imported;
+        return new CampaignImportReport(imported, skippedDup, skippedRecall, skippedNoName, assigned, statusCounts, matchedAgents, unmatchedAgents);
     }
 
-    /** Compare l'en-tête d'une colonne au libellé de chaque question du modèle (insensible à la
-     *  casse, aux accents et à la ponctuation) — renvoie l'id de la question correspondante, ou
-     *  null si aucune ne correspond (la colonne reste alors une information non exploitée). */
-    private String matchFieldByLabel(String header, List<CampaignFieldDto> fields) {
-        String normalizedHeader = normalizeForMatch(header);
-        for (CampaignFieldDto field : fields) {
-            if (field.label() != null && normalizeForMatch(field.label()).equals(normalizedHeader)) {
-                return field.id();
+    private static final Map<String, Integer> STATUS_RANK = Map.of("YELLOW", 3, "GREEN", 2, "PENDING", 1, "RED", 0);
+
+    private static String dedupeKey(String rawAccount, List<String> phones) {
+        String digits = rawAccount == null ? "" : rawAccount.replaceAll("\\D", "");
+        if (digits.length() >= 6) return "A:" + digits;
+        return phones.isEmpty() ? null : "P:" + phones.get(0);
+    }
+
+    /** Nom et numéro de compte inversés à la saisie (compte dans « Nom du client », nom dans « Numéro de compte »). */
+    static boolean looksSwapped(String name, String account) {
+        if (name == null || account == null) return false;
+        return name.matches("[\\d\\s-]{8,}") && account.matches(".*\\p{L}.*");
+    }
+
+    private boolean rowHasData(Row row, int columns) {
+        for (int col = 0; col < columns; col++) if (!cellToString(row.getCell(col)).isBlank()) return true;
+        return false;
+    }
+
+    /**
+     * Statut d'appel d'un fichier existant (export Forms : « SONNE DANS LE VIDE », « CLIENT
+     * ENTRETENU »…) → statut portail : GREEN (joint), RED (non joint), YELLOW (RDV), PENDING
+     * (à appeler / rappel demandé), SKIP (doublon signalé par l'agent).
+     */
+    static String mapPreviousStatus(String raw) {
+        if (raw == null || raw.isBlank()) return "PENDING";
+        String s = Normalizer.normalize(raw, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toUpperCase();
+        if (s.contains("DOUBLON")) return "SKIP";
+        if (s.contains("RDV") || s.contains("RENDEZ")) return "YELLOW";
+        if (s.contains("RAPPEL") || s.contains("INTERROMPU") || s.contains("INAUDIBLE")) return "PENDING";
+        if (s.contains("ENTRETENU") || s.contains("JOINT") || s.contains("INTERACTION") || s.contains("CONTACTE")) return "GREEN";
+        if (s.contains("VIDE") || s.contains("INACCESSIBLE") || s.contains("MESSAGERIE") || s.contains("REPONDEUR")
+                || s.contains("INCONNU") || s.contains("AUCUN") || s.contains("OCCUPE") || s.contains("ERRONE")
+                || s.contains("FAUX") || s.contains("PAS DE REPONSE") || s.contains("NRP") || s.contains("INJOIGNABLE")) return "RED";
+        return "PENDING";
+    }
+
+    /** « +2250505051986 », « 2252720324831,2250707201078 », « 0707842929 », « N/A » → numéros
+     *  ivoiriens à 10 chiffres (préfixe 225 retiré), dans l'ordre, sans doublon. */
+    static List<String> normalizePhones(String raw) {
+        List<String> out = new ArrayList<>();
+        if (raw == null) return out;
+        for (String part : raw.split("[,;/|]+|\\s{2,}|\\s+-\\s+")) {
+            String digits = part.replaceAll("\\D", "");
+            if (digits.length() < 8) continue;
+            if (digits.startsWith("00225")) digits = digits.substring(5);
+            // « 225 » parfois saisi deux fois (+2252250576788063) : retiré tant qu'il reste plus de 10 chiffres.
+            while (digits.startsWith("225") && digits.length() > 10) digits = digits.substring(3);
+            if (!out.contains(digits)) out.add(digits);
+        }
+        return out;
+    }
+
+    private String matchOption(CampaignFieldDto field, String value) {
+        if (field.options() == null || field.options().isEmpty()) return value;
+        String v = normalizeForMatch(value);
+        for (String option : field.options()) if (normalizeForMatch(option).equals(v)) return option;
+        return value;
+    }
+
+    /** Reconnaît l'agent par identifiant, ou par nom complet quel que soit l'ordre des mots
+     *  (« HOURI SAMUEL » = « Samuel Houri »), accents et espaces insécables ignorés. */
+    static final class AgentResolver {
+        private final Map<String, User> byUsername = new java.util.HashMap<>();
+        private final Map<String, User> byName = new java.util.HashMap<>();
+        private final List<User> users;
+        private final Map<String, User> cache = new java.util.HashMap<>();
+
+        AgentResolver(List<User> users) {
+            this.users = users;
+            for (User u : users) {
+                if (u.getUsername() != null) byUsername.putIfAbsent(u.getUsername().toLowerCase(), u);
+                if (u.getName() != null && !u.getName().isBlank()) byName.putIfAbsent(nameKey(u.getName()), u);
             }
         }
-        return null;
+
+        User resolve(String identifier) {
+            String id = identifier.replace(' ', ' ').trim();
+            if (cache.containsKey(id)) return cache.get(id);
+            User u = byUsername.get(id.toLowerCase());
+            if (u == null) u = byName.get(nameKey(id));
+            if (u == null) {
+                // Nom du fichier contenu dans un nom plus long (« HOURI SAMUEL » ↔ « HOURI Kouadio Samuel ») — si unique.
+                Set<String> wanted = new java.util.HashSet<>(List.of(nameKey(id).split(" ")));
+                List<User> hits = users.stream().filter(x -> x.getName() != null
+                        && new java.util.HashSet<>(List.of(nameKey(x.getName()).split(" "))).containsAll(wanted)).toList();
+                if (wanted.size() >= 2 && hits.size() == 1) u = hits.get(0);
+            }
+            cache.put(id, u);
+            return u;
+        }
+
+        static String nameKey(String name) {
+            String n = Normalizer.normalize(name.replace(' ', ' '), Normalizer.Form.NFD).replaceAll("\\p{M}", "").toUpperCase();
+            return java.util.Arrays.stream(n.split("[^A-Z]+")).filter(t -> !t.isEmpty()).sorted().collect(java.util.stream.Collectors.joining(" "));
+        }
     }
 
     private String normalizeForMatch(String s) {
+        if (s == null) return "";
         String noAccents = Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
         return noAccents.toLowerCase().replaceAll("[^a-z0-9]", "");
     }
@@ -360,6 +592,40 @@ public class CampaignService {
     // ═══════════════════════════════════════════════════════════════════
     // ASSIGNATION
     // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Répartition en un clic des contacts NON assignés entre les agents choisis, en équilibrant
+     * la charge (chaque contact va à l'agent qui en a le moins sur cette campagne). Seuls les
+     * contacts « À appeler » sont répartis par défaut.
+     */
+    @Transactional
+    public Map<String, Object> distributeUnassigned(AuthenticatedUser requester, Integer campaignId, List<Long> agentUserIds, boolean includeCalled) {
+        requireCanManage(requester);
+        campaignRepository.findById(campaignId).orElseThrow(() -> ApiException.notFound("Campagne introuvable."));
+        if (agentUserIds == null || agentUserIds.isEmpty()) throw ApiException.badRequest("Choisissez au moins un agent.");
+        List<Long> agentsList = agentUserIds.stream().filter(Objects::nonNull).distinct().toList();
+        for (Long id : agentsList) {
+            if (userRepository.findById(id).isEmpty()) throw ApiException.badRequest("Agent inconnu : " + id);
+        }
+        List<CampaignContact> contacts = campaignContactRepository.findByCampaignIdOrderByClientNameAsc(campaignId);
+        Map<Long, Integer> load = new LinkedHashMap<>();
+        agentsList.forEach(id -> load.put(id, 0));
+        for (CampaignContact c : contacts) if (c.getAgentUserId() != null && load.containsKey(c.getAgentUserId())) load.merge(c.getAgentUserId(), 1, Integer::sum);
+        List<CampaignContact> changed = new ArrayList<>();
+        for (CampaignContact c : contacts) {
+            if (c.getAgentUserId() != null) continue;
+            if (!includeCalled && !"PENDING".equals(c.getCallStatus())) continue;
+            Long target = load.entrySet().stream().min(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElseThrow();
+            c.setAgentUserId(target);
+            load.merge(target, 1, Integer::sum);
+            changed.add(c);
+        }
+        campaignContactRepository.saveAll(changed);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("assigned", changed.size());
+        out.put("perAgent", load);
+        return out;
+    }
 
     @Transactional
     public void assignContact(AuthenticatedUser requester, Integer contactId, Long agentUserId) {
@@ -539,13 +805,67 @@ public class CampaignService {
         }
     }
 
+    private static final java.time.format.DateTimeFormatter FR_DATE = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final java.time.format.DateTimeFormatter FR_DATE_TIME = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+
+    /** Texte d'une cellule : espaces insécables et tabulations nettoyés, dates au format français. */
     private String cellToString(Cell cell) {
         if (cell == null) return "";
-        return switch (cell.getCellType()) {
-            case STRING -> cell.getStringCellValue();
-            case NUMERIC -> String.valueOf((long) cell.getNumericCellValue());
-            default -> cell.toString();
-        };
+        String v;
+        CellType type = cell.getCellType() == CellType.FORMULA ? cell.getCachedFormulaResultType() : cell.getCellType();
+        switch (type) {
+            case STRING -> v = cell.getStringCellValue();
+            case NUMERIC -> {
+                if (DateUtil.isCellDateFormatted(cell)) {
+                    LocalDateTime d = cell.getLocalDateTimeCellValue();
+                    v = d.toLocalTime().equals(java.time.LocalTime.MIDNIGHT) ? d.format(FR_DATE) : d.format(FR_DATE_TIME);
+                } else {
+                    double n = cell.getNumericCellValue();
+                    v = n == Math.rint(n) ? String.valueOf((long) n) : String.valueOf(n);
+                }
+            }
+            case BOOLEAN -> v = String.valueOf(cell.getBooleanCellValue());
+            case BLANK, ERROR, _NONE -> v = "";
+            default -> v = cell.toString();
+        }
+        return v.replace('\u00A0', ' ').replace('\t', ' ').replaceAll(" {2,}", " ").trim();
+    }
+
+    private LocalDateTime cellToDateTime(Cell cell) {
+        if (cell == null) return null;
+        try {
+            if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) return cell.getLocalDateTimeCellValue();
+            String s = cellToString(cell);
+            if (s.matches("\\d{2}/\\d{2}/\\d{4}.*")) return java.time.LocalDate.parse(s.substring(0, 10), FR_DATE).atStartOfDay();
+            if (s.matches("\\d{4}-\\d{2}-\\d{2}.*")) return java.time.LocalDate.parse(s.substring(0, 10)).atStartOfDay();
+        } catch (Exception ignored) {
+            // date illisible : simplement non reprise
+        }
+        return null;
+    }
+
+    /** Valeur pour une question de type DATE : yyyy-MM-dd (format du champ date du navigateur). */
+    private String cellToIsoDate(Cell cell) {
+        LocalDateTime d = cellToDateTime(cell);
+        return d != null ? d.toLocalDate().toString() : cellToString(cell);
+    }
+
+    /** JSON borné à la taille de la colonne (4000) : valeurs longues tronquées, dernières clés
+     *  abandonnées si nécessaire — un import ne doit jamais échouer sur une cellule trop longue. */
+    private String serializeLimited(Map<String, String> values) {
+        if (values == null || values.isEmpty()) return null;
+        Map<String, String> kept = new LinkedHashMap<>();
+        for (Map.Entry<String, String> e : values.entrySet()) {
+            kept.put(limit(e.getKey(), 200), limit(e.getValue(), 600));
+            String json = serializeAnswers(kept);
+            if (json != null && json.length() > 3900) { kept.remove(limit(e.getKey(), 200)); break; }
+        }
+        return serializeAnswers(kept);
+    }
+
+    private static String limit(String s, int max) {
+        if (s == null) return null;
+        return s.length() <= max ? s : s.substring(0, max - 1) + "…";
     }
 
     private String blankToNull(String s) {

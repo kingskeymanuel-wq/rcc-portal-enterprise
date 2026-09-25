@@ -40,6 +40,14 @@
         .tl-kpi-ico { width: 46px; height: 46px; flex-shrink: 0; border-radius: .9rem; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
         .tl-kpi-ico.blue { background: #EAF2FF; color: #0057B8; } .tl-kpi-ico.green { background: #E6F6EE; color: #0F9D6C; }
         .tl-kpi-ico.violet { background: #F1E9FF; color: #7B2FF7; } .tl-kpi-ico.orange { background: #FFF1E0; color: #D97706; }
+        .tl-import-history { padding: .8rem .9rem; border-radius: .9rem; background: #F5F8FC; border: 1px solid #E3EAF5; }
+        .tl-import-history h6 { font-size: .82rem; font-weight: 800; color: #0057B8; }
+        .tl-import-report { padding: .8rem 1rem; border-radius: 1rem; background: #F4FBF7; border: 1px solid #CDEBDC; margin-bottom: 1rem; font-size: .86rem; }
+        .tl-import-report .chips span { display: inline-block; margin: .15rem .3rem .15rem 0; padding: .15rem .55rem; border-radius: 999px; background: #fff; border: 1px solid #DCE4F0; font-size: .76rem; }
+        .tl-import-report .warn { color: #B45309; }
+        .tl-distribute { padding: .8rem 1rem; border-radius: 1rem; background: #FFF8EC; border: 1px solid #F5D9A8; margin-bottom: 1rem; }
+        .tl-distribute-agents { display: flex; flex-wrap: wrap; gap: .4rem; }
+        .tl-distribute-agents label { display: inline-flex; align-items: center; gap: .35rem; padding: .25rem .65rem; border-radius: 999px; background: #fff; border: 1px solid #E8D3AE; font-size: .82rem; cursor: pointer; }
         .tl-meet-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .5rem; margin-bottom: 1rem; }
         .tl-meet-steps span { display: flex; gap: .5rem; align-items: flex-start; padding: .6rem .7rem; border-radius: .9rem; background: #F5F8FC; font-size: .8rem; color: #33415C; }
         .tl-meet-steps b { flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #0057B8; color: #fff; font-size: .72rem; }
@@ -387,8 +395,18 @@
                                     <span class="small text-muted" id="tlCampaignImportStatus"></span>
                                 </div>
                                 <p class="small text-muted"><i class="bi bi-shield-lock"></i> Le numéro de compte est automatiquement masqué à l'import — jamais stocké en clair.</p>
+                                <div id="tlImportReport"></div>
 
                                 <div class="d-flex align-items-center gap-4 mb-3 flex-wrap" id="tlCampaignDonutRow"></div>
+
+                                <div class="tl-distribute" id="tlDistributeBox" style="display:none;">
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                        <div><b><i class="bi bi-people-fill"></i> <span id="tlUnassignedCount">0</span> contact(s) à appeler non assigné(s)</b>
+                                            <div class="small text-muted">Cochez les agents : les contacts sont répartis équitablement (chacun reçoit le suivant quand il en a le moins).</div></div>
+                                        <button class="btn btn-sm btn-primary" id="tlDistributeBtn"><i class="bi bi-shuffle"></i> Répartir</button>
+                                    </div>
+                                    <div class="tl-distribute-agents mt-2" id="tlDistributeAgents"></div>
+                                </div>
 
                                 <div class="table-responsive">
                                     <table class="table table-sm table-hover align-middle">
@@ -396,6 +414,7 @@
                                         <tbody id="tlCampaignContactsBody"><tr><td colspan="7" class="text-center text-muted">Aucun contact importé.</td></tr></tbody>
                                     </table>
                                 </div>
+                                <div class="text-center" id="tlContactsMore"></div>
                             </div>
                         </div>
                     </div>
@@ -410,6 +429,7 @@
                             <div class="modal-body">
                                 <p class="small text-muted mb-3">N'importe quel fichier Excel convient — indiquez simplement quelle colonne correspond à quoi. Un aperçu de la 1ère ligne du fichier est affiché à côté de chaque en-tête pour vous aider.</p>
                                 <div id="tlImportMappingFixedFields" class="mb-3"></div>
+                                <div id="tlImportMappingHistory" class="tl-import-history mb-3"></div>
                                 <div id="tlImportMappingCustomFields"></div>
                                 <div class="small text-danger" id="tlImportMappingError"></div>
                             </div>

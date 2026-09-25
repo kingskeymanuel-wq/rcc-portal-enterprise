@@ -54,20 +54,27 @@ public class CampaignController {
      *  dans la modale de prévisualisation. "mapping" est optionnel pour compatibilité ascendante
      *  (appel direct sans passer par /preview) — dans ce cas le mapping est redéduit des en-têtes. */
     @PostMapping(value = "/{id}/import", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
-    public Map<String, Integer> importContacts(@PathVariable Integer id, @RequestParam("file") MultipartFile file,
+    public com.ecobank.rccportal.dto.CampaignImportReport importContacts(@PathVariable Integer id, @RequestParam("file") MultipartFile file,
                                                 @RequestPart(value = "mapping", required = false) CampaignImportMappingDto mapping,
                                                 @AuthenticationPrincipal AuthenticatedUser requester) {
-        int imported = campaignService.importContacts(requester, id, file, mapping);
-        return Map.of("imported", imported);
+        return campaignService.importContacts(requester, id, file, mapping);
     }
+
+    /** Répartition équilibrée des contacts non assignés entre les agents choisis. */
+    @PostMapping("/{id}/distribute")
+    public Map<String, Object> distribute(@PathVariable Integer id, @RequestBody DistributeRequest body,
+                                          @AuthenticationPrincipal AuthenticatedUser requester) {
+        return campaignService.distributeUnassigned(requester, id, body.agentUserIds(), Boolean.TRUE.equals(body.includeCalled()));
+    }
+
+    public record DistributeRequest(List<Long> agentUserIds, Boolean includeCalled) {}
 
     /** Auto-import — un agent charge directement sa propre liste d'appels, sans passer par un Team Leader. */
     @PostMapping(value = "/self-import", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
-    public Map<String, Integer> selfImportContacts(@RequestParam("file") MultipartFile file,
+    public com.ecobank.rccportal.dto.CampaignImportReport selfImportContacts(@RequestParam("file") MultipartFile file,
                                                      @RequestPart(value = "mapping", required = false) CampaignImportMappingDto mapping,
                                                      @AuthenticationPrincipal AuthenticatedUser requester) {
-        int imported = campaignService.selfImportContacts(requester, file, mapping);
-        return Map.of("imported", imported);
+        return campaignService.selfImportContacts(requester, file, mapping);
     }
 
     @GetMapping("/{id}/contacts")

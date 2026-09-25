@@ -3,6 +3,7 @@
 (function () {
     var $ = function (id) { return document.getElementById(id); };
     var getJson = RccApi.getJson;
+    var sendJson = RccApi.sendJson;
     var escapeHtml = RccApi.escapeHtml;
 
     var myTeam = null; // "INBOUND_VOICE" | "INBOUND_MAIL" | "CIB" | "OUTBOUND"
@@ -429,7 +430,7 @@
                 method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ periodFrom: from, periodTo: to, assignments: assignments })
             })
-                .then(function (res) { if (!res.ok) return res.json().then(function (b) { throw new Error(b.message || ("HTTP " + res.status)); }); return res.json(); })
+                .then(readImportResponse)
                 .then(function (result) {
                     resultBox.className = "text-success";
                     resultBox.textContent = result.agentsPlanified + " agent(s) envoyé(s) à Excelliam (" + result.entriesCreated + " jour(s) au total).";
@@ -447,7 +448,7 @@
             if (!planStatusFromCache || !planStatusToCache) return;
             if (!confirm("Confirmer la mise à jour globale ? Le planning validé par Excelliam deviendra immédiatement visible pour toute l'équipe.")) return;
             fetch("/api/schedule/team/publish?from=" + planStatusFromCache + "&to=" + planStatusToCache, { method: "POST", credentials: "same-origin" })
-                .then(function (res) { if (!res.ok) return res.json().then(function (b) { throw new Error(b.message || ("HTTP " + res.status)); }); return res.json(); })
+                .then(readImportResponse)
                 .then(function (result) {
                     alert(result.entriesPublished + " entrée(s) mise(s) à jour et désormais en ligne.");
                     loadPlanningStatus();
@@ -886,6 +887,9 @@
         $("tlCampaignDetailTitle").innerHTML = '<i class="bi bi-megaphone-fill"></i> ' + escapeHtml(campaign ? campaign.name : "");
         $("tlCampaignImportFile").value = "";
         $("tlCampaignImportStatus").textContent = "";
+        $("tlImportReport").innerHTML = "";
+        $("tlDistributeAgents").removeAttribute("data-for");
+        contactsShown = 200;
         if (!teamMembersCache.length) {
             getJson("/api/team-leader/members").then(function (members) { teamMembersCache = members; loadCampaignContacts(); });
         } else {
@@ -916,7 +920,13 @@
             });
         });
 
-        var visible = currentContactStatusFilter ? campaignContactsCache.filter(function (c) { return c.callStatus === currentContactStatusFilter; }) : campaignContactsCache;
+        renderDistributeBox();
+        var allVisible = currentContactStatusFilter ? campaignContactsCache.filter(function (c) { return c.callStatus === currentContactStatusFilter; }) : campaignContactsCache;
+        // Grandes campagnes (plusieurs milliers de contacts) : affichage par tranches de 200.
+        var visible = allVisible.slice(0, contactsShown);
+        $("tlContactsMore").innerHTML = allVisible.length > visible.length
+            ? '<button class="btn btn-sm btn-outline-primary" id="tlContactsMoreBtn">Afficher 200 de plus (' + visible.length + ' / ' + allVisible.length + ')</button>' : "";
+        if ($("tlContactsMoreBtn")) $("tlContactsMoreBtn").addEventListener("click", function () { contactsShown += 200; renderCampaignDetail(); });
         var body = $("tlCampaignContactsBody");
         if (!visible.length) { body.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Aucun contact' + (currentContactStatusFilter ? " dans ce filtre." : " importé.") + '</td></tr>'; return; }
 
@@ -946,6 +956,40 @@
         });
     }
 
+    var STATUS_REPORT_LABELS = { PENDING: "À appeler", GREEN: "Interaction", RED: "Pas de réponse", YELLOW: "RDV pris" };
+    function renderImportReport(r) {
+        var chips = Object.keys(r.statusCounts || {}).map(function (k) { return '<span>' + (STATUS_REPORT_LABELS[k] || k) + ' : <b>' + r.statusCounts[k] + '</b></span>'; }).join("");
+        var agents = Object.keys(r.matchedAgents || {}).map(function (k) { return '<span><i class="bi bi-person-check"></i> ' + escapeHtml(k) + ' : ' + r.matchedAgents[k] + '</span>'; }).join("");
+        var unmatched = Object.keys(r.unmatchedAgents || {});
+        var skipped = [];
+        if (r.skippedDuplicates) skipped.push(r.skippedDuplicates + " doublon(s)");
+        if (r.skippedNotToRecall) skipped.push(r.skippedNotToRecall + " déjà joint(s)");
+        if (r.skippedWithoutName) skipped.push(r.skippedWithoutName + " sans nom");
+        $("tlImportReport").innerHTML = '<div class="tl-import-report">' +
+            '<div><i class="bi bi-check-circle-fill text-success"></i> <b>' + r.imported + ' contact(s) importé(s)</b>' +
+            (skipped.length ? ' · écartés : ' + skipped.join(", ") : "") + ' · ' + r.assigned + ' déjà affecté(s) à un agent</div>' +
+            '<div class="chips mt-1">' + chips + '</div>' +
+            (agents ? '<div class="chips">' + agents + '</div>' : "") +
+            (unmatched.length ? '<div class="warn small mt-1"><i class="bi bi-exclamation-triangle"></i> Agents du fichier introuvables dans le portail (contacts laissés non assignés) : ' +
+                unmatched.map(function (k) { return escapeHtml(k) + " (" + r.unmatchedAgents[k] + ")"; }).join(", ") + ' — répartissez-les ci-dessous.</div>' : "") +
+            '</div>';
+    }
+
+    var contactsShown = 200;
+    function renderDistributeBox() {
+        var unassigned = campaignContactsCache.filter(function (c) { return !c.agentUserId && c.callStatus === "PENDING"; }).length;
+        $("tlDistributeBox").style.display = unassigned ? "" : "none";
+        $("tlUnassignedCount").textContent = unassigned;
+        if (!unassigned) return;
+        var box = $("tlDistributeAgents");
+        if (box.getAttribute("data-for") !== String(currentCampaignId)) {
+            box.setAttribute("data-for", currentCampaignId);
+            box.innerHTML = teamMembersCache.map(function (m) {
+                return '<label><input type="checkbox" value="' + m.id + '" checked> ' + escapeHtml(m.fullName || m.username) + '</label>';
+            }).join("") || '<span class="small text-muted">Aucun agent dans votre équipe.</span>';
+        }
+    }
+
     function loadCampaignContacts() {
         getJson("/api/campaigns/" + currentCampaignId + "/contacts").then(function (contacts) {
             campaignContactsCache = contacts;
@@ -971,7 +1015,7 @@
         var formData = new FormData();
         formData.append("file", file);
         fetch("/api/campaigns/" + currentCampaignId + "/import/preview", { method: "POST", credentials: "same-origin", body: formData })
-            .then(function (res) { if (!res.ok) return res.json().then(function (b) { throw new Error(b.message || ("HTTP " + res.status)); }); return res.json(); })
+            .then(readImportResponse)
             .then(function (preview) {
                 $("tlCampaignImportStatus").textContent = "";
                 pendingImportPreview = preview;
@@ -981,6 +1025,16 @@
                 $("tlCampaignImportStatus").textContent = "Erreur : " + e.message;
             });
     });
+
+    /** Erreurs du serveur au format { error: { message } } — affichées lisiblement. */
+    function readImportResponse(res) {
+        if (res.ok) return res.json();
+        return res.text().then(function (t) {
+            var msg = "HTTP " + res.status;
+            try { var b = JSON.parse(t); msg = (b.error && b.error.message) || b.message || msg; } catch (e) { if (t) msg = t; }
+            throw new Error(msg);
+        });
+    }
 
     function columnOptionsHtml(headers, sampleRow, selectedCol) {
         var opts = '<option value="">— Aucune colonne —</option>';
@@ -1002,13 +1056,26 @@
             ["tlMapName", "Nom du client (obligatoire)", suggested.nameColumn],
             ["tlMapPhone", "Téléphone", suggested.phoneColumn],
             ["tlMapAccount", "Numéro de compte", suggested.accountColumn],
-            ["tlMapAgent", "Agent assigné (matricule/identifiant)", suggested.agentColumn]
+            ["tlMapAgent", "Agent assigné (identifiant ou nom complet)", suggested.agentColumn]
         ].map(function (row) {
             return '<div class="mb-2"><label class="form-label small mb-1">' + row[1] + '</label>' +
                 '<select class="form-select form-select-sm" id="' + row[0] + '">' + columnOptionsHtml(headers, sampleRow, row[2] === undefined ? null : row[2]) + '</select></div>';
         }).join("");
 
-        var fieldColumns = suggested.fieldColumns || {};
+        // Fichier d'une campagne déjà en cours (export Microsoft Forms…) : reprise de l'historique.
+        $("tlImportMappingHistory").innerHTML =
+            '<h6><i class="bi bi-clock-history"></i> Appels déjà passés (facultatif)</h6>' +
+            '<div class="row g-2">' +
+            '<div class="col-md-6"><label class="form-label small mb-1">Statut d\'appel du fichier</label><select class="form-select form-select-sm" id="tlMapStatus">' + columnOptionsHtml(headers, sampleRow, suggested.statusColumn === undefined ? null : suggested.statusColumn) + '</select></div>' +
+            '<div class="col-md-6"><label class="form-label small mb-1">Date de l\'appel</label><select class="form-select form-select-sm" id="tlMapCallDate">' + columnOptionsHtml(headers, sampleRow, suggested.callDateColumn === undefined ? null : suggested.callDateColumn) + '</select></div>' +
+            '</div>' +
+            '<div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="tlMapSkipDup" checked><label class="form-check-label small" for="tlMapSkipDup">Ignorer les doublons (même compte : on garde l\'appel abouti le plus complet ; lignes « DOUBLON » écartées)</label></div>' +
+            '<div class="form-check"><input class="form-check-input" type="checkbox" id="tlMapRecall"><label class="form-check-label small" for="tlMapRecall"><b>Uniquement les clients à rappeler</b> (non joints : sonne dans le vide, messagerie, inaccessible… ou rappel demandé) — remis « À appeler »</label></div>' +
+            '<div class="small text-muted mt-1">Sans cette case, les statuts du fichier sont repris : client entretenu → Interaction, non joint → Pas de réponse, rappel demandé → À appeler.</div>';
+
+        // Le serveur renvoie { colonne: idQuestion } ; la modale travaille par question.
+        var fieldColumns = {};
+        Object.keys(suggested.fieldColumns || {}).forEach(function (col) { fieldColumns[suggested.fieldColumns[col]] = Number(col); });
         if (fields.length) {
             $("tlImportMappingCustomFields").innerHTML = '<hr><p class="small text-muted mb-2">Pré-remplissage automatique des questions du questionnaire (facultatif) :</p>' +
                 fields.map(function (f) {
@@ -1024,31 +1091,52 @@
         importMappingModal.show();
     }
 
+    $("tlDistributeBtn").addEventListener("click", function () {
+        var ids = Array.prototype.map.call($("tlDistributeAgents").querySelectorAll("input:checked"), function (i) { return Number(i.value); });
+        if (!ids.length) { alert("Cochez au moins un agent."); return; }
+        var btn = this; btn.disabled = true;
+        sendJson("/api/campaigns/" + currentCampaignId + "/distribute", "POST", { agentUserIds: ids })
+            .then(function (r) {
+                $("tlCampaignImportStatus").textContent = r.assigned + " contact(s) réparti(s) entre " + ids.length + " agent(s).";
+                loadCampaignContacts();
+                loadCampaigns();
+            })
+            .catch(function (e) { alert("Erreur : " + e.message); })
+            .then(function () { btn.disabled = false; });
+    });
+
     $("tlImportMappingConfirmBtn").addEventListener("click", function () {
         var nameCol = $("tlMapName").value;
         if (nameCol === "") { $("tlImportMappingError").textContent = "La colonne du nom du client est obligatoire."; return; }
+        // Format attendu par le serveur : { "indexColonne": "idQuestion" }.
         var fieldColumns = {};
         Array.prototype.forEach.call($("tlImportMappingCustomFields").querySelectorAll(".tl-map-field"), function (sel) {
-            if (sel.value !== "") fieldColumns[sel.getAttribute("data-field-id")] = Number(sel.value);
+            if (sel.value !== "") fieldColumns[sel.value] = sel.getAttribute("data-field-id");
         });
+        function colOrNull(id) { var el = $(id); return !el || el.value === "" ? null : Number(el.value); }
         var mapping = {
             nameColumn: Number(nameCol),
-            phoneColumn: $("tlMapPhone").value === "" ? null : Number($("tlMapPhone").value),
-            accountColumn: $("tlMapAccount").value === "" ? null : Number($("tlMapAccount").value),
-            agentColumn: $("tlMapAgent").value === "" ? null : Number($("tlMapAgent").value),
-            fieldColumns: fieldColumns
+            phoneColumn: colOrNull("tlMapPhone"),
+            accountColumn: colOrNull("tlMapAccount"),
+            agentColumn: colOrNull("tlMapAgent"),
+            fieldColumns: fieldColumns,
+            statusColumn: colOrNull("tlMapStatus"),
+            callDateColumn: colOrNull("tlMapCallDate"),
+            skipDuplicates: $("tlMapSkipDup").checked,
+            onlyToRecall: $("tlMapRecall").checked
         };
 
         var formData = new FormData();
         formData.append("file", pendingImportFile);
         formData.append("mapping", new Blob([JSON.stringify(mapping)], { type: "application/json" }));
         $("tlImportMappingError").textContent = "";
-        $("tlCampaignImportStatus").textContent = "Import en cours…";
+        $("tlCampaignImportStatus").textContent = "Import en cours… (quelques secondes pour plusieurs milliers de lignes)";
         fetch("/api/campaigns/" + currentCampaignId + "/import", { method: "POST", credentials: "same-origin", body: formData })
-            .then(function (res) { if (!res.ok) return res.json().then(function (b) { throw new Error(b.message || ("HTTP " + res.status)); }); return res.json(); })
+            .then(readImportResponse)
             .then(function (result) {
                 importMappingModal.hide();
                 $("tlCampaignImportStatus").textContent = result.imported + " contact(s) importé(s).";
+                renderImportReport(result);
                 $("tlCampaignImportFile").value = "";
                 pendingImportFile = null;
                 pendingImportPreview = null;

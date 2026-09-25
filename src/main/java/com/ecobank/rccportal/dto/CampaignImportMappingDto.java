@@ -18,6 +18,20 @@ public record CampaignImportMappingDto(
         Integer phoneColumn,
         Integer accountColumn,
         Integer agentColumn,
-        Map<Integer, String> fieldColumns
+        Map<Integer, String> fieldColumns,
+        /* Statut d'appel déjà renseigné dans le fichier (export Microsoft Forms d'une campagne
+           en cours : « SONNE DANS LE VIDE », « CLIENT ENTRETENU »…) — converti en statut portail. */
+        Integer statusColumn,
+        /* Date du dernier appel (même export). */
+        Integer callDateColumn,
+        /* true (défaut) : un même compte / téléphone n'est importé qu'une fois (fichier + campagne). */
+        Boolean skipDuplicates,
+        /* true : n'importer que les contacts à rappeler (non joints ou rappel demandé), remis « À appeler ». */
+        Boolean onlyToRecall
 ) {
+    /** Compatibilité : ancien mapping sans les options d'historique. */
+    public CampaignImportMappingDto(Integer nameColumn, Integer phoneColumn, Integer accountColumn, Integer agentColumn,
+                                    Map<Integer, String> fieldColumns) {
+        this(nameColumn, phoneColumn, accountColumn, agentColumn, fieldColumns, null, null, null, null);
+    }
 }
