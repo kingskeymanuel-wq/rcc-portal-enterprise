@@ -42,9 +42,7 @@ public class CampaignSeedBootstrap implements CommandLineRunner {
     @Override
     public void run(String... args) {
         try {
-            seedDormantAccountsCampaign();
-            if (campaignRepository.count() > 1) return;
-            if (campaignRepository.count() == 1 && campaignRepository.findAll().stream().noneMatch(c -> DORMANT_NAME.equals(c.getName()))) return;
+            if (campaignRepository.count() > 0) return;
 
             Long ownerId = resolveOwnerId();
             if (ownerId == null) {
@@ -109,45 +107,6 @@ public class CampaignSeedBootstrap implements CommandLineRunner {
             // Table pas encore créée (migration pas exécutée) — pas bloquant, réessaiera au prochain démarrage.
             log.warn("⚠ [CAMPAIGNS SEED] Report : {}", e.getMessage());
         }
-    }
-
-    static final String DORMANT_NAME = "Réactivation des comptes dormants";
-
-    /**
-     * Campagne « Réactivation des comptes dormants » (modèle du formulaire Microsoft Forms utilisé
-     * jusqu'ici) — créée une fois, vide : le Team Leader y importe ensuite le fichier d'appels.
-     * Les libellés des questions reprennent ceux du formulaire pour que l'import les pré-remplisse
-     * automatiquement (voir CampaignService.matchFieldColumns).
-     */
-    private void seedDormantAccountsCampaign() {
-        if (campaignRepository.findAll().stream().anyMatch(c -> DORMANT_NAME.equalsIgnoreCase(c.getName()))) return;
-        Long ownerId = resolveOwnerId();
-        if (ownerId == null) return;
-        List<String> yesNo = List.of("Oui", "Non", "Besoin de réfléchir");
-        campaignRepository.save(Campaign.builder()
-                .name(DORMANT_NAME)
-                .description("Appeler les clients dont le compte est resté plusieurs mois sans mouvement : comprendre la raison, "
-                        + "proposer la réactivation, le package, la carte ou la migration, et fixer un passage en agence.")
-                .createdByUserId(ownerId)
-                .status("ACTIVE")
-                .targetService(null)
-                .iconClass("bi-arrow-repeat")
-                .colorFrom("#0057B8").colorTo("#F59E0B")
-                .coverImageUrl("/images/covers/epargne.svg")
-                .fieldsJson(serialize(List.of(
-                        new CampaignFieldDto("r1", "Votre compte est resté plusieurs mois sans mouvements : quelles en sont les raisons ?", "TEXTAREA", List.of(), false),
-                        new CampaignFieldDto("r2", "Le client est-il intéressé par la réactivation du compte ?", "RADIO", yesNo, true),
-                        new CampaignFieldDto("r3", "Proposez le package. Le client est-il intéressé ?", "RADIO", yesNo, false),
-                        new CampaignFieldDto("r4", "Proposez la carte. Le client est-il intéressé ?", "RADIO", yesNo, false),
-                        new CampaignFieldDto("r5", "Proposez la migration de compte. Le client est-il intéressé ?", "RADIO", yesNo, false),
-                        new CampaignFieldDto("r6", "Si non, pourquoi ?", "TEXTAREA", List.of(), false),
-                        new CampaignFieldDto("r7", "Agence de RDV", "TEXT", List.of(), false),
-                        new CampaignFieldDto("r8", "Quand souhaitez-vous passer en agence ?", "DATE", List.of(), false),
-                        new CampaignFieldDto("r9", "Quand souhaitez-vous que l'on vous recontacte ?", "DATE", List.of(), false),
-                        new CampaignFieldDto("r10", "Commentaires", "TEXTAREA", List.of(), false)
-                )))
-                .build());
-        log.warn("⚠ [CAMPAIGNS SEED] Campagne « {} » créée (questionnaire prêt, contacts à importer par le Team Leader).", DORMANT_NAME);
     }
 
     /** Attribue les campagnes seed à un Team Leader Outbound si on en trouve un, sinon au

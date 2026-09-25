@@ -128,6 +128,8 @@ class CampaignDormantImportTest {
         assertEquals("r10", f.get(23)); assertEquals("r8", f.get(24));
         assertNull(f.get(19)); assertNull(f.get(10));
         assertEquals("KONE ADAMA", p.sampleRow().get(7)); // ligne d'exemple = la plus remplie
+        assertEquals(10, p.matchedQuestions());
+        assertTrue(p.confident());
     }
 
     @Test
@@ -175,12 +177,91 @@ class CampaignDormantImportTest {
     }
 
     @Test
-    void reimportDoesNotRecreateContactsAlreadyInTheCampaign() throws Exception {
-        when(contacts.findByCampaignIdOrderByClientNameAsc(9)).thenReturn(List.of(CampaignContact.builder()
-                .clientName("KOUAME ATTOUBE CHRISTIAN MR").maskedAccountNumber("120******007").build()));
+    void reimportSynchronisesContactsAlreadyInTheCampaign() throws Exception {
+        CampaignContact untouched = CampaignContact.builder().contactId(50).campaignId(9)
+                .clientName("KOUAME ATTOUBE CHRISTIAN MR").maskedAccountNumber("120******007").callStatus("PENDING").build();
+        CampaignContact calledInPortalLater = CampaignContact.builder().contactId(51).campaignId(9).clientName("S E K A D")
+                .maskedAccountNumber("120******013").callStatus("GREEN").lastCalledAt(LocalDateTime.of(2026, 5, 2, 10, 0))
+                .answersJson("{\"r2\":\"Non\"}").build();
+        when(contacts.findByCampaignIdOrderByClientNameAsc(9)).thenReturn(List.of(untouched, calledInPortalLater));
         CampaignImportReport r = svc.importContacts(ADMIN, 9, file(), null);
-        assertEquals(4, r.imported());
-        assertTrue(saved.stream().noneMatch(c -> c.getClientName().startsWith("KOUAME")));
+        assertEquals(3, r.imported());
+        assertEquals(2, r.updated());
+        assertEquals(0, r.unchanged());
+        assertEquals("RED", untouched.getCallStatus());             // le fichier (13/04) complète un contact jamais appelé
+        assertEquals(LocalDateTime.of(2026, 4, 13, 0, 0), untouched.getLastCalledAt());
+        assertNull(untouched.getAgentUserId());                      // MBAYE introuvable : reste non assigné
+        assertEquals("GREEN", calledInPortalLater.getCallStatus()); // appel du portail (02/05) plus récent : gardé
+        assertTrue(calledInPortalLater.getAnswersJson().contains("Non"));
+        assertEquals(21L, calledInPortalLater.getAgentUserId());    // seul ce qui manquait est complété
+        assertTrue(saved.stream().noneMatch(c -> c.getContactId() == null && c.getClientName().startsWith("KOUAME")));
+        assertEquals(10, r.totalQuestions());
+        assertEquals(10, r.matchedQuestions());
+    }
+
+    @Test
+    void importAlignsOnAModelWordedDifferentlyFromTheFile() throws Exception {
+        List<CampaignFieldDto> teamModel = List.of(
+                new CampaignFieldDto("q1", "Raison de l'inactivité", "TEXTAREA", List.of(), false),
+                new CampaignFieldDto("q2", "Intéressé par la réactivation ?", "RADIO", List.of("Oui", "Non", "Besoin de réfléchir"), true),
+                new CampaignFieldDto("q3", "Package", "RADIO", List.of("Oui", "Non", "Besoin de réfléchir"), false),
+                new CampaignFieldDto("q4", "Agence du rendez-vous", "TEXT", List.of(), false),
+                new CampaignFieldDto("q5", "Date de passage en agence", "DATE", List.of(), false),
+                new CampaignFieldDto("q6", "Commentaire", "TEXTAREA", List.of(), false));
+        when(campaigns.findById(9)).thenReturn(Optional.of(Campaign.builder().campaignId(9).name("REACTIVATION CPTES DORMANTS")
+                .createdByUserId(1L).fieldsJson(new ObjectMapper().writeValueAsString(teamModel)).build()));
+        CampaignImportPreviewResponse p = svc.previewImport(ADMIN, 9, file());
+        Map<Integer, String> f = p.suggestedMapping().fieldColumns();
+        assertEquals("q1", f.get(13));
+        assertEquals("q2", f.get(14));
+        assertEquals("q3", f.get(15));
+        assertEquals("q4", f.get(21));
+        assertEquals("q5", f.get(24));
+        assertEquals("q6", f.get(23));
+        assertEquals(6, p.matchedQuestions());
+        assertTrue(p.confident());
+        CampaignImportReport r = svc.importContacts(ADMIN, 9, file(), null);
+        CampaignContact kone = saved.stream().filter(c -> "GREEN".equals(c.getCallStatus())).findFirst().orElseThrow();
+        assertTrue(kone.getAnswersJson().contains("\"q5\":\"2026-04-15\""), kone.getAnswersJson());
+        assertTrue(kone.getAnswersJson().contains("\"q3\":\"Oui\""), kone.getAnswersJson());
+        assertEquals(6, r.matchedQuestions());
+    }
+
+    @Test
+    void importFollowsTheLongStandingTemplateFormatAndItsChoiceLists() throws Exception {
+        when(campaigns.findById(9)).thenReturn(Optional.of(Campaign.builder().campaignId(9)
+                .name(com.ecobank.rccportal.config.OutboundCampaignTemplates.DORMANT_NAME).createdByUserId(1L)
+                .fieldsJson(com.ecobank.rccportal.config.OutboundCampaignTemplates.DORMANT_FIELDS_JSON).build()));
+        Object[] refus = row(8, "HOURI SAMUEL", "YAO KOFFI", "120777777001", "0707070707", "CLIENT ENTRETENU",
+                "EMPLOI PERDU", "NON", "NON", null, null, "LE CLIENT SOUHAITE CLÔTURER SON COMPTE COURANT ET OUVRIR UN COMPTE EPARGNE.", null, null,
+                "ECI- AGENCE ZONE3", null, "N/A", null);
+        Object[] rdv = row(9, "HOURI SAMUEL", "ADOU MARIE", "120888888001", "0505050505", "CLIENT ENTRETENU",
+                "DIFFICULTÉS FINANCIÈRES", "OUI", "BESOIN DE REFLECHIR", null, null, null, null, null, "ECI- AGENCE MARCORY MARCHE", null, "VIENDRA", null);
+        rdv[22] = LocalDateTime.of(2026, 5, 4, 0, 0);
+        MockMultipartFile f = new MockMultipartFile("file", "f.xlsx", "application/octet-stream", workbook(new Object[][]{refus, rdv}));
+        CampaignImportPreviewResponse p = svc.previewImport(ADMIN, 9, f);
+        assertEquals(10, p.matchedQuestions(), "questions non retrouvées : " + p.unmatchedQuestions());
+        assertTrue(p.confident());
+        svc.importContacts(ADMIN, 9, f, null);
+        String a = saved.get(0).getAnswersJson(), b = saved.get(1).getAnswersJson();
+        assertTrue(a.contains("\"raisonInactivite\":\"Client au chômage / emploi perdu\""), a);
+        assertTrue(a.contains("\"interesse\":\"Non\""), a);
+        assertTrue(a.contains("\"sinonPourquoi\":\"Souhaite clôturer et ouvrir un compte épargne\""), a);
+        assertTrue(a.contains("\"agenceRdv\":\"Zone 3\""), a);
+        assertFalse(a.contains("N/A"), a);
+        assertTrue(b.contains("\"interessePackage\":\"Besoin de réfléchir\""), b);
+        assertTrue(b.contains("\"agenceRdv\":\"Marcory Marché\""), b);
+        assertTrue(b.contains("\"quandContacter\":\"2026-05-04\""), b);
+        assertTrue(b.contains("\"commentaire\":\"VIENDRA\""), b);
+    }
+
+    @Test
+    void v188IdsAreAllMappedToTheTemplate() throws Exception {
+        var ids = new java.util.HashSet<String>();
+        for (var f : new ObjectMapper().readValue(com.ecobank.rccportal.config.OutboundCampaignTemplates.DORMANT_FIELDS_JSON, CampaignFieldDto[].class)) ids.add(f.id());
+        assertEquals(10, ids.size());
+        for (String[] pair : com.ecobank.rccportal.config.OutboundCampaignTemplates.DORMANT_V188_IDS) assertTrue(ids.contains(pair[1]), pair[1]);
+        assertEquals("r10", com.ecobank.rccportal.config.OutboundCampaignTemplates.DORMANT_V188_IDS[0][0]); // r10 avant r1
     }
 
     @Test

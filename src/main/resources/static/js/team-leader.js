@@ -965,11 +965,14 @@
         if (r.skippedDuplicates) skipped.push(r.skippedDuplicates + " doublon(s)");
         if (r.skippedNotToRecall) skipped.push(r.skippedNotToRecall + " déjà joint(s)");
         if (r.skippedWithoutName) skipped.push(r.skippedWithoutName + " sans nom");
+        var sync = (r.updated || r.unchanged) ? ' · <b>' + (r.updated || 0) + ' mis à jour</b>, ' + (r.unchanged || 0) + ' déjà à jour' : "";
+        var model = r.totalQuestions ? '<div class="small mt-1"><i class="bi bi-ui-checks"></i> Modèle de la campagne : ' + r.matchedQuestions + '/' + r.totalQuestions + ' question(s) pré-remplie(s) depuis le fichier' +
+            ((r.unmatchedQuestions || []).length ? ' — sans colonne : ' + r.unmatchedQuestions.map(escapeHtml).join(" · ") : "") + '</div>' : "";
         $("tlImportReport").innerHTML = '<div class="tl-import-report">' +
-            '<div><i class="bi bi-check-circle-fill text-success"></i> <b>' + r.imported + ' contact(s) importé(s)</b>' +
+            '<div><i class="bi bi-check-circle-fill text-success"></i> <b>' + r.imported + ' nouveau(x) contact(s)</b>' + sync +
             (skipped.length ? ' · écartés : ' + skipped.join(", ") : "") + ' · ' + r.assigned + ' déjà affecté(s) à un agent</div>' +
             '<div class="chips mt-1">' + chips + '</div>' +
-            (agents ? '<div class="chips">' + agents + '</div>' : "") +
+            (agents ? '<div class="chips">' + agents + '</div>' : "") + model +
             (unmatched.length ? '<div class="warn small mt-1"><i class="bi bi-exclamation-triangle"></i> Agents du fichier introuvables dans le portail (contacts laissés non assignés) : ' +
                 unmatched.map(function (k) { return escapeHtml(k) + " (" + r.unmatchedAgents[k] + ")"; }).join(", ") + ' — répartissez-les ci-dessous.</div>' : "") +
             '</div>';
@@ -1007,24 +1010,63 @@
     var pendingImportPreview = null;
     var importMappingModal;
 
-    $("tlCampaignImportBtn").addEventListener("click", function () {
+    /**
+     * Import synchronisé sur le modèle de la campagne : le fichier est d'abord analysé ; s'il est
+     * reconnu sans ambiguïté (nom du client + questions du modèle retrouvées), l'import part
+     * immédiatement. Sinon — ou si l'on clique « Vérifier les colonnes » — la correspondance des
+     * colonnes s'affiche pour correction.
+     */
+    function startCampaignImport(forceReview) {
         var file = $("tlCampaignImportFile").files[0];
         if (!file) { alert("Choisissez un fichier."); return; }
         pendingImportFile = file;
-        $("tlCampaignImportStatus").textContent = "Lecture du fichier…";
+        $("tlCampaignImportStatus").textContent = "Analyse du fichier…";
         var formData = new FormData();
         formData.append("file", file);
         fetch("/api/campaigns/" + currentCampaignId + "/import/preview", { method: "POST", credentials: "same-origin", body: formData })
             .then(readImportResponse)
             .then(function (preview) {
-                $("tlCampaignImportStatus").textContent = "";
                 pendingImportPreview = preview;
-                openImportMappingModal(preview);
+                if (preview.confident && !forceReview) {
+                    var m = preview.suggestedMapping;
+                    m.skipDuplicates = true;
+                    m.onlyToRecall = $("tlImportRecallOnly").checked;
+                    runImport(m);
+                } else {
+                    $("tlCampaignImportStatus").textContent = "";
+                    openImportMappingModal(preview);
+                }
             })
             .catch(function (e) {
                 $("tlCampaignImportStatus").textContent = "Erreur : " + e.message;
             });
-    });
+    }
+    $("tlCampaignImportBtn").addEventListener("click", function () { startCampaignImport(false); });
+    $("tlImportCheckColumnsLink").addEventListener("click", function (e) { e.preventDefault(); startCampaignImport(true); });
+
+    function runImport(mapping) {
+        var formData = new FormData();
+        formData.append("file", pendingImportFile);
+        formData.append("mapping", new Blob([JSON.stringify(mapping)], { type: "application/json" }));
+        $("tlImportMappingError").textContent = "";
+        $("tlCampaignImportStatus").textContent = "Import et synchronisation en cours… (quelques secondes pour plusieurs milliers de lignes)";
+        return fetch("/api/campaigns/" + currentCampaignId + "/import", { method: "POST", credentials: "same-origin", body: formData })
+            .then(readImportResponse)
+            .then(function (result) {
+                importMappingModal.hide();
+                $("tlCampaignImportStatus").textContent = "";
+                renderImportReport(result);
+                $("tlCampaignImportFile").value = "";
+                pendingImportFile = null;
+                pendingImportPreview = null;
+                loadCampaignContacts();
+                loadCampaigns();
+            })
+            .catch(function (e) {
+                $("tlCampaignImportStatus").textContent = "Erreur : " + e.message;
+                $("tlImportMappingError").textContent = e.message;
+            });
+    }
 
     /** Erreurs du serveur au format { error: { message } } — affichées lisiblement. */
     function readImportResponse(res) {
@@ -1052,6 +1094,14 @@
         var fields = preview.campaignFields || [];
 
         $("tlImportMappingError").textContent = "";
+        var total = fields.length, matched = preview.matchedQuestions || 0;
+        $("tlImportSyncBanner").innerHTML = total
+            ? '<div class="tl-sync-banner ' + (matched === total ? "ok" : "warn") + '"><i class="bi ' + (matched === total ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") + '"></i><div>' +
+              '<b>Modèle de la campagne : ' + matched + ' question(s) sur ' + total + ' retrouvée(s) dans le fichier.</b>' +
+              ((preview.unmatchedQuestions || []).length ? '<br>Sans colonne : ' + preview.unmatchedQuestions.map(escapeHtml).join(" · ") : "") +
+              ((preview.unmatchedColumns || []).length ? '<br><span class="small">Colonnes gardées en informations complémentaires : ' + preview.unmatchedColumns.map(escapeHtml).join(" · ") + '</span>' : "") +
+              '</div></div>'
+            : "";
         $("tlImportMappingFixedFields").innerHTML = [
             ["tlMapName", "Nom du client (obligatoire)", suggested.nameColumn],
             ["tlMapPhone", "Téléphone", suggested.phoneColumn],
@@ -1070,7 +1120,7 @@
             '<div class="col-md-6"><label class="form-label small mb-1">Date de l\'appel</label><select class="form-select form-select-sm" id="tlMapCallDate">' + columnOptionsHtml(headers, sampleRow, suggested.callDateColumn === undefined ? null : suggested.callDateColumn) + '</select></div>' +
             '</div>' +
             '<div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="tlMapSkipDup" checked><label class="form-check-label small" for="tlMapSkipDup">Ignorer les doublons (même compte : on garde l\'appel abouti le plus complet ; lignes « DOUBLON » écartées)</label></div>' +
-            '<div class="form-check"><input class="form-check-input" type="checkbox" id="tlMapRecall"><label class="form-check-label small" for="tlMapRecall"><b>Uniquement les clients à rappeler</b> (non joints : sonne dans le vide, messagerie, inaccessible… ou rappel demandé) — remis « À appeler »</label></div>' +
+            '<div class="form-check"><input class="form-check-input" type="checkbox" id="tlMapRecall"' + ($("tlImportRecallOnly").checked ? " checked" : "") + '><label class="form-check-label small" for="tlMapRecall"><b>Uniquement les clients à rappeler</b> (non joints : sonne dans le vide, messagerie, inaccessible… ou rappel demandé) — remis « À appeler »</label></div>' +
             '<div class="small text-muted mt-1">Sans cette case, les statuts du fichier sont repris : client entretenu → Interaction, non joint → Pas de réponse, rappel demandé → À appeler.</div>';
 
         // Le serveur renvoie { colonne: idQuestion } ; la modale travaille par question.
@@ -1126,26 +1176,7 @@
             onlyToRecall: $("tlMapRecall").checked
         };
 
-        var formData = new FormData();
-        formData.append("file", pendingImportFile);
-        formData.append("mapping", new Blob([JSON.stringify(mapping)], { type: "application/json" }));
-        $("tlImportMappingError").textContent = "";
-        $("tlCampaignImportStatus").textContent = "Import en cours… (quelques secondes pour plusieurs milliers de lignes)";
-        fetch("/api/campaigns/" + currentCampaignId + "/import", { method: "POST", credentials: "same-origin", body: formData })
-            .then(readImportResponse)
-            .then(function (result) {
-                importMappingModal.hide();
-                $("tlCampaignImportStatus").textContent = result.imported + " contact(s) importé(s).";
-                renderImportReport(result);
-                $("tlCampaignImportFile").value = "";
-                pendingImportFile = null;
-                pendingImportPreview = null;
-                loadCampaignContacts();
-                loadCampaigns();
-            })
-            .catch(function (e) {
-                $("tlCampaignImportStatus").textContent = "Erreur : " + e.message;
-            });
+        runImport(mapping);
     });
 
     // ===================== COACHING QA (MY TODO) =====================

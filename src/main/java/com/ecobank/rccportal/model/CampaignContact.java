@@ -58,6 +58,12 @@ public class CampaignContact {
     @Column(name = "ExtraDataJson", length = 4000)
     private String extraDataJson;
 
+    /** Empreinte irréversible (HMAC-SHA256 avec secret serveur) du numéro de compte complet —
+     *  reconnaît le même client à chaque réimport sans jamais conserver le numéro en clair
+     *  (deux homonymes peuvent avoir le même numéro masqué). */
+    @Column(name = "AccountKey", length = 64)
+    private String accountKey;
+
     @Column(name = "LastCalledAt")
     private LocalDateTime lastCalledAt;
 

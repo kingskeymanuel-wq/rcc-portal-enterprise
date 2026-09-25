@@ -1543,6 +1543,7 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         addColumnIfMissing("Campaigns", "FieldsJson", "ALTER TABLE dbo.Campaigns ADD FieldsJson NVARCHAR(4000) NULL");
         addColumnIfMissing("Campaigns", "CoverImageUrl", "ALTER TABLE dbo.Campaigns ADD CoverImageUrl NVARCHAR(500) NULL");
         addColumnIfMissing("CampaignContacts", "AnswersJson", "ALTER TABLE dbo.CampaignContacts ADD AnswersJson NVARCHAR(4000) NULL");
+        addColumnIfMissing("CampaignContacts", "AccountKey", "ALTER TABLE dbo.CampaignContacts ADD AccountKey NVARCHAR(64) NULL");
         seedOutboundCampaignTemplatesIfMissing();
 
         // Module Outbound — ventes et rendez-vous (Portail Team Leader / tableau de bord Outbound).
@@ -2492,6 +2493,41 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         seedCampaignIfMissing(creatorId, "Offres Outbound Générales", null,
                 "bi-megaphone-fill", "#0057B8", "#00A651",
                 "Campagne générale, visible par tous les agents Outbound quel que soit leur sous-service.", generiqueFields);
+
+        // Réactivation des comptes dormants — même format que les modèles ci-dessus (visible par tous).
+        // Si l'équipe a déjà sa propre campagne « … dormants … », c'est elle le modèle : rien n'est ajouté.
+        Integer dormant = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM dbo.Campaigns WHERE Name LIKE '%dormant%' AND Name <> ?", Integer.class, OutboundCampaignTemplates.DORMANT_NAME);
+        if (dormant == null || dormant == 0) {
+            seedCampaignIfMissing(creatorId, OutboundCampaignTemplates.DORMANT_NAME, null,
+                    "bi-arrow-repeat", "#0057B8", "#F59E0B", OutboundCampaignTemplates.DORMANT_DESCRIPTION, OutboundCampaignTemplates.DORMANT_FIELDS_JSON);
+        }
+        alignDormantCampaignOnTemplate();
+    }
+
+    /**
+     * La v188 avait créé « Réactivation des comptes dormants » avec des questions r1…r10 en texte
+     * libre : on l'aligne sur le modèle (identifiants et listes de choix), réponses déjà saisies
+     * comprises. Sans effet si la campagne suit déjà le modèle.
+     */
+    private void alignDormantCampaignOnTemplate() {
+        try {
+            java.util.List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    "SELECT CampaignId, FieldsJson FROM dbo.Campaigns WHERE Name = ?", OutboundCampaignTemplates.DORMANT_NAME);
+            for (java.util.Map<String, Object> row : rows) {
+                Object json = row.get("FieldsJson");
+                if (json == null || !String.valueOf(json).contains("\"id\":\"r1\"")) continue;
+                Object id = row.get("CampaignId");
+                jdbcTemplate.update("UPDATE dbo.Campaigns SET FieldsJson = ? WHERE CampaignId = ?", OutboundCampaignTemplates.DORMANT_FIELDS_JSON, id);
+                for (String[] pair : OutboundCampaignTemplates.DORMANT_V188_IDS) {
+                    jdbcTemplate.update("UPDATE dbo.CampaignContacts SET AnswersJson = REPLACE(AnswersJson, ?, ?) WHERE CampaignId = ? AND AnswersJson IS NOT NULL",
+                            "\"" + pair[0] + "\":", "\"" + pair[1] + "\":", id);
+                }
+                log.warn("⚠ [SCHEMA BOOTSTRAP] Campagne « {} » alignée sur le modèle de campagne (questions et réponses).", OutboundCampaignTemplates.DORMANT_NAME);
+            }
+        } catch (Exception e) {
+            log.warn("Alignement de la campagne comptes dormants non effectué : {}", e.getMessage());
+        }
     }
 
     private void seedCampaignIfMissing(Long creatorId, String name, String targetService, String iconClass,

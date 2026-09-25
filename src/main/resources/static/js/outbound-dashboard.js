@@ -810,9 +810,17 @@
             formData.append("file", file);
             $("obSelfImportStatus").textContent = "Import en cours…";
             fetch("/api/campaigns/self-import", { method: "POST", credentials: "same-origin", body: formData })
-                .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
+                .then(function (res) {
+                    if (res.ok) return res.json();
+                    return res.text().then(function (t) {
+                        var msg = "HTTP " + res.status;
+                        try { var b = JSON.parse(t); msg = (b.error && b.error.message) || msg; } catch (e) { /* texte brut */ }
+                        throw new Error(msg);
+                    });
+                })
                 .then(function (result) {
-                    $("obSelfImportStatus").textContent = result.imported + " contact(s) importé(s).";
+                    $("obSelfImportStatus").textContent = result.imported + " nouveau(x) contact(s)" +
+                        (result.updated ? ", " + result.updated + " mis à jour" : "") + (result.skippedDuplicates ? ", " + result.skippedDuplicates + " doublon(s) écarté(s)" : "") + ".";
                     $("obSelfImportFile").value = "";
                     loadMyCalls();
                 })
