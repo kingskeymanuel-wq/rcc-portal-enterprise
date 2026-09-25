@@ -1544,6 +1544,27 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         addColumnIfMissing("Campaigns", "CoverImageUrl", "ALTER TABLE dbo.Campaigns ADD CoverImageUrl NVARCHAR(500) NULL");
         addColumnIfMissing("CampaignContacts", "AnswersJson", "ALTER TABLE dbo.CampaignContacts ADD AnswersJson NVARCHAR(4000) NULL");
         addColumnIfMissing("CampaignContacts", "AccountKey", "ALTER TABLE dbo.CampaignContacts ADD AccountKey NVARCHAR(64) NULL");
+        // Questionnaire construit depuis un fichier : listes de choix longues → au-delà de 4000 caractères.
+        if (tableExists("Campaigns") && columnExists("Campaigns", "FieldsJson")) {
+            jdbcTemplate.execute("IF COL_LENGTH('dbo.Campaigns', 'FieldsJson') <> -1 ALTER TABLE dbo.Campaigns ALTER COLUMN FieldsJson NVARCHAR(MAX) NULL");
+        }
+        // Journal des appels de campagne (portail + historique importé) : suivi de performance du Team Leader.
+        createIfMissing("CampaignCallLogs", """
+                CREATE TABLE dbo.CampaignCallLogs (
+                    LogId BIGINT IDENTITY PRIMARY KEY,
+                    CampaignId INT NOT NULL,
+                    ContactId INT NOT NULL,
+                    AgentUserId BIGINT NULL,
+                    CallStatus NVARCHAR(20) NOT NULL,
+                    CalledAt DATETIME2 NOT NULL,
+                    Source NVARCHAR(10) NOT NULL,
+                    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+                )
+                """);
+        if (tableExists("CampaignCallLogs")) {
+            jdbcTemplate.execute("IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_CampaignCallLogs_Campaign') "
+                    + "CREATE INDEX IX_CampaignCallLogs_Campaign ON dbo.CampaignCallLogs (CampaignId, CalledAt)");
+        }
         seedOutboundCampaignTemplatesIfMissing();
 
         // Module Outbound — ventes et rendez-vous (Portail Team Leader / tableau de bord Outbound).

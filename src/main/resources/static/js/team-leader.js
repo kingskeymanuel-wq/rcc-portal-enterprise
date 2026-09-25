@@ -889,6 +889,7 @@
         $("tlCampaignImportStatus").textContent = "";
         $("tlImportReport").innerHTML = "";
         $("tlDistributeAgents").removeAttribute("data-for");
+        cpShowTab("tlCpContacts");
         contactsShown = 200;
         if (!teamMembersCache.length) {
             getJson("/api/team-leader/members").then(function (members) { teamMembersCache = members; loadCampaignContacts(); });
@@ -1178,6 +1179,218 @@
 
         runImport(mapping);
     });
+
+    // ===================== NOUVELLE CAMPAGNE DEPUIS UN FICHIER =====================
+    // Transformation complète : fichier → colonnes reconnues + questionnaire déduit des réponses
+    // (types, listes de choix) → relecture du Team Leader → campagne créée + contacts importés,
+    // exactement comme « Réactivation des comptes dormants ».
+    var ffModal = null, ffFile = null, ffAnalysis = null;
+    var FF_TYPES = [["SELECT", "Liste de choix"], ["RADIO", "Choix unique (boutons)"], ["TEXT", "Texte court"], ["TEXTAREA", "Texte long"], ["DATE", "Date"]];
+
+    function ffOpen() {
+        if (!ffModal) ffModal = new bootstrap.Modal($("tlFromFileModal"));
+        ffFile = null; ffAnalysis = null;
+        $("ffFile").value = ""; $("ffStatus").textContent = "";
+        ffShowStep(1);
+        ffModal.show();
+    }
+    function ffShowStep(n) {
+        $("ffStep1").style.display = n === 1 ? "" : "none";
+        $("ffStep2").style.display = n === 2 ? "" : "none";
+        $("ffFooter").style.display = n === 2 ? "" : "none";
+        Array.prototype.forEach.call(document.querySelectorAll(".ff-steps li"), function (li) {
+            li.classList.toggle("on", Number(li.getAttribute("data-step")) <= n);
+        });
+    }
+    $("tlNewCampaignFromFileBtn").addEventListener("click", ffOpen);
+    $("ffBackBtn").addEventListener("click", function () { ffShowStep(1); });
+    $("ffAnalyzeBtn").addEventListener("click", function () {
+        var file = $("ffFile").files[0];
+        if (!file) { alert("Choisissez un fichier."); return; }
+        ffFile = file;
+        $("ffStatus").textContent = "Analyse en cours…";
+        var fd = new FormData(); fd.append("file", file);
+        fetch("/api/campaigns/from-file/analyze", { method: "POST", credentials: "same-origin", body: fd })
+            .then(readImportResponse)
+            .then(function (a) { ffAnalysis = a; $("ffStatus").textContent = ""; ffRender(a); ffShowStep(2); })
+            .catch(function (e) { $("ffStatus").textContent = "Erreur : " + e.message; });
+    });
+
+    function ffRender(a) {
+        var similar = (a.similarCampaigns || []).map(function (c) {
+            return '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mt-1"><span><i class="bi bi-link-45deg"></i> <b>' + escapeHtml(c.name) + '</b> — ' +
+                c.matchedQuestions + '/' + c.totalQuestions + ' questions retrouvées dans ce fichier</span>' +
+                '<button type="button" class="btn btn-sm btn-primary" data-ff-into="' + c.campaignId + '"><i class="bi bi-box-arrow-in-down"></i> Importer dans cette campagne</button></div>';
+        }).join("");
+        var m = a.mapping;
+        var core = [["ffMapName", "Client", m.nameColumn], ["ffMapPhone", "Téléphone", m.phoneColumn], ["ffMapAccount", "N° de compte", m.accountColumn],
+            ["ffMapAgent", "Agent", m.agentColumn], ["ffMapStatus", "Statut d'appel (historique)", m.statusColumn], ["ffMapDate", "Date d'appel (historique)", m.callDateColumn]];
+        $("ffStep2").innerHTML =
+            (similar ? '<div class="ff-similar"><b><i class="bi bi-info-circle"></i> Ce fichier correspond à une campagne existante</b> — vous pouvez l\'y importer (synchronisation) au lieu d\'en créer une nouvelle.' + similar + '</div>' : "") +
+            '<div class="row g-3 mb-3">' +
+            '<div class="col-md-5"><label class="form-label small mb-1">Nom de la campagne</label><input class="form-control" id="ffName" maxlength="200" value="' + escapeHtml(a.suggestedName) + '"></div>' +
+            '<div class="col-md-3"><label class="form-label small mb-1">Agents concernés</label><select class="form-select" id="ffTarget"><option value="">Toute l\'équipe Outbound</option><option value="DIGITAL">Service Digital</option><option value="TELEVENTE">Télévente</option></select></div>' +
+            '<div class="col-md-4"><label class="form-label small mb-1">Description</label><input class="form-control" id="ffDesc" maxlength="1000" placeholder="Objectif de la campagne"></div>' +
+            '</div>' +
+            '<h6 class="fw-bold"><i class="bi bi-columns-gap"></i> Colonnes reconnues <span class="small text-muted fw-normal">(' + a.rows + ' lignes)</span></h6>' +
+            '<div class="row g-2 mb-3">' + core.map(function (c) {
+                return '<div class="col-md-4 col-lg-2"><label class="form-label small mb-1">' + c[1] + '</label><select class="form-select form-select-sm" id="' + c[0] + '">' +
+                    columnOptionsHtml(a.headers, a.sampleRow, c[2] === undefined ? null : c[2]) + '</select></div>';
+            }).join("") + '</div>' +
+            '<h6 class="fw-bold"><i class="bi bi-ui-checks"></i> Questionnaire de l\'agent <span class="small text-muted fw-normal">— déduit des réponses du fichier, modifiable</span></h6>' +
+            (a.fields.length ? a.fields.map(function (f, i) {
+                var fld = f.field;
+                return '<div class="ff-field" data-ff-idx="' + i + '">' +
+                    '<input type="checkbox" class="form-check-input mt-2" checked data-ff-on>' +
+                    '<input class="form-control form-control-sm" data-ff-label value="' + escapeHtml(fld.label) + '">' +
+                    '<select class="form-select form-select-sm" data-ff-type>' + FF_TYPES.map(function (t) { return '<option value="' + t[0] + '"' + (t[0] === fld.type ? " selected" : "") + '>' + t[1] + '</option>'; }).join("") + '</select>' +
+                    '<textarea class="form-control form-control-sm" rows="3" data-ff-options placeholder="Une réponse par ligne"' + ((fld.type === "SELECT" || fld.type === "RADIO") ? "" : ' style="display:none;"') + '>' + escapeHtml((fld.options || []).join("\n")) + '</textarea>' +
+                    '<div class="ff-src"><i class="bi bi-table"></i> Colonne « ' + escapeHtml(f.header) + ' » · ' + f.answered + ' réponse(s)' +
+                    (f.examples && f.examples.length ? ' · ex. ' + f.examples.map(escapeHtml).join(" | ") : "") + '</div></div>';
+            }).join("") : '<p class="text-muted small">Aucune colonne de questionnaire : les agents traiteront la liste avec les statuts d\'appel.</p>') +
+            ((a.ignoredColumns || []).length ? '<p class="small text-muted mt-2"><i class="bi bi-eye-slash"></i> Colonnes ignorées (vides ou techniques) : ' + a.ignoredColumns.map(escapeHtml).join(" · ") + '</p>' : "") +
+            '<div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="ffRecall"><label class="form-check-label small" for="ffRecall"><b>Uniquement les clients à rappeler</b> (si le fichier contient des appels déjà passés)</label></div>' +
+            '<div class="small text-danger mt-2" id="ffError"></div>';
+
+        Array.prototype.forEach.call($("ffStep2").querySelectorAll(".ff-field"), function (row) {
+            row.querySelector("[data-ff-on]").addEventListener("change", function () { row.classList.toggle("off", !this.checked); });
+            row.querySelector("[data-ff-type]").addEventListener("change", function () {
+                row.querySelector("[data-ff-options]").style.display = (this.value === "SELECT" || this.value === "RADIO") ? "" : "none";
+            });
+        });
+        Array.prototype.forEach.call($("ffStep2").querySelectorAll("[data-ff-into]"), function (b) {
+            b.addEventListener("click", function () { ffImportInto(Number(b.getAttribute("data-ff-into"))); });
+        });
+    }
+
+    /** Fichier déjà connu : import synchronisé dans la campagne existante (même chemin que « Importer et synchroniser »). */
+    function ffImportInto(campaignId) {
+        var file = ffFile;
+        ffModal.hide();
+        getJson("/api/campaigns").then(function (list) {
+            openCampaignDetail(campaignId, list);
+            var dt = new DataTransfer(); dt.items.add(file);
+            $("tlCampaignImportFile").files = dt.files;
+            $("tlImportRecallOnly").checked = $("ffRecall") && $("ffRecall").checked;
+            startCampaignImport(false);
+        });
+    }
+
+    $("ffCreateBtn").addEventListener("click", function () {
+        var a = ffAnalysis; if (!a) return;
+        function col(id) { var v = $(id).value; return v === "" ? null : Number(v); }
+        if (col("ffMapName") === null) { $("ffError").textContent = "Indiquez la colonne du client."; return; }
+        if (!$("ffName").value.trim()) { $("ffError").textContent = "Donnez un nom à la campagne."; return; }
+        var fields = [], fieldColumns = {};
+        Array.prototype.forEach.call($("ffStep2").querySelectorAll(".ff-field"), function (row) {
+            if (!row.querySelector("[data-ff-on]").checked) return;
+            var src = a.fields[Number(row.getAttribute("data-ff-idx"))];
+            var type = row.querySelector("[data-ff-type]").value;
+            var options = (type === "SELECT" || type === "RADIO")
+                ? row.querySelector("[data-ff-options]").value.split("\n").map(function (x) { return x.trim(); }).filter(Boolean) : [];
+            fields.push({ id: src.field.id, label: row.querySelector("[data-ff-label]").value.trim() || src.header, type: type, options: options, required: false });
+            fieldColumns[src.column] = src.field.id;
+        });
+        var body = {
+            name: $("ffName").value.trim(), description: $("ffDesc").value.trim() || null, targetService: $("ffTarget").value || null, fields: fields,
+            mapping: { nameColumn: col("ffMapName"), phoneColumn: col("ffMapPhone"), accountColumn: col("ffMapAccount"), agentColumn: col("ffMapAgent"),
+                statusColumn: col("ffMapStatus"), callDateColumn: col("ffMapDate"), fieldColumns: fieldColumns, skipDuplicates: true, onlyToRecall: $("ffRecall").checked }
+        };
+        var fd = new FormData();
+        fd.append("file", ffFile);
+        fd.append("request", new Blob([JSON.stringify(body)], { type: "application/json" }));
+        var btn = this; btn.disabled = true;
+        $("ffError").textContent = "";
+        document.querySelector('.ff-steps li[data-step="3"]').classList.add("on");
+        fetch("/api/campaigns/from-file", { method: "POST", credentials: "same-origin", body: fd })
+            .then(readImportResponse)
+            .then(function (res) {
+                ffModal.hide();
+                return getJson("/api/campaigns").then(function (list) {
+                    loadCampaigns();
+                    openCampaignDetail(res.campaign.campaignId, list);
+                    renderImportReport(res.report);
+                });
+            })
+            .catch(function (e) { $("ffError").textContent = e.message; })
+            .then(function () { btn.disabled = false; });
+    });
+
+    // ===================== PERFORMANCE D'UNE CAMPAGNE (Team Leader Outbound) =====================
+    var cpDays = 0;
+    function cpPct(n, d) { return d ? Math.round(n * 100 / d) : 0; }
+    function loadCampaignPerformance() {
+        var box = $("tlCpPerformance");
+        box.innerHTML = '<p class="text-muted small">Chargement…</p>';
+        getJson("/api/campaigns/" + currentCampaignId + "/performance" + (cpDays ? "?days=" + cpDays : "")).then(function (p) {
+            var kpis = [
+                ["Contacts", p.total, p.unassigned ? p.unassigned + " non assigné(s)" : "tous assignés", "#0057B8"],
+                ["Appelés", p.called, cpPct(p.called, p.total) + " % de la liste", "#1565C0"],
+                ["Joints", p.reached, cpPct(p.reached, p.called) + " % des appelés", "#00A651"],
+                ["RDV pris", p.appointments, cpPct(p.appointments, p.reached) + " % des joints", "#F5A623"],
+                ["Sans réponse", p.noAnswer, cpPct(p.noAnswer, p.called) + " % des appelés", "#dc3545"],
+                ["À appeler", p.pending, cpPct(p.pending, p.total) + " % restant", "#6c757d"],
+                ["Appels " + (p.days ? p.days + " j" : "(tout)"), p.callsInPeriod, "journal portail + fichiers", "#7B2FF7"]
+            ].map(function (k) { return '<div class="cp-kpi" style="border-top:3px solid ' + k[3] + '"><small>' + k[0] + '</small><b>' + k[1] + '</b><span class="cp-rate" style="color:' + k[3] + '">' + k[2] + '</span></div>'; }).join("");
+
+            var agents = p.agents.length ? '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th>Agent</th><th style="min-width:180px">Avancement</th><th class="text-end">Affectés</th><th class="text-end">Appelés</th><th class="text-end">Joints</th><th class="text-end">RDV</th><th class="text-end">Sans rép.</th><th class="text-end">Taux de joignabilité</th><th class="text-end">Appels période</th><th>Dernier appel</th></tr></thead><tbody>' +
+                p.agents.map(function (a) {
+                    var done = a.assigned - a.pending;
+                    return '<tr><td><b>' + escapeHtml(a.name) + '</b></td>' +
+                        '<td><div class="cp-bar" title="' + done + ' / ' + a.assigned + '"><span style="width:' + cpPct(a.reached - a.appointments, a.assigned) + '%;background:#00A651"></span><span style="width:' + cpPct(a.appointments, a.assigned) + '%;background:#F5A623"></span><span style="width:' + cpPct(a.noAnswer, a.assigned) + '%;background:#dc3545"></span></div><small class="text-muted">' + cpPct(done, a.assigned) + ' % traité</small></td>' +
+                        '<td class="text-end">' + a.assigned + '</td><td class="text-end">' + a.called + '</td><td class="text-end">' + a.reached + '</td><td class="text-end">' + a.appointments + '</td><td class="text-end">' + a.noAnswer + '</td>' +
+                        '<td class="text-end"><b>' + cpPct(a.reached, a.called) + ' %</b></td><td class="text-end">' + a.callsInPeriod + '</td>' +
+                        '<td class="small">' + (a.lastActivity ? new Date(a.lastActivity).toLocaleDateString("fr-FR") : "—") + '</td></tr>';
+                }).join("") + '</tbody></table></div>' : '<p class="text-muted small mb-0">Aucun contact affecté pour l\'instant.</p>';
+
+            var chart = cpChart(p.daily);
+            var questions = p.questions.filter(function (q) { return q.options && q.options.length; }).map(function (q) {
+                var max = q.answered || 1;
+                return '<div class="cp-q"><div class="small fw-bold">' + escapeHtml(q.label) + ' <span class="text-muted fw-normal">(' + q.answered + ' réponse(s))</span></div>' +
+                    q.options.slice(0, 10).map(function (o) {
+                        return '<div class="cp-q-row"><span>' + escapeHtml(o.option) + '</span><div class="cp-bar"><span style="width:' + cpPct(o.count, max) + '%;background:#0057B8"></span></div><span class="text-end"><b>' + o.count + '</b> · ' + cpPct(o.count, max) + ' %</span></div>';
+                    }).join("") + '</div>';
+            }).join("");
+
+            box.innerHTML =
+                '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2"><h6 class="fw-bold mb-0"><i class="bi bi-speedometer2"></i> Suivi de la campagne</h6>' +
+                '<div class="cp-days" id="cpDays">' + [[7, "7 j"], [30, "30 j"], [0, "Depuis le début"]].map(function (d) { return '<button type="button" data-d="' + d[0] + '"' + (cpDays === d[0] ? ' class="on"' : "") + '>' + d[1] + '</button>'; }).join("") + '</div></div>' +
+                '<div class="cp-kpis">' + kpis + '</div>' +
+                '<div class="cp-card"><h6><i class="bi bi-person-badge"></i> Performance par agent</h6>' + agents + '</div>' +
+                '<div class="cp-card"><h6><i class="bi bi-bar-chart"></i> Appels par jour <span class="small text-muted fw-normal">— bleu : appels · vert : clients joints</span></h6>' + chart + '</div>' +
+                (questions ? '<div class="cp-card"><h6><i class="bi bi-ui-checks"></i> Réponses au questionnaire</h6>' + questions + '</div>' : "");
+            Array.prototype.forEach.call(box.querySelectorAll("#cpDays [data-d]"), function (b) {
+                b.addEventListener("click", function () { cpDays = Number(b.getAttribute("data-d")); loadCampaignPerformance(); });
+            });
+        }).catch(function (e) { box.innerHTML = '<p class="text-danger small">Performance indisponible : ' + escapeHtml(e.message) + '</p>'; });
+    }
+
+    /** Histogramme SVG simple : appels (bleu) et joints (vert) par jour. */
+    function cpChart(days) {
+        if (!days || !days.length) return '<p class="text-muted small mb-0">Aucun appel enregistré sur la période.</p>';
+        var W = 900, H = 160, pad = 24, max = Math.max.apply(null, days.map(function (d) { return d.calls; })) || 1;
+        var bw = (W - pad * 2) / days.length;
+        var bars = days.map(function (d, i) {
+            var x = pad + i * bw, h1 = (H - pad * 2) * d.calls / max, h2 = (H - pad * 2) * d.reached / max;
+            var label = new Date(d.day + "T00:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+            return '<rect x="' + (x + bw * 0.1).toFixed(1) + '" y="' + (H - pad - h1).toFixed(1) + '" width="' + (bw * 0.8).toFixed(1) + '" height="' + h1.toFixed(1) + '" rx="2" fill="#BFD4F2"><title>' + label + ' : ' + d.calls + ' appel(s), ' + d.reached + ' joint(s)</title></rect>' +
+                '<rect x="' + (x + bw * 0.25).toFixed(1) + '" y="' + (H - pad - h2).toFixed(1) + '" width="' + (bw * 0.5).toFixed(1) + '" height="' + h2.toFixed(1) + '" rx="2" fill="#00A651"><title>' + label + ' : ' + d.reached + ' joint(s)</title></rect>' +
+                ((days.length <= 16 || i % Math.ceil(days.length / 12) === 0) ? '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 6) + '" font-size="10" text-anchor="middle" fill="#6B7A90">' + label + '</text>' : "");
+        }).join("");
+        return '<svg class="cp-chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none"><text x="' + pad + '" y="12" font-size="10" fill="#6B7A90">max ' + max + '/jour</text>' + bars + '</svg>';
+    }
+
+    Array.prototype.forEach.call(document.querySelectorAll("#tlCampaignTabs [data-cp-pane]"), function (b) {
+        b.addEventListener("click", function () { cpShowTab(b.getAttribute("data-cp-pane")); });
+    });
+    function cpShowTab(pane) {
+        Array.prototype.forEach.call(document.querySelectorAll("#tlCampaignTabs [data-cp-pane]"), function (x) {
+            var on = x.getAttribute("data-cp-pane") === pane;
+            x.classList.toggle("on", on);
+            $(x.getAttribute("data-cp-pane")).style.display = on ? "" : "none";
+        });
+        if (pane === "tlCpPerformance") loadCampaignPerformance();
+    }
 
     // ===================== COACHING QA (MY TODO) =====================
 

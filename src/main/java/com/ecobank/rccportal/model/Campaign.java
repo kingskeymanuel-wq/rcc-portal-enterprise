@@ -66,7 +66,7 @@ public class Campaign {
     /** Modèle de questions de la campagne — JSON (liste de CampaignFieldDto sérialisés),
      *  affiché dynamiquement dans la modale d'appel agent en plus des 4 boutons de statut fixes
      *  (À appeler/Interaction/Pas de réponse/RDV pris). Null ou vide = aucune question additionnelle. */
-    @Column(name = "FieldsJson", length = 4000)
+    @Column(name = "FieldsJson", columnDefinition = "NVARCHAR(MAX)")
     private String fieldsJson;
 
     @Column(name = "CreatedAt", nullable = false)

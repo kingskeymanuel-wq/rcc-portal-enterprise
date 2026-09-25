@@ -46,6 +46,25 @@ public class CampaignService {
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
+    /** Journal des appels (dbo.CampaignCallLogs) — facultatif : absent des tests unitaires. */
+    private org.springframework.jdbc.core.JdbcTemplate callLogJdbc;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setCallLogJdbc(org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.callLogJdbc = jdbc;
+    }
+
+    /** Enregistre des appels : {campaignId, contactId, agentUserId, status, calledAt, source}. Meilleur effort. */
+    void logCalls(List<Object[]> rows) {
+        if (callLogJdbc == null || rows.isEmpty()) return;
+        try {
+            callLogJdbc.batchUpdate("INSERT INTO dbo.CampaignCallLogs (CampaignId, ContactId, AgentUserId, CallStatus, CalledAt, Source) VALUES (?, ?, ?, ?, ?, ?)",
+                    rows.stream().map(r -> new Object[]{r[0], r[1], r[2], r[3], java.sql.Timestamp.valueOf((LocalDateTime) r[4]), r[5]}).toList());
+        } catch (RuntimeException e) {
+            org.slf4j.LoggerFactory.getLogger(CampaignService.class).warn("Journal des appels non enregistré : {}", e.getMessage());
+        }
+    }
+
     /** Secret de l'empreinte des numéros de compte (même secret que les jetons de session). */
     @org.springframework.beans.factory.annotation.Value("${rcc.auth.jwt-secret:rcc-campaign-account-key}")
     private String accountKeySecret = "rcc-campaign-account-key";
@@ -194,7 +213,7 @@ public class CampaignService {
         }
     }
 
-    private List<String> readHeaders(Row headerRow) {
+    List<String> readHeaders(Row headerRow) {
         List<String> headers = new ArrayList<>();
         if (headerRow == null) return headers;
         for (int col = 0; col < headerRow.getLastCellNum(); col++) headers.add(cellToString(headerRow.getCell(col)));
@@ -203,7 +222,7 @@ public class CampaignService {
 
     /** Colonnes réellement renseignées sur les 200 premières lignes (un export Microsoft Forms
      *  contient par ex. une colonne « Nom » toujours vide, à ne jamais prendre pour le nom du client). */
-    private Set<Integer> filledColumns(Sheet sheet, int columnCount) {
+    Set<Integer> filledColumns(Sheet sheet, int columnCount) {
         Set<Integer> filled = new java.util.HashSet<>();
         for (int rowIndex = 1; rowIndex <= Math.min(sheet.getLastRowNum(), 200); rowIndex++) {
             Row row = sheet.getRow(rowIndex);
@@ -219,7 +238,7 @@ public class CampaignService {
 
     /** Jusqu'à 40 valeurs distinctes par colonne (300 premières lignes) — pour reconnaître une
      *  question du modèle à ses réponses (Oui/Non, dates…) quand son libellé diffère. */
-    private Map<Integer, List<String>> columnSamples(Sheet sheet, int columnCount) {
+    Map<Integer, List<String>> columnSamples(Sheet sheet, int columnCount) {
         Map<Integer, java.util.LinkedHashSet<String>> acc = new java.util.HashMap<>();
         for (int rowIndex = 1; rowIndex <= Math.min(sheet.getLastRowNum(), 300); rowIndex++) {
             Row row = sheet.getRow(rowIndex);
@@ -237,7 +256,7 @@ public class CampaignService {
     }
 
     /** Métadonnées d'un export Microsoft Forms, jamais utiles à l'agent. */
-    private static final Set<String> FORMS_METADATA = Set.of("id", "heurededebut", "heuredefin", "adressedemessagerie",
+    static final Set<String> FORMS_METADATA = Set.of("id", "heurededebut", "heuredefin", "adressedemessagerie",
             "heuredeladernieremodification", "starttime", "completiontime", "email", "lastmodifiedtime", "name");
 
     /** Propose un mapping par défaut à partir des en-têtes réels du fichier fourni — l'utilisateur
@@ -265,12 +284,14 @@ public class CampaignService {
                 if (score > nameScore) { nameScore = score; nameCol = col; continue; }
             }
             if (!shortHeader) continue;
-            if (phoneCol == null && (h.contains("tel") || h.contains("phone") || h.contains("gsm") || h.contains("mobile")
+            if (phoneCol == null && (h.contains("tel") || h.contains("phone") || h.contains("gsm") || h.contains("mobile") || h.equals("contact") || h.equals("contacts")
                     || h.contains("cellulaire") || (h.contains("numero") && h.contains("appel")))) { phoneCol = col; continue; }
             if (accountCol == null && !h.contains("agence") && (h.contains("compte") || h.contains("account"))) { accountCol = col; continue; }
             if (agentCol == null && (aboutAgent || h.contains("matricule") || h.contains("username"))) { agentCol = col; continue; }
             if (statusCol == null && (h.contains("statut") || h.contains("status") || h.contains("resultat") || h.contains("issue"))) { statusCol = col; continue; }
-            if (dateCol == null && h.contains("date") && (h.contains("appel") || h.contains("call"))) { dateCol = col; }
+            // « Date d'appel » (dernier appel) — pas « Date de rappel » / « à recontacter » (une question du questionnaire).
+            if (dateCol == null && h.contains("date") && (h.contains("appel") || h.contains("call"))
+                    && !h.contains("rappel") && !h.contains("recontact") && !h.contains("callback")) { dateCol = col; }
         }
         if (accountCol == null) {
             for (int col = 0; col < headers.size(); col++) {
@@ -362,7 +383,7 @@ public class CampaignService {
     }
 
     /** Même mot, à une faute de frappe près pour les mots d'au moins 5 lettres. */
-    private static boolean sameWord(String a, String b) {
+    static boolean sameWord(String a, String b) {
         if (a.equals(b)) return true;
         if (Math.min(a.length(), b.length()) < 5 || Math.abs(a.length() - b.length()) > 1) return false;
         int i = 0, j = 0, edits = 0;
@@ -377,7 +398,7 @@ public class CampaignService {
     private static final Map<String, String> SYNONYMS = Map.of("rdv", "rendez vous", "tel", "telephone", "tél", "telephone",
             "num", "numero", "no", "numero", "cpt", "compte", "cli", "client", "comment", "commentaire", "commentaires", "commentaire");
 
-    private Set<String> tokens(String s) {
+    Set<String> tokens(String s) {
         String noAccents = Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase()
                 .replaceAll("(?<=[a-z])(?=\\d)|(?<=\\d)(?=[a-z])", " "); // « zone3 » = « zone 3 »
         Set<String> out = new java.util.LinkedHashSet<>();
@@ -428,6 +449,7 @@ public class CampaignService {
 
         int imported = 0, skippedDup = 0, skippedRecall = 0, skippedNoName = 0, assigned = 0, updated = 0, unchanged = 0;
         Set<String> matchedFieldIds = new java.util.HashSet<>();
+        List<Object[]> callLog = new ArrayList<>();
         Map<String, Integer> statusCounts = new LinkedHashMap<>();
         Map<String, Integer> matchedAgents = new java.util.TreeMap<>();
         Map<String, Integer> unmatchedAgents = new java.util.TreeMap<>();
@@ -576,8 +598,13 @@ public class CampaignService {
                     syncedThisImport.add(existing);
                     boolean keyAdded = existing.getAccountKey() == null && accountKey != null;
                     if (keyAdded) existing.setAccountKey(accountKey);
+                    LocalDateTime callBefore = existing.getLastCalledAt();
                     if (syncExisting(existing, status, previousCall, notes, prefilledAnswers, agentUserId, phones, extraData) || keyAdded) {
                         campaignContactRepository.save(existing);
+                        if (existing.getLastCalledAt() != null && !existing.getLastCalledAt().equals(callBefore)
+                                && !"PENDING".equals(existing.getCallStatus()) && existing.getContactId() != null) {
+                            callLog.add(new Object[]{campaignId, existing.getContactId(), agentUserId, existing.getCallStatus(), existing.getLastCalledAt(), "FILE"});
+                        }
                         updated++;
                     } else {
                         unchanged++;
@@ -587,7 +614,7 @@ public class CampaignService {
                 if (agentUserId != null) assigned++;
                 statusCounts.merge(status, 1, Integer::sum);
 
-                campaignContactRepository.save(CampaignContact.builder()
+                CampaignContact created = campaignContactRepository.save(CampaignContact.builder()
                         .campaignId(campaignId)
                         .agentUserId(agentUserId)
                         .clientName(limit(clientName, 200))
@@ -600,6 +627,10 @@ public class CampaignService {
                         .lastCalledAt(onlyToRecall || "PENDING".equals(status) ? null : previousCall)
                         .callStatus(status)
                         .build());
+                // Historique du fichier : l'appel déjà passé compte dans le suivi de performance (même en mode « à rappeler »).
+                if (previousCall != null && !"PENDING".equals(mapped) && created != null && created.getContactId() != null) {
+                    callLog.add(new Object[]{campaignId, created.getContactId(), agentUserId, mapped, previousCall, "FILE"});
+                }
                 imported++;
             }
         } catch (ApiException e) {
@@ -607,6 +638,7 @@ public class CampaignService {
         } catch (Exception e) {
             throw ApiException.badRequest("Fichier illisible : " + e.getMessage());
         }
+        logCalls(callLog);
         List<String> unmatchedQuestions = fields.stream().filter(f -> !matchedFieldIds.contains(f.id())).map(CampaignFieldDto::label).toList();
         return new CampaignImportReport(imported, skippedDup, skippedRecall, skippedNoName, assigned, statusCounts, matchedAgents, unmatchedAgents,
                 updated, unchanged, matchedFieldIds.size(), fields.size(), unmatchedQuestions);
@@ -811,7 +843,7 @@ public class CampaignService {
         }
     }
 
-    private String normalizeForMatch(String s) {
+    String normalizeForMatch(String s) {
         if (s == null) return "";
         String noAccents = Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
         return noAccents.toLowerCase().replaceAll("[^a-z0-9]", "");
@@ -922,6 +954,11 @@ public class CampaignService {
         if (request.answers() != null) contact.setAnswersJson(serializeAnswers(request.answers()));
         contact.setLastCalledAt(LocalDateTime.now());
         contact = campaignContactRepository.save(contact);
+        if (!"PENDING".equals(status)) {
+            List<Object[]> log = new ArrayList<>();
+            log.add(new Object[]{contact.getCampaignId(), contact.getContactId(), agent.getId(), status, contact.getLastCalledAt(), "PORTAL"});
+            logCalls(log);
+        }
         return toContactResponse(contact);
     }
 
@@ -937,13 +974,13 @@ public class CampaignService {
     // HELPERS
     // ═══════════════════════════════════════════════════════════════════
 
-    private User requireUser(AuthenticatedUser requester) {
+    User requireUser(AuthenticatedUser requester) {
         if (requester == null || requester.username() == null) throw ApiException.unauthorized("Utilisateur non authentifié.");
         return userRepository.findFirstByUsernameIgnoreCase(requester.username())
                 .orElseThrow(() -> ApiException.unauthorized("Utilisateur inconnu."));
     }
 
-    private void requireCanManage(AuthenticatedUser requester) {
+    void requireCanManage(AuthenticatedUser requester) {
         if (!canManageOutboundTeam(requester)) {
             throw ApiException.forbidden("Réservé au Team Leader de l'équipe Outbound, à QA ou à l'admin.");
         }
@@ -979,7 +1016,7 @@ public class CampaignService {
         return null;
     }
 
-    private String normalizeTargetService(String raw) {
+    String normalizeTargetService(String raw) {
         if (raw == null || raw.isBlank()) return null;
         String v = raw.trim().toUpperCase();
         if (!v.equals("DIGITAL") && !v.equals("TELEVENTE")) {
@@ -988,7 +1025,7 @@ public class CampaignService {
         return v;
     }
 
-    private CampaignResponse toResponse(Campaign c, List<CampaignContact> contacts) {
+    CampaignResponse toResponse(Campaign c, List<CampaignContact> contacts) {
         int calls = (int) contacts.stream().filter(x -> !"PENDING".equals(x.getCallStatus())).count();
         int contacted = (int) contacts.stream().filter(x -> "GREEN".equals(x.getCallStatus())).count();
         int appointments = (int) contacts.stream().filter(x -> "YELLOW".equals(x.getCallStatus())).count();
@@ -1011,7 +1048,7 @@ public class CampaignService {
                 c.getLastCalledAt(), c.getAppointmentId());
     }
 
-    private String serializeFields(List<CampaignFieldDto> fields) {
+    String serializeFields(List<CampaignFieldDto> fields) {
         if (fields == null || fields.isEmpty()) return null;
         try {
             return objectMapper.writeValueAsString(fields);
@@ -1020,7 +1057,7 @@ public class CampaignService {
         }
     }
 
-    private List<CampaignFieldDto> deserializeFields(String json) {
+    List<CampaignFieldDto> deserializeFields(String json) {
         if (json == null || json.isBlank()) return List.of();
         try {
             return new ArrayList<>(List.of(objectMapper.readValue(json, CampaignFieldDto[].class)));
@@ -1038,7 +1075,7 @@ public class CampaignService {
         }
     }
 
-    private Map<String, String> deserializeAnswers(String json) {
+    Map<String, String> deserializeAnswers(String json) {
         if (json == null || json.isBlank()) return Map.of();
         try {
             return new LinkedHashMap<>(objectMapper.readValue(json, new TypeReference<Map<String, String>>() {}));
@@ -1051,7 +1088,7 @@ public class CampaignService {
     private static final java.time.format.DateTimeFormatter FR_DATE_TIME = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     /** Texte d'une cellule : espaces insécables et tabulations nettoyés, dates au format français. */
-    private String cellToString(Cell cell) {
+    String cellToString(Cell cell) {
         if (cell == null) return "";
         String v;
         CellType type = cell.getCellType() == CellType.FORMULA ? cell.getCachedFormulaResultType() : cell.getCellType();
@@ -1073,7 +1110,7 @@ public class CampaignService {
         return v.replace('\u00A0', ' ').replace('\t', ' ').replaceAll(" {2,}", " ").trim();
     }
 
-    private LocalDateTime cellToDateTime(Cell cell) {
+    LocalDateTime cellToDateTime(Cell cell) {
         if (cell == null) return null;
         try {
             if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) return cell.getLocalDateTimeCellValue();

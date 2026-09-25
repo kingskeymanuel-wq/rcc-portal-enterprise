@@ -40,6 +40,34 @@
         .tl-kpi-ico { width: 46px; height: 46px; flex-shrink: 0; border-radius: .9rem; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
         .tl-kpi-ico.blue { background: #EAF2FF; color: #0057B8; } .tl-kpi-ico.green { background: #E6F6EE; color: #0F9D6C; }
         .tl-kpi-ico.violet { background: #F1E9FF; color: #7B2FF7; } .tl-kpi-ico.orange { background: #FFF1E0; color: #D97706; }
+        .cp-tabs { display: flex; gap: .35rem; margin-bottom: 1rem; padding: .3rem; border-radius: 999px; background: #F1F5FA; width: fit-content; }
+        .cp-tabs button { border: 0; background: transparent; border-radius: 999px; padding: .4rem 1rem; font-weight: 700; font-size: .86rem; color: #4B5A70; }
+        .cp-tabs button.on { background: #fff; color: #0057B8; box-shadow: 0 4px 12px rgba(0, 32, 84, .1); }
+        .cp-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .6rem; margin-bottom: 1rem; }
+        .cp-kpi { padding: .75rem .9rem; border-radius: 1rem; background: #fff; border: 1px solid #EEF1F5; box-shadow: 0 6px 16px rgba(0, 32, 84, .05); }
+        .cp-kpi b { display: block; font-size: 1.35rem; font-weight: 800; color: #122240; }
+        .cp-kpi small { color: #6B7A90; }
+        .cp-kpi .cp-rate { font-size: .74rem; font-weight: 700; }
+        .cp-card { padding: 1rem; border-radius: 1rem; background: #fff; border: 1px solid #EEF1F5; margin-bottom: 1rem; }
+        .cp-card h6 { font-weight: 800; color: #122240; }
+        .cp-bar { height: 8px; border-radius: 999px; background: #EEF2F8; overflow: hidden; display: flex; }
+        .cp-bar span { height: 100%; }
+        .cp-days { display: flex; padding: .2rem; border-radius: 999px; background: #EEF2F8; }
+        .cp-days button { border: 0; background: transparent; border-radius: 999px; padding: .25rem .75rem; font-size: .78rem; font-weight: 700; color: #4B5A70; }
+        .cp-days button.on { background: #0057B8; color: #fff; }
+        .cp-chart { width: 100%; height: 170px; }
+        .cp-q { margin-bottom: .9rem; }
+        .cp-q-row { display: grid; grid-template-columns: minmax(120px, 34%) 1fr 70px; gap: .6rem; align-items: center; font-size: .82rem; margin-top: .25rem; }
+        .cp-q-row .cp-bar { height: 10px; }
+        .ff-steps { display: flex; gap: .4rem; padding: 0; list-style: none; margin-bottom: 1rem; counter-reset: s; }
+        .ff-steps li { counter-increment: s; padding: .3rem .8rem; border-radius: 999px; background: #EEF2F8; color: #6B7A90; font-size: .8rem; font-weight: 700; }
+        .ff-steps li::before { content: counter(s) ". "; }
+        .ff-steps li.on { background: #0057B8; color: #fff; }
+        .ff-field { display: grid; grid-template-columns: 28px minmax(200px, 1.4fr) 150px minmax(180px, 1fr); gap: .6rem; align-items: start; padding: .7rem; border: 1px solid #EEF1F5; border-radius: .9rem; margin-bottom: .5rem; background: #fff; }
+        .ff-field.off { opacity: .45; }
+        .ff-field .ff-src { grid-column: 2 / -1; font-size: .74rem; color: #6B7A90; }
+        .ff-similar { padding: .8rem 1rem; border-radius: 1rem; background: #EAF2FF; border: 1px solid #BFD4F2; margin-bottom: 1rem; }
+        @media (max-width: 767px) { .ff-field { grid-template-columns: 28px 1fr; } .ff-field > *:nth-child(n+3) { grid-column: 2; } .cp-q-row { grid-template-columns: 1fr 60px; } .cp-q-row .cp-bar { grid-column: 1 / -1; } }
         .tl-sync-banner { display: flex; gap: .6rem; align-items: flex-start; padding: .7rem .9rem; border-radius: .9rem; margin-bottom: .9rem; font-size: .85rem; }
         .tl-sync-banner.ok { background: #E8F5E9; color: #1B5E20; }
         .tl-sync-banner.warn { background: #FFF3E0; color: #8A4B00; }
@@ -308,7 +336,10 @@
                         <div id="tlPaneCampaigns" class="card-body" style="display:none;">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h6 class="mb-0">Mes campagnes</h6>
-                                <button class="btn btn-sm btn-primary" id="tlNewCampaignBtn"><i class="bi bi-plus-lg"></i> Nouvelle campagne</button>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button class="btn btn-sm btn-primary" id="tlNewCampaignFromFileBtn"><i class="bi bi-file-earmark-spreadsheet"></i> Nouvelle campagne depuis un fichier</button>
+                                    <button class="btn btn-sm btn-outline-primary" id="tlNewCampaignBtn"><i class="bi bi-plus-lg"></i> Campagne vide</button>
+                                </div>
                             </div>
                             <div id="tlCampaignsList"></div>
                         </div>
@@ -389,6 +420,12 @@
                             <div class="modal-header"><h5 class="modal-title" id="tlCampaignDetailTitle"><i class="bi bi-megaphone-fill"></i></h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                             <div class="modal-body">
+                                <nav class="cp-tabs" id="tlCampaignTabs">
+                                    <button type="button" class="on" data-cp-pane="tlCpContacts"><i class="bi bi-people"></i> Contacts &amp; import</button>
+                                    <button type="button" data-cp-pane="tlCpPerformance"><i class="bi bi-graph-up-arrow"></i> Performance</button>
+                                </nav>
+                                <div id="tlCpPerformance" style="display:none;"></div>
+                                <div id="tlCpContacts">
                                 <div class="d-flex gap-2 align-items-end mb-3 flex-wrap">
                                     <div>
                                         <label class="form-label small mb-1">Importer des contacts (.xlsx — n'importe quelle disposition de colonnes)</label>
@@ -424,6 +461,33 @@
                                     </table>
                                 </div>
                                 <div class="text-center" id="tlContactsMore"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===================== MODALE — NOUVELLE CAMPAGNE DEPUIS UN FICHIER ===================== -->
+                <div class="modal fade" id="tlFromFileModal" tabindex="-1" data-bs-backdrop="static">
+                    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header"><h5 class="modal-title"><i class="bi bi-magic"></i> Nouvelle campagne depuis un fichier</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                            <div class="modal-body">
+                                <ol class="ff-steps"><li class="on" data-step="1">Fichier</li><li data-step="2">Questionnaire</li><li data-step="3">Création &amp; import</li></ol>
+                                <div id="ffStep1">
+                                    <p class="text-muted small">Liste de clients à appeler ou export d'une campagne déjà en cours (Microsoft Forms…) : le portail reconnaît les colonnes, construit le questionnaire à partir des réponses, puis crée la campagne et charge les contacts pour les agents Outbound.</p>
+                                    <div class="d-flex gap-2 align-items-end flex-wrap">
+                                        <input type="file" class="form-control" id="ffFile" accept=".xlsx,.xls" style="max-width:420px;">
+                                        <button class="btn btn-primary" id="ffAnalyzeBtn"><i class="bi bi-search"></i> Analyser le fichier</button>
+                                        <span class="small text-muted" id="ffStatus"></span>
+                                    </div>
+                                </div>
+                                <div id="ffStep2" style="display:none;"></div>
+                            </div>
+                            <div class="modal-footer" id="ffFooter" style="display:none;">
+                                <button class="btn btn-light" id="ffBackBtn"><i class="bi bi-arrow-left"></i> Autre fichier</button>
+                                <button class="btn btn-primary" id="ffCreateBtn"><i class="bi bi-rocket-takeoff"></i> Créer la campagne et importer</button>
                             </div>
                         </div>
                     </div>
