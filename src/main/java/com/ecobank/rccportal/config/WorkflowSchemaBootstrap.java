@@ -607,6 +607,17 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
                     CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
                 )
                 """);
+        // Réponses déjà utilisées dans les champs des masques de mail (hors données personnelles du client) :
+        // suggestions proposées aux autres agents pour le même champ.
+        createIfMissing("MailFieldHistory", """
+                CREATE TABLE dbo.MailFieldHistory (
+                    FieldKey NVARCHAR(60) NOT NULL,
+                    FieldValue NVARCHAR(300) NOT NULL,
+                    UseCount INT NOT NULL DEFAULT 1,
+                    LastUsedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    CONSTRAINT PK_MailFieldHistory PRIMARY KEY (FieldKey, FieldValue)
+                )
+                """);
         // Utilisation des onglets (Audit → Utilisation) : cumul par utilisateur, jour et onglet, conservé 2 mois.
         createIfMissing("PageUsageDaily", """
                 CREATE TABLE dbo.PageUsageDaily (

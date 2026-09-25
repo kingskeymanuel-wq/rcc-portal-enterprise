@@ -421,6 +421,40 @@
     $("newTemplateRecipientGroup").addEventListener("change", refreshCreatePreview);
     $("newTemplateSubject").addEventListener("input", refreshCreatePreview);
     $("newTemplateBody").addEventListener("input", refreshCreatePreview);
+    $("newTemplateSubject").addEventListener("input", scheduleFieldSuggestions);
+    $("newTemplateBody").addEventListener("input", scheduleFieldSuggestions);
+
+    /** Champs proposés selon le type de mail (demande de coordonnées, carte, réclamation…) : un clic les insère. */
+    var fieldSuggestTimer = null;
+    function scheduleFieldSuggestions() {
+        clearTimeout(fieldSuggestTimer);
+        fieldSuggestTimer = setTimeout(loadFieldSuggestions, 350);
+    }
+    function loadFieldSuggestions() {
+        var subject = $("newTemplateSubject").value, body = $("newTemplateBody").value;
+        var box = $("mtSuggestedFields");
+        if (!subject.trim() && !body.trim()) { box.style.display = "none"; return; }
+        sendJson("/api/mail-templates/suggest-fields", "POST", { subject: subject, body: body }).then(function (fields) {
+            if (!fields || !fields.length) { box.style.display = "none"; return; }
+            box.style.display = "";
+            box.innerHTML = '<span class="mt-muted small me-1"><i class="bi bi-magic"></i> Champs suggérés :</span>' + fields.map(function (f) {
+                return '<button type="button" data-ph="' + escapeHtml(f.key) + '" title="' + escapeHtml(f.reason) + '"><i class="bi bi-plus-lg"></i> ' + escapeHtml(f.label) + '</button>';
+            }).join("");
+            Array.prototype.forEach.call(box.querySelectorAll("[data-ph]"), function (b) {
+                b.addEventListener("click", function () { insertPlaceholder(b.getAttribute("data-ph")); scheduleFieldSuggestions(); });
+            });
+        }).catch(function () { box.style.display = "none"; });
+    }
+    function insertPlaceholder(key) {
+        var area = $("newTemplateBody");
+        var token = "[" + key + "]";
+        var start = area.selectionStart != null ? area.selectionStart : area.value.length;
+        var end = area.selectionEnd != null ? area.selectionEnd : area.value.length;
+        area.value = area.value.slice(0, start) + token + area.value.slice(end);
+        area.focus();
+        area.selectionStart = area.selectionEnd = start + token.length;
+        refreshCreatePreview();
+    }
 
     Array.prototype.forEach.call($("mtPlaceholderChips").querySelectorAll("[data-ph]"), function (b) {
         b.addEventListener("click", function () {
@@ -512,14 +546,26 @@
     // ===== Utilisation d'un masque — remplissage automatique =====
 
     /** Rend le nom de balise plus lisible : "CLE_ACTIVATION" -> "Cle activation". */
+    /** Accents restitués sur les noms de champs écrits sans accent (COORDONNEES_DEMANDEES → « Coordonnées demandées »). */
+    var ACCENTS = {"coordonnees": "coordonnées", "demandees": "demandées", "demandes": "demandés", "pieces": "pièces", "piece": "pièce", "a": "à", "numero": "numéro", "delai": "délai", "telephone": "téléphone", "civilite": "civilité", "reference": "référence", "etat": "état", "cle": "clé", "details": "détails", "detail": "détail", "identite": "identité", "prenoms": "prénoms", "operation": "opération", "precedent": "précédent", "donnees": "données", "electronique": "électronique", "reclamation": "réclamation", "echeance": "échéance", "beneficiaire": "bénéficiaire", "societe": "société", "eligible": "éligible", "debit": "débit", "credit": "crédit", "activite": "activité"};
     function humanizePlaceholder(key) {
-        var lower = key.toLowerCase().replace(/_/g, " ");
+        var lower = key.toLowerCase().split("_").map(function (w) { return ACCENTS[w] || w; }).join(" ").trim();
         return lower.charAt(0).toUpperCase() + lower.slice(1);
     }
 
+    /**
+     * Champs du masque avec SUGGESTIONS DE RÉPONSE (tous les masques, y compris ceux créés par
+     * les agents — la suggestion dépend du nom du champ) : listes à cocher pour les coordonnées
+     * ou pièces à demander, listes réelles (agences, cartes), réponses usuelles, valeurs
+     * pré-remplies (date, conseiller) et réponses les plus utilisées par les collègues.
+     */
     function openUseTemplate(templateId) {
         var template = (overviewCache.templates || []).find(function (t) { return t.id === templateId; });
-        getJson("/api/mail-templates/" + templateId + "/placeholders").then(function (placeholders) {
+        Promise.all([
+            getJson("/api/mail-templates/" + templateId + "/placeholders"),
+            getJson("/api/mail-templates/" + templateId + "/suggestions").catch(function () { return {}; })
+        ]).then(function (res) {
+            var placeholders = res[0], suggestions = res[1] || {};
             $("useTemplateModal").setAttribute("data-template-id", templateId);
             $("mtUseTitle").textContent = template ? template.subject : "Masque";
             $("useTemplateModal").setAttribute("data-recipient-type", template ? template.recipientType : "");
@@ -533,24 +579,102 @@
                 $("clientFieldsCard").style.display = "none";
             } else {
                 $("clientFieldsCard").style.display = "";
-                $("clientFieldsRow").innerHTML = placeholders.map(function (key) {
-                    return '<div class="col-md-4">' +
-                        '<label class="form-label small">' + escapeHtml(humanizePlaceholder(key)) + '</label>' +
-                        '<input type="text" class="form-control form-control-sm client-field-input" data-key="' + key + '">' +
-                        '</div>';
+                $("clientFieldsRow").innerHTML = placeholders.map(function (key, i) {
+                    return fieldHtml(key, suggestions[key], i);
                 }).join("");
-
-                Array.prototype.forEach.call($("clientFieldsRow").querySelectorAll(".client-field-input"), function (input) {
-                    input.addEventListener("input", function () {
-                        input.classList.toggle("filled", !!input.value.trim());
-                        refreshFilledMail();
-                    });
-                });
+                wireSuggestionFields();
             }
 
             refreshFilledMail();
             useTemplateModal.show();
         }).catch(function (e) { alert("Erreur : " + e.message); });
+    }
+
+    function fieldHtml(key, sug, idx) {
+        sug = sug || { kind: "FREE", options: [] };
+        var label = escapeHtml(humanizePlaceholder(key));
+        var hint = sug.hint ? '<small class="mt-sug-hint">' + escapeHtml(sug.hint) + '</small>' : "";
+        var opts = sug.options || [];
+        if (sug.kind === "MULTI") {
+            return '<div class="col-12"><label class="form-label small">' + label + ' <span class="mt-sug-badge"><i class="bi bi-magic"></i> suggestions</span></label>' +
+                '<div class="mt-sug-multi" data-multi="' + escapeHtml(key) + '">' + opts.map(function (o) {
+                    return '<button type="button" class="mt-sug-chip" data-opt="' + escapeHtml(o) + '"><i class="bi bi-plus-lg"></i> ' + escapeHtml(o) + '</button>';
+                }).join("") + '<input type="text" class="form-control form-control-sm mt-sug-other" placeholder="Autre élément… (Entrée pour ajouter)"></div>' +
+                '<input type="hidden" class="client-field-input" data-key="' + escapeHtml(key) + '" value="">' + hint + '</div>';
+        }
+        var listId = "mtSug" + idx;
+        var chips = opts.slice(0, 6).map(function (o) {
+            return '<button type="button" class="mt-sug-chip small" data-fill="' + escapeHtml(o) + '">' + escapeHtml(o) + '</button>';
+        }).join("");
+        return '<div class="' + (opts.length ? "col-md-6" : "col-md-4") + '"><label class="form-label small">' + label +
+            (opts.length ? ' <span class="mt-sug-badge"><i class="bi bi-magic"></i> suggestions</span>' : "") +
+            (sug.personal ? ' <i class="bi bi-shield-lock text-muted" title="Donnée du client : jamais conservée"></i>' : "") + '</label>' +
+            '<input type="text" class="form-control form-control-sm client-field-input" data-key="' + escapeHtml(key) + '"' + (sug.personal ? ' data-personal="1"' : "") +
+            (opts.length ? ' list="' + listId + '"' : "") + ' value="' + escapeHtml(sug.prefill || "") + '"' +
+            (sug.hint && !opts.length ? ' placeholder="' + escapeHtml(sug.hint) + '"' : "") + '>' +
+            (opts.length ? '<datalist id="' + listId + '">' + opts.map(function (o) { return '<option value="' + escapeHtml(o) + '">'; }).join("") + '</datalist>' : "") +
+            (chips ? '<div class="mt-sug-row">' + chips + (opts.length > 6 ? '<span class="mt-sug-more">+' + (opts.length - 6) + ' dans la liste</span>' : "") + '</div>' : "") +
+            (opts.length ? hint : "") + '</div>';
+    }
+
+    function wireSuggestionFields() {
+        var row = $("clientFieldsRow");
+        Array.prototype.forEach.call(row.querySelectorAll(".client-field-input"), function (input) {
+            input.classList.toggle("filled", !!input.value.trim());
+            input.addEventListener("input", function () {
+                input.classList.toggle("filled", !!input.value.trim());
+                refreshFilledMail();
+            });
+        });
+        Array.prototype.forEach.call(row.querySelectorAll("[data-fill]"), function (b) {
+            b.addEventListener("click", function () {
+                var input = b.closest("[class^='col']").querySelector(".client-field-input");
+                input.value = b.getAttribute("data-fill");
+                input.classList.add("filled");
+                refreshFilledMail();
+            });
+        });
+        Array.prototype.forEach.call(row.querySelectorAll("[data-multi]"), function (box) {
+            var hidden = box.parentNode.querySelector(".client-field-input");
+            function sync() {
+                var items = Array.prototype.filter.call(box.querySelectorAll(".mt-sug-chip"), function (c) { return c.classList.contains("on"); })
+                    .map(function (c) { return c.getAttribute("data-opt"); });
+                hidden.value = items.length ? "\n" + items.map(function (x) { return "- " + x; }).join("\n") + "\n" : "";
+                hidden.classList.toggle("filled", items.length > 0);
+                refreshFilledMail();
+            }
+            box.addEventListener("click", function (e) {
+                var chip = e.target.closest(".mt-sug-chip");
+                if (!chip) return;
+                chip.classList.toggle("on");
+                chip.querySelector("i").className = chip.classList.contains("on") ? "bi bi-check-lg" : "bi bi-plus-lg";
+                sync();
+            });
+            box.querySelector(".mt-sug-other").addEventListener("keydown", function (e) {
+                if (e.key !== "Enter" || !this.value.trim()) return;
+                e.preventDefault();
+                var chip = document.createElement("button");
+                chip.type = "button";
+                chip.className = "mt-sug-chip on";
+                chip.setAttribute("data-opt", this.value.trim());
+                chip.innerHTML = '<i class="bi bi-check-lg"></i> ' + escapeHtml(this.value.trim());
+                box.insertBefore(chip, this);
+                this.value = "";
+                sync();
+            });
+        });
+    }
+
+    /** Mail copié ou envoyé : les réponses non personnelles deviennent des suggestions pour les collègues. */
+    function rememberUsedValues() {
+        var templateId = $("useTemplateModal").getAttribute("data-template-id");
+        if (!templateId) return;
+        var values = {};
+        Array.prototype.forEach.call($("clientFieldsRow").querySelectorAll(".client-field-input"), function (input) {
+            // Jamais les données du client (nom, compte, téléphone…) : seulement les réponses réutilisables.
+            if (input.type !== "hidden" && !input.getAttribute("data-personal") && input.value.trim()) values[input.getAttribute("data-key")] = input.value.trim();
+        });
+        if (Object.keys(values).length) sendJson("/api/mail-templates/" + templateId + "/used", "POST", { values: values }).catch(function () {});
     }
 
     /** Marque le champ comme modifié manuellement — refreshFilledMail() ne l'écrasera plus. */
@@ -669,6 +793,8 @@
         return navigator.clipboard.writeText(plain);
     }
 
+    $("sendFilledMailBtn").addEventListener("click", rememberUsedValues);
+    $("copyFilledMailBtn").addEventListener("click", rememberUsedValues);
     $("sendFilledMailBtn").addEventListener("click", function () {
         var subject = $("filledSubject").value;
         var body = $("filledBody").value;

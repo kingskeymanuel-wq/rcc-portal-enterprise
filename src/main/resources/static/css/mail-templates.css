@@ -205,3 +205,17 @@ mark.mt-hl { background: #fff1b8; padding: 0 1px; border-radius: 3px; }
 .mt-rich-preview table { max-width: 100%; }
 @keyframes mtRichIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .mt-rich-wrap { animation: none; } }
+
+/* ===== Suggestions de réponse dans les champs des masques ===== */
+.mt-sug-badge { font-size: .66rem; font-weight: 700; color: #7B2FF7; background: #F1E9FF; border-radius: 999px; padding: .05rem .45rem; margin-left: .25rem; }
+.mt-sug-hint { display: block; color: #6B7A90; font-size: .72rem; margin-top: .2rem; }
+.mt-sug-row { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .35rem; align-items: center; }
+.mt-sug-chip { border: 1px solid #DCE4F0; background: #fff; border-radius: 999px; padding: .2rem .65rem; font-size: .78rem; color: #33415C; transition: all .15s ease; }
+.mt-sug-chip.small { padding: .12rem .55rem; font-size: .74rem; }
+.mt-sug-chip:hover { border-color: #7B2FF7; color: #7B2FF7; }
+.mt-sug-chip.on { background: #7B2FF7; border-color: #7B2FF7; color: #fff; }
+.mt-sug-more { font-size: .72rem; color: #8A97AB; }
+.mt-sug-multi { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; padding: .55rem; border: 1px dashed #D5C3FA; border-radius: .8rem; background: #FBF8FF; }
+.mt-sug-other { max-width: 260px; border-radius: 999px; }
+.mt-sug-fields { margin-top: .4rem; }
+.mt-sug-fields button { border-color: #D5C3FA !important; color: #7B2FF7 !important; }
