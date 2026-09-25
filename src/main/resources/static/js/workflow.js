@@ -1236,6 +1236,28 @@
             if (!btn) return;
             btn.addEventListener("click", function () { activateTab(def); });
         });
+        // Raccourcis (bandeau, états vides) : data-wf-goto="idDuBoutonOnglet".
+        document.addEventListener("click", function (e) {
+            var go = e.target.closest ? e.target.closest("[data-wf-goto]") : null;
+            if (!go) return;
+            var target = document.getElementById(go.getAttribute("data-wf-goto"));
+            if (target && target.closest("li") && target.closest("li").style.display !== "none") {
+                target.click();
+                target.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+            }
+        });
+        window.addEventListener("resize", moveTabInk);
+        setTimeout(moveTabInk, 80);
+    }
+
+    /** Pastille animée sous l'onglet actif. */
+    function moveTabInk() {
+        var ink = document.querySelector("#wfMainTabs .wf-tab-ink");
+        var active = document.querySelector("#wfMainTabs .nav-link.active");
+        if (!ink || !active || !active.offsetWidth) return;
+        ink.style.width = active.offsetWidth + "px";
+        ink.style.transform = "translateX(" + (active.parentElement.offsetLeft + active.offsetLeft) + "px)";
+        ink.style.opacity = "1";
     }
 
     function activateTab(activeDef) {
@@ -1247,6 +1269,7 @@
             btn.classList.toggle("active", isActive);
             pane.style.display = isActive ? "" : "none";
         });
+        moveTabInk();
         if (activeDef.onShow) activeDef.onShow();
     }
 
@@ -1285,19 +1308,62 @@
 
     function setText(id, value) {
         var el = document.getElementById(id);
-        if (el) el.textContent = value;
+        if (!el) return;
+        // Chiffres des tuiles : défilement animé jusqu'à la valeur (texte laissé tel quel sinon).
+        var target = typeof value === "number" ? value : null;
+        if (target === null || !el.classList.contains("wf-stat-value") || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            el.textContent = value;
+            return;
+        }
+        var from = Number(el.getAttribute("data-v") || 0), t0 = null;
+        el.setAttribute("data-v", target);
+        function step(ts) {
+            if (!t0) t0 = ts;
+            var k = Math.min(1, (ts - t0) / 700);
+            el.textContent = Math.round(from + (target - from) * (1 - Math.pow(1 - k, 3)));
+            if (k < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+    }
+
+    function subLine(parts) {
+        return parts.filter(function (x) { return x && x !== "undefined" && x !== "null"; }).join(" · ");
+    }
+
+    /** Période de la demande (congés…) sinon date de création — jamais « undefined ». */
+    function periodOrDate(r) {
+        if (r.periodFrom) return formatPeriod(r);
+        var d = r.createdAt || r.submittedAt;
+        if (!d) return "";
+        var date = new Date(d);
+        return isNaN(date) ? "" : "le " + date.toLocaleDateString("fr-FR");
+    }
+
+    function emptyState(icon, title, text, gotoBtn, gotoLabel) {
+        return '<div class="wf-empty">' +
+            '<span class="wf-empty-ico"><i class="bi ' + icon + '"></i></span>' +
+            '<b>' + escapeHtml(title) + '</b><small>' + escapeHtml(text) + '</small>' +
+            (gotoBtn ? '<button type="button" class="btn btn-sm btn-primary mt-2" data-wf-goto="' + gotoBtn + '">' + escapeHtml(gotoLabel) + '</button>' : "") +
+            '</div>';
+    }
+
+    function wfRow(icon, tone, title, sub, right, i) {
+        return '<div class="wf-row" style="animation-delay:' + (i * 50) + 'ms"><span class="wf-row-ico ' + tone + '"><i class="bi ' + icon + '"></i></span>' +
+            '<div class="wf-row-main"><div class="wf-row-title">' + escapeHtml(title) + '</div><div class="wf-row-sub">' + escapeHtml(sub) + '</div></div>' +
+            '<div class="wf-row-right">' + right + '</div></div>';
     }
 
     function renderOverviewMineList() {
         var container = document.getElementById("wfOverviewMineList");
         if (!container) return;
         var recent = mineCache.slice(0, 5);
-        if (!recent.length) { container.innerHTML = '<p class="text-muted text-center mb-0">Aucune demande pour l\'instant.</p>'; return; }
-        container.innerHTML = recent.map(function (r) {
-            return '<div class="d-flex justify-content-between align-items-center py-2 border-bottom">' +
-                '<div><div class="fw-semibold small">' + escapeHtml(r.title) + '</div>' +
-                '<div class="text-muted small">' + escapeHtml(TYPE_LABELS[r.type] || r.type) + ' · ' + escapeHtml(formatPeriod(r)) + '</div></div>' +
-                (STATUS_BADGES[r.status] || escapeHtml(r.status)) + '</div>';
+        if (!recent.length) {
+            container.innerHTML = emptyState("bi-send", "Aucune demande pour l'instant", "Un accès bloqué, un outil en panne, du matériel manquant ? Votre Team Leader est là pour vous aider.", "wfTabMineBtn", "Faire une demande");
+            return;
+        }
+        container.innerHTML = recent.map(function (r, i) {
+            var tone = r.status === "APPROVED" ? "ok" : r.status === "REJECTED" ? "ko" : "wait";
+            return wfRow("bi-send", tone, r.title, subLine([TYPE_LABELS[r.type] || r.type, periodOrDate(r)]), STATUS_BADGES[r.status] || escapeHtml(r.status), i);
         }).join("");
     }
 
@@ -1305,12 +1371,13 @@
         var container = document.getElementById("wfOverviewPendingList");
         if (!container) return;
         var recent = pendingCache.slice(0, 5);
-        if (!recent.length) { container.innerHTML = '<p class="text-muted text-center mb-0">Aucune demande en attente.</p>'; return; }
-        container.innerHTML = recent.map(function (r) {
-            return '<div class="d-flex justify-content-between align-items-center py-2 border-bottom">' +
-                '<div><div class="fw-semibold small">' + escapeHtml(r.title) + '</div>' +
-                '<div class="text-muted small">' + escapeHtml(r.requestedByName || r.requestedByUsername) + ' · ' + escapeHtml(formatPeriod(r)) + '</div></div>' +
-                '<span class="badge bg-warning text-dark">En attente</span></div>';
+        if (!recent.length) {
+            container.innerHTML = emptyState("bi-check2-all", "Rien à valider", "Toutes les demandes de votre équipe sont traitées.", null, null);
+            return;
+        }
+        container.innerHTML = recent.map(function (r, i) {
+            return wfRow("bi-hourglass-split", "wait", r.title, subLine([r.requestedByName || r.requestedByUsername, periodOrDate(r)]),
+                '<button type="button" class="btn btn-sm btn-warning" data-wf-goto="wfTabPendingBtn">Traiter</button>', i);
         }).join("");
     }
 
@@ -1318,11 +1385,14 @@
         var container = document.getElementById("wfOverviewTasksList");
         if (!container) return;
         var open = tasksCache.filter(function (t) { return t.status !== "DONE"; }).slice(0, 5);
-        if (!open.length) { container.innerHTML = '<p class="text-muted text-center mb-0">Aucune tâche ouverte. 🎉</p>'; return; }
-        container.innerHTML = open.map(function (t) {
-            var due = t.dueDate ? '<span class="text-muted small"><i class="bi bi-calendar-event"></i> ' + escapeHtml(t.dueDate) + '</span>' : "";
-            return '<div class="d-flex justify-content-between align-items-center py-2 border-bottom">' +
-                '<span class="small">' + escapeHtml(t.title) + '</span>' + due + '</div>';
+        if (!open.length) {
+            container.innerHTML = emptyState("bi-emoji-smile", "Aucune tâche ouverte", "Notez vos rappels et suivis dans « Tâches & notes » pour ne rien oublier.", "wfTabTasksBtn", "Ajouter une tâche");
+            return;
+        }
+        container.innerHTML = open.map(function (t, i) {
+            var late = t.dueDate && t.dueDate < new Date().toISOString().slice(0, 10);
+            var due = t.dueDate ? '<span class="wf-due' + (late ? " late" : "") + '"><i class="bi bi-calendar-event"></i> ' + escapeHtml(t.dueDate) + '</span>' : "";
+            return wfRow("bi-journal-check", late ? "ko" : "task", t.title, t.description || "Tâche", due, i);
         }).join("");
     }
 
@@ -1516,8 +1586,12 @@
                 if (currentProfile === "ADMIN" || currentProfile === "QA") {
                     currentTeam = currentProfile;
                     Array.prototype.forEach.call(document.querySelectorAll(".qa-only"), function (el) {
+                        // Les panneaux d'onglet restent gérés par activateTab (sinon « À valider »,
+                        // « Historique » et « Modèles » s'affichaient tous sous la vue d'ensemble).
+                        if (el.classList.contains("wf-tab-pane")) return;
                         el.style.display = "";
                     });
+                    setTimeout(moveTabInk, 50);
                     document.getElementById("teamBadge").textContent = TEAM_LABELS[currentTeam];
                     loadPending();
                     wireTaskAssign();

@@ -315,51 +315,6 @@
                 up();
             }
         },
-        iban: {
-            label: "IBAN / RIB", icon: "bi-bank", color: "#5E35B1", desc: "Vérifier un IBAN, construire l'IBAN d'un RIB",
-            render: function (el) {
-                el.innerHTML = '<div class="ag-tool-grid"><div>' +
-                    '<label class="form-label small">IBAN à vérifier</label><input id="ibIn" class="form-control form-control-lg ag-mono" placeholder="CI93 CI05 9010 0100 …" autocomplete="off">' +
-                    '<div id="ibOut" class="ag-gap mt-2"></div><hr>' +
-                    '<label class="form-label small">Construire l\'IBAN à partir du RIB</label><div class="d-flex gap-2"><select id="ibCty" class="form-select" style="max-width:90px"><option>CI</option><option>SN</option><option>BJ</option><option>BF</option><option>ML</option><option>NE</option><option>TG</option><option>CM</option><option>GA</option></select>' +
-                    '<input id="ibRib" class="form-control ag-mono" placeholder="Code banque + guichet + n° de compte + clé RIB" autocomplete="off"></div>' +
-                    '<div id="ibBuilt" class="ag-gap mt-2"></div></div>' +
-                    '<div class="ag-result-card small"><b>Contrôle standard ISO 13616</b><p class="mb-0 mt-1 text-muted">Détecte les erreurs de frappe (chiffre inversé, oublié) avant un virement. La vérification ne dit pas si le compte existe : elle se fait dans votre navigateur, sans consulter aucun système.</p></div></div>';
-                el.querySelector("#ibIn").addEventListener("input", function (e) {
-                    var out = el.querySelector("#ibOut"); var v = e.target.value.trim();
-                    if (!v) { out.innerHTML = ""; out.className = "ag-gap mt-2"; return; }
-                    var r = checkIban(v);
-                    out.className = "ag-gap mt-2 " + (r.valid ? "ok" : "minus");
-                    out.innerHTML = (r.valid ? '<i class="bi bi-check-circle-fill"></i> IBAN valide' : '<i class="bi bi-x-circle-fill"></i> IBAN invalide') + " — " + esc(r.reason) + (r.formatted ? '<br><span class="ag-mono">' + esc(r.formatted) + "</span>" : "");
-                });
-                function build() {
-                    var out = el.querySelector("#ibBuilt"); var rib = el.querySelector("#ibRib").value.trim();
-                    if (!rib) { out.innerHTML = ""; out.className = "ag-gap mt-2"; return; }
-                    var iban = ibanFromRib(el.querySelector("#ibCty").value, rib);
-                    out.className = "ag-gap mt-2 " + (iban ? "ok" : "minus");
-                    out.innerHTML = iban ? 'IBAN : <span class="ag-mono">' + esc(iban.replace(/(.{4})/g, "$1 ").trim()) + "</span>" : "RIB non reconnu (10 à 30 caractères alphanumériques).";
-                }
-                el.querySelector("#ibRib").addEventListener("input", build);
-                el.querySelector("#ibCty").addEventListener("change", build);
-            }
-        },
-        carte: {
-            label: "Contrôle carte", icon: "bi-credit-card", color: "#E0435B", desc: "Numéro de carte plausible ? (Luhn)",
-            render: function (el) {
-                el.innerHTML = '<div class="ag-tool-grid"><div><label class="form-label small">Numéro de carte (jamais conservé ni affiché en clair)</label>' +
-                    '<input id="lcIn" type="password" class="form-control form-control-lg ag-mono" inputmode="numeric" autocomplete="off" placeholder="Saisir ou coller le numéro">' +
-                    '<div id="lcOut" class="ag-gap mt-2"></div></div>' +
-                    '<div class="ag-result-card small"><b>Algorithme de Luhn</b><p class="mb-0 mt-1 text-muted">Vérifie qu\'un numéro est bien formé (erreur de saisie) avant une opposition ou une réclamation. Le champ est effacé quand vous quittez l\'outil.</p></div></div>';
-                el.querySelector("#lcIn").addEventListener("input", function (e) {
-                    var out = el.querySelector("#lcOut");
-                    if (!e.target.value.trim()) { out.innerHTML = ""; out.className = "ag-gap mt-2"; return; }
-                    var r = luhn(e.target.value);
-                    out.className = "ag-gap mt-2 " + (r.valid ? "ok" : "minus");
-                    out.innerHTML = (r.valid ? '<i class="bi bi-check-circle-fill"></i> Numéro bien formé' : '<i class="bi bi-x-circle-fill"></i> Numéro invalide') +
-                        ' — <span class="ag-mono">' + esc(r.masked) + "</span> · " + r.length + " chiffres" + (r.network ? " · " + esc(r.network) : "");
-                });
-            }
-        },
         delais: {
             label: "Délais ouvrés", icon: "bi-calendar2-week", color: "#6A1B9A", desc: "Date de traitement annoncée au client",
             render: function (el) {
@@ -385,17 +340,6 @@
                     copy("Votre demande sera traitée au plus tard le " + el.querySelector("#dlOut").textContent + ". Nous restons à votre disposition.", ev.currentTarget);
                 });
                 up();
-            }
-        },
-        masque: {
-            label: "Masquage", icon: "bi-incognito", color: "#37474F", desc: "Retirer les données sensibles d'un texte",
-            render: function (el) {
-                el.innerHTML = '<div class="ag-tool-grid"><div><label class="form-label small">Texte à partager (mail, message RCC, capture…)</label>' +
-                    '<textarea id="msIn" class="form-control" rows="8" placeholder="Collez ici le texte : les n° de compte, cartes, IBAN, téléphones et e-mails seront masqués."></textarea></div>' +
-                    '<div><label class="form-label small">Texte masqué</label><pre id="msOut" class="ag-preview"></pre>' +
-                    '<button class="btn btn-primary btn-sm" id="msCopy"><i class="bi bi-clipboard-check"></i> Copier le texte masqué</button></div></div>';
-                el.querySelector("#msIn").addEventListener("input", function (e) { el.querySelector("#msOut").textContent = maskSensitive(e.target.value); });
-                el.querySelector("#msCopy").addEventListener("click", function (e) { copy(el.querySelector("#msOut").textContent, e.currentTarget); });
             }
         },
         kyc: {
@@ -440,8 +384,8 @@
     };
 
     var ORDER = {
-        CAISSIER: ["billetage", "rendu", "devises", "carte", "masque", "delais", "iban", "pret", "kyc"],
-        GESTIONNAIRE: ["pret", "kyc", "iban", "delais", "devises", "masque", "carte", "billetage", "rendu"]
+        CAISSIER: ["billetage", "rendu", "devises", "delais", "pret", "kyc"],
+        GESTIONNAIRE: ["pret", "kyc", "delais", "devises", "billetage", "rendu"]
     };
 
     window.AgenceTools = {

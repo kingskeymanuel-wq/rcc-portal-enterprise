@@ -9,6 +9,7 @@
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <link rel="stylesheet" th:href="@{/css/support-requests.css}">
     <link rel="stylesheet" th:href="@{/css/workflow-tasks.css}">
+    <link rel="stylesheet" th:href="@{/css/workflow-ui.css}">
     <style>
         .wf-tab-nav .btn.nav-link { border: none; border-bottom: 3px solid transparent; border-radius: 0; color: #6b7280; font-weight: 600; padding: .75rem 1.1rem; }
         .wf-tab-nav .btn.nav-link.active { color: #0057B8; border-bottom-color: #0057B8; background: transparent; }
@@ -129,15 +130,30 @@
         <main id="page-content">
             <div class="container-fluid">
 
-                <div class="welcome-banner">
-                    <div>
+                <section class="wf-hero">
+                    <div class="wf-hero-glow" aria-hidden="true"><span></span><span></span></div>
+                    <div class="wf-hero-main">
+                        <span class="wf-hero-chip"><i class="bi bi-lightning-charge-fill"></i> Demandes &amp; validations</span>
                         <h2>Workflow</h2>
-                        <p class="text-muted">Demandes d'aide (accès, outils, matériel, difficultés) envoyées au Team Leader et escaladées si besoin — suivi, validation et SLA</p>
+                        <p>Une difficulté (accès, outil, matériel) ? Envoyez votre demande à votre Team Leader : elle est suivie, validée et escaladée automatiquement si le délai est dépassé.</p>
+                        <div class="wf-hero-actions">
+                            <button type="button" class="wf-hero-btn primary" data-wf-goto="wfTabMineBtn"><i class="bi bi-plus-circle-fill"></i> Nouvelle demande</button>
+                            <button type="button" class="wf-hero-btn" data-wf-goto="wfTabTasksBtn"><i class="bi bi-journal-check"></i> Mes tâches</button>
+                            <button type="button" class="wf-hero-btn" data-wf-goto="wfTabSlaBtn"><i class="bi bi-stopwatch"></i> Délais SLA</button>
+                        </div>
                     </div>
-                </div>
+                    <div class="wf-flow" aria-label="Parcours d'une demande">
+                        <div class="wf-flow-track"><span class="wf-flow-dot"></span></div>
+                        <div class="wf-flow-step"><span><i class="bi bi-send-fill"></i></span><b>Demande</b><small>vous</small></div>
+                        <div class="wf-flow-step"><span><i class="bi bi-person-badge-fill"></i></span><b>Team Leader</b><small>prise en charge</small></div>
+                        <div class="wf-flow-step"><span><i class="bi bi-arrow-up-right-circle-fill"></i></span><b>Escalade</b><small>si délai dépassé</small></div>
+                        <div class="wf-flow-step"><span><i class="bi bi-check2-circle"></i></span><b>Résolu</b><small>validé</small></div>
+                    </div>
+                </section>
 
                 <!-- ===================== NAVIGATION PAR ONGLETS ===================== -->
-                <ul class="nav wf-tab-nav mb-4 flex-nowrap overflow-auto" id="wfMainTabs">
+                <ul class="nav wf-tab-nav wf-pills mb-4 flex-nowrap overflow-auto" id="wfMainTabs">
+                    <span class="wf-tab-ink" aria-hidden="true"></span>
                     <li class="nav-item"><button type="button" class="btn nav-link active" id="wfTabOverviewBtn"><i class="bi bi-speedometer2"></i> Vue d'ensemble</button></li>
                     <li class="nav-item"><button type="button" class="btn nav-link" id="wfTabMineBtn"><i class="bi bi-send"></i> Mes demandes</button></li>
                     <li class="nav-item qa-only" style="display:none;"><button type="button" class="btn nav-link" id="wfTabPendingBtn"><i class="bi bi-hourglass-split"></i> À valider <span class="badge bg-warning text-dark" id="wfBadgePending" style="display:none;"></span></button></li>
@@ -218,6 +234,20 @@
                                 <div class="card-header"><i class="bi bi-journal-text"></i> Mes tâches en cours</div>
                                 <div class="card-body" id="wfOverviewTasksList">
                                     <p class="text-muted text-center mb-0">Chargement…</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="card dashboard-card shadow-sm h-100 wf-howto">
+                                <div class="card-header"><i class="bi bi-signpost-split"></i> Comment ça marche ?</div>
+                                <div class="card-body">
+                                    <ol class="wf-howto-steps">
+                                        <li><b>Décrivez le blocage</b> dans « Mes demandes » : accès, outil, matériel ou difficulté, avec un modèle si besoin.</li>
+                                        <li><b>Votre Team Leader</b> la prend en charge et vous tient informé ici.</li>
+                                        <li><b>Sans solution dans le délai</b>, la demande est escaladée automatiquement au Superviseur.</li>
+                                        <li><b>Une fois réglée</b>, elle est validée et archivée dans l'historique.</li>
+                                    </ol>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" data-wf-goto="wfTabSlaBtn"><i class="bi bi-stopwatch"></i> Voir les délais par pôle</button>
                                 </div>
                             </div>
                         </div>
