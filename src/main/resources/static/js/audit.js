@@ -81,7 +81,7 @@
             resultBox.className = "small mt-2 text-muted";
             resultBox.textContent = "Envoi en cours…";
 
-            postJson("/api/mon-rcc/notifications", {
+            RccApi.sendJson("/api/mon-rcc/notifications", "POST", {
                 content: content,
                 countryCode: document.getElementById("broadcastCountry").value || null,
                 serviceCode: document.getElementById("broadcastService").value || null,
@@ -123,7 +123,21 @@
         });
     }
 
+    function wireTabs() {
+        var buttons = document.querySelectorAll("#auTabs [data-pane]");
+        buttons.forEach(function (b) {
+            b.addEventListener("click", function () {
+                buttons.forEach(function (x) {
+                    x.classList.toggle("on", x === b);
+                    document.getElementById(x.getAttribute("data-pane")).style.display = x === b ? "" : "none";
+                });
+            });
+        });
+    }
+
     function init() {
+        wireTabs();
+        if (window.RccAuditUsage) window.RccAuditUsage.init();
         wireBroadcastForm();
         wireBroadcastEmailForm();
         loadLogins();

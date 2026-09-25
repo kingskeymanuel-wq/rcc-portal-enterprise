@@ -297,6 +297,7 @@ public class AuthService {
             excelliamUser.setFailedAttempts(0);
             excelliamUser.setAccountLocked(false);
             userRepository.save(excelliamUser);
+            recordLoginEvent(excelliamUser, "login_success");
 
             SessionTokens tokens = issueSession(excelliamUser, null);
             return new LoginChallengeResponse(null, null, false, tokens, false);
@@ -587,6 +588,7 @@ public class AuthService {
         user.setAccountLocked(false);
 
         userRepository.save(user);
+        recordLoginEvent(user, "login_success");
 
         // Pointage automatique — isolé dans sa propre transaction (REQUIRES_NEW)
         // pour ne pas empoisonner la transaction principale de completeLogin() si
@@ -811,6 +813,37 @@ public class AuthService {
 
     private com.ecobank.rccportal.repository.LoginAuditRepository loginAuditRepository;
 
+    private org.springframework.jdbc.core.JdbcTemplate auditJdbc;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setAuditJdbc(org.springframework.jdbc.core.JdbcTemplate auditJdbc) {
+        this.auditJdbc = auditJdbc;
+    }
+
+    /**
+     * Journal de connexions (page Audit) — écrit en JDBC pur et en « meilleur effort » : une
+     * erreur ici (table absente, colonne différente) ne doit jamais faire échouer la connexion
+     * ni marquer la transaction de connexion en rollback (ce que ferait un repository JPA).
+     */
+    private void recordLoginEvent(User user, String eventType) {
+        if (auditJdbc == null || user == null || user.getId() == null) return;
+        try {
+            String ip = null;
+            var attrs = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+            if (attrs instanceof org.springframework.web.context.request.ServletRequestAttributes sra) {
+                var req = sra.getRequest();
+                String fwd = req.getHeader("X-Forwarded-For");
+                ip = fwd != null && !fwd.isBlank() ? fwd.split(",")[0].trim() : req.getRemoteAddr();
+                if (ip != null && ip.length() > 45) ip = ip.substring(0, 45);
+            }
+            java.sql.Timestamp now = java.sql.Timestamp.valueOf(java.time.LocalDateTime.now());
+            auditJdbc.update("INSERT INTO dbo.LoginAudit (UserId, EventType, OccurredAt, IpAddress, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, ?, ?)",
+                    user.getId(), eventType, now, ip, now, now);
+        } catch (RuntimeException e) {
+            log.warn("Journal de connexions : événement {} non enregistré pour {} ({})", eventType, user.getUsername(), e.getMessage());
+        }
+    }
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     void setLoginAuditRepository(com.ecobank.rccportal.repository.LoginAuditRepository loginAuditRepository) {
         this.loginAuditRepository = loginAuditRepository;
@@ -891,9 +924,11 @@ public class AuthService {
                         : user.getFailedAttempts()) + 1;
 
         user.setFailedAttempts(failed);
+        recordLoginEvent(user, "login_failed");
 
         if (failed >= MAX_STEP1_FAILURES) {
             user.setAccountLocked(true);
+            recordLoginEvent(user, "locked");
             log.warn(
                     "Account locked after {} failed attempt(s) (username={})",
                     failed,

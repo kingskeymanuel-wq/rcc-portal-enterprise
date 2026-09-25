@@ -607,6 +607,18 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
                     CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
                 )
                 """);
+        // Utilisation des onglets (Audit → Utilisation) : cumul par utilisateur, jour et onglet, conservé 2 mois.
+        createIfMissing("PageUsageDaily", """
+                CREATE TABLE dbo.PageUsageDaily (
+                    UserId BIGINT NOT NULL,
+                    UsageDate DATE NOT NULL,
+                    PageKey NVARCHAR(80) NOT NULL,
+                    Seconds INT NOT NULL DEFAULT 0,
+                    Visits INT NOT NULL DEFAULT 0,
+                    LastSeenAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    CONSTRAINT PK_PageUsageDaily PRIMARY KEY (UserId, UsageDate, PageKey)
+                )
+                """);
         createIfMissing("UserAgency", """
                 CREATE TABLE dbo.UserAgency (
                     UserId BIGINT NOT NULL PRIMARY KEY,

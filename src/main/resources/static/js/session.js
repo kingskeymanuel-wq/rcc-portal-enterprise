@@ -630,6 +630,43 @@ window.RccSession = (function () {
             .catch(function () {});
     }
 
+    /**
+     * Mesure d'utilisation des onglets (Audit → Utilisation) : une visite à l'ouverture de la
+     * page, puis le temps ACTIF (onglet du navigateur visible et activité clavier/souris/défilement
+     * dans les 5 dernières minutes), envoyé par paquets d'une minute et à la fermeture.
+     * Conservation 2 mois côté serveur. Aucune donnée saisie n'est transmise, seulement l'onglet.
+     */
+    var usageStarted = false;
+    function startUsageTracking() {
+        if (usageStarted || !window.fetch) return;
+        usageStarted = true;
+        var page = (location.pathname.replace(/\/+$/, "") || "/dashboard").toLowerCase();
+        if (page === "/login") return;
+        var pending = 0, lastActivity = Date.now(), TICK = 15;
+        function send(seconds, visit, beacon) {
+            var body = JSON.stringify({ page: page, seconds: seconds, visit: visit });
+            try {
+                if (beacon && navigator.sendBeacon) {
+                    navigator.sendBeacon("/api/usage/ping", new Blob([body], { type: "application/json" }));
+                    return;
+                }
+                fetch("/api/usage/ping", { method: "POST", credentials: "same-origin", keepalive: true,
+                    headers: { "Content-Type": "application/json" }, body: body }).catch(function () {});
+            } catch (e) { /* mesure facultative */ }
+        }
+        ["mousemove", "keydown", "scroll", "click", "touchstart"].forEach(function (evt) {
+            window.addEventListener(evt, function () { lastActivity = Date.now(); }, { passive: true });
+        });
+        send(0, true, false);
+        setInterval(function () {
+            if (document.visibilityState === "visible" && Date.now() - lastActivity < 5 * 60 * 1000) pending += TICK;
+        }, TICK * 1000);
+        setInterval(function () { if (pending > 0) { send(pending, false, false); pending = 0; } }, 60 * 1000);
+        function flush() { if (pending > 0) { send(pending, false, true); pending = 0; } }
+        window.addEventListener("pagehide", flush);
+        document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") flush(); });
+    }
+
     function init() {
         wireGlobalSearch();
         return fetch("/api/auth/me", { credentials: "same-origin" })
@@ -643,6 +680,7 @@ window.RccSession = (function () {
                     return null;
                 }
                 var profile = computeProfile(user);
+                startUsageTracking();
 
                 // Source unique de vérité pour "cet agent est-il Outbound ?" — calculé côté
                 // serveur via TeamClassifier (fiable), plutôt qu'un champ "activity" qui

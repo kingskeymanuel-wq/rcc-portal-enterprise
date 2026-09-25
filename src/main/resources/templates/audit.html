@@ -7,6 +7,7 @@
     <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}" rel="stylesheet">
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/audit-usage.css}">
 </head>
 <body>
 <div class="layout">
@@ -16,13 +17,39 @@
         <main id="page-content">
             <div class="container-fluid">
 
-                <div class="welcome-banner">
+                <section class="au-hero">
                     <div>
+                        <span class="au-kicker"><i class="bi bi-shield-lock"></i> Administration</span>
                         <h2>Audit</h2>
-                        <p class="text-muted">Journal de connexions et diffusion de notifications</p>
+                        <p>Utilisation des onglets par équipe, diffusion de notifications et journal de connexions.</p>
                     </div>
+                    <nav class="au-tabs" id="auTabs">
+                        <button type="button" class="on" data-pane="auPaneUsage"><i class="bi bi-pie-chart-fill"></i> Utilisation des onglets</button>
+                        <button type="button" data-pane="auPaneBroadcast"><i class="bi bi-megaphone"></i> Diffusion</button>
+                        <button type="button" data-pane="auPaneLogins"><i class="bi bi-clipboard-check"></i> Journal de connexions</button>
+                    </nav>
+                </section>
+
+                <!-- ===================== UTILISATION DES ONGLETS ===================== -->
+                <div id="auPaneUsage">
+                    <div class="us-toolbar">
+                        <div>
+                            <h5 class="mb-0">Utilisation des onglets par équipe</h5>
+                            <small class="text-muted">Part du temps actif passé sur chaque onglet — <span id="usPeriod">…</span> · données conservées 2 mois</small>
+                        </div>
+                        <div class="us-tools">
+                            <div class="us-search"><i class="bi bi-search"></i><input id="usSearch" type="search" placeholder="Rechercher un utilisateur…"></div>
+                            <div class="us-days" id="usDays">
+                                <button type="button" data-days="7">7 j</button>
+                                <button type="button" data-days="30">30 j</button>
+                                <button type="button" class="on" data-days="60">2 mois</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="usBody"></div>
                 </div>
 
+                <div id="auPaneBroadcast" style="display:none;">
                 <div class="row g-4 mb-4">
                     <div class="col-lg-6">
                         <div class="card shadow-sm h-100">
@@ -91,6 +118,9 @@
                     </div>
                 </div>
 
+                </div>
+
+                <div id="auPaneLogins" style="display:none;">
                 <div class="card shadow-sm">
                     <div class="card-body">
                         <h5 class="card-title mb-3"><i class="bi bi-clipboard-check"></i> Journal de connexions</h5>
@@ -111,6 +141,7 @@
                         </div>
                     </div>
                 </div>
+                </div>
 
             </div>
         </main>
@@ -121,6 +152,15 @@
 <script th:src="@{/js/preferences.js}"></script>
 <script th:src="@{/js/rcc-api.js}"></script>
 <script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/audit-usage.js}"></script>
 <script th:src="@{/js/audit.js}"></script>
+<div class="modal fade us-modal" id="usUserModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
+        <div class="us-modal-head"><span class="us-av us-modal-av">?</span>
+            <div><h5 class="mb-0 us-modal-name"></h5><small class="us-modal-sub"></small></div>
+            <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal" aria-label="Fermer"></button></div>
+        <div class="modal-body"></div>
+    </div></div>
+</div>
 </body>
 </html>

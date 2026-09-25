@@ -40,4 +40,16 @@ public final class TeamClassifier {
 
         return Team.OTHER;
     }
+
+    /** Équipe d'un utilisateur : champ Activité, sinon déduite de ses codes de service (AGENT_INBOUND → Inbound Voix…). */
+    public static Team classify(String activity, java.util.Collection<String> serviceCodes) {
+        Team team = classify(activity);
+        if (team != Team.OTHER || serviceCodes == null) return team;
+        for (String code : serviceCodes) {
+            if (code == null) continue;
+            Team t = classify(code.replace('_', ' '));
+            if (t != Team.OTHER) return t;
+        }
+        return team;
+    }
 }

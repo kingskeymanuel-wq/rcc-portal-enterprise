@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -498,43 +499,42 @@ public class MonRccService {
         }
 
         // Ciblage réel — un exemplaire par destinataire correspondant à la filiale/service/équipe choisis.
-        List<User> allUsers = userRepository.findAll();
-        List<User> matching = allUsers.stream()
-                .filter(u -> request.countryCode() == null || request.countryCode().isBlank()
-                        || request.countryCode().equalsIgnoreCase(u.getAffiliateBranch()))
-                .filter(u -> {
-                    if (request.activity() == null || request.activity().isBlank()) return true;
-                    // Comparaison exacte impossible : User.activity est un champ libre très
-                    // hétérogène ("INBOUND VOICE", "INBOUND MAIL/CIS", "CMB CIB"...), jamais une
-                    // des 4 valeurs canoniques telles quelles — d'où "Aucun agent ne correspond"
-                    // même quand des agents de cette équipe existent bel et bien. On classifie
-                    // avec la même logique que le reste du portail (Team Leader/Reporting), voir
-                    // TeamClassifier.
-                    try {
-                        return com.ecobank.rccportal.util.TeamClassifier.classify(u.getActivity()).name()
-                                .equalsIgnoreCase(request.activity());
-                    } catch (Exception e) {
-                        return false;
-                    }
-                })
-                .filter(u -> {
-                    if (request.serviceCode() == null || request.serviceCode().isBlank()) return true;
-                    var assignments = userServiceAssignmentRepository.findServicesByUserId(u.getId());
-                    return assignments.stream().anyMatch(a -> a.getService() != null
-                            && request.serviceCode().equalsIgnoreCase(a.getService().getCode()));
-                })
+        // Filiale : la fiche peut porter le code ISO2 (« CI ») ou ISO3 (« CIV ») → comparaison normalisée.
+        // Équipe : User.activity est un champ libre souvent vide → si elle ne se classe pas, on déduit
+        // l'équipe des services attribués (AGENT_INBOUND → Inbound Voix, AGENT_INBOUND_MAIL → Mail…).
+        String wantedCountry = country2(request.countryCode());
+        String wantedService = request.serviceCode() == null || request.serviceCode().isBlank() ? null : request.serviceCode().trim();
+        String wantedTeam = request.activity() == null || request.activity().isBlank() ? null : request.activity().trim();
+        List<User> byCountry = userRepository.findAll().stream()
+                .filter(u -> !Boolean.FALSE.equals(u.getAccountEnabled()))
+                .filter(u -> wantedCountry == null || wantedCountry.equalsIgnoreCase(country2(u.getAffiliateBranch())))
                 .toList();
+        Map<Long, List<String>> serviceCodes = new HashMap<>();
+        java.util.function.Function<User, List<String>> codesOf = u -> serviceCodes.computeIfAbsent(u.getId(), id ->
+                userServiceAssignmentRepository.findServicesByUserId(id).stream()
+                        .filter(a -> a.getService() != null && a.getService().getCode() != null)
+                        .map(a -> a.getService().getCode()).toList());
+        List<User> byService = byCountry.stream()
+                .filter(u -> wantedService == null || codesOf.apply(u).stream().anyMatch(wantedService::equalsIgnoreCase))
+                .toList();
+        List<User> matching = byService.stream()
+                .filter(u -> wantedTeam == null || com.ecobank.rccportal.util.TeamClassifier.classify(u.getActivity(), codesOf.apply(u)).name().equalsIgnoreCase(wantedTeam))
+                .toList();
+        if (matching.isEmpty()) {
+            throw ApiException.badRequest("Aucun destinataire : " + byCountry.size() + " utilisateur(s) actif(s) dans la filiale"
+                    + (wantedService != null ? ", dont " + byService.size() + " avec ce service" : "")
+                    + (wantedTeam != null ? ", dont 0 dans cette équipe" : "")
+                    + ". Élargissez la cible (laissez un filtre sur « Tous »).");
+        }
 
         RccNotification last = null;
         for (User target : matching) {
             last = notificationRepository.save(RccNotification.builder()
                     .targetUser(target).content(request.content()).isRead(false).build());
         }
-        if (last == null) {
-            throw ApiException.badRequest("Aucun agent ne correspond à cette filiale/service/équipe.");
-        }
         return toResponse(last);
     }
+
 
     // ---------- Permissions ----------
 
