@@ -52,6 +52,10 @@
             } else if (r.actionType === "COMPETITION_TEAM_SELECTION" && r.actionTarget) {
                 actionBtn = '<a class="btn btn-sm btn-warning me-2" href="/team-leader">' +
                     '<i class="bi bi-trophy-fill"></i> Choisir les membres</a>';
+            } else if (r.actionType === "OPEN_MEETING" && r.actionTarget) {
+                actionBtn = '<a class="btn btn-sm btn-outline-primary me-2" ' +
+                    'href="/workflow?meeting=' + encodeURIComponent(r.actionTarget) + '">' +
+                    '<i class="bi bi-chat-square-heart"></i> Ouvrir le meeting</a>';
             }
 
             var unreadClass = r.isRead ? "" : "bg-light";

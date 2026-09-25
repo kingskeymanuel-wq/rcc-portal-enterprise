@@ -212,6 +212,9 @@ public class AssignedTaskService {
     public AssignedTaskResponse markDone(Integer taskId, String username) {
         AssignedTask task = assignedTaskRepository.findById(taskId).orElseThrow(() -> ApiException.notFound("Tâche inconnue."));
         assertCanManage(task, username);
+        if (task.getRelatedMeetingId() != null) {
+            throw ApiException.badRequest("Tâche de meeting : utilisez « Remplir le compte rendu » ou « Lire et approuver ».");
+        }
         task.setStatus("DONE".equals(task.getStatus()) ? "OPEN" : "DONE");
         return toResponse(assignedTaskRepository.save(task));
     }
@@ -220,6 +223,9 @@ public class AssignedTaskService {
     public void delete(Integer taskId, String username) {
         AssignedTask task = assignedTaskRepository.findById(taskId).orElseThrow(() -> ApiException.notFound("Tâche inconnue."));
         assertCanManage(task, username);
+        if (task.getRelatedMeetingId() != null && "OPEN".equals(task.getStatus())) {
+            throw ApiException.badRequest("Tâche de meeting en cours : elle se clôture avec le compte rendu (ou l'annulation du meeting).");
+        }
         assignedTaskRepository.delete(task);
     }
 
@@ -252,6 +258,6 @@ public class AssignedTaskService {
                 createdBy != null ? createdBy.getUsername() : null,
                 createdBy != null ? createdBy.getName() : null,
                 t.getDueDate(), t.getPriority() == null ? "NORMAL" : t.getPriority(), t.getStatus(), t.getCreatedAt(),
-                t.getCategory(), t.getJustified(), t.getRelatedDate());
+                t.getCategory(), t.getJustified(), t.getRelatedDate(), t.getRelatedMeetingId());
     }
 }

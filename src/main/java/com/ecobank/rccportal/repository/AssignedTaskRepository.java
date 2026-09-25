@@ -13,4 +13,6 @@ public interface AssignedTaskRepository extends JpaRepository<AssignedTask, Inte
     List<AssignedTask> findByAssignedToTeamCodeOrderByCreatedAtDesc(String teamCode);
     List<AssignedTask> findByCreatedByUserAndAssignedToIsNullAndAssignedToTeamCodeIsNullOrderByCreatedAtDesc(User createdByUser);
     List<AssignedTask> findByCategoryIsNotNullOrderByCreatedAtDesc();
+
+    List<AssignedTask> findByRelatedMeetingId(Long relatedMeetingId);
 }

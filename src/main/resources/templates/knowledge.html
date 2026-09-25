@@ -109,15 +109,8 @@
                             <div class="col-md-3">
                                 <input type="text" class="form-control" id="newCategoryIcon" placeholder="Icône Bootstrap (ex. bi-credit-card, optionnel)">
                             </div>
-                            <div class="col-md-3">
-                                <select class="form-select" id="newCategoryTeam">
-                                    <option value="">Inbound (historique)</option>
-                                    <option value="INBOUND_VOICE">Inbound Voix</option>
-                                    <option value="INBOUND_MAIL">Inbound Mail / Rafiki</option>
-                                    <option value="CIB">CIB</option>
-                                    <option value="OUTBOUND">Outbound</option>
-                                </select>
-                            </div>
+                            <!-- Base commune à toutes les équipes : plus de choix d'équipe. -->
+                            <input type="hidden" id="newCategoryTeam" value="">
                             <div class="col-12">
                                 <button class="btn btn-primary btn-sm" id="createCategoryBtn">Créer</button>
                                 <button class="btn btn-outline-secondary btn-sm" id="cancelCategoryBtn">Annuler</button>

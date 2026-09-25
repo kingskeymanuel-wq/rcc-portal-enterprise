@@ -54,20 +54,9 @@ public class KnowledgeService {
      */
     @Transactional(readOnly = true)
     public List<KnowledgeCategoryResponse> listCategoriesFor(com.ecobank.rccportal.security.AuthenticatedUser requester) {
-        boolean isAdmin = requester != null && "admin".equalsIgnoreCase(requester.role());
-        boolean isQa = requester != null && requester.service() != null
-                && "quality assurance".equals(requester.service().toLowerCase().replace('_', ' '));
-        if (isAdmin || isQa || requester == null) {
-            return listCategories();
-        }
-        var user = userRepository.findFirstByUsernameIgnoreCase(requester.username()).orElse(null);
-        String myTeam = user != null
-                ? com.ecobank.rccportal.util.TeamClassifier.classify(user.getActivity()).name()
-                : null;
-        if (myTeam == null || "OTHER".equals(myTeam)) {
-            return listCategories(); // équipe non classifiée — pas de filtrage plutôt que de tout cacher
-        }
-        return listCategories(myTeam);
+        // Base de connaissances UNIQUE : toutes les équipes (Inbound Voix, Mail/Rafiki, CIB,
+        // Outbound, agences…) voient exactement les mêmes rubriques — plus de filtrage par équipe.
+        return listCategories();
     }
 
     // ---------- Categories ----------

@@ -583,6 +583,30 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
                     CONSTRAINT UQ_AtmAgencyStatus UNIQUE (CountryCode, AgencyCode)
                 )
                 """);
+        // Meetings de performance (tête-à-tête Team Leader ↔ agent), remontés au Head QA et au Head RCC.
+        createIfMissing("CoachingMeetings", """
+                CREATE TABLE dbo.CoachingMeetings (
+                    MeetingId BIGINT IDENTITY PRIMARY KEY,
+                    TeamLeaderId BIGINT NOT NULL,
+                    AgentId BIGINT NOT NULL,
+                    ScheduledAt DATETIME2 NOT NULL,
+                    DurationMinutes INT NULL,
+                    Location NVARCHAR(200) NULL,
+                    Objective NVARCHAR(300) NOT NULL,
+                    Agenda NVARCHAR(2000) NULL,
+                    CcUsernames NVARCHAR(1000) NULL,
+                    Status NVARCHAR(20) NOT NULL,
+                    Reasons NVARCHAR(2000) NULL,
+                    Strengths NVARCHAR(2000) NULL,
+                    Improvements NVARCHAR(2000) NULL,
+                    ActionPlan NVARCHAR(2000) NULL,
+                    FollowUpDate DATE NULL,
+                    ReportedAt DATETIME2 NULL,
+                    AgentComment NVARCHAR(1000) NULL,
+                    AcknowledgedAt DATETIME2 NULL,
+                    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+                )
+                """);
         createIfMissing("UserAgency", """
                 CREATE TABLE dbo.UserAgency (
                     UserId BIGINT NOT NULL PRIMARY KEY,
@@ -617,6 +641,8 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         addColumnIfMissing("AssignedTasks", "Priority", "ALTER TABLE dbo.AssignedTasks ADD Priority NVARCHAR(10) NOT NULL DEFAULT 'NORMAL'");
         addColumnIfMissing("AssignedTasks", "Category", "ALTER TABLE dbo.AssignedTasks ADD Category NVARCHAR(30) NULL");
         addColumnIfMissing("AssignedTasks", "Justified", "ALTER TABLE dbo.AssignedTasks ADD Justified BIT NULL");
+        // Meeting tête-à-tête Team Leader ↔ agent : tâche « compte rendu » (TL) / « lu et approuvé » (agent).
+        addColumnIfMissing("AssignedTasks", "RelatedMeetingId", "ALTER TABLE dbo.AssignedTasks ADD RelatedMeetingId BIGINT NULL");
         addColumnIfMissing("AssignedTasks", "RelatedDate", "ALTER TABLE dbo.AssignedTasks ADD RelatedDate DATE NULL");
 
         boolean communitiesJustCreated = !tableExists("RccCommunities");

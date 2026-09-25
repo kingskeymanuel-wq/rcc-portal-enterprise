@@ -602,7 +602,10 @@
             doneToggle.classList.toggle("open");
         });
 
-        Array.prototype.forEach.call(container.querySelectorAll(".wf-task-check"), function (btn) {
+        Array.prototype.forEach.call(container.querySelectorAll(".wf-meeting-open"), function (btn) {
+            btn.addEventListener("click", function () { RccMeetings.openMeeting(Number(btn.getAttribute("data-meeting"))); });
+        });
+        Array.prototype.forEach.call(container.querySelectorAll(".wf-task-check[data-id]"), function (btn) {
             btn.addEventListener("click", function () {
                 var card = btn.closest(".wf-task-card");
                 var completing = card && !card.classList.contains("wf-done");
@@ -676,12 +679,22 @@
                 (t.category === "ATTENDANCE_LATE" ? "Retard" : "Absence") + '</span>' + justifiedChip;
         } else if (t.category === "QA_COACHING") {
             categoryChip = '<span class="wf-task-chip" style="background:#e7f1ff;color:#0057B8;"><i class="bi bi-chat-dots-fill"></i> Entretien qualité</span>';
+        } else if (t.category === "MEETING_REPORT" || t.category === "MEETING_ACK") {
+            categoryChip = '<span class="wf-task-chip" style="background:#FFF1E0;color:#B45309;"><i class="bi bi-chat-square-heart"></i> Meeting tête-à-tête</span>';
         }
-        var signaturePrompt = (t.category && !isDone)
+        // Tâche de meeting : pas de case à cocher ni de suppression — elle se clôt par le formulaire
+        // (compte rendu du Team Leader) ou par « Lu et approuvé » (agent).
+        var meeting = t.relatedMeetingId && (t.category === "MEETING_REPORT" || t.category === "MEETING_ACK");
+        var signaturePrompt = meeting
+            ? (isDone ? "" : '<button type="button" class="btn btn-sm ' + (t.category === "MEETING_REPORT" ? "btn-primary" : "btn-success") + ' mt-2 wf-meeting-open" data-meeting="' + t.relatedMeetingId + '">' +
+                (t.category === "MEETING_REPORT" ? '<i class="bi bi-journal-text"></i> Remplir le compte rendu' : '<i class="bi bi-patch-check"></i> Lire et approuver') + '</button>')
+            : (t.category && !isDone)
             ? '<div class="small text-primary mt-1"><i class="bi bi-pen"></i> Cochez pour signer — vous attestez en avoir pris connaissance.</div>' : "";
+        var check = meeting
+            ? '<div class="wf-task-check wf-task-check-locked" title="Se clôt via le formulaire du meeting">' + (isDone ? '<i class="bi bi-check-lg small"></i>' : '<i class="bi bi-lock-fill small"></i>') + '</div>'
+            : '<div class="wf-task-check" data-id="' + t.taskId + '" title="' + (t.category ? "Signer" : "Marquer comme fait") + '">' + (isDone ? '<i class="bi bi-check-lg small"></i>' : '') + '</div>';
 
-        return '<div class="' + cardClass + '">' +
-            '<div class="wf-task-check" data-id="' + t.taskId + '" title="' + (t.category ? "Signer" : "Marquer comme fait") + '">' + (isDone ? '<i class="bi bi-check-lg small"></i>' : '') + '</div>' +
+        return '<div class="' + cardClass + '">' + check +
             '<div class="flex-grow-1">' +
             '<div class="wf-task-title">' + escapeHtml(t.title) + '</div>' +
             (t.description ? '<div class="wf-task-desc">' + escapeHtml(t.description) + '</div>' : "") +
@@ -689,7 +702,7 @@
             signaturePrompt +
             '</div>' +
             '<div class="wf-task-actions">' +
-            '<button class="btn btn-sm btn-outline-danger delete-task-btn" data-id="' + t.taskId + '"><i class="bi bi-trash"></i></button>' +
+            (meeting ? "" : '<button class="btn btn-sm btn-outline-danger delete-task-btn" data-id="' + t.taskId + '"><i class="bi bi-trash"></i></button>') +
             '</div></div>';
     }
 
@@ -1227,8 +1240,43 @@
         { btn: "wfTabSlaBtn", pane: "wfPaneSla", onShow: function () { showPolesListView(); } },
         { btn: "wfTabHistoryBtn", pane: "wfPaneHistory", onShow: function () { loadHistory(); } },
         { btn: "wfTabTemplatesBtn", pane: "wfPaneTemplates", onShow: function () { loadTemplatesAdmin(); } },
-        { btn: "wfTabTasksBtn", pane: "wfPaneTasks" }
+        { btn: "wfTabTasksBtn", pane: "wfPaneTasks" },
+        { btn: "wfTabMeetingsBtn", pane: "wfPaneMeetings", onShow: function () { loadMeetings(); } }
     ];
+
+    // ===== Meetings tête-à-tête (meetings.js) =====
+    // Team Leader : ses meetings ; agent : les siens ; Head QA / Head RCC / admin : tous (remontée).
+    function loadMeetings() {
+        var box = document.getElementById("wfMeetingsList");
+        if (box && window.RccMeetings) RccMeetings.renderList(box, { onCounts: showMeetingBadge });
+    }
+    function showMeetingBadge(counts) {
+        var b = document.getElementById("wfBadgeMeetings");
+        if (!b) return;
+        b.textContent = counts.todo;
+        b.style.display = counts.todo ? "" : "none";
+    }
+    function wireMeetings() {
+        if (!window.RccMeetings) return;
+        RccMeetings.onChange(function () {
+            loadNotes();
+            var pane = document.getElementById("wfPaneMeetings");
+            if (pane && pane.style.display !== "none") loadMeetings(); else refreshMeetingBadge();
+        });
+        refreshMeetingBadge();
+        // Lien direct (notification, e-mail) : /workflow?meeting=ID ouvre l'onglet et le meeting.
+        var m = /[?&]meeting=(\d+)/.exec(location.search);
+        if (m) {
+            var def = TAB_DEFS.filter(function (d) { return d.btn === "wfTabMeetingsBtn"; })[0];
+            activateTab(def);
+            RccMeetings.openMeeting(Number(m[1]));
+        }
+    }
+    function refreshMeetingBadge() {
+        getJson("/api/meetings").then(function (list) {
+            showMeetingBadge({ todo: list.filter(function (x) { return x.canReport || x.canAcknowledge; }).length });
+        }).catch(function () { /* badge facultatif */ });
+    }
 
     function wireTabs() {
         TAB_DEFS.forEach(function (def) {
@@ -1578,6 +1626,7 @@
         loadRequestTemplates();
         wireNotes();
         loadNotes();
+        wireMeetings();
 
         fetch("/api/auth/me", { credentials: "same-origin" })
             .then(function (res) { return res.json(); })

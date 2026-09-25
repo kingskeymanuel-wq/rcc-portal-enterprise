@@ -75,11 +75,8 @@
                 if (!category) return;
                 var newTitle = prompt("Nouveau titre de la catégorie :", category.title);
                 if (!newTitle || !newTitle.trim()) return;
-                var teamPrompt = "Équipe (laisser vide = Inbound historique) :\n" +
-                    "INBOUND_VOICE, INBOUND_MAIL, CIB ou OUTBOUND";
-                var newTeam = prompt(teamPrompt, category.team || "");
-                if (newTeam === null) return; // annulé
-                sendJson("/api/kb/categories/" + category.categoryId, "PUT", { title: newTitle.trim(), team: newTeam.trim() })
+                // Base commune à toutes les équipes : plus de choix d'équipe par rubrique.
+                sendJson("/api/kb/categories/" + category.categoryId, "PUT", { title: newTitle.trim(), team: "" })
                     .then(function () { loadCategories(currentCategoryId); })
                     .catch(function (e) { alert("Erreur : " + e.message); });
             });
@@ -124,7 +121,7 @@
 
     function isAdminOnly() { return currentProfile === "ADMIN"; }
 
-    var currentTeamFilter = ""; // "" = auto (backend décide : QA/Admin voient tout, agent voit sa propre équipe)
+    var currentTeamFilter = ""; // base commune : jamais de filtre par équipe
 
     function loadCategories(thenSelectCategoryId) {
         var url = "/api/kb/categories" + (currentTeamFilter ? "?team=" + encodeURIComponent(currentTeamFilter) : "");
@@ -140,29 +137,10 @@
         }).catch(function (e) { console.error(e); });
     }
 
-    /** Barre d'onglets équipe — réservée QA/Admin (un agent classique est déjà auto-filtré côté serveur). */
+    /** Base de connaissances commune à toutes les équipes : plus de barre de filtre par équipe. */
     function renderTeamTabBar() {
-        if (!isQaOrAdmin()) { $("kbTeamTabBar").style.display = "none"; return; }
-        $("kbTeamTabBar").style.display = "";
-        var teams = [
-            { code: "", label: "Toutes" },
-            { code: "INBOUND_VOICE", label: "Inbound Voix" },
-            { code: "INBOUND_MAIL", label: "Inbound Mail / Rafiki" },
-            { code: "CIB", label: "CIB" },
-            { code: "OUTBOUND", label: "Outbound" }
-        ];
-        var buttons = teams.map(function (t) {
-            var active = currentTeamFilter === t.code ? "btn-primary" : "btn-outline-secondary";
-            return '<button type="button" class="btn btn-sm ' + active + ' team-tab-btn" data-team="' + t.code + '">' + t.label + '</button>';
-        }).join("");
-        $("kbTeamTabBar").innerHTML = '<span class="text-muted small"><i class="bi bi-people-fill"></i> Équipe :</span> ' + buttons;
-        Array.prototype.forEach.call($("kbTeamTabBar").querySelectorAll(".team-tab-btn"), function (btn) {
-            btn.addEventListener("click", function () {
-                currentTeamFilter = btn.getAttribute("data-team");
-                renderTeamTabBar();
-                loadCategories();
-            });
-        });
+        var bar = $("kbTeamTabBar");
+        if (bar) { bar.style.display = "none"; bar.innerHTML = ""; }
     }
 
     function populateCategorySelect() {

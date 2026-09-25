@@ -64,4 +64,8 @@ public class AssignedTask extends Auditable {
     /** Date du retard/absence, ou date de l'évaluation QA concernée. */
     @Column(name = "RelatedDate")
     private java.time.LocalDate relatedDate;
+
+    /** Meeting tête-à-tête lié (Category = MEETING_REPORT pour le TL, MEETING_ACK pour l'agent). */
+    @Column(name = "RelatedMeetingId")
+    private Long relatedMeetingId;
 }

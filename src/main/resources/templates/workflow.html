@@ -10,6 +10,7 @@
     <link rel="stylesheet" th:href="@{/css/support-requests.css}">
     <link rel="stylesheet" th:href="@{/css/workflow-tasks.css}">
     <link rel="stylesheet" th:href="@{/css/workflow-ui.css}">
+    <link rel="stylesheet" th:href="@{/css/meetings.css}">
     <style>
         .wf-tab-nav .btn.nav-link { border: none; border-bottom: 3px solid transparent; border-radius: 0; color: #6b7280; font-weight: 600; padding: .75rem 1.1rem; }
         .wf-tab-nav .btn.nav-link.active { color: #0057B8; border-bottom-color: #0057B8; background: transparent; }
@@ -161,6 +162,7 @@
                     <li class="nav-item qa-only" style="display:none;"><button type="button" class="btn nav-link" id="wfTabHistoryBtn"><i class="bi bi-archive"></i> Historique</button></li>
                     <li class="nav-item qa-only" style="display:none;"><button type="button" class="btn nav-link" id="wfTabTemplatesBtn"><i class="bi bi-file-earmark-text"></i> Modèles</button></li>
                     <li class="nav-item"><button type="button" class="btn nav-link" id="wfTabTasksBtn"><i class="bi bi-journal-text"></i> Tâches &amp; notes <span class="badge bg-primary" id="wfBadgeTasks" style="display:none;"></span></button></li>
+                    <li class="nav-item"><button type="button" class="btn nav-link" id="wfTabMeetingsBtn"><i class="bi bi-chat-square-heart"></i> Meetings <span class="badge bg-warning text-dark" id="wfBadgeMeetings" style="display:none;"></span></button></li>
                 </ul>
 
                 <!-- ===================== VUE D'ENSEMBLE ===================== -->
@@ -526,6 +528,15 @@
                     </div>
                 </div>
 
+                <!-- ===================== MEETINGS TÊTE-À-TÊTE ===================== -->
+                <div id="wfPaneMeetings" class="wf-tab-pane" style="display:none;">
+                    <div class="card dashboard-card shadow-sm"><div class="card-body">
+                        <h5 class="card-title mb-1"><i class="bi bi-chat-square-heart"></i> Meetings de performance</h5>
+                        <p class="text-muted small mb-3">Tête-à-tête Team Leader ↔ agent : le Team Leader remplit le compte rendu, l'agent le lit et l'approuve, puis il remonte au Head QA et au Head RCC (qui voient ici tous les meetings).</p>
+                        <div id="wfMeetingsList"></div>
+                    </div></div>
+                </div>
+
                 <!-- ===================== TÂCHES & NOTES ===================== -->
                 <div id="wfPaneTasks" class="wf-tab-pane" style="display:none;">
 
@@ -647,6 +658,7 @@
 <script th:src="@{/js/rcc-api.js}"></script>
 <script th:src="@{/js/session.js}"></script>
 <script th:src="@{/js/support-requests.js}"></script>
+<script th:src="@{/js/meetings.js}"></script>
 <script th:src="@{/js/workflow.js}"></script>
 <!-- Modale détail d'une demande à valider -->
 <div class="modal fade" id="wfPendingDetailModal" tabindex="-1">

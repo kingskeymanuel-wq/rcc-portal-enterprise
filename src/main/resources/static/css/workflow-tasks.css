@@ -144,3 +144,6 @@
 @media (prefers-reduced-motion: reduce) {
     .tk-hero, .tk-hero-art i, .tk-stat, .tk-card, #wfPaneTasks .wf-task-card, .tk-empty-art, .tk-stat-late.has-late .tk-stat-ic { animation: none !important; }
 }
+/* Tâche de meeting : se clôt via le formulaire (compte rendu / « Lu et approuvé »), pas par la case. */
+#wfPaneTasks .wf-task-check.wf-task-check-locked { cursor: default; color: #B45309; border-color: #F5C98B; background: #FFF7EC; }
+#wfPaneTasks .wf-task-check.wf-task-check-locked:hover { transform: none; background: #FFF7EC; }

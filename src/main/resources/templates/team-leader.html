@@ -9,11 +9,41 @@
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <link rel="stylesheet" th:href="@{/css/support-requests.css}">
     <link rel="stylesheet" th:href="@{/css/excelliam-portal.css}">
+    <link rel="stylesheet" th:href="@{/css/meetings.css}">
     <style>
-        .tl-tab-nav .btn.nav-link { border: none; border-bottom: 3px solid transparent; border-radius: 0; color: #6b7280; font-weight: 600; padding: .75rem 1.1rem; }
-        .tl-tab-nav .btn.nav-link.active { color: #0057B8; border-bottom-color: #0057B8; background: transparent; }
-        .tl-stat-card { border: none; border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,.05); }
-        .tl-stat-value { font-size: 1.7rem; font-weight: 700; }
+        .tl-tab-nav { gap: .35rem; padding: .7rem .8rem; background: #F5F8FC; border-radius: 1rem 1rem 0 0; }
+        .tl-tab-nav .btn.nav-link { border: 0; border-radius: 999px; color: #4B5A70; font-weight: 700; font-size: .86rem; padding: .45rem .95rem; transition: background .2s ease, color .2s ease, box-shadow .2s ease; }
+        .tl-tab-nav .btn.nav-link:hover { background: #fff; color: #0057B8; }
+        .tl-tab-nav .btn.nav-link.active { color: #fff; background: linear-gradient(135deg, #0057B8, #0F9D6C); box-shadow: 0 6px 14px rgba(0, 87, 184, .25); }
+        .tl-tab-count { display: inline-block; min-width: 1.25rem; padding: 0 .35rem; margin-left: .15rem; border-radius: 999px; background: #F59E0B; color: #fff; font-size: .68rem; }
+        .tl-stat-value { font-size: 1.6rem; font-weight: 800; color: #122240; line-height: 1.1; }
+        .tl-hero { position: relative; overflow: hidden; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding: 1.5rem 1.6rem; margin-bottom: 1.2rem; border-radius: 1.4rem; color: #fff; background: linear-gradient(120deg, #1B1F6B 0%, #0057B8 55%, #0F9D6C 100%); box-shadow: 0 16px 36px rgba(0, 45, 110, .25); }
+        .tl-hero::after { content: ""; position: absolute; right: -60px; top: -80px; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.18), transparent 70%); pointer-events: none; }
+        .tl-hero h2 { margin: .2rem 0 .15rem; font-weight: 800; font-size: 1.6rem; }
+        .tl-hero p { margin: 0; opacity: .85; }
+        .tl-hero-kicker { font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; opacity: .85; }
+        .tl-hero-actions { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-end; gap: .6rem; }
+        .tl-meeting-btn { display: flex; align-items: center; gap: .7rem; border: 0; border-radius: 1rem; padding: .65rem 1.1rem; background: #fff; color: #0057B8; text-align: left; box-shadow: 0 10px 24px rgba(0,0,0,.18); transition: transform .2s ease, box-shadow .2s ease; }
+        .tl-meeting-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(0,0,0,.22); }
+        .tl-meeting-btn > .bi { font-size: 1.5rem; width: 42px; height: 42px; border-radius: .8rem; display: flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(135deg, #F59E0B, #E0435B); }
+        .tl-meeting-btn b { display: block; font-size: 1rem; color: #122240; }
+        .tl-meeting-btn small { display: block; font-size: .74rem; color: #6B7A90; }
+        .tl-quick { display: flex; flex-wrap: wrap; gap: .4rem; }
+        .tl-quick a { color: #fff; text-decoration: none; font-size: .8rem; font-weight: 700; padding: .3rem .75rem; border-radius: 999px; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.25); transition: background .2s ease; }
+        .tl-quick a:hover { background: rgba(255,255,255,.3); }
+        .tl-dot-badge { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px; background: #E0435B; color: #fff; font-size: .62rem; display: flex; align-items: center; justify-content: center; }
+        .tl-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .8rem; margin-bottom: 1.2rem; }
+        .tl-kpi { display: flex; align-items: center; gap: .8rem; padding: 1rem; border: 1px solid #EEF1F5; border-radius: 1.1rem; background: #fff; box-shadow: 0 8px 20px rgba(0, 32, 84, .05); text-align: left; transition: transform .2s ease, box-shadow .2s ease; }
+        .tl-kpi:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(0, 32, 84, .09); }
+        .tl-kpi small { color: #6B7A90; }
+        .tl-kpi-link { cursor: pointer; }
+        .tl-kpi-ico { width: 46px; height: 46px; flex-shrink: 0; border-radius: .9rem; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
+        .tl-kpi-ico.blue { background: #EAF2FF; color: #0057B8; } .tl-kpi-ico.green { background: #E6F6EE; color: #0F9D6C; }
+        .tl-kpi-ico.violet { background: #F1E9FF; color: #7B2FF7; } .tl-kpi-ico.orange { background: #FFF1E0; color: #D97706; }
+        .tl-meet-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .5rem; margin-bottom: 1rem; }
+        .tl-meet-steps span { display: flex; gap: .5rem; align-items: flex-start; padding: .6rem .7rem; border-radius: .9rem; background: #F5F8FC; font-size: .8rem; color: #33415C; }
+        .tl-meet-steps b { flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #0057B8; color: #fff; font-size: .72rem; }
+        @media (max-width: 767px) { .tl-hero-actions { align-items: stretch; width: 100%; } .tl-hero { padding: 1.2rem; } }
         .tl-status-badge.PLANNED, .tl-status-badge.PENDING { background: #fff3cd; color: #7a5b00; }
         .tl-status-badge.DONE, .tl-status-badge.CONFIRMED { background: #d1f2e0; color: #0a6b3f; }
         .tl-status-badge.NO_SHOW, .tl-status-badge.CANCELLED { background: #fde2e2; color: #b02a2a; }
@@ -39,50 +69,40 @@
         <main id="page-content">
             <div class="container-fluid">
 
-                <div class="welcome-banner d-flex justify-content-between align-items-end flex-wrap gap-2">
-                    <div>
-                        <h2><i class="bi bi-people-fill"></i> Portail Team Leader</h2>
-                        <p class="text-muted mb-0" id="tlSubtitle">Gestion de votre équipe — reporting, qualité, présence</p>
+                <section class="tl-hero">
+                    <div class="tl-hero-text">
+                        <span class="tl-hero-kicker"><i class="bi bi-stars"></i> Espace Team Leader</span>
+                        <h2 id="tlHello">Portail Team Leader</h2>
+                        <p id="tlSubtitle">Gestion de votre équipe — reporting, qualité, présence</p>
                     </div>
-                    <div class="d-flex gap-2 flex-wrap">
-                        <a href="/shift?open=live" class="btn btn-sm btn-outline-danger">
-                            <i class="bi bi-broadcast"></i> En direct
-                        </a>
-                        <a href="/shift?open=swap" class="btn btn-sm btn-outline-primary position-relative">
-                            <i class="bi bi-arrow-left-right"></i> Permutations
-                            <span class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle" id="tlSwapBadge" style="display:none; font-size:.6rem;">0</span>
-                        </a>
-                        <a href="/shift?open=leave" class="btn btn-sm btn-outline-primary position-relative">
-                            <i class="bi bi-calendar-plus"></i> Congés
-                            <span class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle" id="tlLeaveBadge" style="display:none; font-size:.6rem;">0</span>
-                        </a>
+                    <div class="tl-hero-actions">
+                        <button type="button" class="tl-meeting-btn" id="tlMeetingBtn">
+                            <i class="bi bi-people-fill"></i><span><b>Meeting</b><small>Tête-à-tête avec un agent</small></span>
+                        </button>
+                        <div class="tl-quick">
+                            <a href="/shift?open=live"><i class="bi bi-broadcast"></i> En direct</a>
+                            <a href="/shift?open=swap" class="position-relative"><i class="bi bi-arrow-left-right"></i> Permutations
+                                <span class="tl-dot-badge" id="tlSwapBadge" style="display:none;">0</span></a>
+                            <a href="/shift?open=leave" class="position-relative"><i class="bi bi-calendar-plus"></i> Congés
+                                <span class="tl-dot-badge" id="tlLeaveBadge" style="display:none;">0</span></a>
+                        </div>
                     </div>
-                </div>
+                </section>
 
                 <div id="tlNoTeamWarning" class="alert alert-warning" style="display:none;">
                     <i class="bi bi-exclamation-triangle"></i> Aucune équipe ne vous a été affectée. Contactez votre administrateur.
                 </div>
 
                 <div id="tlContent" style="display:none;">
-                    <div class="row g-3 mb-4">
-                        <div class="col-6 col-lg-4">
-                            <div class="card tl-stat-card h-100"><div class="card-body">
-                                <div class="tl-stat-value" id="tlStatMembers">—</div>
-                                <div class="text-muted small">Agents dans l'équipe</div>
-                            </div></div>
-                        </div>
-                        <div class="col-6 col-lg-4">
-                            <div class="card tl-stat-card h-100"><div class="card-body">
-                                <div class="tl-stat-value" id="tlStatQaScore">—</div>
-                                <div class="text-muted small">Score QA moyen</div>
-                            </div></div>
-                        </div>
-                        <div class="col-6 col-lg-4">
-                            <div class="card tl-stat-card h-100"><div class="card-body">
-                                <div class="tl-stat-value" id="tlStatEval">—</div>
-                                <div class="text-muted small">Évaluations QA (total)</div>
-                            </div></div>
-                        </div>
+                    <div class="tl-kpis">
+                        <div class="tl-kpi"><span class="tl-kpi-ico blue"><i class="bi bi-people"></i></span>
+                            <div><div class="tl-stat-value" id="tlStatMembers">—</div><small>Agents dans l'équipe</small></div></div>
+                        <div class="tl-kpi"><span class="tl-kpi-ico green"><i class="bi bi-award"></i></span>
+                            <div><div class="tl-stat-value" id="tlStatQaScore">—</div><small>Score QA moyen</small></div></div>
+                        <div class="tl-kpi"><span class="tl-kpi-ico violet"><i class="bi bi-clipboard-check"></i></span>
+                            <div><div class="tl-stat-value" id="tlStatEval">—</div><small>Évaluations QA (total)</small></div></div>
+                        <button type="button" class="tl-kpi tl-kpi-link" id="tlStatMeetingsCard"><span class="tl-kpi-ico orange"><i class="bi bi-chat-square-heart"></i></span>
+                            <div><div class="tl-stat-value" id="tlStatMeetings">—</div><small>Meetings à compléter</small></div></button>
                     </div>
 
 
@@ -116,6 +136,7 @@
                                 <button class="btn nav-link" id="tlTabCampaignsBtn" style="display:none;"><i class="bi bi-megaphone-fill"></i> Campagnes</button>
                                 <button class="btn nav-link" id="tlTabAlertsBtn"><i class="bi bi-exclamation-triangle"></i> Alertes</button>
                                 <button class="btn nav-link" id="tlTabCompetitionsBtn"><i class="bi bi-trophy-fill"></i> Compétitions</button>
+                                <button class="btn nav-link" id="tlTabMeetingsBtn"><i class="bi bi-chat-square-heart"></i> Meetings <span class="tl-tab-count" id="tlMeetingsTabCount" style="display:none;">0</span></button>
                             </nav>
                         </div>
 
@@ -254,6 +275,19 @@
                         </div>
 
                         <!-- ===================== COMPÉTITIONS ===================== -->
+                        <!-- ===================== MEETINGS TÊTE-À-TÊTE ===================== -->
+                        <div id="tlPaneMeetings" class="card-body" style="display:none;">
+                            <div class="tl-meet-intro">
+                                <div class="tl-meet-steps">
+                                    <span><b>1</b> Planifiez le tête-à-tête et mettez les responsables en copie</span>
+                                    <span><b>2</b> Après le meeting, remplissez le compte rendu (Workflow → Tâches &amp; notes)</span>
+                                    <span><b>3</b> L'agent coche « Lu et approuvé »</span>
+                                    <span><b>4</b> Le compte rendu remonte au Head QA et au Head RCC</span>
+                                </div>
+                            </div>
+                            <div id="tlMeetingsList"></div>
+                        </div>
+
                         <div id="tlPaneCompetitions" class="card-body" style="display:none;">
                             <p class="text-muted small">Compétitions où votre équipe est engagée — choisissez les membres qui participeront.</p>
                             <div id="tlCompetitionsList"><p class="text-muted text-center">Chargement…</p></div>
@@ -548,6 +582,7 @@
 <script th:src="@{/js/rcc-api.js}"></script>
 <script th:src="@{/js/session.js}"></script>
 <script th:src="@{/js/support-requests.js}"></script>
+<script th:src="@{/js/meetings.js}"></script>
 <script th:src="@{/js/team-leader.js}"></script>
 </body>
 </html>

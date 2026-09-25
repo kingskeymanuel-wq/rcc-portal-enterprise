@@ -8,5 +8,5 @@ public record AssignedTaskResponse(
         String assignedToUsername, String assignedToName, String assignedToTeamCode,
         String createdByUsername, String createdByName,
         LocalDate dueDate, String priority, String status, LocalDateTime createdAt,
-        String category, Boolean justified, LocalDate relatedDate) {
+        String category, Boolean justified, LocalDate relatedDate, Long relatedMeetingId) {
 }

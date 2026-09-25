@@ -37,9 +37,7 @@ public class KnowledgeApiController {
     @GetMapping("/categories")
     public List<KnowledgeCategoryResponse> categories(@RequestParam(required = false) String team,
                                                         @AuthenticationPrincipal AuthenticatedUser requester) {
-        if (team != null && !team.isBlank()) {
-            return knowledgeService.listCategories(team);
-        }
+        // Paramètre « team » conservé pour compatibilité mais ignoré : base commune à toutes les équipes.
         return knowledgeService.listCategoriesFor(requester);
     }
 

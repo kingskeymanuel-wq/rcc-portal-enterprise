@@ -10,7 +10,7 @@
     var salesByAgentCache = {}; // agentName -> count (mois du reporting en cours), Outbound uniquement
     var agentModal;
 
-    var TABS = ["Reporting", "Members", "Planning", "Qa", "Sales", "Rdv", "Campaigns", "Alerts", "Competitions"];
+    var TABS = ["Reporting", "Members", "Planning", "Qa", "Sales", "Rdv", "Campaigns", "Alerts", "Competitions", "Meetings"];
 
     function switchTab(tab) {
         TABS.forEach(function (t) {
@@ -29,6 +29,24 @@
         if (tab === "campaigns") loadCampaigns();
         if (tab === "alerts") loadAlerts();
         if (tab === "competitions") loadTeamLeaderCompetitions();
+        if (tab === "meetings") loadMeetings();
+    }
+
+    /** Meetings tête-à-tête (module partagé meetings.js) : liste + compteur « à compléter ». */
+    function loadMeetings() {
+        RccMeetings.renderList($("tlMeetingsList"), { canSchedule: true, onCounts: showMeetingCounts });
+    }
+    function refreshMeetingCounts() {
+        getJson("/api/meetings").then(function (list) {
+            var c = { todo: list.filter(function (m) { return m.canReport; }).length };
+            showMeetingCounts(c);
+        }).catch(function () { /* compteur facultatif */ });
+    }
+    function showMeetingCounts(counts) {
+        $("tlStatMeetings").textContent = counts.todo;
+        var badge = $("tlMeetingsTabCount");
+        badge.textContent = counts.todo;
+        badge.style.display = counts.todo ? "" : "none";
     }
 
     function currentMonthValue() {
@@ -251,6 +269,7 @@
                         '<div><strong>' + escapeHtml(u.fullName || u.username) + '</strong> ' + statusBadge +
                             '<div class="small text-muted">' + escapeHtml(u.email || "—") + ' · ' + escapeHtml(u.affiliateBranch || "—") + '</div></div>' +
                         '<div class="d-flex align-items-center gap-2">' +
+                            '<button type="button" class="btn btn-sm btn-outline-primary tl-meet-member-btn" data-username="' + escapeHtml(u.username) + '" title="Planifier un meeting tête-à-tête"><i class="bi bi-people-fill"></i> Meeting</button>' +
                             '<button type="button" class="btn btn-sm btn-outline-danger tl-remove-member-btn" data-id="' + u.id + '" data-name="' + escapeHtml(u.fullName || u.username) + '" title="Retirer de mon équipe"><i class="bi bi-person-dash-fill"></i></button>' +
                             '<i class="bi bi-chevron-right text-muted"></i>' +
                         '</div>' +
@@ -258,6 +277,12 @@
             }).join("");
             Array.prototype.forEach.call(container.querySelectorAll(".tl-member-row"), function (row) {
                 row.addEventListener("click", function () { openMemberDetail(members[Number(row.getAttribute("data-member-idx"))]); });
+            });
+            Array.prototype.forEach.call(container.querySelectorAll(".tl-meet-member-btn"), function (btn) {
+                btn.addEventListener("click", function (e) {
+                    e.stopPropagation();
+                    RccMeetings.openSchedule(btn.getAttribute("data-username"));
+                });
             });
             Array.prototype.forEach.call(container.querySelectorAll(".tl-remove-member-btn"), function (btn) {
                 btn.addEventListener("click", function (e) {
@@ -1260,6 +1285,16 @@
         $("tlTabCampaignsBtn").addEventListener("click", function () { switchTab("campaigns"); });
         $("tlTabAlertsBtn").addEventListener("click", function () { switchTab("alerts"); });
         $("tlTabCompetitionsBtn").addEventListener("click", function () { switchTab("competitions"); });
+        $("tlTabMeetingsBtn").addEventListener("click", function () { switchTab("meetings"); });
+        $("tlStatMeetingsCard").addEventListener("click", function () { switchTab("meetings"); });
+        $("tlMeetingBtn").addEventListener("click", function () { RccMeetings.openSchedule(); });
+        RccMeetings.onChange(function () {
+            if ($("tlPaneMeetings").style.display !== "none") loadMeetings(); else refreshMeetingCounts();
+        });
+        getJson("/api/auth/me").then(function (me) {
+            var first = String((me && (me.name || me.username)) || "").split(/\s+/)[0];
+            if (first) $("tlHello").textContent = "Bonjour " + first + " 👋";
+        }).catch(function () { /* titre par défaut */ });
 
         $("tlReportingApplyBtn").addEventListener("click", loadReporting);
         $("tlSalesApplyBtn").addEventListener("click", loadSales);
@@ -1275,6 +1310,8 @@
                 $("tlTabCampaignsBtn").style.display = "";
             }
             loadReporting();
+            refreshMeetingCounts();
+            if (/[?&]tab=meetings\b/.test(location.search)) switchTab("meetings");
             checkPendingNotificationPopup(notifPopupModal);
             loadTlToolBadges();
         }).catch(function () {
