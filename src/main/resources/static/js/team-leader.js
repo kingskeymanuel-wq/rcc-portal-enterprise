@@ -11,7 +11,9 @@
     var salesByAgentCache = {}; // agentName -> count (mois du reporting en cours), Outbound uniquement
     var agentModal;
 
-    var TABS = ["Reporting", "Members", "Planning", "Qa", "Sales", "Rdv", "Campaigns", "Alerts", "Competitions", "Meetings"];
+    var TABS = ["Reporting", "Members", "Planning", "Qa", "PerfFiles", "Sales", "Rdv", "Campaigns", "Alerts", "Competitions", "Meetings"];
+
+    var perfFilesMounted = false;
 
     function switchTab(tab) {
         TABS.forEach(function (t) {
@@ -25,6 +27,7 @@
         if (tab === "members") loadMembers();
         if (tab === "planning") loadPlanningTab();
         if (tab === "qa") loadQa();
+        if (tab === "perffiles" && !perfFilesMounted && window.RccPerfFiles) { perfFilesMounted = true; RccPerfFiles.mountImport($("tlPerfFilesRoot")); }
         if (tab === "sales") loadSales();
         if (tab === "rdv") loadRdv();
         if (tab === "campaigns") loadCampaigns();
@@ -1640,6 +1643,7 @@
         $("tlTabMembersBtn").addEventListener("click", function () { switchTab("members"); });
         $("tlTabPlanningBtn").addEventListener("click", function () { switchTab("planning"); });
         $("tlTabQaBtn").addEventListener("click", function () { switchTab("qa"); });
+        $("tlTabPerfFilesBtn").addEventListener("click", function () { switchTab("perffiles"); });
         $("tlTabSalesBtn").addEventListener("click", function () { switchTab("sales"); });
         $("tlTabRdvBtn").addEventListener("click", function () { switchTab("rdv"); });
         $("tlTabCampaignsBtn").addEventListener("click", function () { switchTab("campaigns"); });

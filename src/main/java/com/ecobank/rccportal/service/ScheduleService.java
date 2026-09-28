@@ -60,7 +60,27 @@ public class ScheduleService {
     /** "Matin 08h-17h", "Nuit 21h-07h", "Après-midi 12h-21h"... — capture heure/minute de
      *  début et de fin. Les minutes sont optionnelles (ex. "8h" aussi bien que "08h30"). */
     private static final Pattern TIME_RANGE_PATTERN =
-            Pattern.compile("(\\d{1,2})h(\\d{2})?\\s*-\\s*(\\d{1,2})h(\\d{2})?");
+            Pattern.compile("(?i)(\\d{1,2})\\s*h(\\d{2})?\\s*-\\s*(\\d{1,2})\\s*h(\\d{2})?");
+
+    /** Lignes de synthèse du planning Exceliam : « TOTAL M2 (08H - 17H) » — la seule « légende » de ce fichier. */
+    private static final Pattern TOTAL_LEGEND_PATTERN =
+            Pattern.compile("(?i)^TOTAL\\s+([A-Z][A-Z0-9]{0,3})\\s*\\((.*)\\)\\s*$");
+
+    /** Mentions ajoutées après le nom dans le planning (en rouge) : « Premium », « Premium vendredi et samedi », « Stage », site « Aghien »… */
+    static final Pattern NAME_ANNOTATION = Pattern.compile("(?i)\\s+((?:premium|stage|stagiaire|aghien|interim|intérim)\\b.*)$");
+
+    /** Codes habituels quand le fichier ne les définit pas (les horaires du fichier restent prioritaires). */
+    private static final Map<String, ShiftDef> DEFAULT_CODES = Map.of(
+            "M", new ShiftDef("Matin 07h-16h", LocalTime.of(7, 0), LocalTime.of(16, 0), false),
+            "M2", new ShiftDef("Matin 08h-17h", LocalTime.of(8, 0), LocalTime.of(17, 0), false),
+            "M3", new ShiftDef("Matin 09h-18h", LocalTime.of(9, 0), LocalTime.of(18, 0), false),
+            "M4", new ShiftDef("Matin 10h-19h", LocalTime.of(10, 0), LocalTime.of(19, 0), false),
+            "A", new ShiftDef("Après-midi 12h-21h", LocalTime.of(12, 0), LocalTime.of(21, 0), false),
+            "N", new ShiftDef("Nuit 21h-07h", LocalTime.of(21, 0), LocalTime.of(7, 0), true),
+            "C", new ShiftDef("Congé", null, null, false),
+            "RM", new ShiftDef("Repos maladie", null, null, false),
+            "ABS", new ShiftDef("Absence", null, null, false),
+            "OFF", new ShiftDef("Repos", null, null, false));
 
     private final AgentScheduleRepository agentScheduleRepository;
     private final ShiftEventRepository shiftEventRepository;
@@ -90,7 +110,7 @@ public class ScheduleService {
         this.notificationRepository = notificationRepository;
     }
 
-    private record ShiftDef(String label, LocalTime start, LocalTime end, boolean overnight) {}
+    record ShiftDef(String label, LocalTime start, LocalTime end, boolean overnight) {}
 
     /** Les 4 shifts fixes proposés dans la modale "Planifier" (portail Excelliam) — indépendants
      *  de la légende dynamique d'un fichier importé puisqu'il n'y a ici aucun fichier, juste une
@@ -285,7 +305,10 @@ public class ScheduleService {
                 if (cell.contains("LEGENDE")) { legendRow = r; legendCol = c; break outer; }
             }
         }
-        if (legendRow < 0) return legend; // pas de légende trouvée — les codes resteront sans horaire, jamais bloquant
+        if (legendRow < 0) {
+            addTotalRowsAndDefaults(grid, legend);
+            return legend;
+        }
 
         for (int r = legendRow + 1; r < grid.size(); r++) {
             String code = cellAt(grid, r, legendCol);
@@ -304,20 +327,76 @@ public class ScheduleService {
                 legend.put(codeUpper, new ShiftDef(label.isBlank() ? code : label, null, null, false));
             }
         }
+        addTotalRowsAndDefaults(grid, legend);
         return legend;
+    }
+
+    /** « TOTAL M (07H - 16H) » → M = 07h-16h ; puis les codes courants encore inconnus (M3, M4, C, RM…). */
+    static void addTotalRowsAndDefaults(List<List<String>> grid, Map<String, ShiftDef> legend) {
+        for (List<String> line : grid) {
+            for (String cell : line) {
+                if (cell == null) continue;
+                Matcher t = TOTAL_LEGEND_PATTERN.matcher(cell.trim());
+                if (!t.matches()) continue;
+                String code = t.group(1).toUpperCase();
+                Matcher m = TIME_RANGE_PATTERN.matcher(t.group(2));
+                if (legend.containsKey(code) || !m.find()) continue;
+                LocalTime start = LocalTime.of(Integer.parseInt(m.group(1)) % 24, m.group(2) != null ? Integer.parseInt(m.group(2)) : 0);
+                LocalTime end = LocalTime.of(Integer.parseInt(m.group(3)) % 24, m.group(4) != null ? Integer.parseInt(m.group(4)) : 0);
+                String label = (code.startsWith("M") ? "Matin " : code.equals("A") ? "Après-midi " : code.equals("N") ? "Nuit " : code + " ")
+                        + String.format("%02dh-%02dh", start.getHour(), end.getHour());
+                legend.put(code, new ShiftDef(label, start, end, !end.isAfter(start)));
+            }
+        }
+        DEFAULT_CODES.forEach(legend::putIfAbsent);
+    }
+
+    /** « KONE NANGBAMA KINAYA CECILIA Premium vendredi et samedi » → [nom, mention]. */
+    static String[] splitNameAnnotation(String cell) {
+        Matcher m = NAME_ANNOTATION.matcher(cell.trim());
+        return m.find() ? new String[]{cell.trim().substring(0, m.start()).trim(), m.group(1).trim()} : new String[]{cell.trim(), null};
+    }
+
+    /**
+     * Mois d'un planning qui ne l'écrit pas (seulement « Thu 01 … Sat 31 ») : le mois le plus proche d'aujourd'hui
+     * (prochain en priorité) dont le 1er tombe ce jour-là et qui compte assez de jours.
+     */
+    static YearMonth guessMonth(String firstDayLabel, int lastDay, YearMonth today) {
+        String abbrev = firstDayLabel.replaceAll("\\s*\\d+$", "").trim().toUpperCase();
+        if (abbrev.length() < 2) return null;
+        YearMonth best = null;
+        int bestScore = Integer.MAX_VALUE;
+        for (int delta = -3; delta <= 6; delta++) {
+            YearMonth ym = today.plusMonths(delta);
+            String en = ym.atDay(1).getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.ENGLISH).toUpperCase();
+            String fr = ym.atDay(1).getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.FRENCH).toUpperCase().replace(".", "");
+            boolean sameDay = en.startsWith(abbrev.substring(0, Math.min(3, abbrev.length())))
+                    || fr.startsWith(abbrev.substring(0, Math.min(3, abbrev.length())).toUpperCase());
+            if (!sameDay || ym.lengthOfMonth() < lastDay) continue;
+            int score = delta >= 0 ? delta * 2 : -delta * 2 + 1; // à distance égale, le mois à venir l'emporte
+            if (score < bestScore) { bestScore = score; best = ym; }
+        }
+        return best;
     }
 
     private ScheduleImportResult importWideFormat(List<List<String>> grid, int headerRowIndex, YearMonth month,
                                                    com.ecobank.rccportal.model.RccService importService,
                                                    String normalizedCountry, String normalizedTeam,
                                                    String originalFilename, String enteredByUsername) {
-        if (month == null) {
-            throw ApiException.badRequest(
-                    "Ce fichier est au format grille mensuelle (une colonne par jour) : choisissez le mois du planning avant d'importer.");
-        }
-
         Map<Integer, Integer> dayColumns = findDayColumns(grid.get(headerRowIndex));
+        if (month == null) {
+            // Le planning Exceliam n'écrit pas le mois : déduit du jour de semaine du 1er (« Thu 01 » → octobre 2026).
+            String firstLabel = dayColumns.entrySet().stream().filter(e -> e.getValue() == 1)
+                    .map(e -> cellAt(grid, headerRowIndex, e.getKey())).findFirst().orElse("");
+            int lastDay = dayColumns.values().stream().mapToInt(Integer::intValue).max().orElse(28);
+            month = guessMonth(firstLabel, lastDay, YearMonth.now());
+            if (month == null) {
+                throw ApiException.badRequest(
+                        "Ce fichier est au format grille mensuelle (une colonne par jour) : choisissez le mois du planning avant d'importer.");
+            }
+        }
         Map<String, ShiftDef> legend = parseLegend(grid);
+        String monthNote = null;
 
         // Vérifie que le jour 1 du fichier tombe bien sur le jour de semaine attendu pour le
         // mois choisi — plutôt qu'importer silencieusement un planning décalé d'un mois.
@@ -329,12 +408,20 @@ public class ScheduleService {
                     .getDisplayName(TextStyle.SHORT, Locale.ENGLISH)).toUpperCase();
             String actualAbbrev = stripAccents(firstDayLabel.replaceAll("\\s*\\d+$", "")).toUpperCase();
             if (!actualAbbrev.isBlank() && !actualAbbrev.startsWith(expectedAbbrev.substring(0, Math.min(3, expectedAbbrev.length())))) {
-                throw ApiException.badRequest("Le mois choisi (" + month + ") ne correspond pas au fichier : le 1er y tombe un « "
+                // Le fichier désigne sans ambiguïté un mois proche (ex. octobre importé en septembre) : on le prend et on le signale.
+                int lastDay = dayColumns.values().stream().mapToInt(Integer::intValue).max().orElse(28);
+                YearMonth guessed = guessMonth(firstDayLabel, lastDay, month);
+                if (guessed != null) {
+                    monthNote = "Mois corrigé d'après le fichier : " + month + " choisi, mais le 1er y tombe un « " + firstDayLabel
+                            + " » — planning importé sur " + guessed + ".";
+                    month = guessed;
+                } else throw ApiException.badRequest("Le mois choisi (" + month + ") ne correspond pas au fichier : le 1er y tombe un « "
                         + firstDayLabel + " », mais le 1er " + month + " est un " +
                         month.atDay(1).getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.FRENCH) + ". Vérifiez le mois sélectionné.");
             }
         }
 
+        final YearMonth planMonth = month;
         Map<String, User> usersByNormalizedName = new HashMap<>();
         for (User u : userRepository.findAll()) {
             if (u.getName() != null && !u.getName().isBlank()) {
@@ -350,10 +437,13 @@ public class ScheduleService {
         final int previewCap = 80;
         Set<String> unmappedCodes = new TreeSet<>();
         Set<Long> importedUserIds = new HashSet<>();
+        List<String> annotations = new ArrayList<>();
 
         for (int r = headerRowIndex + 1; r < grid.size(); r++) {
             String rowNumCell = cellAt(grid, r, 0);
-            String name = cellAt(grid, r, 1);
+            String[] nameParts = splitNameAnnotation(cellAt(grid, r, 1));
+            String name = nameParts[0];
+            if (nameParts[1] != null) annotations.add(name + " — " + nameParts[1]);
             boolean looksLikeAgentRow = !rowNumCell.isBlank() && rowNumCell.matches("\\d+") && !name.isBlank();
             if (!looksLikeAgentRow) {
                 // Ligne d'équipe ("Team Inbound Voix"), ligne TOTAL, ou ligne vide — jamais une
@@ -400,7 +490,7 @@ public class ScheduleService {
 
                 LocalDate workDate;
                 try {
-                    workDate = month.atDay(dayCol.getValue());
+                    workDate = planMonth.atDay(dayCol.getValue());
                 } catch (Exception e) {
                     continue; // jour hors plage du mois (ex. 31 sur un mois à 30 jours) — cellule ignorée, pas une erreur
                 }
@@ -428,6 +518,10 @@ public class ScheduleService {
             }
         }
 
+        if (monthNote != null) anomalies.add(monthNote);
+        if (!annotations.isEmpty()) {
+            anomalies.add("Mentions lues après le nom (retirées du nom de l'agent, à noter) : " + String.join(" ; ", annotations) + ".");
+        }
         if (!unmappedCodes.isEmpty()) {
             anomalies.add("Code(s) sans correspondance dans la légende du fichier (importés tels quels, sans horaire) : "
                     + String.join(", ", unmappedCodes) + ".");
@@ -451,7 +545,7 @@ public class ScheduleService {
         }
 
         auditLogService.record(enteredByUsername, "IMPORT_SCHEDULE_WIDE",
-                "Fichier : " + (originalFilename != null ? originalFilename : "(sans nom)") + " — mois " + month + " — "
+                "Fichier : " + (originalFilename != null ? originalFilename : "(sans nom)") + " — mois " + planMonth + " — "
                         + rowsProcessed + " agent(s), " + entriesCreated + " case(s) capturée(s), "
                         + usersAutoCreated + " compte(s) créé(s)"
                         + (unmappedCodes.isEmpty() ? "" : ", codes non mappés : " + unmappedCodes));

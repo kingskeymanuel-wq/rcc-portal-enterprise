@@ -1,0 +1,48 @@
+/* ===== Portails agents Tchat / Rafiki ===== */
+.content { min-width: 0; }
+.da-page { --da-a: #0B8A8A; --da-b: #5B3CC4; --da-soft: #E7F6F6; }
+.da-page[data-channel="RAFIKI"] { --da-a: #1877F2; --da-b: #D6249F; --da-soft: #EAF1FE; }
+
+.da-hero { position: relative; overflow: hidden; border-radius: 1.5rem; padding: 1.8rem 2rem; color: #fff; display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap;
+    background: linear-gradient(120deg, var(--da-a), var(--da-b)); box-shadow: 0 18px 40px rgba(20, 30, 80, .18); margin-bottom: 1.4rem; }
+.da-hero-art { width: 84px; height: 84px; border-radius: 1.4rem; background: rgba(255, 255, 255, .16); display: flex; align-items: center; justify-content: center; font-size: 2.6rem; flex-shrink: 0; }
+.da-hero-copy { flex: 1 1 380px; min-width: 0; }
+.da-chip { display: inline-flex; gap: .4rem; align-items: center; background: rgba(255, 255, 255, .18); border: 1px solid rgba(255, 255, 255, .28); border-radius: 999px; padding: .25rem .8rem; font-size: .78rem; font-weight: 700; }
+.da-hero h1 { font-weight: 800; font-size: 2rem; margin: .5rem 0 .3rem; }
+.da-hero p { margin: 0 0 .8rem; color: rgba(255, 255, 255, .88); max-width: 680px; }
+.da-today { display: inline-flex; gap: .45rem; align-items: center; background: #fff; color: #122240; border-radius: .9rem; padding: .45rem .9rem; font-size: .88rem; }
+.da-hero-side { display: flex; }
+.da-platforms { display: flex; flex-wrap: wrap; gap: .4rem; }
+.da-platforms span { background: rgba(255, 255, 255, .16); border-radius: .8rem; padding: .45rem .75rem; font-weight: 700; font-size: .84rem; }
+
+.da-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 1.2rem; align-items: start; }
+.da-card { background: #fff; border: 1px solid #E6ECF4; border-radius: 1.2rem; padding: 1rem 1.1rem; margin-bottom: 1.2rem; box-shadow: 0 10px 26px rgba(0, 32, 84, .05); }
+.da-card-head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; margin-bottom: .7rem; }
+.da-card-head h5 { font-weight: 800; color: #122240; margin: 0; font-size: 1rem; }
+.da-card-head h5 i { color: var(--da-a); }
+.da-link { font-size: .82rem; font-weight: 700; color: var(--da-a); text-decoration: none; }
+.da-empty { display: flex; gap: .9rem; align-items: center; background: var(--da-soft); border-style: dashed; }
+.da-empty i { font-size: 1.8rem; color: var(--da-a); }
+.da-empty b { display: block; color: #122240; }
+.da-empty small { color: #4B5A70; }
+.da-rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .6rem; }
+.da-rule { display: flex; gap: .6rem; padding: .7rem; border-radius: .9rem; background: #FAFCFE; border: 1px solid #EEF1F5; }
+.da-rule i { color: var(--da-a); font-size: 1.2rem; }
+.da-rule b { display: block; color: #122240; font-size: .9rem; }
+.da-rule small { color: #6B7A90; }
+.da-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .3rem; }
+.da-day { text-align: center; border-radius: .8rem; padding: .45rem .2rem; background: var(--da-soft); border: 1px solid transparent; min-width: 0; }
+.da-day span { display: block; font-size: .66rem; color: #6B7A90; text-transform: capitalize; }
+.da-day b { display: block; font-size: .95rem; color: #122240; }
+.da-day small { display: block; font-size: .6rem; color: #4B5A70; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.da-day.off { background: #F3F5F8; }
+.da-day.today { border-color: var(--da-a); box-shadow: 0 0 0 2px color-mix(in srgb, var(--da-a) 20%, transparent); }
+.da-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+.da-tools a { display: flex; flex-direction: column; gap: .3rem; align-items: flex-start; padding: .7rem; border-radius: .9rem; background: #FAFCFE; border: 1px solid #EEF1F5; text-decoration: none; color: #122240; font-weight: 700; font-size: .84rem; transition: transform .15s ease, border-color .15s ease; }
+.da-tools a:hover { transform: translateY(-2px); border-color: var(--da-a); }
+.da-tools i { color: var(--da-a); font-size: 1.2rem; }
+.da-tips { margin: 0; padding-left: 1.1rem; color: #33415C; font-size: .86rem; }
+.da-tips li { margin-bottom: .4rem; }
+.da-page .tpf-mine { margin-top: 0; }
+@media (max-width: 1100px) { .da-grid { grid-template-columns: 1fr; } }
+@media (max-width: 575px) { .da-hero { padding: 1.3rem 1.1rem; } .da-hero h1 { font-size: 1.5rem; } .da-hero-art { width: 60px; height: 60px; font-size: 1.8rem; } .da-day small { display: none; } }

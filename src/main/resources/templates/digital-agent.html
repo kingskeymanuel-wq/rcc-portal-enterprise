@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${channel == 'RAFIKI'} ? 'RCC Portal — Portail agent Rafiki' : 'RCC Portal — Portail agent Tchat'">RCC Portal — Portail agent</title>
+    <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}" rel="stylesheet">
+    <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/team-perf-files.css}">
+    <link rel="stylesheet" th:href="@{/css/digital-agent.css}">
+</head>
+<body>
+<div class="layout">
+    <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+    <div class="content">
+        <div th:replace="~{fragments/header :: header}"></div>
+        <main id="page-content" class="da-page" th:attr="data-channel=${channel}">
+            <div class="container-fluid py-3">
+
+                <section class="da-hero">
+                    <div class="da-hero-art" aria-hidden="true"><i class="bi" id="daHeroIcon"></i></div>
+                    <div class="da-hero-copy">
+                        <span class="da-chip" id="daChannelChip"></span>
+                        <h1 id="daGreeting">Bonjour</h1>
+                        <p id="daHeroText"></p>
+                        <div class="da-today" id="daToday"><i class="bi bi-clock"></i> Chargement du planning…</div>
+                    </div>
+                    <div class="da-hero-side">
+                        <div class="da-platforms" id="daPlatforms"></div>
+                    </div>
+                </section>
+
+                <div class="da-grid">
+                    <div class="da-main">
+                        <div id="daPerf"></div>
+
+                        <section class="da-card">
+                            <div class="da-card-head"><h5><i class="bi bi-calculator"></i> Comment ma performance est calculée</h5></div>
+                            <div class="da-rules" id="daRules"></div>
+                        </section>
+                    </div>
+
+                    <aside class="da-aside">
+                        <section class="da-card">
+                            <div class="da-card-head"><h5><i class="bi bi-calendar-week"></i> Mon planning — 7 jours</h5>
+                                <a th:href="@{/shift}" class="da-link">Tout voir <i class="bi bi-arrow-right"></i></a></div>
+                            <div class="da-week" id="daWeek"></div>
+                        </section>
+
+                        <section class="da-card">
+                            <div class="da-card-head"><h5><i class="bi bi-lightning-charge"></i> Mes outils</h5></div>
+                            <div class="da-tools">
+                                <a th:href="@{/mail-templates}"><i class="bi bi-chat-square-quote"></i><span>Réponses types</span></a>
+                                <a th:href="@{/translator}"><i class="bi bi-spellcheck"></i><span>Correcteur &amp; traducteur</span></a>
+                                <a th:href="@{/knowledge}"><i class="bi bi-book"></i><span>Knowledge Base</span></a>
+                                <a th:href="@{/procedures}"><i class="bi bi-list-check"></i><span>Procédures</span></a>
+                                <a th:href="@{/performance}"><i class="bi bi-speedometer2"></i><span>Ma performance</span></a>
+                                <a th:href="@{/mon-rcc}"><i class="bi bi-chat-square-heart"></i><span>MON RCC</span></a>
+                            </div>
+                        </section>
+
+                        <section class="da-card">
+                            <div class="da-card-head"><h5><i class="bi bi-stars"></i> <span id="daTipsTitle">Bonnes pratiques</span></h5></div>
+                            <ul class="da-tips" id="daTips"></ul>
+                        </section>
+                    </aside>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:src="@{/vendor/bootstrap/js/bootstrap.bundle.min.js}"></script>
+<script th:src="@{/js/preferences.js}"></script>
+<script th:src="@{/js/rcc-api.js}"></script>
+<script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/team-perf-files.js}"></script>
+<script th:src="@{/js/digital-agent.js}"></script>
+</body>
+</html>

@@ -133,6 +133,16 @@ public class UserService {
                     .orElse(null);
         }
 
+        // Agent Inbound Mail dont l'activité est le Tchat ou Rafiki : son portail de canal plutôt que l'accueil générique.
+        boolean plainAgent = roles.stream().noneMatch(r -> {
+            String n = r.getRole() != null ? r.getRole().getName() : null;
+            return n != null && !"AGENT".equalsIgnoreCase(n.trim());
+        });
+        if (!isAdmin && plainAgent && (redirectTo == null || "/dashboard".equals(redirectTo))) {
+            String channel = digitalChannelPortal(user.getActivity());
+            if (channel != null) redirectTo = channel;
+        }
+
         // Redirection Outbound réservée aux simples agents (dernier repli, si ni Service ni
         // Rôle métier ci-dessus ne correspond) — un QA/Admin/RH/Superviseur/Team Leader dont
         // l'ACTIVITY personnelle contiendrait "OUTBOUND" ne doit pas être détourné de son
@@ -170,6 +180,8 @@ public class UserService {
                 put("TEAM_LEADER_INBOUND_MAIL", "/team-leader");
                 put("TEAM_LEADER_OUTBOUND", "/team-leader");
                 put("AGENT_OUTBOUND", "/outbound-dashboard");
+                put("AGENT_TCHAT", "/portail-tchat");
+                put("AGENT_RAFIKI", "/portail-rafiki");
                 put("AGENT_INBOUND", "/dashboard");
                 put("AGENT_INBOUND_MAIL", "/dashboard");
                 put("AGENT_CIB", "/dashboard");
@@ -177,6 +189,15 @@ public class UserService {
                 put("AGENCE_GESTIONNAIRE", "/agence");
                 put("AGENCE", "/agence");
             }};
+
+    /** Portail du canal digital d'après l'activité : « RAFIKI » → /portail-rafiki, « TCHAT » / « LIVE CHAT » → /portail-tchat. */
+    static String digitalChannelPortal(String activity) {
+        if (activity == null) return null;
+        String a = activity.toUpperCase(java.util.Locale.ROOT);
+        if (a.contains("RAFIKI")) return "/portail-rafiki";
+        if (a.contains("TCHAT") || a.contains("LIVE CHAT") || a.matches(".*\\bCHAT\\b.*")) return "/portail-tchat";
+        return null;
+    }
 
     /** Repli — voir commentaire sur son usage dans teamStatus(). Clés = noms de Rôle réels. */
     private static final java.util.LinkedHashMap<String, String> ROLE_PORTAL_REDIRECTS =
@@ -654,6 +675,8 @@ public class UserService {
                 put("TEAM_LEADER_OUTBOUND", "TEAM_LEADER");
                 put("AGENT_INBOUND", "AGENT");
                 put("AGENT_OUTBOUND", "AGENT");
+                put("AGENT_TCHAT", "AGENT");
+                put("AGENT_RAFIKI", "AGENT");
                 put("AGENT_INBOUND_MAIL", "AGENT");
                 put("AGENT_CIB", "AGENT");
             }};

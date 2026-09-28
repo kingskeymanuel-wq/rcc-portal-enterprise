@@ -155,7 +155,7 @@ window.RccPerfFiles = (function () {
                 var btn = this; btn.disabled = true;
                 send(false).then(function (res) {
                     box.innerHTML = '<div class="tpf-msg ok"><i class="bi bi-check-circle-fill"></i> ' + res.lines.length + ' ligne(s) enregistrée(s) pour ' + esc(res.teamLabel) + ', ' + period(res.from, res.to) +
-                        (res.replaced ? " (remplace l'import précédent de cette semaine)" : "") + '. Chaque agent rattaché voit maintenant ses performances dans « Ma Performance ».</div>';
+                        (res.replaced ? " (remplace l'import précédent de cette semaine)" : "") + '. Chaque agent rattaché voit maintenant ses chiffres dans son portail et a reçu une notification.</div>';
                     loadSheet(res.from + "|" + res.to);
                 }).catch(function (e) { btn.disabled = false; alert(e.message); });
             });
@@ -188,17 +188,32 @@ window.RccPerfFiles = (function () {
 
         getJson("/api/team-perf-files/catalog").then(function (c) {
             state.catalog = c;
-            selectTeam("INBOUND_MAIL");
+            if (!c.length) { root.innerHTML = '<div class="tpf-msg error">Aucune équipe à importer pour votre profil.</div>'; return; }
+            selectTeam(c.some(function (t) { return t.code === "INBOUND_MAIL"; }) ? "INBOUND_MAIL" : c[0].code);
         }).catch(function (e) { root.innerHTML = '<div class="tpf-msg error">' + esc(e.message) + '</div>'; });
     }
 
     // ───────────── Agent ─────────────
 
-    function mountMine(root) {
+    function mountMine(root, opts) {
+        opts = opts || {};
+        var shown = null, idx = 0;
+        load();
+        // Mise à jour automatique : un nouvel import de la QA ou du Team Leader apparaît sans recharger la page.
+        setInterval(function () { if (!document.hidden) load(); }, 5 * 60 * 1000);
+
+        function load() {
         getJson("/api/team-perf-files/me").then(function (p) {
-            if (!p.weeks || !p.weeks.length) { root.style.display = "none"; return; }
+            var sig = JSON.stringify(p.weeks && p.weeks.map(function (w) { return [w.from, w.values]; }));
+            if (sig === shown) return;
+            shown = sig;
+            if (opts.onData) opts.onData(p);
+            if (!p.weeks || !p.weeks.length) {
+                if (opts.emptyHtml) { root.style.display = ""; root.innerHTML = opts.emptyHtml; } else root.style.display = "none";
+                return;
+            }
             root.style.display = "";
-            var idx = 0;
+            idx = 0;
             function render() {
                 var w = p.weeks[idx], lv = LEVELS[w.level] || null;
                 var prod = w.values.productivity;
@@ -234,7 +249,8 @@ window.RccPerfFiles = (function () {
                 root.querySelector("[data-week]").addEventListener("change", function () { idx = Number(this.value); render(); });
             }
             render();
-        }).catch(function () { root.style.display = "none"; });
+        }).catch(function () { if (!opts.emptyHtml) root.style.display = "none"; });
+        }
     }
 
     return { mountImport: mountImport, mountMine: mountMine, table: table };

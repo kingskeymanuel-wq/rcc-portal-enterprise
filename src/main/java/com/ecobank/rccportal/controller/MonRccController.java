@@ -18,10 +18,19 @@ public class MonRccController {
 
     private final MonRccService monRccService;
     private final com.ecobank.rccportal.service.ImageStorageService imageStorageService;
+    private final com.ecobank.rccportal.service.MonRccSpaceService spaceService;
 
-    public MonRccController(MonRccService monRccService, com.ecobank.rccportal.service.ImageStorageService imageStorageService) {
+    public MonRccController(MonRccService monRccService, com.ecobank.rccportal.service.ImageStorageService imageStorageService,
+                            com.ecobank.rccportal.service.MonRccSpaceService spaceService) {
         this.monRccService = monRccService;
         this.imageStorageService = imageStorageService;
+        this.spaceService = spaceService;
+    }
+
+    /** « Mon espace » : portail, équipe, repères et correspondants propres à l'utilisateur connecté. */
+    @GetMapping("/my-space")
+    public com.ecobank.rccportal.service.MonRccSpaceService.MySpace mySpace(@AuthenticationPrincipal AuthenticatedUser requester) {
+        return spaceService.mySpace(requester);
     }
 
     /** Upload direct depuis l'ordinateur (photo ou courte vidéo) — alternative au collage d'URL. */

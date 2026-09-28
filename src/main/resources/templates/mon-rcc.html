@@ -98,6 +98,7 @@
         .mrcc-wallpaper-swatch.active { border-color: var(--eco-blue); }
     </style>
     <link rel="stylesheet" th:href="@{/css/mon-rcc.css}">
+    <link rel="stylesheet" th:href="@{/css/mon-rcc-space.css}">
 </head>
 <body>
 <div class="layout">
@@ -116,9 +117,9 @@
                     <span class="mrcc-bubble b4" aria-hidden="true"><i class="bi bi-star-fill"></i></span>
                     <span class="mrcc-bubble b5" aria-hidden="true"><i class="bi bi-people-fill"></i></span>
                     <div class="mrcc-hero-content">
-                        <span class="mrcc-hero-chip"><i class="bi bi-stars"></i> La communauté RCC</span>
-                        <h2>MON RCC</h2>
-                        <p>Fil d'actualité et messagerie interne — partagez, réagissez, restez connectés.</p>
+                        <span class="mrcc-hero-chip" id="mrccHeroChip"><i class="bi bi-stars"></i> La communauté RCC</span>
+                        <h2 id="mrccHeroTitle">MON RCC</h2>
+                        <p id="mrccHeroText">Fil d'actualité et messagerie interne — partagez, réagissez, restez connectés.</p>
                         <div class="mrcc-hero-stats">
                             <span class="mrcc-stat"><i class="bi bi-file-earmark-richtext"></i> <b id="mrccStatPosts">–</b> publications</span>
                             <span class="mrcc-stat"><i class="bi bi-heart-fill"></i> <b id="mrccStatLikes">–</b> J'aime</span>
@@ -232,6 +233,12 @@
                     </div>
 
                     <aside class="mrcc-aside">
+                        <!-- Mon espace : propre à chaque utilisateur (portail, équipe, repères du métier) -->
+                        <div class="mrcc-card mrcc-space" id="mrccMySpace" style="display:none;"></div>
+                        <div class="mrcc-card" id="mrccMyContactsCard" style="display:none;">
+                            <div class="mrcc-card-title"><span class="mrcc-ico"><i class="bi bi-person-lines-fill"></i></span> Mes contacts</div>
+                            <div id="mrccMyContacts"></div>
+                        </div>
                         <div class="mrcc-card">
                             <div class="mrcc-card-title"><span class="mrcc-ico"><i class="bi bi-people-fill"></i></span> Communautés</div>
                             <div id="communitiesList" class="d-flex flex-wrap gap-2"></div>

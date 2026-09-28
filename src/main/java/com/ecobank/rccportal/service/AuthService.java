@@ -1043,6 +1043,8 @@ public class AuthService {
                 put("TEAM_LEADER_OUTBOUND", "TEAM_LEADER");
                 put("AGENT_INBOUND", "AGENT");
                 put("AGENT_OUTBOUND", "AGENT");
+                put("AGENT_TCHAT", "AGENT");
+                put("AGENT_RAFIKI", "AGENT");
                 put("AGENT_INBOUND_MAIL", "AGENT");
                 put("AGENT_CIB", "AGENT");
                 put("AGENCE_CAISSIER", "AGENCE");

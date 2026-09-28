@@ -904,7 +904,72 @@
 
     function loadDirectory() {
         var container = document.getElementById("correspondentResults");
+        // Chaque utilisateur retrouve d'abord SES correspondants (Team Leader, équipe, QA…) — la recherche reste disponible.
+        if (mySpace && mySpace.contacts && mySpace.contacts.length) {
+            container.innerHTML = '<p class="text-muted small mb-2">Vos correspondants habituels — ou tapez un nom pour chercher quelqu\'un d\'autre.</p>' + contactsHtml(mySpace.contacts, 40);
+            wireContactButtons(container);
+            return;
+        }
         container.innerHTML = '<p class="text-muted small">Tapez un nom, un identifiant, un service ou une filiale pour rechercher.</p>';
+    }
+
+    // ===== Mon espace (propre à chaque utilisateur) =====
+
+    var mySpace = null;
+
+    function contactsHtml(contacts, max) {
+        var groups = {};
+        contacts.slice(0, max).forEach(function (c) { (groups[c.group] = groups[c.group] || []).push(c); });
+        return Object.keys(groups).map(function (g) {
+            return '<div class="mrcc-contact-group">' + escapeHtml(g) + '</div>' + groups[g].map(function (c) {
+                return '<button type="button" class="mrcc-contact" data-username="' + escapeHtml(c.username) + '" data-name="' + escapeHtml(c.name) + '">' +
+                    '<span class="mrcc-contact-av">' + escapeHtml(initials(c.name || c.username)) + '</span>' +
+                    '<span class="mrcc-contact-txt"><b>' + escapeHtml(c.name) + '</b><small>' + escapeHtml(c.role || "") + '</small></span>' +
+                    '<i class="bi bi-chat-dots"></i></button>';
+            }).join("");
+        }).join("");
+    }
+
+    function wireContactButtons(root) {
+        Array.prototype.forEach.call(root.querySelectorAll(".mrcc-contact"), function (b) {
+            b.addEventListener("click", function () {
+                var tab = document.querySelector('#monRccTabs [data-tab="chat"]');
+                if (tab) tab.click();
+                startConversation(b.getAttribute("data-username"), b.getAttribute("data-name"));
+            });
+        });
+    }
+
+    function loadMySpace() {
+        getJson("/api/mon-rcc/my-space").then(function (sp) {
+            mySpace = sp;
+            var hero = document.querySelector(".mrcc-hero");
+            if (hero) hero.setAttribute("data-theme-space", sp.theme);
+            document.getElementById("mrccHeroChip").innerHTML = '<i class="bi bi-stars"></i> MON RCC · ' + escapeHtml(sp.portalLabel) + (sp.teamLabel ? " · " + escapeHtml(sp.teamLabel) : "");
+            document.getElementById("mrccHeroTitle").textContent = "Bonjour " + sp.firstName;
+            document.getElementById("mrccHeroText").textContent = sp.headline;
+
+            var box = document.getElementById("mrccMySpace");
+            box.style.display = "";
+            box.innerHTML = '<div class="mrcc-card-title"><span class="mrcc-ico"><i class="bi bi-person-workspace"></i></span> Mon espace</div>' +
+                '<div class="mrcc-space-tiles">' + sp.tiles.map(function (t) {
+                    return '<a class="mrcc-space-tile' + (t.tone ? " " + t.tone : "") + '" href="' + escapeHtml(t.link || "#") + '">' +
+                        '<i class="bi ' + escapeHtml(t.icon) + '"></i><span>' + escapeHtml(t.label) + '</span><b>' + escapeHtml(t.value) + '</b>' +
+                        (t.hint ? '<small>' + escapeHtml(t.hint) + '</small>' : "") + '</a>';
+                }).join("") + '</div>';
+
+            var card = document.getElementById("mrccMyContactsCard");
+            if (sp.contacts && sp.contacts.length) {
+                card.style.display = "";
+                document.getElementById("mrccMyContacts").innerHTML = contactsHtml(sp.contacts, 8) +
+                    (sp.contacts.length > 8 ? '<button type="button" class="btn btn-link btn-sm px-0" id="mrccAllContacts">Voir mes ' + sp.contacts.length + ' contacts</button>' : "");
+                wireContactButtons(document.getElementById("mrccMyContacts"));
+                var all = document.getElementById("mrccAllContacts");
+                if (all) all.addEventListener("click", function () { var tab = document.querySelector('#monRccTabs [data-tab="chat"]'); if (tab) tab.click(); loadDirectory(); });
+            }
+            var q = document.getElementById("correspondentSearch");
+            if (!q || !q.value.trim()) loadDirectory();
+        }).catch(function () { /* MON RCC reste utilisable sans l'espace personnel */ });
     }
 
     function groupKey(user) {
@@ -1022,6 +1087,7 @@
     function searchCorrespondents(query) {
         var container = document.getElementById("correspondentResults");
         query = query.trim();
+        if (!query.length) { loadDirectory(); return; }
         if (query.length < 2) {
             container.innerHTML = '<p class="text-muted small">Tapez au moins 2 caractères pour rechercher.</p>';
             return;
@@ -1353,6 +1419,7 @@
         loadMonRccHeroBanner();
         loadMonRccNews();
         loadPosts();
+        loadMySpace();
 
         fetch("/api/auth/me", { credentials: "same-origin" })
             .then(function (res) { return res.json(); })

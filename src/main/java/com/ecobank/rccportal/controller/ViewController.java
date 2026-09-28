@@ -142,6 +142,19 @@ public class ViewController {
         return "outbound-dashboard";
     }
 
+    /** Portails des agents des canaux digitaux : même page, indicateurs et couleurs propres au canal. */
+    @GetMapping("/portail-tchat")
+    public String chatPortal(org.springframework.ui.Model model) {
+        model.addAttribute("channel", "TCHAT");
+        return "digital-agent";
+    }
+
+    @GetMapping("/portail-rafiki")
+    public String rafikiPortal(org.springframework.ui.Model model) {
+        model.addAttribute("channel", "RAFIKI");
+        return "digital-agent";
+    }
+
     @GetMapping("/audit")
     public String audit() {
         return "audit";

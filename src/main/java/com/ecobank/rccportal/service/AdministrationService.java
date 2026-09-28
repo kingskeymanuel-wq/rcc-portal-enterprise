@@ -498,6 +498,8 @@ public class AdministrationService {
             "TEAM_LEADER_INBOUND_MAIL", "INBOUND MAIL",
             "AGENT_CIB", "CIB",
             "AGENT_OUTBOUND", "OUTBOUND",
+            "AGENT_TCHAT", "INBOUND TCHAT",
+            "AGENT_RAFIKI", "INBOUND RAFIKI",
             "TEAM_LEADER_OUTBOUND", "OUTBOUND"
     );
 

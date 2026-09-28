@@ -9,6 +9,14 @@
             <h4>RCC Portal</h4>
         </div>
         <nav class="sidebar-menu">
+            <a th:href="@{/portail-tchat}" data-roles="AGENT,ADMIN">
+                <i class="bi bi-chat-text-fill"></i>
+                <span>Mon portail Tchat</span>
+            </a>
+            <a th:href="@{/portail-rafiki}" data-roles="AGENT,ADMIN">
+                <i class="bi bi-chat-heart-fill"></i>
+                <span>Mon portail Rafiki</span>
+            </a>
             <a th:href="@{/dashboard}" data-roles="AGENT,QA,ADMIN">
                 <i class="bi bi-grid-fill"></i>
                 <span data-i18n="nav.dashboard">Accueil</span>

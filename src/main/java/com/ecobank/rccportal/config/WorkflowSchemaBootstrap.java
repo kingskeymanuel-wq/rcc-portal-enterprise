@@ -901,6 +901,9 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         // Agence (/agence), mêmes référentiels que le RCC pour un traitement uniforme.
         seedServiceIfMissing("AGENCE_CAISSIER", "Agence — Caissier", "Caissier en agence : opérations de guichet, assistance client", 18);
         seedServiceIfMissing("AGENCE_GESTIONNAIRE", "Agence — Gestionnaire clientèle", "Gestionnaire de clientèle en agence : conseil, comptes, cartes, crédits", 19);
+        // Agents des canaux digitaux : chacun atterrit sur son propre portail (/portail-tchat, /portail-rafiki).
+        seedServiceIfMissing("AGENT_TCHAT", "Agent Tchat", "Conseiller clientèle — Live chat", 20);
+        seedServiceIfMissing("AGENT_RAFIKI", "Agent Rafiki", "Conseiller clientèle — Rafiki (Facebook, Instagram, X)", 21);
 
         createIfMissing("USERS", """
                 CREATE TABLE dbo.USERS (

@@ -23,8 +23,8 @@ public class TeamPerfFileController {
 
     /** Équipes et indicateurs pris en compte pour chacune. */
     @GetMapping("/catalog")
-    public List<TeamPerfFileService.TeamDef> catalog() {
-        return service.catalog();
+    public List<TeamPerfFileService.TeamDef> catalog(@AuthenticationPrincipal AuthenticatedUser requester) {
+        return service.catalog(requester);
     }
 
     /** dryRun=true : aperçu (colonnes reconnues, agents rattachés, période détectée) sans rien enregistrer. */

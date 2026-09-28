@@ -141,6 +141,73 @@ class TeamPerfFileServiceTest {
         assertNull(TeamPerfFileService.matchUser("Gerard ZOUHO", all));
     }
 
+    private static Workbook grid(String title, String[] header, Object[][] rows) {
+        Workbook wb = new XSSFWorkbook();
+        Sheet s = wb.createSheet("S");
+        s.createRow(0).createCell(0).setCellValue(title);
+        Row h = s.createRow(1);
+        for (int c = 0; c < header.length; c++) h.createCell(c).setCellValue(header[c]);
+        for (int r = 0; r < rows.length; r++) {
+            Row row = s.createRow(2 + r);
+            for (int c = 0; c < rows[r].length; c++) {
+                Object v = rows[r][c];
+                if (v instanceof Integer i) row.createCell(c).setCellValue(i);
+                else if (v != null && !"".equals(v)) row.createCell(c).setCellValue((String) v);
+            }
+        }
+        return wb;
+    }
+
+    /** « PERFORMANCE AGENTS CHATS-DU 21 au 27 SEPTEMBRE 2026 ». */
+    @Test
+    void readsTheChatReport() {
+        var wb = grid("PERFORMANCE AGENTS CHATS-DU 21 au 27 SEPTEMBRE 2026",
+                new String[]{"Agent Name", "Live Chat", "Autres activités", "Jours travaillés - 5 jrs", "Target Hebdo", "Prod Globale", "Taux de presence (20%)",
+                        "Prod Moyenne", "Tx Atteinte Target", "DMT", "ARRET MALADIE"},
+                new Object[][]{
+                        {"BOKOUMGOU Marietou Yasmine Adjoua", 558, 42, 5, 450, 600, "100%", 120, "", "12:16:00 AM", ""},
+                        {"WANGAH Cedric", 70, 9, 2, 450, 79, "40%", 40, "", "12:09:50 AM", "3 jours arrêt maladie"},
+                        {"ZOUKOUAN Ebalouhou Ange Merveille", 0, 0, 0, 0, 0, "0%", 0, "0%", "12:00:00 AM", "Agent permanent sur les RS"},
+                        {"TOTAL/MOYENNE", 408, 26, 4, 386, 434, "77%", 113, "109%", "", ""}});
+        var p = TeamPerfFileService.parse(wb, TeamPerfFileService.team("TCHAT"), TODAY);
+        assertEquals(3, p.lines().size());
+        assertEquals(LocalDate.of(2026, 9, 21), p.from());
+        var b = line(p, "BOKOUMGOU Marietou Yasmine Adjoua").values();
+        assertEquals(600.0, b.get("totalProduction"));
+        assertEquals(133.0, b.get("productivity"));                         // Prod globale ÷ Target hebdo, absent du fichier
+        assertEquals(960.0, b.get("aht"));                                  // « 12:16:00 AM » = 16 min
+        assertEquals("GOOD", line(p, "BOKOUMGOU Marietou Yasmine Adjoua").level());
+        assertEquals("3 jours arrêt maladie", line(p, "WANGAH Cedric").values().get("remark"));
+        assertNull(line(p, "ZOUKOUAN Ebalouhou Ange Merveille").level());   // aucun jour travaillé : pas de feu rouge
+    }
+
+    /** Rapport Rafiki (conversations résolues sur Facebook / Instagram / X). */
+    @Test
+    void readsTheRafikiReport() {
+        var wb = grid("Rafiki du 21 au 27 septembre",
+                new String[]{"Agent Name", "First Response Time", "Target Hebdo", "Jours travaillés - 5 jrs", "Resolved conversations", "Activités Annexes",
+                        "Taux de presence (20%)", "Taux de productivité (30%)", "Performance globale", "ARRET MALADIE"},
+                new Object[][]{
+                        {"Haoua KONATE", "0:01:44", 450, 5, 784, 117, "100%", "200%", 901, ""},
+                        {"ALLA MARIE ODE", "0:02:32", 160, 2, 250, 0, "40%", "", "", "Agent en soutien sur RS"},
+                        {"BOKOUMGOU Mariétou Yasmine", "0:00:00", 0, 0, 0, 0, "0%", "#DIV/0!", 0, "Agent permanent sur tchats"},
+                        {"Moyenne", "0:01:44", 318, 4, 613, 332, "71%", "204%", 649, ""}});
+        var p = TeamPerfFileService.parse(wb, TeamPerfFileService.team("RAFIKI"), TODAY);
+        assertEquals(3, p.lines().size());
+        assertEquals(104.0, line(p, "Haoua KONATE").values().get("firstResponse"));
+        assertEquals(200.0, line(p, "Haoua KONATE").values().get("productivity"));
+        var alla = line(p, "ALLA MARIE ODE").values();
+        assertEquals(250.0, alla.get("totalProduction"));                  // conversations résolues + annexes
+        assertEquals(156.0, alla.get("productivity"));                     // 250 ÷ 160 (target proratisé)
+        assertNull(line(p, "BOKOUMGOU Mariétou Yasmine").values().get("productivity"));
+    }
+
+    @Test
+    void teamLeadersManageTheirOwnFiles() {
+        assertEquals(Set.of("INBOUND_MAIL", "TCHAT", "RAFIKI"), TeamPerfFileService.fileTeamsFor(com.ecobank.rccportal.util.TeamClassifier.Team.INBOUND_MAIL));
+        assertEquals(Set.of("INBOUND_VOICE"), TeamPerfFileService.fileTeamsFor(com.ecobank.rccportal.util.TeamClassifier.Team.INBOUND_VOICE));
+    }
+
     @Test
     void onlyQualityTeamsImport() {
         assertTrue(TeamPerfFileService.canImport(new AuthenticatedUser("q", "QA", "QUALITY_ASSURANCE", null)));

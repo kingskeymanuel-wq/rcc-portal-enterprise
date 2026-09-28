@@ -76,6 +76,14 @@ public class TeamPerfFileService {
     private static final Field PRODUCTIVITY = c("productivity", "Productivité", "PCT", true, "Moy / jour ÷ Target / jour", "PRODUCTIVITE", "TAUX_PRODUCTIVITE", "~PRODUCTIVIT");
     private static final Field QUALITY = f("quality", "Qualité", "PCT", true, "QUALITE", "SCORE_QUALITE", "SCORE_QA", "NOTE_QUALITE", "QUALITY");
     private static final Field SENIORITY = f("seniority", "Ancienneté", "TEXT", true, "ANCIENNETE", "~ANCIENNET");
+    private static final Field WEEKLY_TARGET = f("weeklyTarget", "Target hebdo", "RATE", true, "TARGET_HEBDO", "TARGET_HEBDOMADAIRE", "OBJECTIF_HEBDO",
+            "OBJECTIF_HEBDOMADAIRE", "TARGET", "OBJECTIF", "~TARGET+HEBDO", "~OBJECTIF+HEBDO");
+    private static final Field OTHER_ACTIVITIES = f("otherActivities", "Activités annexes", "COUNT", true, "AUTRES_ACTIVITES", "ACTIVITES_ANNEXES",
+            "AUTRE_ACTIVITE", "ACTIVITE_ANNEXE", "~AUTRE+ACTIVIT", "~ACTIVIT+ANNEXE");
+    private static final Field PRESENCE = c("presence", "Taux de présence", "PCT", true, "Jours travaillés ÷ 5", "TAUX_DE_PRESENCE", "TAUX_PRESENCE",
+            "PRESENCE", "~PRESENCE");
+    private static final Field REMARK = f("remark", "Arrêt maladie / remarque", "TEXT", true, "ARRET_MALADIE", "COMMENTAIRE", "COMMENTAIRES",
+            "OBSERVATION", "OBSERVATIONS", "REMARQUE", "~ARRET");
 
     private static Field avgPerDay(String volumeLabel) {
         return c("avgPerDay", "Moy / jour", "RATE", true, volumeLabel + " ÷ Jours travaillés", "MOY_JOUR", "MOYENNE_JOUR", "MOYENNE_JOURNALIERE", "MOY_JOURNALIERE", "~MOY+JOUR");
@@ -84,7 +92,7 @@ public class TeamPerfFileService {
     public static final Map<String, TeamDef> CATALOG = new LinkedHashMap<>();
 
     static {
-        CATALOG.put("INBOUND_MAIL", new TeamDef("INBOUND_MAIL", "Inbound Mail (Mails · Tchat · Rafiki)", "totalActivities", List.of(
+        CATALOG.put("INBOUND_MAIL", new TeamDef("INBOUND_MAIL", "Inbound Mail", "totalActivities", List.of(
                 DAYS,
                 f("outboundCalls", "Appels sortants", "COUNT", true, "APPELS_SORTANT", "APPELS_SORTANTS", "APPEL_SORTANT", "~APPEL+SORTANT"),
                 f("cis", "CIS", "COUNT", true, "CIS", "NOMBRE_CIS"),
@@ -92,6 +100,26 @@ public class TeamPerfFileService {
                 f("requests", "Sollicitations", "COUNT", true, "SOLLICITATIONS", "SOLLICITATION", "~SOLLICITATION"),
                 c("totalActivities", "Total activités", "COUNT", true, "CIS + Mails assistés + Sollicitations", "TOTAL_ACTIVITES", "TOTAL_ACTIVITE", "TOTAL", "~TOTAL+ACTIVIT"),
                 avgPerDay("Total activités"), TARGET, PRODUCTIVITY, QUALITY, SENIORITY)));
+        // Rapport « PERFORMANCE AGENTS CHATS » : production = Live Chat + autres activités, rapportée au target de la semaine.
+        CATALOG.put("TCHAT", new TeamDef("TCHAT", "Tchat", "totalProduction", List.of(
+                f("liveChat", "Live Chat", "COUNT", true, "LIVE_CHAT", "LIVE_CHATS", "CHATS", "CHATS_TRAITES", "NOMBRE_CHATS", "~LIVE+CHAT", "~CHAT+TRAIT"),
+                OTHER_ACTIVITIES, DAYS, WEEKLY_TARGET,
+                c("totalProduction", "Prod globale", "COUNT", true, "Live Chat + Activités annexes", "PROD_GLOBALE", "PRODUCTION_GLOBALE", "~PROD+GLOBAL"),
+                PRESENCE,
+                c("avgPerDay", "Prod moyenne / jour", "RATE", true, "Prod globale ÷ Jours travaillés", "PROD_MOYENNE", "PRODUCTION_MOYENNE", "MOY_JOUR", "~PROD+MOYENNE"),
+                c("productivity", "Taux d'atteinte du target", "PCT", true, "Prod globale ÷ Target hebdo", "TX_ATTEINTE_TARGET", "TAUX_ATTEINTE_TARGET",
+                        "TAUX_D_ATTEINTE", "TX_ATTEINTE", "~ATTEINTE", "~PRODUCTIVIT"),
+                f("aht", "DMT", "SECONDS", false, "DMT", "AHT", "DUREE_MOYENNE_TRAITEMENT", "~DUREE+MOYENNE"),
+                QUALITY, REMARK)));
+        // Rapport Rafiki (réseaux sociaux : Facebook, Instagram, X) : conversations résolues + activités annexes.
+        CATALOG.put("RAFIKI", new TeamDef("RAFIKI", "Rafiki", "totalProduction", List.of(
+                f("firstResponse", "First Response Time", "SECONDS", false, "FIRST_RESPONSE_TIME", "FRT", "DELAI_PREMIERE_REPONSE", "~FIRST+RESPONSE", "~PREMIERE+REPONSE"),
+                WEEKLY_TARGET, DAYS,
+                f("resolved", "Conversations résolues", "COUNT", true, "RESOLVED_CONVERSATIONS", "CONVERSATIONS_RESOLUES", "CONVERSATIONS", "~RESOLVED", "~CONVERSATION"),
+                OTHER_ACTIVITIES, PRESENCE,
+                c("productivity", "Taux de productivité", "PCT", true, "Performance globale ÷ Target hebdo", "TAUX_DE_PRODUCTIVITE", "TAUX_PRODUCTIVITE", "~PRODUCTIVIT", "~ATTEINTE"),
+                c("totalProduction", "Performance globale", "COUNT", true, "Conversations résolues + Activités annexes", "PERFORMANCE_GLOBALE", "PROD_GLOBALE", "~PERFORMANCE+GLOBAL"),
+                QUALITY, REMARK)));
         CATALOG.put("INBOUND_VOICE", new TeamDef("INBOUND_VOICE", "Inbound Voix", "calls", List.of(
                 DAYS,
                 f("calls", "Appels traités", "COUNT", true, "APPELS_TRAITES", "APPELS_RECUS", "APPELS_ENTRANTS", "APPELS_DECROCHES", "APPELS_REPONDUS", "NOMBRE_APPELS", "APPELS", "~APPEL+TRAIT", "~APPEL+ENTRANT"),
@@ -116,7 +144,7 @@ public class TeamPerfFileService {
                 avgPerDay("Interactions"), TARGET, PRODUCTIVITY, QUALITY, SENIORITY)));
     }
 
-    private static final List<String> NAME_HEADERS = List.of("AGENT", "AGENTS", "NOM", "NOMS", "NOM_ET_PRENOMS", "NOM_PRENOMS", "NOM_PRENOM",
+    private static final List<String> NAME_HEADERS = List.of("AGENT", "AGENTS", "AGENT_NAME", "NOM_AGENT", "NOM_DE_L_AGENT", "NOM_DES_AGENTS", "NOM", "NOMS", "NOM_ET_PRENOMS", "NOM_PRENOMS", "NOM_PRENOM",
             "COLLABORATEUR", "COLLABORATEURS", "CONSEILLER", "CONSEILLERS", "CONSEILLER_CLIENTELE", "PRENOMS_ET_NOM", "NOM_COMPLET");
 
     private static final Map<String, Integer> MONTHS = new HashMap<>();
@@ -132,18 +160,52 @@ public class TeamPerfFileService {
     private final AuditLogService audit;
     private final TeamLeaderService teamLeaders;
     private final LocalOcrClient ocr;
+    private final com.ecobank.rccportal.repository.RccNotificationRepository notifications;
     private final ObjectMapper json = new ObjectMapper();
 
-    public TeamPerfFileService(JdbcTemplate jdbc, UserRepository users, AuditLogService audit, TeamLeaderService teamLeaders, LocalOcrClient ocr) {
+    public TeamPerfFileService(JdbcTemplate jdbc, UserRepository users, AuditLogService audit, TeamLeaderService teamLeaders, LocalOcrClient ocr,
+                               com.ecobank.rccportal.repository.RccNotificationRepository notifications) {
         this.jdbc = jdbc;
         this.users = users;
         this.audit = audit;
         this.teamLeaders = teamLeaders;
         this.ocr = ocr;
+        this.notifications = notifications;
     }
 
-    public List<TeamDef> catalog() {
+    /** Équipes proposées : toutes pour la QA / le Superviseur, celles de SON équipe pour un Team Leader. */
+    public List<TeamDef> catalog(AuthenticatedUser requester) {
+        if (requester != null && !canImport(requester) && "TEAM_LEADER".equalsIgnoreCase(requester.role())) {
+            Set<String> mine = ledFileTeams(requester);
+            return CATALOG.values().stream().filter(t -> mine.contains(t.code())).toList();
+        }
         return List.copyOf(CATALOG.values());
+    }
+
+    /** Fichiers d'équipe gérés par le Team Leader d'une équipe du portail (Inbound Mail couvre aussi Tchat et Rafiki). */
+    static Set<String> fileTeamsFor(TeamClassifier.Team led) {
+        if (led == null) return Set.of();
+        return switch (led) {
+            case INBOUND_MAIL -> Set.of("INBOUND_MAIL", "TCHAT", "RAFIKI");
+            case INBOUND_VOICE -> Set.of("INBOUND_VOICE");
+            case OUTBOUND -> Set.of("OUTBOUND");
+            case CIB -> Set.of("CIB");
+            default -> Set.of();
+        };
+    }
+
+    private Set<String> ledFileTeams(AuthenticatedUser u) {
+        try {
+            return fileTeamsFor(teamLeaders.requireLedTeam(u));
+        } catch (RuntimeException e) {
+            return Set.of();
+        }
+    }
+
+    /** La QA importe pour toutes les équipes ; un Team Leader uniquement pour la sienne. */
+    boolean canImportTeam(AuthenticatedUser u, String teamCode) {
+        if (canImport(u)) return true;
+        return u != null && "TEAM_LEADER".equalsIgnoreCase(u.role()) && ledFileTeams(u).contains(teamCode);
     }
 
     static TeamDef team(String code) {
@@ -164,7 +226,7 @@ public class TeamPerfFileService {
     private void requireCanView(AuthenticatedUser u, TeamDef t) {
         if (u == null) throw ApiException.unauthorized("Non connecté.");
         if (canImport(u) || "RH".equalsIgnoreCase(u.role())) return;
-        if ("TEAM_LEADER".equalsIgnoreCase(u.role()) && teamLeaders.requireLedTeam(u).name().equals(t.code())) return;
+        if ("TEAM_LEADER".equalsIgnoreCase(u.role()) && ledFileTeams(u).contains(t.code())) return;
         throw ApiException.forbidden("Réservé à la QA, au Superviseur, au RH et au Team Leader de l'équipe.");
     }
 
@@ -173,9 +235,11 @@ public class TeamPerfFileService {
     @Transactional
     public ImportReport importFile(AuthenticatedUser requester, MultipartFile file, String teamCode, String from, String to,
                                    String countryCode, boolean dryRun) {
-        if (!canImport(requester)) throw ApiException.forbidden("Réservé à la QA, au Head QA, au Superviseur et à l'administrateur.");
-        if (file == null || file.isEmpty()) throw ApiException.badRequest("Le fichier est requis.");
         TeamDef t = team(teamCode);
+        if (!canImportTeam(requester, t.code())) {
+            throw ApiException.forbidden("Import réservé à la QA, au Superviseur et au Team Leader de l'équipe « " + t.label() + " ».");
+        }
+        if (file == null || file.isEmpty()) throw ApiException.badRequest("Le fichier est requis.");
         Workbook wb;
         try {
             KpiFileReader.Result read = KpiFileReader.read(file.getBytes(), file.getOriginalFilename(), file.getContentType());
@@ -226,11 +290,32 @@ public class TeamPerfFileService {
                         t.code(), java.sql.Date.valueOf(start), java.sql.Date.valueOf(end), l.userId(), l.agentName(), nameKey(l.agentName()),
                         write(l.values()), country, batchId, requester.username());
             }
+            notifyAgents(t, start, end, lines);
             audit.record(requester.username(), "IMPORT_TEAM_PERF_FILE", t.label() + " — " + start + " au " + end + " — " + lines.size()
                     + " agent(s), " + matched + " rattaché(s) — fichier " + Objects.toString(file.getOriginalFilename(), "(sans nom)"));
         }
         return new ImportReport(t.code(), t.label(), start, end, detected, p.periodText(), t.fields(), p.recognized(), p.ignored(), p.missing(),
                 lines, matched, lines.size() - matched, save, batchId, replaced);
+    }
+
+    /** Mise à jour automatique côté agent : chacun est prévenu que ses chiffres de la semaine sont publiés. */
+    private void notifyAgents(TeamDef t, LocalDate start, LocalDate end, List<AgentLine> lines) {
+        if (notifications == null) return;
+        java.time.format.DateTimeFormatter f = java.time.format.DateTimeFormatter.ofPattern("dd/MM");
+        for (AgentLine l : lines) {
+            if (l.userId() == null) continue;
+            users.findById(l.userId()).ifPresent(u -> {
+                Double p = d(l.values(), "productivity");
+                try {
+                    notifications.save(com.ecobank.rccportal.model.RccNotification.builder().targetUser(u).isRead(false)
+                            .content("Vos performances " + t.label() + " du " + start.format(f) + " au " + end.format(f) + " sont disponibles"
+                                    + (p != null ? " : " + fmt(p) + " % de l'objectif." : ".") + " Consultez « Ma Performance ».")
+                            .build());
+                } catch (RuntimeException ignored) {
+                    // la notification ne doit jamais bloquer l'import
+                }
+            });
+        }
     }
 
     record Parsed(List<AgentLine> lines, Map<String, String> recognized, List<String> ignored, List<String> missing,
@@ -418,11 +503,15 @@ public class TeamPerfFileService {
         return bestCol;
     }
 
-    /** Indicateurs calculés quand le fichier ne les donne pas — même règle que le rapport hebdo. */
+    /** Indicateurs calculés quand le fichier ne les donne pas — mêmes règles que les rapports hebdo. */
     static void complete(TeamDef t, Map<String, Object> v, List<String> notes) {
         if ("INBOUND_MAIL".equals(t.code()) && !v.containsKey("totalActivities")) {
             Double cis = d(v, "cis"), mails = d(v, "mails"), req = d(v, "requests");
             if (cis != null || mails != null || req != null) v.put("totalActivities", round1(z(cis) + z(mails) + z(req)));
+        }
+        if (("TCHAT".equals(t.code()) || "RAFIKI".equals(t.code())) && !v.containsKey("totalProduction")) {
+            Double main = d(v, "TCHAT".equals(t.code()) ? "liveChat" : "resolved"), other = d(v, "otherActivities");
+            if (main != null || other != null) v.put("totalProduction", round1(z(main) + z(other)));
         }
         if ("OUTBOUND".equals(t.code())) {
             Double calls = d(v, "calls"), reached = d(v, "reached"), sales = d(v, "sales");
@@ -430,22 +519,29 @@ public class TeamPerfFileService {
             if (!v.containsKey("conversion") && reached != null && reached > 0 && sales != null) v.put("conversion", round1(sales * 100 / reached));
         }
         Double volume = d(v, t.volumeKey()), days = d(v, "daysWorked");
-        if (!v.containsKey("avgPerDay") && volume != null && days != null && days > 0) v.put("avgPerDay", round1(volume / days));
-        Double avg = d(v, "avgPerDay"), target = d(v, "targetPerDay");
-        if (avg != null && target != null && target > 0) {
-            double computed = Math.round(avg * 100 / target);
+        if (has(t, "avgPerDay") && !v.containsKey("avgPerDay") && volume != null && days != null && days > 0) v.put("avgPerDay", round1(volume / days));
+        if (has(t, "presence") && !v.containsKey("presence") && days != null) v.put("presence", (double) Math.round(Math.min(100, days * 20)));
+        Double computed = null;
+        Double avg = d(v, "avgPerDay"), target = d(v, "targetPerDay"), weekly = d(v, "weeklyTarget");
+        if (has(t, "targetPerDay") && avg != null && target != null && target > 0) computed = (double) Math.round(avg * 100 / target);
+        else if (has(t, "weeklyTarget") && volume != null && weekly != null && weekly > 0) computed = (double) Math.round(volume * 100 / weekly);
+        if (computed != null) {
             Double given = d(v, "productivity");
             if (given == null) v.put("productivity", computed);
-            else if (notes != null && Math.abs(given - computed) > 3) {
+            else if (notes != null && has(t, "targetPerDay") && Math.abs(given - computed) > 3) {
                 notes.add("Productivité du fichier (" + fmt(given) + " %) différente du calcul Moy/jour ÷ Target (" + fmt(computed) + " %)");
             }
         }
     }
 
+    private static boolean has(TeamDef t, String key) {
+        return t.fields().stream().anyMatch(f -> f.key().equals(key));
+    }
+
     /** ≥ 100 % : objectif atteint (vert) · 90 à 99 % : proche (orange) · < 90 % : à accompagner (rouge). */
     static String level(Map<String, Object> v) {
-        Double p = d(v, "productivity");
-        if (p == null) return null;
+        Double p = d(v, "productivity"), days = d(v, "daysWorked");
+        if (p == null || (days != null && days == 0)) return null; // absent toute la semaine : non évalué
         return p >= 100 ? "GOOD" : p >= 90 ? "WARN" : "BAD";
     }
 
@@ -632,7 +728,9 @@ public class TeamPerfFileService {
     }
 
     public void deleteBatch(AuthenticatedUser requester, String batchId) {
-        if (!canImport(requester)) throw ApiException.forbidden("Réservé à la QA et à l'administrateur.");
+        List<String> teams = jdbc.queryForList("SELECT DISTINCT Team FROM dbo.TeamPerfRecords WHERE BatchId = ?", String.class, batchId);
+        if (teams.isEmpty()) throw ApiException.notFound("Import introuvable.");
+        if (!canImportTeam(requester, teams.get(0))) throw ApiException.forbidden("Réservé à la QA et au Team Leader de l'équipe.");
         int n = jdbc.update("DELETE FROM dbo.TeamPerfRecords WHERE BatchId = ?", batchId);
         if (n == 0) throw ApiException.notFound("Import introuvable.");
         audit.record(requester.username(), "DELETE_TEAM_PERF_FILE", "Import " + batchId + " supprimé (" + n + " ligne(s))");
@@ -741,11 +839,17 @@ public class TeamPerfFileService {
 
     /** « 0:03:25 », « 03:25 » ou un nombre de secondes. */
     static Double seconds(String raw) {
-        Matcher m = Pattern.compile("^(\\d{1,2}):(\\d{2})(?::(\\d{2}))?$").matcher(raw.trim());
+        Matcher m = Pattern.compile("^(\\d{1,2}):(\\d{2})(?::(\\d{2}))?\\s*([AaPp][Mm])?$").matcher(raw.trim());
         if (m.matches()) {
-            return m.group(3) != null
-                    ? Integer.parseInt(m.group(1)) * 3600.0 + Integer.parseInt(m.group(2)) * 60 + Integer.parseInt(m.group(3))
-                    : Integer.parseInt(m.group(1)) * 60.0 + Integer.parseInt(m.group(2));
+            int a = Integer.parseInt(m.group(1));
+            String meridiem = m.group(4);
+            if (meridiem != null) { // heure Excel affichée « 12:16:00 AM » = 0 h 16 min
+                if (meridiem.equalsIgnoreCase("AM") && a == 12) a = 0;
+                else if (meridiem.equalsIgnoreCase("PM") && a < 12) a += 12;
+            }
+            return m.group(3) != null || meridiem != null
+                    ? a * 3600.0 + Integer.parseInt(m.group(2)) * 60 + (m.group(3) == null ? 0 : Integer.parseInt(m.group(3)))
+                    : a * 60.0 + Integer.parseInt(m.group(2));
         }
         return number(raw);
     }

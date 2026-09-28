@@ -107,7 +107,7 @@ window.RccSession = (function () {
         });
     }
 
-    function applySidebarVisibility(profile, permissionOverrides, deniedTabCodes, isOutboundAgent) {
+    function applySidebarVisibility(profile, permissionOverrides, deniedTabCodes, isOutboundAgent, channelPortal) {
         var links = document.querySelectorAll(".sidebar-menu a[data-roles]");
         var currentPath = window.location.pathname;
         var overridesByCode = {};
@@ -130,6 +130,9 @@ window.RccSession = (function () {
             // vente" de son propre tableau de bord Outbound.
             if ((featureCode === "procedures" || featureCode === "knowledge" || featureCode === "training" || featureCode === "performance") && outboundAgent) isAllowed = false;
             if (featureCode === "outbound-dashboard" && !outboundAgent) isAllowed = false;
+            // Portails Tchat / Rafiki : chaque agent ne voit que celui de son canal (l'administrateur voit les deux).
+            if ((featureCode === "portail-tchat" || featureCode === "portail-rafiki") && profile !== "ADMIN"
+                && channelPortal !== "/" + featureCode) isAllowed = false;
 
             isAllowed = computeFeatureAllowed(featureCode, isAllowed, overridesByCode, denied);
 
@@ -704,7 +707,8 @@ window.RccSession = (function () {
                     var teamStatus = results[2];
 
                     var isOutboundAgent = profile === "AGENT" && teamStatus.redirectTo === "/outbound-dashboard";
-                    applySidebarVisibility(profile, permissionOverrides, deniedTabCodes, isOutboundAgent);
+                    var channelPortal = profile === "AGENT" && /^\/portail-(tchat|rafiki)$/.test(teamStatus.redirectTo || "") ? teamStatus.redirectTo : null;
+                    applySidebarVisibility(profile, permissionOverrides, deniedTabCodes, isOutboundAgent, channelPortal);
                     applyHeader(user, profile);
 
                     // Suivi de shift (pointeuse personnelle) — sans objet pour ces profils : ils
@@ -724,7 +728,7 @@ window.RccSession = (function () {
                     // Vérification périodique (onglet visible uniquement) pour signaler les nouvelles notifications.
                     var pollSec = Math.max(30, Number(window.RccPreferences && window.RccPreferences.get ? window.RccPreferences.get("notifPollSeconds") : 60) || 60);
                     setInterval(function () { if (!document.hidden) refreshNotificationBadge(); }, pollSec * 1000);
-                    return { user: user, profile: profile, isOutboundAgent: isOutboundAgent };
+                    return { user: user, profile: profile, isOutboundAgent: isOutboundAgent, channelPortal: channelPortal };
                 });
             })
             .catch(function (e) {
