@@ -210,6 +210,10 @@ public class UserService {
                 put("Team Leader Inbound Voice", "/team-leader");
                 put("Team Leader Inbound Mail", "/team-leader");
                 put("Team Leader Outbound", "/team-leader");
+                // Rôles de base (comptes de test, comptes sans service métier) : chacun arrive sur son portail.
+                put("TEAM_LEADER", "/team-leader");
+                put("SUPERVISOR", "/supervisor");
+                put("AGENCE", "/agence");
             }};
 
     /** "Mon Parcours" RH — dates et type de contrat de chaque agent, filtré sur la filiale du RH (l'admin voit tout). */
