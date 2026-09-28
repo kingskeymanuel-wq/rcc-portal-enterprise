@@ -165,7 +165,7 @@ public class ManualKpiEntryService {
         }
     }
 
-    private Workbook buildWorkbookFromOcrGrid(String rawJson) throws IOException {
+    static Workbook buildWorkbookFromOcrGrid(String rawJson) throws IOException {
         com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(rawJson);
         if (root.has("error")) {
             throw ApiException.serviceUnavailable("OCR local : " + root.path("error").asText());

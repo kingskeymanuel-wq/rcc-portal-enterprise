@@ -15,6 +15,7 @@
           rel="stylesheet">
 
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/team-perf-files.css}">
 
     <style>
         .qa-card { background:#fff; border:1px solid rgba(0,0,0,.06); border-radius:.75rem; padding:1.25rem 1.5rem; }
@@ -134,6 +135,11 @@
                     <li class="nav-item">
                         <button type="button" class="btn nav-link" id="qaPerformanceTabBtn">
                             <i class="bi bi-bar-chart-line"></i> Performance
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button type="button" class="btn nav-link" id="qaPerfFilesTabBtn">
+                            <i class="bi bi-file-earmark-spreadsheet"></i> Fichiers de performance
                         </button>
                     </li>
                 </ul>
@@ -404,36 +410,7 @@
                     </div>
                 </div>
 
-            </div>
-
-        </main>
-
-    </div>
-
-</div>
-
-<!-- Modale IA — transcription et analyse (serveurs auto-hébergés Ecobank uniquement) -->
-<div class="modal fade" id="aiModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Transcription &amp; analyse <span class="badge bg-secondary">Azure AI Speech + Azure OpenAI</span></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="d-flex gap-2 mb-3">
-                    <button class="btn btn-outline-primary btn-sm" id="transcribeBtn"><i class="bi bi-mic"></i> Transcrire l'appel</button>
-                    <button class="btn btn-outline-primary btn-sm" id="analyzeBtn"><i class="bi bi-magic"></i> Analyser</button>
-                </div>
-                <div id="aiStatus" class="alert alert-info" style="display:none;"></div>
-                <h6>Transcription</h6>
-                <div id="aiTranscript" class="border rounded p-2 mb-3 small" style="max-height:200px;overflow-y:auto;white-space:pre-wrap;">—</div>
-                <h6>Analyse</h6>
-                <div id="aiAnalysis" class="border rounded p-2 small" style="max-height:200px;overflow-y:auto;white-space:pre-wrap;">—</div>
-            </div>
-        </div>
-
-        </div><!-- /qaOverviewPane -->
+            </div><!-- /qaOverviewPane -->
 
         <!-- Performance — réutilise les mêmes données que Reporting, réorganisées pour la QA -->
         <div id="qaPerformancePane" style="display:none;">
@@ -488,6 +465,43 @@
             </div>
         </div><!-- /qaPerformancePane -->
 
+        <!-- Fichiers de performance par équipe (rapport hebdo) : choix de l'équipe, indicateurs, import, tableau -->
+        <div id="qaPerfFilesPane" style="display:none;">
+            <p class="text-muted small mb-3">Choisissez l'équipe : seuls ses indicateurs sont recherchés dans le fichier, les indicateurs
+                calculés (Total activités, Moy / jour, Productivité…) sont complétés s'ils manquent, et chaque agent retrouve ses chiffres dans « Ma Performance ».</p>
+            <div id="qaPerfFilesRoot"></div>
+        </div>
+
+            </div><!-- /container-fluid -->
+
+        </main>
+
+    </div>
+
+</div>
+
+<!-- Modale IA — transcription et analyse (serveurs auto-hébergés Ecobank uniquement) -->
+<div class="modal fade" id="aiModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Transcription &amp; analyse <span class="badge bg-secondary">Azure AI Speech + Azure OpenAI</span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex gap-2 mb-3">
+                    <button class="btn btn-outline-primary btn-sm" id="transcribeBtn"><i class="bi bi-mic"></i> Transcrire l'appel</button>
+                    <button class="btn btn-outline-primary btn-sm" id="analyzeBtn"><i class="bi bi-magic"></i> Analyser</button>
+                </div>
+                <div id="aiStatus" class="alert alert-info" style="display:none;"></div>
+                <h6>Transcription</h6>
+                <div id="aiTranscript" class="border rounded p-2 mb-3 small" style="max-height:200px;overflow-y:auto;white-space:pre-wrap;">—</div>
+                <h6>Analyse</h6>
+                <div id="aiAnalysis" class="border rounded p-2 small" style="max-height:200px;overflow-y:auto;white-space:pre-wrap;">—</div>
+            </div>
+        </div>
+
+
     </div>
 </div>
 
@@ -496,6 +510,7 @@
 <script th:src="@{/js/preferences.js}"></script>
 <script th:src="@{/js/rcc-api.js}"></script>
 <script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/team-perf-files.js}"></script>
 <script th:src="@{/js/qa.js}"></script>
 
 </body>

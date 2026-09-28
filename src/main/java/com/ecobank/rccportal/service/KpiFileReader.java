@@ -60,6 +60,9 @@ final class KpiFileReader {
         if (zip && new String(bytes, 0, Math.min(bytes.length, 200), StandardCharsets.ISO_8859_1).contains("opendocument")) {
             throw ApiException.badRequest("Fichier OpenDocument (.ods) : enregistrez-le au format .xlsx ou .csv depuis LibreOffice, puis réimportez-le.");
         }
+        if (zip && (name.endsWith(".pptx") || type.contains("presentation") || containsAscii(bytes, "ppt/slides/"))) {
+            return new Result(Kind.WORKBOOK, fromPptx(bytes));
+        }
         if (zip || ole2) {
             try {
                 return new Result(Kind.WORKBOOK, WorkbookFactory.create(new ByteArrayInputStream(bytes)));
@@ -234,6 +237,45 @@ final class KpiFileReader {
         out.add(String.join(" ", java.util.Arrays.copyOfRange(tokens, 0, firstNumber)));
         for (int i = firstNumber; i < tokens.length; i++) out.add(tokens[i]);
         return out;
+    }
+
+    // ───────────── PowerPoint (rapport hebdo) ─────────────
+
+    /**
+     * Présentation .pptx (ex. « Rapport Weekly RCC ») : chaque tableau des diapositives devient des
+     * lignes du classeur, précédées des textes de la diapositive (titre « Performances MAILS — du 21 -
+     * 27 Septembre »), qui permettent de retrouver la période. Une ligne vide sépare deux tableaux.
+     */
+    static Workbook fromPptx(byte[] bytes) throws IOException {
+        List<List<String>> rows = new ArrayList<>();
+        try (org.apache.poi.xslf.usermodel.XMLSlideShow show = new org.apache.poi.xslf.usermodel.XMLSlideShow(new ByteArrayInputStream(bytes))) {
+            for (org.apache.poi.xslf.usermodel.XSLFSlide slide : show.getSlides()) {
+                List<org.apache.poi.xslf.usermodel.XSLFTable> tables = new ArrayList<>();
+                for (org.apache.poi.xslf.usermodel.XSLFShape shape : slide.getShapes()) {
+                    if (shape instanceof org.apache.poi.xslf.usermodel.XSLFTable t) tables.add(t);
+                    else if (shape instanceof org.apache.poi.xslf.usermodel.XSLFTextShape s && s.getText() != null && !s.getText().isBlank()) {
+                        rows.add(List.of(s.getText().replace('\n', ' ').replace('\u000b', ' ').trim()));
+                    }
+                }
+                for (org.apache.poi.xslf.usermodel.XSLFTable t : tables) {
+                    rows.add(List.of());
+                    for (org.apache.poi.xslf.usermodel.XSLFTableRow r : t.getRows()) {
+                        List<String> cells = new ArrayList<>();
+                        for (org.apache.poi.xslf.usermodel.XSLFTableCell c : r.getCells()) {
+                            cells.add(c.getText() == null ? "" : c.getText().replace('\n', ' ').replace('\u000b', ' ').trim());
+                        }
+                        rows.add(cells);
+                    }
+                }
+                rows.add(List.of());
+            }
+        }
+        if (rows.stream().allMatch(List::isEmpty)) throw ApiException.badRequest("Aucun tableau trouvé dans cette présentation.");
+        return toWorkbook(rows);
+    }
+
+    private static boolean containsAscii(byte[] bytes, String needle) {
+        return new String(bytes, 0, Math.min(bytes.length, 64 * 1024), StandardCharsets.ISO_8859_1).contains(needle);
     }
 
     // ───────────── Utilitaires ─────────────

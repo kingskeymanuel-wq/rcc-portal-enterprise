@@ -17,8 +17,8 @@ import java.util.*;
  * Performance par équipe avec les indicateurs PROPRES à chaque métier :
  * <ul>
  *   <li><b>Inbound Voix</b> : appels traités, DMT, taux de décroché, résolution au 1er contact, score des écoutes ;</li>
- *   <li><b>Inbound Mail / Rafiki</b> : mails/tickets traités, délai moyen de réponse, respect du SLA, cas créés et bien
- *       créés, backlog, score QA écrit ;</li>
+ *   <li><b>Inbound Mail / Tchat / Rafiki</b> : indicateurs du rapport hebdo — jours travaillés, appels sortants, CIS, mails
+ *       assistés, sollicitations, total activités, moyenne / jour, target / jour, productivité, qualité ;</li>
  *   <li><b>Outbound</b> : appels émis, clients joints, taux de joignabilité, RDV, ventes, taux de transformation ;</li>
  *   <li><b>CIB</b> : interactions, cas créés, score QA.</li>
  * </ul>
@@ -29,7 +29,8 @@ import java.util.*;
 @Service
 public class TeamPerformanceService {
 
-    /** unit : COUNT | PCT | SECONDS | MINUTES | SCORE ; alias : code KPI exact, ou « ~MOT1+MOT2 » (le code contient les deux). */
+    /** unit : COUNT | RATE | PCT | SECONDS | MINUTES | SCORE ; alias : code KPI exact, « ~MOT1+MOT2 » (le code contient les deux)
+     *  ou « @clé » (indicateur du fichier de performance de l'équipe, voir TeamPerfFileService). */
     public record Column(String key, String label, String unit, boolean higherIsBetter, String hint) {}
 
     public record Row(Long userId, String username, String name, String affiliateBranch, Map<String, Double> values,
@@ -73,16 +74,22 @@ public class TeamPerformanceService {
                 computed("qaVoice", "Score écoutes", "PCT", true, "Moyenne des écoutes QA (appels) de la période", "QA_VOICE", SCORE_QA),
                 kpi("evaluation", "Évaluation", "PCT", true, "Score au module Évaluation", "SCORE_EVALUATION"),
                 computed("presence", "Présence", "PCT", true, "Taux de présence (pointage)", "PRESENCE")));
+        // Inbound Mail (Mails, Tchat, Rafiki) : indicateurs du rapport hebdo « Performances MAILS » (fichier importé par la QA,
+        // alias « @clé »), repli sur les KPI importés sous leurs autres appellations.
         PROFILES.put(TeamClassifier.Team.INBOUND_MAIL, List.of(
-                kpi("mails", "Mails / tickets traités", "COUNT", true, "Mails, chats et tickets Rafiki clôturés",
-                        concat(new String[]{"MAILS_TRAITES", "TICKETS_TRAITES", "VOLUME_TRAITE", "CONTACTS_TRAITES", "~MAIL+TRAIT", "~TICKET"}, INTERACTIONS)),
-                kpi("responseTime", "Délai moyen de réponse", "MINUTES", false, "Temps moyen avant la réponse au client",
-                        "DELAI_MOYEN_REPONSE", "DELAI_MOYEN_DE_REPONSE", "DMR", "TEMPS_MOYEN_REPONSE", "TEMPS_MOYEN_DE_REPONSE", "~DELAI", "~TEMPS+REPONSE"),
-                kpi("sla", "Respect du SLA", "PCT", true, "Part des demandes traitées dans le délai", "TAUX_RESPECT_SLA", "RESPECT_SLA", "SLA", "~SLA"),
-                kpi("cases", "Cas créés", "COUNT", true, "Cas créés dans l'outil de ticketing", "CAS_CREES", "NOMBRE_CAS_CREES"),
-                kpi("goodCases", "Bonne création de cas", "PCT", true, "Cas correctement qualifiés", "TAUX_BONNE_CREATION_CAS", "~BONNE+CREATION"),
-                kpi("backlog", "Backlog", "COUNT", false, "Demandes encore en attente", "BACKLOG", "EN_ATTENTE", "~BACKLOG"),
-                computed("qaWritten", "Score QA écrit", "PCT", true, "Moyenne des évaluations écrites (mails / chat)", "QA_WRITTEN", SCORE_QA),
+                kpi("daysWorked", "Jours travaillés", "COUNT", true, "Jours travaillés sur la période", "@daysWorked", "JOURS_TRAVAILLES", "~JOUR+TRAVAIL"),
+                kpi("outboundCalls", "Appels sortants", "COUNT", true, "Rappels clients passés", "@outboundCalls", "APPELS_SORTANT", "APPELS_SORTANTS"),
+                kpi("cis", "CIS", "COUNT", true, "Dossiers CIS traités", "@cis", "CIS"),
+                kpi("mails", "Mails assistés", "COUNT", true, "Mails traités / assistés",
+                        concat(new String[]{"@mails", "MAILS_ASSIST", "MAILS_ASSISTES", "MAILS_TRAITES", "TICKETS_TRAITES", "~MAIL+ASSIST", "~MAIL+TRAIT"}, INTERACTIONS)),
+                kpi("requests", "Sollicitations", "COUNT", true, "Sollicitations traitées (tchat, Rafiki…)", "@requests", "SOLLICITATIONS", "~SOLLICITATION"),
+                kpi("totalActivities", "Total activités", "COUNT", true, "CIS + Mails assistés + Sollicitations", "@totalActivities", "TOTAL_ACTIVITES"),
+                kpi("avgPerDay", "Moy / jour", "RATE", true, "Total activités ÷ jours travaillés", "@avgPerDay", "MOY_JOUR", "~MOY+JOUR"),
+                kpi("targetPerDay", "Target / jour", "RATE", true, "Objectif journalier de l'agent", "@targetPerDay", "TARGET_JOUR"),
+                kpi("productivity", "Productivité", "PCT", true, "Moy / jour ÷ Target / jour — vert ≥ 100 %, orange 90–99 %, rouge < 90 %",
+                        "@productivity", "PRODUCTIVITE", "~PRODUCTIVIT"),
+                computed("qaWritten", "Qualité", "PCT", true, "Qualité du rapport hebdo, sinon moyenne des évaluations écrites (mails / chat)", "QA_WRITTEN",
+                        concat(new String[]{"@quality"}, SCORE_QA)),
                 computed("presence", "Présence", "PCT", true, "Taux de présence (pointage)", "PRESENCE")));
         PROFILES.put(TeamClassifier.Team.OUTBOUND, List.of(
                 computed("calls", "Appels émis", "COUNT", true, "Appels passés (campagnes du portail, sinon KPI importé)", "OUT_CALLS",
@@ -107,12 +114,15 @@ public class TeamPerformanceService {
     private final TeamLeaderService teamLeaders;
     private final QualityEvaluationService evaluations;
     private final JdbcTemplate jdbc;
+    private final TeamPerfFileService perfFiles;
 
-    public TeamPerformanceService(ReportingService reporting, TeamLeaderService teamLeaders, QualityEvaluationService evaluations, JdbcTemplate jdbc) {
+    public TeamPerformanceService(ReportingService reporting, TeamLeaderService teamLeaders, QualityEvaluationService evaluations, JdbcTemplate jdbc,
+                                  TeamPerfFileService perfFiles) {
         this.reporting = reporting;
         this.teamLeaders = teamLeaders;
         this.evaluations = evaluations;
         this.jdbc = jdbc;
+        this.perfFiles = perfFiles;
     }
 
     /** Colonnes (indicateurs) d'une équipe. */
@@ -157,11 +167,21 @@ public class TeamPerformanceService {
         List<PerformanceResponse> base = reporting.teamSummary(start, end, label, countryCode).stream()
                 .filter(r -> TeamClassifier.classify(r.activity(), services.getOrDefault(r.userId(), List.of())) == target)
                 .toList();
-        return build(team, label, base, sources(start, end));
+        Sources src = sources(start, end);
+        return build(team, label, base, perfFiles == null ? src : src.withSheet(perfFiles.aggregate(team.name(), start, end)));
     }
 
     /** Données calculées de la période : écoutes / écrits par agent, appels de campagne, ventes. */
-    record Sources(Map<String, double[]> qaVoice, Map<String, double[]> qaWritten, Map<Long, long[]> outbound, Map<Long, Long> sales) {}
+    record Sources(Map<String, double[]> qaVoice, Map<String, double[]> qaWritten, Map<Long, long[]> outbound, Map<Long, Long> sales,
+                   TeamPerfFileService.Aggregate sheet) {
+        Sources(Map<String, double[]> qaVoice, Map<String, double[]> qaWritten, Map<Long, long[]> outbound, Map<Long, Long> sales) {
+            this(qaVoice, qaWritten, outbound, sales, new TeamPerfFileService.Aggregate(Map.of(), Map.of()));
+        }
+
+        Sources withSheet(TeamPerfFileService.Aggregate s) {
+            return new Sources(qaVoice, qaWritten, outbound, sales, s);
+        }
+    }
 
     Sources sources(LocalDate start, LocalDate end) {
         Map<String, double[]> voice = new HashMap<>(), written = new HashMap<>();
@@ -199,10 +219,15 @@ public class TeamPerformanceService {
             String user = r.username() == null ? "" : r.username().toLowerCase(Locale.ROOT);
             long[] out = r.userId() == null ? null : src.outbound().get(r.userId());
             Long sold = r.userId() == null ? null : src.sales().get(r.userId());
+            // Fichier de performance de l'équipe (semaines de la période) : prioritaire sur le reste.
+            Map<String, Double> sheet = src.sheet().find(r.userId(), r.userFullName() != null ? r.userFullName() : r.username());
             Map<String, Double> values = new LinkedHashMap<>();
             for (Def d : defs) {
                 Double v = null;
-                if (d.computed() != null) {
+                if (sheet != null) {
+                    for (String a : d.aliases()) if (a.startsWith("@") && sheet.get(a.substring(1)) != null) { v = sheet.get(a.substring(1)); break; }
+                }
+                if (v == null && d.computed() != null) {
                     v = switch (d.computed()) {
                         case "PRESENCE" -> r.presenceRate();
                         case "QA_VOICE" -> avg(src.qaVoice().get(user));
@@ -231,7 +256,7 @@ public class TeamPerformanceService {
             List<Double> vals = rows.stream().map(x -> x.values().get(key)).filter(Objects::nonNull).toList();
             if (vals.isEmpty()) { team_.put(key, null); continue; }
             double sum = vals.stream().mapToDouble(Double::doubleValue).sum();
-            team_.put(key, "COUNT".equals(d.column().unit()) ? sum : round1(sum / vals.size()));
+            team_.put(key, "COUNT".equals(d.column().unit()) ? round1(sum) : round1(sum / vals.size()));
         }
         // Taux d'équipe recalculés sur les totaux (plus justes qu'une moyenne de taux).
         if (team == TeamClassifier.Team.OUTBOUND) {
@@ -246,7 +271,7 @@ public class TeamPerformanceService {
     static Double fromKpis(Map<String, Double> kpis, List<String> aliases) {
         if (kpis.isEmpty()) return null;
         for (String a : aliases) {
-            if (a.startsWith("~")) continue;
+            if (a.startsWith("~") || a.startsWith("@")) continue;
             Double v = kpis.get(a);
             if (v != null) return v;
         }

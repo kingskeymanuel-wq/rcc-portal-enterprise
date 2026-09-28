@@ -634,6 +634,24 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
                     ReintegratedBy NVARCHAR(100) NULL
                 )
                 """);
+        // Fichiers de performance par équipe (ex. « Performances MAILS du 21 au 27 septembre ») : une ligne par
+        // agent et par période, indicateurs de l'équipe en JSON. Lu par la QA, le Team Leader et l'agent lui-même.
+        createIfMissing("TeamPerfRecords", """
+                CREATE TABLE dbo.TeamPerfRecords (
+                    RecordId BIGINT IDENTITY PRIMARY KEY,
+                    Team NVARCHAR(30) NOT NULL,
+                    PeriodStart DATE NOT NULL,
+                    PeriodEnd DATE NOT NULL,
+                    UserId BIGINT NULL,
+                    AgentName NVARCHAR(200) NOT NULL,
+                    NameKey NVARCHAR(200) NOT NULL,
+                    MetricsJson NVARCHAR(MAX) NOT NULL,
+                    CountryCode NVARCHAR(3) NULL,
+                    BatchId NVARCHAR(40) NOT NULL,
+                    ImportedBy NVARCHAR(100) NULL,
+                    ImportedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+                )
+                """);
         // Réponses déjà utilisées dans les champs des masques de mail (hors données personnelles du client) :
         // suggestions proposées aux autres agents pour le même champ.
         createIfMissing("MailFieldHistory", """

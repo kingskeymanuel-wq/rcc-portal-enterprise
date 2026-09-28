@@ -9,6 +9,7 @@
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}"
           rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/team-perf-files.css}">
     <style>
         /* =====================================================================
            "Ma Performance" — design system dédié
@@ -177,6 +178,9 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Rapport hebdo de l'équipe importé par la QA : mes chiffres, mon rang, la moyenne de l'équipe -->
+                <div id="myTeamPerfCard" style="display:none;"></div>
 
                 <!-- Indicateurs individuels — cliquables (QA/Admin/RH) pour voir le détail équipe -->
                 <div class="pf-kpi-row">
@@ -381,6 +385,7 @@
 <script th:src="@{/js/rcc-api.js}"></script>
 <script th:src="@{/js/session.js}"></script>
 <script th:src="@{/js/shift-timeline.js}"></script>
+<script th:src="@{/js/team-perf-files.js}"></script>
 <script th:src="@{/js/performance.js}"></script>
 </body>
 </html>

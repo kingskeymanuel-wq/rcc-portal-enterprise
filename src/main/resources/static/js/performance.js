@@ -1063,6 +1063,8 @@
         wireManualEntry();
         load();
         loadManualKpiHistory();
+        // Rapport hebdo de mon équipe (importé par la QA) : caché s'il n'y a encore rien pour moi.
+        if (window.RccPerfFiles && document.getElementById("myTeamPerfCard")) RccPerfFiles.mountMine(document.getElementById("myTeamPerfCard"));
 
         window.RccSession.init().then(function (session) {
             var isSupervisor = session && (session.profile === "QA" || session.profile === "ADMIN");

@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class TeamPerformanceServiceTest {
 
-    private final TeamPerformanceService svc = new TeamPerformanceService(null, null, null, null);
+    private final TeamPerformanceService svc = new TeamPerformanceService(null, null, null, null, null);
 
     private static PerformanceResponse agent(long id, String username, Map<String, Double> kpis, double presence) {
         return new PerformanceResponse(username, username.toUpperCase(), "2026-09", 0, null, kpis, presence, 80.0, "CI", null, null, id);
@@ -23,7 +23,8 @@ class TeamPerformanceServiceTest {
         List<String> mail = TeamPerformanceService.columns(TeamClassifier.Team.INBOUND_MAIL).stream().map(TeamPerformanceService.Column::label).toList();
         List<String> out = TeamPerformanceService.columns(TeamClassifier.Team.OUTBOUND).stream().map(TeamPerformanceService.Column::label).toList();
         assertTrue(voice.containsAll(List.of("Appels traités", "DMT", "Taux de décroché")));
-        assertTrue(mail.containsAll(List.of("Mails / tickets traités", "Délai moyen de réponse", "Respect du SLA", "Score QA écrit")));
+        assertTrue(mail.containsAll(List.of("Jours travaillés", "Appels sortants", "CIS", "Mails assistés", "Sollicitations", "Total activités",
+                "Moy / jour", "Target / jour", "Productivité", "Qualité")));
         assertTrue(out.containsAll(List.of("Appels émis", "Clients joints", "Taux de joignabilité", "RDV pris", "Ventes", "Taux de transformation")));
         assertFalse(voice.contains("Ventes"));
         assertFalse(mail.contains("DMT"));
@@ -62,12 +63,26 @@ class TeamPerformanceServiceTest {
     void mailTeamUsesWrittenEvaluations() {
         var src = new TeamPerformanceService.Sources(Map.of("fatou", new double[]{50, 1}), Map.of("fatou", new double[]{180, 2}), Map.of(), Map.of());
         var p = svc.build(TeamClassifier.Team.INBOUND_MAIL, "2026-09",
-                List.of(agent(9, "fatou", Map.of("TICKETS_TRAITES", 300.0, "DMR", 42.0), 97)), src);
+                List.of(agent(9, "fatou", Map.of("TICKETS_TRAITES", 300.0), 97)), src);
         var v = p.rows().get(0).values();
         assertEquals(300.0, v.get("mails"));
-        assertEquals(42.0, v.get("responseTime"));
         assertEquals(90.0, v.get("qaWritten"));                 // écrits seulement, pas l'écoute à 50 %
         assertEquals(97.0, v.get("presence"));
+    }
+
+    @Test
+    void mailTeamTakesTheWeeklyPerformanceFileFirst() {
+        var sheet = new TeamPerfFileService.Aggregate(Map.of(9L, Map.of("daysWorked", 4.0, "cis", 320.0, "mails", 165.0, "requests", 6.0,
+                "totalActivities", 491.0, "avgPerDay", 122.8, "targetPerDay", 70.0, "productivity", 175.0, "quality", 88.0)), Map.of());
+        var src = new TeamPerformanceService.Sources(Map.of(), Map.of("fatou", new double[]{60, 1}), Map.of(), Map.of()).withSheet(sheet);
+        var p = svc.build(TeamClassifier.Team.INBOUND_MAIL, "2026-09",
+                List.of(agent(9, "fatou", Map.of("MAILS_TRAITES", 10.0), 97), agent(10, "awa", Map.of(), 90)), src);
+        var v = p.rows().stream().filter(r -> r.username().equals("fatou")).findFirst().orElseThrow().values();
+        assertEquals(165.0, v.get("mails"));                    // le fichier hebdo prime sur le KPI importé
+        assertEquals(491.0, v.get("totalActivities"));
+        assertEquals(175.0, v.get("productivity"));
+        assertEquals(88.0, v.get("qaWritten"));                  // qualité du fichier, avant les évaluations écrites
+        assertEquals(122.8, p.teamValues().get("avgPerDay"));    // taux : moyenne, pas somme
     }
 
     @Test

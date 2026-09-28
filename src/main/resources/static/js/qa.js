@@ -782,19 +782,26 @@
     function wireQaPerformanceTab() {
         $("qaPerfMonth").value = qaPerfMonthValue();
 
-        $("qaOverviewTabBtn").addEventListener("click", function () {
-            $("qaOverviewTabBtn").classList.add("active");
-            $("qaPerformanceTabBtn").classList.remove("active");
-            $("qaOverviewPane").style.display = "";
-            $("qaPerformancePane").style.display = "none";
-        });
+        var qaTabs = [["qaOverviewTabBtn", "qaOverviewPane"], ["qaPerformanceTabBtn", "qaPerformancePane"], ["qaPerfFilesTabBtn", "qaPerfFilesPane"]];
+        var perfFilesMounted = false;
+        function showQaTab(btnId) {
+            qaTabs.forEach(function (t) {
+                if (!$(t[0])) return;
+                $(t[0]).classList.toggle("active", t[0] === btnId);
+                $(t[1]).style.display = t[0] === btnId ? "" : "none";
+            });
+        }
+        $("qaOverviewTabBtn").addEventListener("click", function () { showQaTab("qaOverviewTabBtn"); });
         $("qaPerformanceTabBtn").addEventListener("click", function () {
-            $("qaPerformanceTabBtn").classList.add("active");
-            $("qaOverviewTabBtn").classList.remove("active");
-            $("qaOverviewPane").style.display = "none";
-            $("qaPerformancePane").style.display = "";
+            showQaTab("qaPerformanceTabBtn");
             if (!qaPerfLoaded) { qaPerfLoaded = true; loadQaPerformance(); }
         });
+        if ($("qaPerfFilesTabBtn")) {
+            $("qaPerfFilesTabBtn").addEventListener("click", function () {
+                showQaTab("qaPerfFilesTabBtn");
+                if (!perfFilesMounted && window.RccPerfFiles) { perfFilesMounted = true; RccPerfFiles.mountImport($("qaPerfFilesRoot")); }
+            });
+        }
 
         $("qaPerfByServiceBtn").addEventListener("click", function () {
             $("qaPerfByServiceBtn").classList.add("active", "btn-secondary");

@@ -779,18 +779,68 @@
         if (show) $("mtRichPreview").innerHTML = bodyToHtml(body);
     }
 
-    /** Copie riche (tableau HTML) si possible, texte sinon. */
+    /**
+     * Copie « à l'ancienne » (execCommand) : seule méthode disponible quand le portail est ouvert en
+     * http:// sur le réseau interne (navigator.clipboard n'existe qu'en https ou sur localhost).
+     * L'élément temporaire est placé DANS la fenêtre du masque : le piège de focus de la modale
+     * Bootstrap empêcherait sinon la sélection, et rien ne serait copié.
+     */
+    function legacyCopy(plain, html) {
+        var host = $("useTemplateModal") && $("useTemplateModal").classList.contains("show") ? $("useTemplateModal") : document.body;
+        var el;
+        if (html) {
+            el = document.createElement("div");
+            el.contentEditable = "true";
+            el.innerHTML = html;
+        } else {
+            el = document.createElement("textarea");
+            el.value = plain;
+            el.setAttribute("readonly", "");
+        }
+        el.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0;white-space:pre-wrap;";
+        host.appendChild(el);
+        var active = document.activeElement;
+        var ok = false;
+        try {
+            if (html) {
+                var range = document.createRange();
+                range.selectNodeContents(el);
+                var sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            } else {
+                el.focus();
+                el.select();
+                el.setSelectionRange(0, plain.length);
+            }
+            ok = document.execCommand("copy");
+        } catch (e) {
+            ok = false;
+        }
+        host.removeChild(el);
+        if (window.getSelection) window.getSelection().removeAllRanges();
+        if (active && active.focus) active.focus();
+        return ok ? Promise.resolve() : Promise.reject(new Error("copy"));
+    }
+
+    /** Copie riche (tableau HTML) si possible, texte sinon — avec repli quand le presse-papiers moderne est absent ou refusé. */
     function copyMail(subjectToo) {
         var body = $("filledBody").value;
         var plain = (subjectToo ? $("filledSubject").value + "\n\n" : "") + bodyToText(body);
-        if (hasTable(body) && window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
-            var html = '<div>' + (subjectToo ? '<div style="font:bold 13px Calibri,Arial,sans-serif;">' + escapeHtml($("filledSubject").value) + '</div><div>&nbsp;</div>' : "") + bodyToHtml(body) + '</div>';
+        var html = hasTable(body)
+            ? '<div>' + (subjectToo ? '<div style="font:bold 13px Calibri,Arial,sans-serif;">' + escapeHtml($("filledSubject").value) + '</div><div>&nbsp;</div>' : "") + bodyToHtml(body) + '</div>'
+            : null;
+        var modern = window.isSecureContext && navigator.clipboard;
+        if (html && modern && window.ClipboardItem && navigator.clipboard.write) {
             return navigator.clipboard.write([new ClipboardItem({
                 "text/html": new Blob([html], { type: "text/html" }),
                 "text/plain": new Blob([plain], { type: "text/plain" })
-            })]).catch(function () { return navigator.clipboard.writeText(plain); });
+            })]).catch(function () { return legacyCopy(plain, html); });
         }
-        return navigator.clipboard.writeText(plain);
+        if (modern && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(plain).catch(function () { return legacyCopy(plain, html); });
+        }
+        return legacyCopy(plain, html);
     }
 
     $("sendFilledMailBtn").addEventListener("click", rememberUsedValues);
@@ -822,7 +872,13 @@
             var original = btn.innerHTML;
             btn.innerHTML = '<i class="bi bi-check-lg"></i> Copié';
             setTimeout(function () { btn.innerHTML = original; }, 1500);
-        }).catch(function () { alert("Impossible de copier automatiquement — sélectionnez le texte manuellement."); });
+        }).catch(function () {
+            // Dernier recours : le texte est sélectionné, l'agent n'a plus qu'à faire Ctrl+C.
+            var area = $("filledBody");
+            area.focus();
+            area.select();
+            alert("Copie automatique bloquée par le navigateur — le texte est sélectionné : faites Ctrl+C.");
+        });
     });
 
     // ===================== INIT =====================
