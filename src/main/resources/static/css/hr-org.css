@@ -1,0 +1,90 @@
+/* ===== Portail RH : filiale, parcours, performance, sorties ===== */
+/* Le contenu (enfant flex) ne doit pas s'élargir au-delà de l'écran avec le sélecteur de filiale et les tableaux. */
+.content { min-width: 0; }
+.hr-country { display: flex; padding: .25rem; border-radius: 999px; background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .25); }
+.hr-country button { border: 0; background: transparent; color: #fff; font-weight: 700; font-size: .84rem; padding: .38rem .9rem; border-radius: 999px; transition: background .2s ease, color .2s ease; }
+.hr-country button.on { background: #fff; color: #0057B8; box-shadow: 0 6px 14px rgba(0, 0, 0, .15); }
+.hr-flag { margin-right: .2rem; }
+.hr-btn-primary { background: linear-gradient(135deg, #0057B8, #0F9D6C); color: #fff; border: 0; }
+.hr-btn-danger { background: #FDECEE; color: #C62828; border: 1px solid #F5C2C7; }
+.hr-btn-danger:hover { background: #C62828; color: #fff; }
+
+.hro-pop-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .8rem; }
+.hro-pop-card { display: flex; gap: .8rem; align-items: center; text-align: left; border: 1px solid #EEF1F5; border-left: 5px solid var(--c); background: #fff; border-radius: 1.1rem; padding: 1rem; box-shadow: 0 8px 20px rgba(0, 32, 84, .05); transition: transform .2s ease, box-shadow .2s ease; }
+.hro-pop-card:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(0, 32, 84, .1); }
+.hro-pop-card.warn { --c: #F59E0B; }
+.hro-pop-card small { display: block; color: #6B7A90; font-weight: 700; text-transform: uppercase; font-size: .7rem; letter-spacing: .05em; }
+.hro-pop-card b { display: block; font-size: 1.7rem; font-weight: 800; color: #122240; line-height: 1.1; }
+.hro-pop-teams { display: block; font-size: .74rem; color: #6B7A90; }
+.hro-pop-ico { width: 46px; height: 46px; flex-shrink: 0; border-radius: .9rem; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; color: var(--c, #0057B8); background: color-mix(in srgb, var(--c, #0057B8) 12%, #fff); }
+
+.hro-tree { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+.hro-pop { border: 1px solid #EEF1F5; border-top: 4px solid var(--c); border-radius: 1.1rem; padding: .9rem; background: linear-gradient(180deg, color-mix(in srgb, var(--c) 5%, #fff), #fff 60%); }
+.hro-pop header { display: flex; align-items: center; gap: .7rem; margin-bottom: .7rem; }
+.hro-pop h4 { margin: 0; font-size: 1.05rem; font-weight: 800; color: #122240; }
+.hro-pop header small { color: #6B7A90; }
+.hro-all { margin-left: auto; border: 1px solid color-mix(in srgb, var(--c) 30%, #fff); background: #fff; color: var(--c); border-radius: 999px; font-size: .76rem; font-weight: 700; padding: .2rem .7rem; }
+.hro-all.on { background: var(--c); color: #fff; }
+.hro-teams { display: flex; flex-direction: column; gap: .4rem; }
+.hro-team { display: flex; align-items: center; gap: .6rem; width: 100%; text-align: left; border: 1px solid #EEF1F5; background: #fff; border-radius: .8rem; padding: .55rem .7rem; font-weight: 600; color: #33415C; transition: all .18s ease; }
+.hro-team i { color: var(--c); }
+.hro-team span { flex: 1; }
+.hro-team b { min-width: 2rem; text-align: center; padding: .05rem .5rem; border-radius: 999px; background: color-mix(in srgb, var(--c) 12%, #fff); color: var(--c); }
+.hro-team:hover { border-color: var(--c); transform: translateX(2px); }
+.hro-team.on { background: var(--c); color: #fff; border-color: var(--c); }
+.hro-team.on i, .hro-team.on b { color: #fff; background: rgba(255, 255, 255, .2); }
+.hro-toassign { margin-top: 1rem; width: 100%; border: 1px dashed #F5C98B; background: #FFF8EC; color: #8A4B00; border-radius: .9rem; padding: .6rem .9rem; font-weight: 600; text-align: left; }
+.hro-toassign.on { background: #F59E0B; color: #fff; }
+.hro-count { display: inline-block; min-width: 1.6rem; padding: 0 .45rem; border-radius: 999px; background: #EEF2F8; font-size: .8rem; text-align: center; }
+
+.hro-people { display: flex; flex-direction: column; gap: .5rem; }
+.hro-person { display: flex; align-items: center; gap: .8rem; padding: .7rem .8rem; border: 1px solid #EEF1F5; border-radius: 1rem; background: #fff; flex-wrap: wrap; }
+.hro-person.out { opacity: .65; background: #FAFBFD; }
+.hro-av { width: 42px; height: 42px; flex-shrink: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: .82rem; background: var(--c); }
+.hro-person-main { flex: 1; min-width: 200px; }
+.hro-person-main b { color: #122240; }
+.hro-person-main small { display: block; color: #6B7A90; font-size: .74rem; }
+.hro-tags { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .3rem; }
+.hro-tag { font-size: .72rem; padding: .1rem .55rem; border-radius: 999px; color: var(--c, #0057B8); background: color-mix(in srgb, var(--c, #0057B8) 10%, #fff); border: 1px solid color-mix(in srgb, var(--c, #0057B8) 22%, #fff); }
+.hro-tag.warn { --c: #D97706; }
+.hro-tag.danger { --c: #C62828; }
+.hro-tag.muted { --c: #6B7A90; }
+.hro-actions { display: flex; gap: .35rem; flex-wrap: wrap; }
+
+.hro-pop-filter { display: flex; padding: .2rem; border-radius: 999px; background: #EEF2F8; flex-wrap: wrap; }
+.hro-pop-filter button { border: 0; background: transparent; border-radius: 999px; padding: .3rem .85rem; font-size: .8rem; font-weight: 700; color: #4B5A70; }
+.hro-pop-filter button.on { background: #0057B8; color: #fff; }
+.hro-perf-group { margin-bottom: 1.2rem; }
+.hro-perf-group h5 { font-size: .95rem; font-weight: 800; color: #122240; }
+.hro-perf-group h5 i { color: var(--c); font-size: .6rem; vertical-align: middle; }
+.hro-perf-table tr[role="button"]:hover { background: #F5F8FC; cursor: pointer; }
+.hro-perf-table { table-layout: fixed; min-width: 760px; }
+.hro-perf-table th:first-child { width: 26%; }
+.hro-perf-table th:nth-child(2), .hro-perf-table th:nth-child(6) { width: 9%; }
+.hro-perf-table th:last-child { width: 4%; }
+.hro-g { display: inline-flex; align-items: center; gap: .5rem; min-width: 150px; }
+.hro-g-bar { flex: 1; height: 7px; border-radius: 999px; background: #EEF2F8; overflow: hidden; min-width: 70px; }
+.hro-g-bar span { display: block; height: 100%; border-radius: 999px; }
+.hro-g b { font-size: .82rem; min-width: 52px; text-align: right; }
+.hro-g.muted { color: #8A97AB; }
+
+.hro-exit-kpis { display: flex; flex-wrap: wrap; gap: .6rem; margin-bottom: 1rem; align-items: center; }
+.hro-kpi { display: flex; gap: .6rem; align-items: center; padding: .6rem .9rem; border-radius: .9rem; background: color-mix(in srgb, var(--c) 8%, #fff); border: 1px solid color-mix(in srgb, var(--c) 20%, #fff); }
+.hro-kpi i { color: var(--c); font-size: 1.2rem; }
+.hro-kpi b { display: block; font-size: 1.2rem; color: #122240; line-height: 1; }
+.hro-kpi small { color: #6B7A90; font-size: .72rem; }
+.hro-reasons { display: flex; flex-wrap: wrap; gap: .35rem; margin-left: auto; }
+.hro-reasons span { font-size: .76rem; padding: .15rem .6rem; border-radius: 999px; background: #F5F8FC; border: 1px solid #E3EAF5; color: #33415C; }
+
+.hro-modal .modal-content { border: 0; border-radius: 1.2rem; overflow: hidden; }
+.hro-modal-head { display: flex; align-items: center; gap: .8rem; padding: 1rem 1.2rem; color: #fff; background: linear-gradient(120deg, #1B1F6B, #0057B8 60%, #0F9D6C); }
+.hro-modal-head.danger { background: linear-gradient(120deg, #5C1020, #C62828); }
+.hro-modal-head > i { font-size: 1.4rem; }
+.hro-modal-head small { opacity: .85; }
+.hro-seg { display: flex; gap: .4rem; flex-wrap: wrap; }
+.hro-seg button { border: 1px solid #DCE4F0; background: #fff; border-radius: 999px; padding: .35rem .85rem; font-size: .82rem; font-weight: 700; color: #33415C; }
+.hro-seg button.on { background: var(--c); border-color: var(--c); color: #fff; }
+.hro-team-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: .4rem; }
+.hro-team-pick button { border: 1px solid #DCE4F0; background: #fff; border-radius: .8rem; padding: .5rem .7rem; text-align: left; font-size: .84rem; font-weight: 600; color: #33415C; }
+.hro-team-pick button.on { background: #0057B8; border-color: #0057B8; color: #fff; }
+@media (max-width: 575px) { .hro-actions { width: 100%; } .hro-reasons { margin-left: 0; } .hr-country { width: 100%; justify-content: center; } }

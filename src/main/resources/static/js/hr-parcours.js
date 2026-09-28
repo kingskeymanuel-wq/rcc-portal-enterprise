@@ -138,6 +138,14 @@
 
     function hideError() { if (el("hrError")) el("hrError").classList.add("d-none"); }
 
+    /** « CIV » / « CI » / vide → CI ; « TGO » / « TG » → TG (même règle que le serveur). */
+    function countryOf(branch) {
+        var b = String(branch || "").trim().toUpperCase();
+        if (!b || b.indexOf("CI") === 0 || b.indexOf("IVOIRE") !== -1) return "CI";
+        if (b.indexOf("TG") === 0 || b.indexOf("TOGO") !== -1) return "TG";
+        return b.slice(0, 2);
+    }
+
     function filterByHrScope(list) {
         if (!Array.isArray(list) || !employees.length) return Array.isArray(list) ? list : [];
         var usernames = {};
@@ -669,11 +677,13 @@
             api("/api/reporting/team?month=" + encodeURIComponent(month)),
             api("/api/sync/status")
         ]);
-        employees = dedupeEmployees(Array.isArray(results[0]) ? results[0] : []);
-        leaves = Array.isArray(results[1]) ? results[1] : [];
-        balances = Array.isArray(results[2]) ? results[2] : [];
+        // Filiale choisie en haut du portail (Côte d'Ivoire / Togo) : tout le portail s'y limite.
+        var country = (window.RccHr && window.RccHr.country) || "CI";
+        employees = dedupeEmployees((Array.isArray(results[0]) ? results[0] : []).filter(function (u) { return countryOf(u.affiliateBranch) === country; }));
+        leaves = filterByHrScope(Array.isArray(results[1]) ? results[1] : []);
+        balances = filterByHrScope(Array.isArray(results[2]) ? results[2] : []);
         formations = Array.isArray(results[3]) ? results[3] : [];
-        tasks = Array.isArray(results[4]) ? results[4] : [];
+        tasks = filterByHrScope(Array.isArray(results[4]) ? results[4] : []);
         reporting = Array.isArray(results[5]) ? filterByHrScope(results[5]) : [];
 
         if (!employees.length && results[0] && results[0].__error) showError("Impossible de charger le périmètre RH : " + results[0].__error);
@@ -706,7 +716,7 @@
         var hash = (location.hash || "").replace("#", "");
         var legacy = { employees: "people", followup: "growth", training: "growth", leave: "leave" };
         hash = legacy[hash] || hash;
-        if (["overview", "people", "leave", "growth"].indexOf(hash) !== -1) showTab(hash);
+        if (["overview", "org", "perf", "people", "leave", "exits", "growth"].indexOf(hash) !== -1) showTab(hash);
     }
 
     function init() {
@@ -748,8 +758,15 @@
                 return;
             }
             loadAll();
+            if (window.RccHrOrg) window.RccHrOrg.start(session.profile);
         }).catch(function (e) { showError(e.message || "Session indisponible."); });
     }
+
+    // Utilisé par hr-org.js (filiale, parcours, performance, sorties).
+    window.RccHr = window.RccHr || {};
+    window.RccHr.reload = function () { return loadAll(); };
+    window.RccHr.openDossier = function (userId, name) { openDossier(userId, name); };
+    window.RccHr.showTab = function (name) { showTab(name); };
 
     document.addEventListener("DOMContentLoaded", init);
 })();

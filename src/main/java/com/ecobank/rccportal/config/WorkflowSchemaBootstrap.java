@@ -607,6 +607,33 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
                     CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
                 )
                 """);
+        // Portail RH : placement des collaborateurs (population Outsource / Stagiaire / Staff Ecobank + équipe)
+        // corrigé par le RH, et historique des sorties (retraits d'agents).
+        createIfMissing("HrAssignments", """
+                CREATE TABLE dbo.HrAssignments (
+                    UserId BIGINT NOT NULL PRIMARY KEY,
+                    Population NVARCHAR(20) NULL,
+                    HrTeam NVARCHAR(30) NULL,
+                    UpdatedBy NVARCHAR(100) NULL,
+                    UpdatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+                )
+                """);
+        createIfMissing("HrDepartures", """
+                CREATE TABLE dbo.HrDepartures (
+                    DepartureId BIGINT IDENTITY PRIMARY KEY,
+                    UserId BIGINT NOT NULL,
+                    Reason NVARCHAR(30) NOT NULL,
+                    DepartureDate DATE NOT NULL,
+                    Comment NVARCHAR(500) NULL,
+                    Population NVARCHAR(20) NULL,
+                    HrTeam NVARCHAR(30) NULL,
+                    CountryCode NVARCHAR(3) NULL,
+                    RecordedBy NVARCHAR(100) NULL,
+                    RecordedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    ReintegratedAt DATETIME2 NULL,
+                    ReintegratedBy NVARCHAR(100) NULL
+                )
+                """);
         // Réponses déjà utilisées dans les champs des masques de mail (hors données personnelles du client) :
         // suggestions proposées aux autres agents pour le même champ.
         createIfMissing("MailFieldHistory", """
