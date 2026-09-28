@@ -93,16 +93,6 @@ public class ScheduleController {
         return scheduleService.planningForTeamScoped(requester, team, LocalDate.parse(from), LocalDate.parse(to));
     }
 
-    /** Planification directe par shift (modale "Planifier" — portail Excelliam) : clic équipe,
-     *  agents cochés, un shift au choix par agent (7h-16h/8h-17h/12h-21h/21h-6h), Enregistrer.
-     *  Écrit dans la même table AgentSchedule que l'import fichier RH — visible immédiatement
-     *  dans tous les portails qui affichent déjà le planning, sans synchronisation à part. */
-    @PostMapping("/planify")
-    public com.ecobank.rccportal.dto.PlanifyShiftsResult planify(@RequestBody com.ecobank.rccportal.dto.PlanifyShiftsRequest request,
-                                                                   @AuthenticationPrincipal AuthenticatedUser requester) {
-        requireSupervisorOrAdmin(requester);
-        return scheduleService.planifyShifts(request);
-    }
 
     /** Le Team Leader valide ou refuse (avec motif obligatoire) le planning en attente de
      *  SA PROPRE équipe sur une période — réservé au rôle Team Leader (chacun ne peut décider
@@ -126,14 +116,6 @@ public class ScheduleController {
         return scheduleService.submitTeamPlanning(requester, request);
     }
 
-    /** Étape 2 — Excelliam valide ou refuse le planning soumis par un Team Leader. Une
-     *  validation ne le rend pas encore visible aux agents : voir /team/publish. */
-    @PostMapping("/excelliam/decide")
-    public java.util.Map<String, Integer> decideExcelliamValidation(@RequestBody com.ecobank.rccportal.dto.ExcelliamPlanningDecisionRequest request,
-                                                                      @AuthenticationPrincipal AuthenticatedUser requester) {
-        int count = scheduleService.decideExcelliamValidation(requester, request.team(), request.from(), request.to(), request.approve(), request.reason());
-        return java.util.Map.of("entriesDecided", count);
-    }
 
     /** Étape 3 — clic "Mise à jour" du Team Leader : rend effectif (globalement visible)
      *  tout planning déjà validé par Excelliam pour sa propre équipe sur la période donnée. */
@@ -147,12 +129,11 @@ public class ScheduleController {
     private void requireSupervisorOrAdmin(AuthenticatedUser requester) {
         boolean allowed = "admin".equalsIgnoreCase(requester.role())
                 || "rh".equalsIgnoreCase(requester.role())
-                || "excelliam".equalsIgnoreCase(requester.role())
                 || "supervisor".equalsIgnoreCase(requester.role())
                 || (requester.service() != null
                     && Set.of("quality assurance", "superviseur qa").contains(requester.service().toLowerCase().replace('_', ' ')));
         if (!allowed) {
-            throw ApiException.forbidden("Only Quality Assurance, RH, Excelliam, Supervisor, or an administrator can manage schedules.");
+            throw ApiException.forbidden("Only Quality Assurance, RH, Supervisor, or an administrator can manage schedules.");
         }
     }
 }

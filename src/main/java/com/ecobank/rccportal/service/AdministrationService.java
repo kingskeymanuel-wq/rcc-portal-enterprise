@@ -478,7 +478,9 @@ public class AdministrationService {
     private static final java.util.Map<String, String> SERVICE_CODE_TO_LED_TEAM = java.util.Map.of(
             "TEAM_LEADER_INBOUND_VOICE", "INBOUND_VOICE",
             "TEAM_LEADER_INBOUND_MAIL", "INBOUND_MAIL",
-            "TEAM_LEADER_OUTBOUND", "OUTBOUND"
+            "TEAM_LEADER_OUTBOUND", "OUTBOUND",
+            "TEAM_LEADER_TCHAT", "TCHAT",
+            "TEAM_LEADER_RAFIKI", "RAFIKI"
     );
 
     /**
@@ -491,16 +493,18 @@ public class AdministrationService {
      * : ce ne sont pas des équipes opérationnelles, et ils sont de toute façon exclus des
      * écrans de reporting KPI (voir ReportingService.isExcludedFromKpi()).
      */
-    private static final java.util.Map<String, String> SERVICE_CODE_TO_ACTIVITY = java.util.Map.of(
-            "AGENT_INBOUND", "INBOUND VOICE",
-            "TEAM_LEADER_INBOUND_VOICE", "INBOUND VOICE",
-            "AGENT_INBOUND_MAIL", "INBOUND MAIL",
-            "TEAM_LEADER_INBOUND_MAIL", "INBOUND MAIL",
-            "AGENT_CIB", "CIB",
-            "AGENT_OUTBOUND", "OUTBOUND",
-            "AGENT_TCHAT", "INBOUND TCHAT",
-            "AGENT_RAFIKI", "INBOUND RAFIKI",
-            "TEAM_LEADER_OUTBOUND", "OUTBOUND"
+    private static final java.util.Map<String, String> SERVICE_CODE_TO_ACTIVITY = java.util.Map.ofEntries(
+            java.util.Map.entry("AGENT_INBOUND", "INBOUND VOICE"),
+            java.util.Map.entry("TEAM_LEADER_INBOUND_VOICE", "INBOUND VOICE"),
+            java.util.Map.entry("AGENT_INBOUND_MAIL", "INBOUND MAIL"),
+            java.util.Map.entry("TEAM_LEADER_INBOUND_MAIL", "INBOUND MAIL"),
+            java.util.Map.entry("AGENT_CIB", "CIB"),
+            java.util.Map.entry("AGENT_OUTBOUND", "OUTBOUND"),
+            java.util.Map.entry("AGENT_TCHAT", "INBOUND TCHAT"),
+            java.util.Map.entry("AGENT_RAFIKI", "INBOUND RAFIKI"),
+            java.util.Map.entry("TEAM_LEADER_OUTBOUND", "OUTBOUND"),
+            java.util.Map.entry("TEAM_LEADER_TCHAT", "INBOUND TCHAT"),
+            java.util.Map.entry("TEAM_LEADER_RAFIKI", "INBOUND RAFIKI")
     );
 
     @Transactional

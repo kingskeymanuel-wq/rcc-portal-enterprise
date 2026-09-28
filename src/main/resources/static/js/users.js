@@ -457,7 +457,7 @@
      * Comparaison insensible à la casse sur le NOM du rôle réel (voir WorkflowSchemaBootstrap).
      */
     var ROLE_SERVICE_FILTER = [
-        { roleMatch: /team leader/i, serviceCodes: ["TEAM_LEADER_INBOUND_VOICE", "TEAM_LEADER_INBOUND_MAIL", "TEAM_LEADER_OUTBOUND"] },
+        { roleMatch: /team leader/i, serviceCodes: ["TEAM_LEADER_INBOUND_VOICE", "TEAM_LEADER_INBOUND_MAIL", "TEAM_LEADER_TCHAT", "TEAM_LEADER_RAFIKI", "TEAM_LEADER_OUTBOUND"] },
         { roleMatch: /agent/i, serviceCodes: ["AGENT_INBOUND", "AGENT_OUTBOUND", "AGENT_INBOUND_MAIL", "AGENT_TCHAT", "AGENT_RAFIKI", "AGENT_CIB"] },
         { roleMatch: /^quality assurance$/i, serviceCodes: ["QUALITY_ASSURANCE", "FORMATEUR", "COMMUNICATION"] }
     ];
@@ -494,11 +494,6 @@
             document.getElementById("userDetailUsername").textContent = detail.username;
             document.getElementById("userDetailActive").textContent = detail.active ? "Actif" : "Inactif";
             document.getElementById("userDetailAvatar").src = detail.photoUrl || "/images/avatar.png";
-
-            // Réinitialisation de mot de passe — uniquement pertinent pour un compte Excelliam
-            // (les autres rôles s'authentifient via l'AD Ecobank, pas de mot de passe local ici).
-            var isExcelliam = (detail.roles || []).some(function (r) { return (r.name || "").toUpperCase() === "EXCELLIAM"; });
-            document.getElementById("excelliamResetPasswordBtn").style.display = isExcelliam ? "" : "none";
 
             document.getElementById("editUsername").value = detail.username || "";
             document.getElementById("editName").value = detail.name || "";
@@ -785,19 +780,6 @@
         });
     }
 
-    /** Réservé aux comptes Excelliam (voir la logique de visibilité dans openUserDetail) —
-     *  remet le mot de passe à null, la personne devra en recréer un à sa prochaine connexion. */
-    function wireExcelliamResetPasswordButton() {
-        document.getElementById("excelliamResetPasswordBtn").addEventListener("click", function () {
-            if (!currentDetailUserId) return;
-            var name = document.getElementById("userDetailName").textContent || "ce compte";
-            if (!confirm("Réinitialiser le mot de passe de " + name + " ?\n\nCette personne devra en créer un nouveau à sa prochaine connexion.")) return;
-            postJson("/api/users/" + currentDetailUserId + "/excelliam-password-reset")
-                .then(function (result) { alert(result.message || "Mot de passe réinitialisé."); })
-                .catch(function (e) { alert("Erreur : " + e.message); });
-        });
-    }
-
     function loadLoginAlerts() {
         var container = document.getElementById("loginAlertsList");
         var countBadge = document.getElementById("loginAlertsCount");
@@ -863,7 +845,6 @@
                 document.getElementById("deleteUserBtn").style.display = currentProfile === "ADMIN" ? "" : "none";
                 wireAddButtons();
                 wireDeleteUserButton();
-                wireExcelliamResetPasswordButton();
                 wireCreateUserForm();
                 wireEditForm();
                 wirePhotoLightbox();

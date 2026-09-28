@@ -7,6 +7,7 @@
     <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}" rel="stylesheet">
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/agent-live.css}">
     <style>
         .ob-chat-scroll { max-height: 60vh; overflow-y: auto; padding: 4px; }
         .ob-chat-msg { max-width: 82%; margin-bottom: .6rem; display: flex; }
@@ -97,6 +98,9 @@
         <div th:replace="~{fragments/header :: header}"></div>
         <main id="page-content">
             <div class="container-fluid">
+
+                <!-- Conseiller : son planning et ses performances, en direct dès la connexion -->
+                <div id="agentLive" style="display:none;"></div>
 
                 <div class="welcome-banner d-flex justify-content-between align-items-end flex-wrap gap-2">
                     <div>
@@ -557,6 +561,7 @@
 <script th:src="@{/vendor/bootstrap/js/bootstrap.bundle.min.js}"></script>
 <script th:src="@{/js/rcc-api.js}"></script>
 <script th:src="@{/js/session.js}"></script>
+<script th:src="@{/js/agent-live.js}"></script>
 <script th:src="@{/js/outbound-dashboard.js}"></script>
 </body>
 </html>

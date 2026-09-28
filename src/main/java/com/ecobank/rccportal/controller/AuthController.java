@@ -50,20 +50,9 @@ public class AuthController {
         return java.util.Map.of("message", "L'équipe IT a été notifiée.", "adminsNotified", notified);
     }
 
-    /**
-     * Création du mot de passe d'un compte EXCELLIAM à sa toute première connexion — accessible
-     * depuis la page de connexion (pas encore authentifié), comme /forgot-password et
-     * /contact-it. Voir AuthService.setExcelliamPassword pour les règles de sécurité (statut
-     * actif requis, ne fonctionne qu'une seule fois par compte).
-     */
-    @PostMapping("/excelliam/set-password")
-    public java.util.Map<String, String> setExcelliamPassword(@RequestBody java.util.Map<String, String> body) {
-        authService.setExcelliamPassword(body.get("username"), body.get("newPassword"));
-        return java.util.Map.of("message", "Mot de passe créé. Vous pouvez maintenant vous connecter.");
-    }
 
     /**
-     * Etape 1 : Active Directory (ou session posée directement ici pour un compte EXCELLIAM,
+     * Etape 1 : Active Directory (ou session posée directement ici pour un compte de test,
      * sans MFA — voir AuthService.initiateLogin et le champ "session" de LoginChallengeResponse).
      */
     @PostMapping("/login")

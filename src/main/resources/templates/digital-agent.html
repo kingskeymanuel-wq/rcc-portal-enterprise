@@ -9,6 +9,7 @@
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <link rel="stylesheet" th:href="@{/css/team-perf-files.css}">
     <link rel="stylesheet" th:href="@{/css/digital-agent.css}">
+    <link rel="stylesheet" th:href="@{/css/agent-live.css}">
 </head>
 <body>
 <div class="layout">
@@ -33,6 +34,7 @@
 
                 <div class="da-grid">
                     <div class="da-main">
+                        <div id="agentLive"></div>
                         <div id="daPerf"></div>
 
                         <section class="da-card">
@@ -42,12 +44,6 @@
                     </div>
 
                     <aside class="da-aside">
-                        <section class="da-card">
-                            <div class="da-card-head"><h5><i class="bi bi-calendar-week"></i> Mon planning — 7 jours</h5>
-                                <a th:href="@{/shift}" class="da-link">Tout voir <i class="bi bi-arrow-right"></i></a></div>
-                            <div class="da-week" id="daWeek"></div>
-                        </section>
-
                         <section class="da-card">
                             <div class="da-card-head"><h5><i class="bi bi-lightning-charge"></i> Mes outils</h5></div>
                             <div class="da-tools">
@@ -76,6 +72,7 @@
 <script th:src="@{/js/rcc-api.js}"></script>
 <script th:src="@{/js/session.js}"></script>
 <script th:src="@{/js/team-perf-files.js}"></script>
+<script th:src="@{/js/agent-live.js}"></script>
 <script th:src="@{/js/digital-agent.js}"></script>
 </body>
 </html>

@@ -7,6 +7,7 @@
     var escapeHtml = RccApi.escapeHtml;
 
     var myTeam = null; // "INBOUND_VOICE" | "INBOUND_MAIL" | "CIB" | "OUTBOUND"
+    var myChannel = ""; // "TCHAT" | "RAFIKI" pour un Team Leader de canal (pôle Inbound Mail), sinon vide
     var reportingCache = [];
     var salesByAgentCache = {}; // agentName -> count (mois du reporting en cours), Outbound uniquement
     var agentModal;
@@ -338,11 +339,11 @@
     var addMemberModal = null, addMemberSearchTimer = null;
 
     // ═══════════════════════════════════════════════════════════════════
-    // PLANNING (onglet Team Leader) — même principe que la modale "Planifier" d'Excelliam :
+    // PLANNING (onglet Team Leader) — le Team Leader construit et publie le planning de son équipe :
     // on coche des agents de SA PROPRE équipe et on choisit un shift chacun sur une période,
-    // puis "Envoyer à Excelliam" (statut PENDING/origin TEAM_LEADER). Une fois qu'Excelliam
-    // valide (statut VALIDATED), le bouton "Mise à jour" apparaît pour rendre le planning
-    // effectif (statut APPROVED) — voir ScheduleService.submitTeamPlanning/publishTeamPlanning.
+    // puis « Publier » : en ligne tout de suite (APPROVED). Les plannings restés en attente de
+    // l'ancien portail Excelliam se publient avec « Publier les plannings en attente »
+    // — voir ScheduleService.submitTeamPlanning/publishTeamPlanning.
     // ═══════════════════════════════════════════════════════════════════
 
     var planStatusFromCache = null, planStatusToCache = null;
@@ -391,10 +392,11 @@
         $("tlPlanCheckedCount").textContent = $("tlPlanAgentList").querySelectorAll(".tl-plan-check:checked").length;
     }
 
+    // PENDING / VALIDATED : plannings envoyés à l'ancien portail Excelliam (supprimé), à publier par le Team Leader.
     var PLAN_STATUS_LABELS = {
-        PENDING: '<span class="badge bg-warning text-dark">Envoyé — en attente d\'Excelliam</span>',
-        VALIDATED: '<span class="badge bg-info text-dark">Validé par Excelliam — prêt pour mise à jour</span>',
-        REJECTED: '<span class="badge bg-danger">Refusé par Excelliam</span>',
+        PENDING: '<span class="badge bg-warning text-dark">En attente — à publier</span>',
+        VALIDATED: '<span class="badge bg-warning text-dark">En attente — à publier</span>',
+        REJECTED: '<span class="badge bg-danger">Refusé</span>',
         APPROVED: '<span class="badge bg-success">En ligne</span>'
     };
 
@@ -410,7 +412,7 @@
                 $("tlPlanPublishBtn").classList.add("d-none");
                 return;
             }
-            var hasValidated = mine.some(function (e) { return e.approvalStatus === "VALIDATED"; });
+            var hasValidated = mine.some(function (e) { return e.approvalStatus === "VALIDATED" || e.approvalStatus === "PENDING"; });
             $("tlPlanPublishBtn").classList.toggle("d-none", !hasValidated);
 
             var byStatus = {};
@@ -436,8 +438,8 @@
             });
         });
 
-        // Deux façons de finaliser : publication directe, ou envoi (facultatif) à Excelliam pour validation.
-        function submitPlanning(sendToExcelliam) {
+        // Publication directe : en ligne tout de suite, chaque agent est prévenu.
+        function submitPlanning() {
             var from = $("tlPlanFrom").value, to = $("tlPlanTo").value;
             var resultBox = $("tlPlanResult");
             if (!from || !to) { resultBox.className = "text-danger"; resultBox.textContent = "Choisissez une période."; return; }
@@ -449,20 +451,18 @@
                 assignments.push({ username: row.getAttribute("data-username"), shiftCode: row.querySelector(".tl-plan-shift").value });
             });
             if (!assignments.length) { resultBox.className = "text-danger"; resultBox.textContent = "Cochez au moins un agent."; return; }
-            if (!sendToExcelliam && !confirm("Publier ce planning maintenant ? Il sera immédiatement visible par les " + assignments.length + " agent(s) concerné(s), sans validation Excelliam.")) return;
+            if (!confirm("Publier ce planning maintenant ? Il sera immédiatement visible par les " + assignments.length + " agent(s) concerné(s).")) return;
 
             resultBox.className = "text-muted";
-            resultBox.textContent = sendToExcelliam ? "Envoi à Excelliam…" : "Publication…";
+            resultBox.textContent = "Publication…";
             fetch("/api/schedule/team/submit", {
                 method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ periodFrom: from, periodTo: to, assignments: assignments, sendToExcelliam: sendToExcelliam })
+                body: JSON.stringify({ periodFrom: from, periodTo: to, assignments: assignments })
             })
                 .then(readImportResponse)
                 .then(function (result) {
                     resultBox.className = "text-success";
-                    resultBox.textContent = sendToExcelliam
-                        ? result.agentsPlanified + " agent(s) envoyé(s) à Excelliam (" + result.entriesCreated + " jour(s) au total)."
-                        : "Planning publié : " + result.agentsPlanified + " agent(s), " + result.entriesCreated + " jour(s) — en ligne et agents prévenus.";
+                    resultBox.textContent = "Planning publié : " + result.agentsPlanified + " agent(s), " + result.entriesCreated + " jour(s) — en ligne et agents prévenus.";
                     loadPlanningStatus();
                 })
                 .catch(function (e) {
@@ -470,14 +470,13 @@
                     resultBox.textContent = "Erreur : " + e.message;
                 });
         }
-        $("tlPlanSubmitBtn").addEventListener("click", function () { submitPlanning(true); });
-        $("tlPlanPublishDirectBtn").addEventListener("click", function () { submitPlanning(false); });
+        $("tlPlanPublishDirectBtn").addEventListener("click", submitPlanning);
 
         $("tlPlanRefreshStatusBtn").addEventListener("click", loadPlanningStatus);
 
         $("tlPlanPublishBtn").addEventListener("click", function () {
             if (!planStatusFromCache || !planStatusToCache) return;
-            if (!confirm("Confirmer la mise à jour globale ? Le planning validé par Excelliam deviendra immédiatement visible pour toute l'équipe.")) return;
+            if (!confirm("Publier les plannings encore en attente sur cette période ? Ils deviendront immédiatement visibles pour votre équipe.")) return;
             fetch("/api/schedule/team/publish?from=" + planStatusFromCache + "&to=" + planStatusToCache, { method: "POST", credentials: "same-origin" })
                 .then(readImportResponse)
                 .then(function (result) {
@@ -1666,7 +1665,16 @@
 
         getJson("/api/team-leader/my-team").then(function (result) {
             myTeam = result.team;
+            myChannel = result.channel || "";
             $("tlSubtitle").textContent = "Gestion de votre équipe — " + teamLabel(myTeam);
+            if (myChannel) {
+                // Portail Team Leader Tchat / Rafiki : mêmes onglets, restreints aux agents du canal.
+                var hero = document.querySelector(".tl-hero");
+                if (hero) hero.setAttribute("data-channel", myChannel);
+                var kicker = document.querySelector(".tl-hero-kicker");
+                if (kicker) kicker.innerHTML = '<i class="bi ' + (myChannel === "RAFIKI" ? "bi-chat-heart-fill" : "bi-chat-text-fill") + '"></i> Espace Team Leader ' + teamLabel(myTeam);
+                document.title = "RCC Portal — Portail Team Leader " + teamLabel(myTeam);
+            }
             $("tlContent").style.display = "";
             if (myTeam === "OUTBOUND") {
                 $("tlTabSalesBtn").style.display = "";
@@ -1686,7 +1694,8 @@
     }
 
     function teamLabel(team) {
-        return { INBOUND_VOICE: "Inbound Voix", INBOUND_MAIL: "Inbound Mail / Rafiki", CIB: "CIB", OUTBOUND: "Outbound" }[team] || team;
+        if (myChannel) return myChannel === "RAFIKI" ? "Rafiki" : "Tchat";
+        return { INBOUND_VOICE: "Inbound Voix", INBOUND_MAIL: "Inbound Mail", CIB: "CIB", OUTBOUND: "Outbound" }[team] || team;
     }
 
     document.addEventListener("DOMContentLoaded", init);

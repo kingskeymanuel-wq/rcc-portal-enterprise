@@ -196,10 +196,16 @@ public class TeamPerfFileService {
 
     private Set<String> ledFileTeams(AuthenticatedUser u) {
         try {
-            return fileTeamsFor(teamLeaders.requireLedTeam(u));
+            return fileTeamsFor(teamLeaders.ledTeamCode(u));
         } catch (RuntimeException e) {
             return Set.of();
         }
+    }
+
+    /** Fichiers gérés selon le code d'équipe menée : un Team Leader Tchat ou Rafiki n'importe que son canal. */
+    static Set<String> fileTeamsFor(String ledTeamCode) {
+        if (TeamClassifier.isChannel(ledTeamCode)) return Set.of(ledTeamCode.trim().toUpperCase(Locale.ROOT));
+        return fileTeamsFor(TeamClassifier.teamOf(ledTeamCode));
     }
 
     /** La QA importe pour toutes les équipes ; un Team Leader uniquement pour la sienne. */

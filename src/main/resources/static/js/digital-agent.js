@@ -44,7 +44,6 @@
     };
     var c = CHANNELS[channel] || CHANNELS.TCHAT;
     function $(id) { return document.getElementById(id); }
-    function iso(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
 
     $("daHeroIcon").className = "bi " + c.icon;
     $("daChannelChip").innerHTML = '<i class="bi ' + c.icon + '"></i> Portail agent ' + c.label + ' · ' + c.chip;
@@ -56,29 +55,18 @@
     $("daTipsTitle").textContent = c.tipsTitle;
     $("daTips").innerHTML = c.tips.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join("");
 
-    function loadWeek() {
-        var from = new Date(), to = new Date();
-        to.setDate(to.getDate() + 6);
-        RccApi.getJson("/api/schedule/me?from=" + iso(from) + "&to=" + iso(to)).then(function (rows) {
-            var byDate = {};
-            (rows || []).forEach(function (r) { byDate[r.workDate] = r; });
-            var days = [];
-            for (var i = 0; i < 7; i++) { var d = new Date(); d.setDate(d.getDate() + i); days.push(d); }
-            $("daWeek").innerHTML = days.map(function (d, i) {
-                var r = byDate[iso(d)];
-                var hours = r && r.startTime ? r.startTime.slice(0, 5) + "–" + (r.endTime || "").slice(0, 5) : "";
-                var off = !r || !r.startTime;
-                return '<div class="da-day' + (i === 0 ? " today" : "") + (off ? " off" : "") + '"><span>' + d.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit" }) +
-                    '</span><b>' + esc(r ? r.shiftCode : "—") + '</b><small>' + esc(hours || (r ? r.shiftLabel || "" : "Non planifié")) + '</small></div>';
-            }).join("");
-            var today = byDate[iso(new Date())];
-            $("daToday").innerHTML = today && today.startTime
-                ? '<i class="bi bi-clock"></i> Aujourd\'hui : <b>' + esc(today.shiftLabel || today.shiftCode) + '</b> · ' + today.startTime.slice(0, 5) + ' – ' + (today.endTime || "").slice(0, 5)
-                : '<i class="bi bi-cup-hot"></i> ' + (today ? esc(today.shiftLabel || today.shiftCode) + " aujourd'hui" : "Pas de shift planifié aujourd'hui");
-        }).catch(function () {
-            $("daWeek").innerHTML = '<div class="text-muted small">Planning indisponible.</div>';
-            $("daToday").textContent = "";
-        });
+    /** Bandeau « aujourd'hui » du portail, tenu à jour par le bloc « Mon direct » (planning en temps réel). */
+    function showToday(st) {
+        var box = $("daToday");
+        if (st.kind === "on") {
+            box.innerHTML = '<i class="bi bi-broadcast"></i> En poste : <b>' + esc(st.entry.shiftLabel || st.entry.shiftCode) + '</b> · ' +
+                String(st.entry.startTime).slice(0, 5) + ' – ' + String(st.entry.endTime).slice(0, 5);
+        } else if (st.kind === "next") {
+            box.innerHTML = '<i class="bi bi-clock"></i> Prochain shift : <b>' + esc(st.entry.shiftCode) + '</b> · ' +
+                st.w.start.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit" }) + ' à ' + String(st.entry.startTime).slice(0, 5);
+        } else {
+            box.innerHTML = '<i class="bi bi-cup-hot"></i> Aucun shift à venir';
+        }
     }
 
     window.RccSession.init().then(function (session) {
@@ -89,7 +77,7 @@
             || (words[1] ? words[1].charAt(0) + words[1].slice(1).toLowerCase() : words[0]);
         var h = new Date().getHours();
         $("daGreeting").textContent = (h < 18 ? "Bonjour " : "Bonsoir ") + first;
-        loadWeek();
+        RccAgentLive.mount($("agentLive"), { onToday: showToday });
         RccPerfFiles.mountMine($("daPerf"), {
             emptyHtml: '<section class="da-card da-empty"><i class="bi bi-hourglass-split"></i><div><b>Vos performances ' + esc(c.label) + ' arrivent bientôt</b>' +
                 '<small>Elles s\'affichent ici dès que la QA ou votre Team Leader importe le rapport de la semaine — sans recharger la page.</small></div></section>'

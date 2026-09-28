@@ -1,0 +1,39 @@
+/* ===== « Mon direct » : planning et performances de l'agent, mis à jour en continu ===== */
+.al-card { background: #fff; border: 1px solid #E6ECF4; border-radius: 1.2rem; padding: 1rem 1.1rem; margin-bottom: 1.4rem; box-shadow: 0 10px 26px rgba(0, 32, 84, .06); }
+.al-head { display: flex; justify-content: space-between; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .8rem; }
+.al-head h5 { margin: 0; font-weight: 800; color: #122240; font-size: 1.02rem; }
+.al-head h5 i { color: #0057B8; }
+.al-live { display: inline-flex; align-items: center; gap: .4rem; font-size: .76rem; color: #1E7B34; font-weight: 700; background: #E8F6EC; border-radius: 999px; padding: .2rem .65rem; }
+.al-dot { width: 8px; height: 8px; border-radius: 50%; background: #22A04B; animation: alPulse 1.6s ease-in-out infinite; }
+@keyframes alPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(34, 160, 75, .5); } 50% { box-shadow: 0 0 0 6px rgba(34, 160, 75, 0); } }
+@media (prefers-reduced-motion: reduce) { .al-dot { animation: none; } }
+.al-body { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: .9rem; margin-bottom: .9rem; }
+.al-now { border-radius: 1rem; padding: .85rem 1rem; color: #fff; background: linear-gradient(120deg, #003B7A, #0057B8); display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+.al-now.on { background: linear-gradient(120deg, #0B7A3E, #12A35A); }
+.al-now.none { background: linear-gradient(120deg, #4B5A70, #6B7A90); }
+.al-now small { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; opacity: .85; font-weight: 700; }
+.al-now b { font-size: 1.2rem; font-weight: 800; text-transform: capitalize; }
+.al-now span { font-size: .86rem; opacity: .95; }
+.al-progress { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, .25); margin-top: .45rem; overflow: hidden; }
+.al-progress span { display: block; height: 100%; background: #fff; border-radius: 999px; }
+.al-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .35rem; align-content: center; }
+.al-day { text-align: center; border-radius: .8rem; padding: .5rem .2rem; background: #EEF4FC; border: 1px solid transparent; min-width: 0; }
+.al-day span { display: block; font-size: .68rem; color: #6B7A90; text-transform: capitalize; }
+.al-day b { display: block; font-size: 1rem; color: #122240; }
+.al-day small { display: block; font-size: .64rem; color: #4B5A70; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.al-day.off { background: #F3F5F8; }
+.al-day.today { border-color: #0057B8; box-shadow: 0 0 0 2px rgba(0, 87, 184, .15); }
+.al-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .55rem; }
+.al-kpi { display: flex; flex-direction: column; gap: .1rem; padding: .65rem .8rem; border-radius: .9rem; background: #FAFCFE; border: 1px solid #EEF1F5; text-decoration: none; color: #122240; transition: transform .15s ease, border-color .15s ease; }
+.al-kpi:hover { transform: translateY(-2px); border-color: #0057B8; color: #122240; }
+.al-kpi i { color: #0057B8; font-size: 1.1rem; }
+.al-kpi span { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: #6B7A90; }
+.al-kpi b { font-size: 1.3rem; font-weight: 800; }
+.al-kpi small { font-size: .72rem; color: #6B7A90; }
+.al-kpi.good { background: #E8F6EC; border-color: #BFE5CB; } .al-kpi.good b, .al-kpi.good i { color: #1E7B34; }
+.al-kpi.warn { background: #FFF4E6; border-color: #F8D6A8; } .al-kpi.warn b, .al-kpi.warn i { color: #B45309; }
+.al-kpi.bad { background: #FDECEE; border-color: #F5C2C7; } .al-kpi.bad b, .al-kpi.bad i { color: #B42318; }
+html[data-theme="dark"] .al-card, html[data-theme="dark"] .al-kpi { background: #1A2233; border-color: #2A3448; color: #EDF2FB; }
+html[data-theme="dark"] .al-head h5, html[data-theme="dark"] .al-day b, html[data-theme="dark"] .al-kpi b { color: #EDF2FB; }
+html[data-theme="dark"] .al-day { background: #161d2c; }
+@media (max-width: 767px) { .al-body { grid-template-columns: 1fr; } .al-day small { display: none; } }

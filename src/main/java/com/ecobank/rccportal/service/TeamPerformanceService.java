@@ -110,6 +110,26 @@ public class TeamPerformanceService {
                 computed("presence", "Présence", "PCT", true, "Taux de présence (pointage)", "PRESENCE")));
     }
 
+    /** Canaux de l'Inbound Mail menés par leur propre Team Leader : indicateurs de leur rapport hebdo. */
+    static final Map<String, List<Def>> CHANNEL_PROFILES = Map.of(
+            "TCHAT", List.of(
+                    kpi("liveChat", "Live Chat", "COUNT", true, "Conversations live chat traitées", "@liveChat", "LIVE_CHAT", "~LIVE+CHAT"),
+                    kpi("otherActivities", "Autres activités", "COUNT", true, "Activités annexes", "@otherActivities", "AUTRES_ACTIVITES"),
+                    kpi("totalProduction", "Prod globale", "COUNT", true, "Live Chat + autres activités", "@totalProduction", "PROD_GLOBALE"),
+                    kpi("avgPerDay", "Prod moyenne / jour", "RATE", true, "Prod globale ÷ jours travaillés", "@avgPerDay", "PROD_MOYENNE"),
+                    kpi("productivity", "Taux d'atteinte", "PCT", true, "Prod globale ÷ target hebdo — vert ≥ 100 %", "@productivity", "TX_ATTEINTE_TARGET"),
+                    kpi("aht", "DMT", "SECONDS", false, "Durée moyenne de traitement d'une conversation", "@aht", "DMT", "AHT"),
+                    computed("qaWritten", "Qualité", "PCT", true, "Qualité du rapport, sinon évaluations écrites", "QA_WRITTEN", concat(new String[]{"@quality"}, SCORE_QA)),
+                    computed("presence", "Présence", "PCT", true, "Taux de présence (pointage)", "PRESENCE")),
+            "RAFIKI", List.of(
+                    kpi("resolved", "Conversations résolues", "COUNT", true, "Facebook, Instagram et X", "@resolved", "RESOLVED_CONVERSATIONS"),
+                    kpi("otherActivities", "Activités annexes", "COUNT", true, "Activités annexes", "@otherActivities", "ACTIVITES_ANNEXES"),
+                    kpi("totalProduction", "Performance globale", "COUNT", true, "Conversations résolues + activités annexes", "@totalProduction", "PERFORMANCE_GLOBALE"),
+                    kpi("productivity", "Taux de productivité", "PCT", true, "Performance globale ÷ target hebdo — vert ≥ 100 %", "@productivity", "TAUX_DE_PRODUCTIVITE"),
+                    kpi("firstResponse", "First Response Time", "SECONDS", false, "Délai avant la première réponse", "@firstResponse", "FIRST_RESPONSE_TIME"),
+                    computed("qaWritten", "Qualité", "PCT", true, "Qualité du rapport, sinon évaluations écrites", "QA_WRITTEN", concat(new String[]{"@quality"}, SCORE_QA)),
+                    computed("presence", "Présence", "PCT", true, "Taux de présence (pointage)", "PRESENCE")));
+
     private final ReportingService reporting;
     private final TeamLeaderService teamLeaders;
     private final QualityEvaluationService evaluations;
@@ -140,14 +160,18 @@ public class TeamPerformanceService {
     public TeamPerformance performance(AuthenticatedUser requester, String teamCode, String month, String from, String to, String countryCode) {
         if (requester == null) throw ApiException.unauthorized("Non connecté.");
         TeamClassifier.Team team;
+        String channel = null;
         if (isManager(requester)) {
-            try {
-                team = TeamClassifier.Team.valueOf(teamCode == null ? "" : teamCode.trim().toUpperCase(Locale.ROOT));
+            String code = teamCode == null ? "" : teamCode.trim().toUpperCase(Locale.ROOT);
+            if (TeamClassifier.isChannel(code)) { channel = code; team = TeamClassifier.Team.INBOUND_MAIL; }
+            else try {
+                team = TeamClassifier.Team.valueOf(code);
             } catch (IllegalArgumentException e) {
-                throw ApiException.badRequest("Équipe inconnue : INBOUND_VOICE, INBOUND_MAIL, CIB ou OUTBOUND.");
+                throw ApiException.badRequest("Équipe inconnue : INBOUND_VOICE, INBOUND_MAIL, TCHAT, RAFIKI, CIB ou OUTBOUND.");
             }
         } else if ("TEAM_LEADER".equalsIgnoreCase(requester.role())) {
             team = teamLeaders.requireLedTeam(requester); // un Team Leader ne voit que son équipe
+            channel = teamLeaders.ledChannel(requester);  // … ou son canal (Tchat, Rafiki)
         } else {
             throw ApiException.forbidden("Réservé aux Team Leaders, au Superviseur, à la QA et à l'administrateur.");
         }
@@ -164,11 +188,17 @@ public class TeamPerformanceService {
         }
         Map<Long, List<String>> services = serviceCodes();
         final TeamClassifier.Team target = team;
+        final String ch = channel;
         List<PerformanceResponse> base = reporting.teamSummary(start, end, label, countryCode).stream()
                 .filter(r -> TeamClassifier.classify(r.activity(), services.getOrDefault(r.userId(), List.of())) == target)
+                .filter(r -> ch == null || ch.equals(TeamClassifier.channel(r.activity(), services.getOrDefault(r.userId(), List.of()))))
                 .toList();
         Sources src = sources(start, end);
-        return build(team, label, base, perfFiles == null ? src : src.withSheet(perfFiles.aggregate(team.name(), start, end)));
+        String sheetTeam = channel != null ? channel : team.name();
+        src = perfFiles == null ? src : src.withSheet(perfFiles.aggregate(sheetTeam, start, end));
+        return channel != null
+                ? build(CHANNEL_PROFILES.get(channel), channel, "TCHAT".equals(channel) ? "Tchat" : "Rafiki", false, label, base, src)
+                : build(team, label, base, src);
     }
 
     /** Données calculées de la période : écoutes / écrits par agent, appels de campagne, ventes. */
@@ -212,7 +242,10 @@ public class TeamPerformanceService {
     }
 
     TeamPerformance build(TeamClassifier.Team team, String label, List<PerformanceResponse> base, Sources src) {
-        List<Def> defs = PROFILES.get(team);
+        return build(PROFILES.get(team), team.name(), team.label, team == TeamClassifier.Team.OUTBOUND, label, base, src);
+    }
+
+    TeamPerformance build(List<Def> defs, String teamCode, String teamLabel, boolean outbound, String label, List<PerformanceResponse> base, Sources src) {
         List<Row> rows = new ArrayList<>();
         for (PerformanceResponse r : base) {
             Map<String, Double> kpis = r.kpiMetrics() == null ? Map.of() : r.kpiMetrics();
@@ -259,12 +292,12 @@ public class TeamPerformanceService {
             team_.put(key, "COUNT".equals(d.column().unit()) ? round1(sum) : round1(sum / vals.size()));
         }
         // Taux d'équipe recalculés sur les totaux (plus justes qu'une moyenne de taux).
-        if (team == TeamClassifier.Team.OUTBOUND) {
+        if (outbound) {
             Double calls = team_.get("calls"), reached = team_.get("reached"), sales = team_.get("sales");
             if (calls != null && reached != null && calls > 0) team_.put("reachRate", round1(reached * 100 / calls));
             if (reached != null && reached > 0 && sales != null) team_.put("conversion", round1(sales * 100 / reached));
         }
-        return new TeamPerformance(team.name(), team.label, label, defs.stream().map(Def::column).toList(), rows, team_);
+        return new TeamPerformance(teamCode, teamLabel, label, defs.stream().map(Def::column).toList(), rows, team_);
     }
 
     /** Valeur d'un KPI importé sous l'une de ses appellations (code exact, puis « ~MOT1+MOT2 »). */

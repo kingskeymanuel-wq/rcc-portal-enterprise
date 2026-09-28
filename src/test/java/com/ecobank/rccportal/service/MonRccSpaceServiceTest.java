@@ -48,6 +48,18 @@ class MonRccSpaceServiceTest {
     }
 
     @Test
+    void chatTeamLeaderPortalIsLimitedToTheChannel() {
+        var withChatTl = new ArrayList<>(all);
+        withChatTl.add(m(11, "Ines TL Tchat", null, "TCHAT", "TEAM_LEADER_TCHAT"));
+        var tl = MonRccSpaceService.contacts("TEAM_LEADER", withChatTl.get(9), withChatTl);
+        assertTrue(names(tl).containsAll(List.of("Awa Tchat", "Marc Tchat")));
+        assertFalse(names(tl).contains("Haoua Rafiki"));                   // le Rafiki a son propre Team Leader
+        var agent = MonRccSpaceService.contacts("AGENT", all.get(0), withChatTl);
+        assertEquals("Ines TL Tchat", agent.get(0).name());                // son Team Leader de canal, pas celui du pôle
+        assertEquals(1, agent.stream().filter(c -> c.group().equals("Mon Team Leader")).count());
+    }
+
+    @Test
     void rhAndSupervisorGetTheirOwnCorrespondents() {
         assertEquals(List.of("Équipe RH", "Superviseur", "Team Leaders"),
                 MonRccSpaceService.contacts("RH", m(10, "Autre RH", null, null, "RH"), all).stream().map(MonRccSpaceService.Contact::group).distinct().toList());

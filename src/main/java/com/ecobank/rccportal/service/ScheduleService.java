@@ -112,7 +112,7 @@ public class ScheduleService {
 
     record ShiftDef(String label, LocalTime start, LocalTime end, boolean overnight) {}
 
-    /** Les 4 shifts fixes proposés dans la modale "Planifier" (portail Excelliam) — indépendants
+    /** Les 4 shifts fixes proposés dans le planning du Team Leader — indépendants
      *  de la légende dynamique d'un fichier importé puisqu'il n'y a ici aucun fichier, juste une
      *  saisie manuelle par le prestataire. Mêmes horaires que M/M2/A/N dans les fichiers RH réels
      *  (voir parseLegend) — cohérence volontaire pour que le même code affiche la même couleur/
@@ -754,93 +754,9 @@ public class ScheduleService {
     }
 
     /**
-     * Planification directe par shift (modale "Planifier" du portail Excelliam) — sans fichier,
-     * le prestataire coche des agents d'une équipe et choisit un shift par agent pour toute la
-     * période (periodFrom -> periodTo, un même shift répété chaque jour de la période, pas de
-     * grille jour par jour comme l'import fichier). Écrit dans AgentSchedule, la même table que
-     * l'import RH — donc immédiatement visible partout où le planning est déjà affiché (RH, Admin,
-     * Superviseur, Team Leader, Agent) sans synchronisation supplémentaire à construire.
-     *
-     * Écrit avec approvalStatus="PENDING" (jamais APPROVED directement) — le Team Leader de
-     * l'équipe DOIT valider avant que les agents ne voient leur planning (voir
-     * planningForUser/planningForTeam, qui filtrent sur APPROVED). Toute nouvelle planification
-     * remet le statut à PENDING même si une version précédente avait déjà été validée : un
-     * planning modifié redevient à valider, jamais silencieusement réputé toujours bon.
-     *
-     * "OFF" retire l'agent du planning de cette période (jour de repos, aucun horaire) plutôt que
-     * de refuser la requête — permet de corriger une planification en cochant à nouveau l'agent
-     * avec OFF, sans devoir supprimer manuellement en base.
-     */
-    @Transactional
-    public com.ecobank.rccportal.dto.PlanifyShiftsResult planifyShifts(com.ecobank.rccportal.dto.PlanifyShiftsRequest request) {
-        if (request == null || request.assignments() == null || request.assignments().isEmpty()) {
-            throw ApiException.badRequest("Au moins un agent doit être coché.");
-        }
-        if (request.periodFrom() == null || request.periodTo() == null) {
-            throw ApiException.badRequest("La période (du/au) est requise.");
-        }
-        if (request.periodFrom().isAfter(request.periodTo())) {
-            throw ApiException.badRequest("La date de début doit précéder la date de fin.");
-        }
-
-        int agentsPlanified = 0, entriesCreated = 0;
-        List<String> unknownUsernames = new ArrayList<>();
-        java.util.Set<String> teamsToNotify = new java.util.HashSet<>();
-
-        for (com.ecobank.rccportal.dto.PlanifyShiftsRequest.AgentShiftAssignment a : request.assignments()) {
-            if (a.username() == null || a.username().isBlank()) continue;
-            String code = a.shiftCode() == null ? "" : a.shiftCode().trim().toUpperCase();
-            boolean isOff = "OFF".equals(code);
-            ShiftDef def = FIXED_SHIFTS.get(code);
-            if (!isOff && def == null) {
-                throw ApiException.badRequest("Shift inconnu : \"" + code + "\" — attendu : "
-                        + String.join(", ", FIXED_SHIFTS.keySet()) + " ou OFF.");
-            }
-
-            User user = userRepository.findFirstByUsernameIgnoreCase(a.username().trim()).orElse(null);
-            if (user == null) {
-                unknownUsernames.add(a.username());
-                continue;
-            }
-            agentsPlanified++;
-            if (user.getActivity() != null && !user.getActivity().isBlank()) teamsToNotify.add(user.getActivity());
-
-            for (LocalDate d = request.periodFrom(); !d.isAfter(request.periodTo()); d = d.plusDays(1)) {
-                final User scheduleUser = user;
-                final LocalDate day = d;
-                AgentSchedule schedule = agentScheduleRepository.findByUserAndWorkDate(user, day)
-                        .orElseGet(() -> AgentSchedule.builder().user(scheduleUser).workDate(day).build());
-                schedule.setShiftCode(isOff ? "OFF" : code);
-                schedule.setShiftLabel(isOff ? "Repos hebdomadaire" : def.label());
-                schedule.setPlannedStartTime(isOff ? null : def.start());
-                schedule.setPlannedEndTime(isOff ? null : def.end());
-                schedule.setOvernightCrossesMidnight(!isOff && def.overnight());
-                schedule.setApprovalStatus("PENDING");
-                schedule.setRejectionReason(null);
-                schedule.setOrigin("EXCELLIAM");
-                agentScheduleRepository.save(schedule);
-                entriesCreated++;
-            }
-        }
-
-        for (String team : teamsToNotify) {
-            User teamLeader = findTeamLeaderForTeam(team);
-            if (teamLeader != null) {
-                notificationRepository.save(com.ecobank.rccportal.model.RccNotification.builder()
-                        .targetUser(teamLeader)
-                        .content("Nouveau planning à valider pour votre équipe (" + team + ") — voir Suivi de shift.")
-                        .isRead(false)
-                        .build());
-            }
-        }
-
-        return new com.ecobank.rccportal.dto.PlanifyShiftsResult(agentsPlanified, entriesCreated, unknownUsernames);
-    }
-
-    /**
-     * Nouveau flux symétrique — le Team Leader planifie lui-même sa propre équipe (même
-     * principe que planifyShifts côté Excelliam : un shift par agent sur une période) et
-     * l'envoie à Excelliam pour validation. Toujours restreint à SA PROPRE équipe (User.ledTeam),
+     * Le Team Leader planifie lui-même sa propre équipe (un shift par agent sur une période) et le
+     * publie directement : en ligne tout de suite, chaque agent est prévenu (le portail Excelliam
+     * et sa validation ont été supprimés). Toujours restreint à SA PROPRE équipe (User.ledTeam),
      * vérifié ici côté serveur — jamais confié au frontend, même si un agent listé dans la
      * requête n'appartient pas à son équipe, il est rejeté explicitement (pas juste ignoré) pour
      * qu'un mauvais mapping ne passe pas inaperçu.
@@ -851,8 +767,6 @@ public class ScheduleService {
         if (!"team_leader".equalsIgnoreCase(requester.role())) {
             throw ApiException.forbidden("Seul un Team Leader peut créer le planning de son équipe.");
         }
-        // L'envoi à Excelliam est facultatif : sans envoi, le planning est publié directement.
-        boolean toExcelliam = request == null || !Boolean.FALSE.equals(request.sendToExcelliam());
         User teamLeader = userRepository.findFirstByUsernameIgnoreCase(requester.username())
                 .orElseThrow(() -> ApiException.unauthorized("Unknown user."));
         String ownTeam = teamLeader.getLedTeam();
@@ -905,7 +819,7 @@ public class ScheduleService {
                 schedule.setPlannedStartTime(isOff ? null : def.start());
                 schedule.setPlannedEndTime(isOff ? null : def.end());
                 schedule.setOvernightCrossesMidnight(!isOff && def.overnight());
-                schedule.setApprovalStatus(toExcelliam ? "PENDING" : "APPROVED");
+                schedule.setApprovalStatus("APPROVED");
                 schedule.setRejectionReason(null);
                 schedule.setOrigin("TEAM_LEADER");
                 agentScheduleRepository.save(schedule);
@@ -913,84 +827,21 @@ public class ScheduleService {
             }
         }
 
-        if (!toExcelliam) {
-            // Publication directe : en ligne tout de suite (planning agent, retards, reporting) ; chaque agent est prévenu.
-            String who = teamLeader.getName() != null && !teamLeader.getName().isBlank() ? teamLeader.getName() : teamLeader.getUsername();
-            String msg = "📅 Votre planning du " + request.periodFrom().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
-                    + " au " + request.periodTo().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + " a été publié par " + who + ".";
-            for (User agent : plannedAgents) {
-                notificationRepository.save(com.ecobank.rccportal.model.RccNotification.builder()
-                        .targetUser(agent).content(msg).isRead(false).build());
-            }
-            return new com.ecobank.rccportal.dto.PlanifyShiftsResult(agentsPlanified, entriesCreated, unknownUsernames);
+        // Publication directe : en ligne tout de suite (planning agent, retards, reporting) ; chaque agent est prévenu.
+        String who = teamLeader.getName() != null && !teamLeader.getName().isBlank() ? teamLeader.getName() : teamLeader.getUsername();
+        String msg = "📅 Votre planning du " + request.periodFrom().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                + " au " + request.periodTo().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + " a été publié par " + who + ".";
+        for (User agent : plannedAgents) {
+            notificationRepository.save(com.ecobank.rccportal.model.RccNotification.builder()
+                    .targetUser(agent).content(msg).isRead(false).build());
         }
-
-        String content = "Le Team Leader de l'équipe " + ownTeam + " a soumis un nouveau planning à valider ("
-                + entriesCreated + " entrée(s), du " + request.periodFrom() + " au " + request.periodTo() + ").";
-        userRoleRepository.findByRoleNameIgnoreCase("EXCELLIAM").stream()
-                .map(com.ecobank.rccportal.model.UserRole::getUser)
-                .distinct()
-                .forEach(u -> notificationRepository.save(com.ecobank.rccportal.model.RccNotification.builder()
-                        .targetUser(u).content(content).isRead(false).build()));
-
         return new com.ecobank.rccportal.dto.PlanifyShiftsResult(agentsPlanified, entriesCreated, unknownUsernames);
     }
 
     /**
-     * Excelliam valide ou refuse le planning soumis par un Team Leader (origin = TEAM_LEADER,
-     * statut PENDING). Une validation ne rend PAS le planning visible immédiatement : elle
-     * passe seulement au statut "VALIDATED", en attente du clic "Mise à jour" du Team Leader
-     * (voir publishTeamPlanning) — c'est la mise à jour globale demandée explicitement par le
-     * métier, pour que le Team Leader garde la main sur le moment où ça devient effectif.
-     * Un refus, lui, est immédiat (REJECTED, motif obligatoire) — le Team Leader n'a qu'à
-     * corriger et resoumettre.
-     */
-    @Transactional
-    public int decideExcelliamValidation(com.ecobank.rccportal.security.AuthenticatedUser requester,
-                                          String team, LocalDate from, LocalDate to, boolean approve, String reason) {
-        if (!"excelliam".equalsIgnoreCase(requester.role()) && !"admin".equalsIgnoreCase(requester.role())) {
-            throw ApiException.forbidden("Seul Excelliam (ou un administrateur) peut valider un planning soumis par un Team Leader.");
-        }
-        if (team == null || team.isBlank()) {
-            throw ApiException.badRequest("L'équipe est requise.");
-        }
-        if (!approve && (reason == null || reason.isBlank())) {
-            throw ApiException.badRequest("Un motif est requis pour refuser un planning.");
-        }
-
-        java.util.function.Predicate<User> inTeam = teamMember(team);
-        List<AgentSchedule> pending = agentScheduleRepository.findByWorkDateBetween(from, to).stream()
-                .filter(s -> "PENDING".equals(s.getApprovalStatus()))
-                .filter(s -> "TEAM_LEADER".equals(s.getOrigin()))
-                .filter(s -> inTeam.test(s.getUser()))
-                .toList();
-        if (pending.isEmpty()) {
-            throw ApiException.badRequest("Aucun planning soumis par le Team Leader en attente pour cette équipe sur cette période.");
-        }
-
-        String newStatus = approve ? "VALIDATED" : "REJECTED";
-        for (AgentSchedule s : pending) {
-            s.setApprovalStatus(newStatus);
-            s.setRejectionReason(approve ? null : reason.trim());
-            agentScheduleRepository.save(s);
-        }
-
-        String content = approve
-                ? "Excelliam a validé le planning soumis (" + pending.size() + " entrée(s)) — cliquez \"Mise à jour\" pour l'appliquer."
-                : "Excelliam a REFUSÉ le planning soumis — motif : " + reason.trim();
-        User teamLeader = findTeamLeaderForTeam(team);
-        if (teamLeader != null) {
-            notificationRepository.save(com.ecobank.rccportal.model.RccNotification.builder()
-                    .targetUser(teamLeader).content(content).isRead(false).build());
-        }
-        return pending.size();
-    }
-
-    /**
-     * Clic "Mise à jour" du Team Leader — dernière étape du flux TEAM_LEADER : bascule en
-     * APPROVED (donc effectivement en ligne, visible partout : planning agent, reporting,
-     * retards) toutes les entrées VALIDATED de sa propre équipe sur la période donnée. Tant que
-     * ce clic n'a pas eu lieu, même après validation Excelliam, rien ne change pour les agents.
+     * Clic « Publier » du Team Leader : met en ligne (APPROVED, visible partout : planning agent, reporting,
+     * retards) les plannings de SA propre équipe restés en attente sur la période — ceux envoyés à Excelliam
+     * avant la suppression de son portail (PENDING ou VALIDATED), qui ne seraient sinon jamais publiés.
      */
     @Transactional
     public int publishTeamPlanning(com.ecobank.rccportal.security.AuthenticatedUser requester, LocalDate from, LocalDate to) {
@@ -1006,12 +857,12 @@ public class ScheduleService {
 
         java.util.function.Predicate<User> inOwnTeam = teamMember(ownTeam);
         List<AgentSchedule> validated = agentScheduleRepository.findByWorkDateBetween(from, to).stream()
-                .filter(s -> "VALIDATED".equals(s.getApprovalStatus()))
+                .filter(s -> "VALIDATED".equals(s.getApprovalStatus()) || "PENDING".equals(s.getApprovalStatus()))
                 .filter(s -> "TEAM_LEADER".equals(s.getOrigin()))
                 .filter(s -> inOwnTeam.test(s.getUser()))
                 .toList();
         if (validated.isEmpty()) {
-            throw ApiException.badRequest("Aucun planning validé par Excelliam en attente de mise à jour pour votre équipe sur cette période.");
+            throw ApiException.badRequest("Aucun planning en attente de publication pour votre équipe sur cette période.");
         }
         for (AgentSchedule s : validated) {
             s.setApprovalStatus("APPROVED");
@@ -1036,8 +887,8 @@ public class ScheduleService {
                 List<String> codes = userServiceAssignmentRepository.findServicesByUserId(id).stream()
                         .filter(a -> a.getService() != null && a.getService().getCode() != null)
                         .map(a -> a.getService().getCode()).toList();
-                com.ecobank.rccportal.util.TeamClassifier.Team t = com.ecobank.rccportal.util.TeamClassifier.classify(u.getActivity(), codes);
-                return t != com.ecobank.rccportal.util.TeamClassifier.Team.OTHER && t.name().equals(wanted);
+                // Tchat / Rafiki : seulement les agents du canal ; sinon tout le pôle (Inbound Mail couvre aussi Tchat et Rafiki).
+                return com.ecobank.rccportal.util.TeamClassifier.belongsTo(wanted, u.getActivity(), codes);
             });
         };
     }
@@ -1046,11 +897,9 @@ public class ScheduleService {
      *  WorkflowService.findTeamLeaderForTeam, dupliquée ici volontairement : ScheduleService
      *  ne dépend pas de WorkflowService (couches distinctes), et cette résolution est petite. */
     private User findTeamLeaderForTeam(String team) {
-        return userRoleRepository.findByRoleNameIgnoreCase("TEAM_LEADER").stream()
-                .map(com.ecobank.rccportal.model.UserRole::getUser)
-                .filter(u -> u.getLedTeam() != null && u.getLedTeam().equalsIgnoreCase(team))
-                .findFirst()
-                .orElse(null);
+        List<User> leaders = userRoleRepository.findByRoleNameIgnoreCase("TEAM_LEADER").stream()
+                .map(com.ecobank.rccportal.model.UserRole::getUser).distinct().toList();
+        return com.ecobank.rccportal.util.TeamClassifier.leaderFor(team, leaders, User::getLedTeam);
     }
 
     /**
@@ -1076,7 +925,7 @@ public class ScheduleService {
         List<AgentSchedule> pending = agentScheduleRepository.findByWorkDateBetween(from, to).stream()
                 .filter(s -> "PENDING".equals(s.getApprovalStatus()))
                 .filter(s -> "EXCELLIAM".equals(s.getOrigin()))
-                .filter(s -> team.equalsIgnoreCase(s.getUser().getActivity()))
+                .filter(s -> com.ecobank.rccportal.util.TeamClassifier.matchesTeam(team, s.getUser().getActivity()))
                 .toList();
         if (pending.isEmpty()) {
             throw ApiException.badRequest("Aucun planning en attente de validation pour votre équipe sur cette période.");
@@ -1088,17 +937,6 @@ public class ScheduleService {
             s.setRejectionReason(approve ? null : reason.trim());
             agentScheduleRepository.save(s);
         }
-
-        // Notifie Excelliam du résultat — surtout utile en cas de refus, pour qu'il sache
-        // qu'il doit ajuster le planning (le motif est déjà visible dans son dashboard).
-        String content = approve
-                ? "Planning de l'équipe " + team + " validé par le Team Leader (" + pending.size() + " entrée(s))."
-                : "Planning de l'équipe " + team + " REFUSÉ par le Team Leader — motif : " + reason.trim();
-        userRoleRepository.findByRoleNameIgnoreCase("EXCELLIAM").stream()
-                .map(com.ecobank.rccportal.model.UserRole::getUser)
-                .distinct()
-                .forEach(u -> notificationRepository.save(com.ecobank.rccportal.model.RccNotification.builder()
-                        .targetUser(u).content(content).isRead(false).build()));
 
         return pending.size();
     }
@@ -1130,7 +968,7 @@ public class ScheduleService {
         List<AgentSchedule> schedules = (team == null || team.isBlank())
                 ? agentScheduleRepository.findByWorkDateBetweenOrderByWorkDateAsc(from, to)
                 : agentScheduleRepository.findByWorkDateBetweenOrderByWorkDateAsc(from, to).stream()
-                    .filter(s -> team.equalsIgnoreCase(s.getUser().getActivity()))
+                    .filter(s -> com.ecobank.rccportal.util.TeamClassifier.matchesTeam(team, s.getUser().getActivity()))
                     .toList();
         if (!includePending) {
             schedules = schedules.stream().filter(s -> "APPROVED".equals(s.getApprovalStatus())).toList();
@@ -1165,7 +1003,8 @@ public class ScheduleService {
         // Team Leader / Agent : toujours SA propre équipe, jamais celle demandée par le client.
         User self = userRepository.findFirstByUsernameIgnoreCase(requester.username())
                 .orElseThrow(() -> ApiException.unauthorized("Unknown user."));
-        String ownTeam = self.getActivity();
+        // Un Team Leader voit l'équipe qu'il dirige (Tchat, Rafiki… compris) ; un agent, la sienne.
+        String ownTeam = isTeamLeader && self.getLedTeam() != null && !self.getLedTeam().isBlank() ? self.getLedTeam() : self.getActivity();
         if (ownTeam == null || ownTeam.isBlank()) return List.of(); // "Non classée" — aucune équipe à montrer
         return planningForTeam(ownTeam, from, to, isTeamLeader);
     }

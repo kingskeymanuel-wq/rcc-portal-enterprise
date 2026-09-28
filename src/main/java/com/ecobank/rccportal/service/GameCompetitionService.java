@@ -137,18 +137,18 @@ public class GameCompetitionService {
         if (!"team_leader".equalsIgnoreCase(requester.role()) || leader.getLedTeam() == null) {
             throw ApiException.forbidden("Réservé au Team Leader de l'équipe concernée.");
         }
-        GameCompetitionTeam team = competitionTeamRepository.findByCompetitionIdAndTeam(competitionId, leader.getLedTeam())
+        GameCompetitionTeam team = competitionTeamRepository.findByCompetitionIdAndTeam(competitionId, TeamClassifier.teamOf(leader.getLedTeam()).name())
                 .orElseThrow(() -> ApiException.forbidden("Votre équipe n'est pas engagée dans cette compétition."));
 
         for (Long userId : userIds) {
             User participant = userRepository.findById(userId).orElse(null);
             if (participant == null) continue;
-            if (!leader.getLedTeam().equalsIgnoreCase(TeamClassifier.classify(participant.getActivity()).name())) continue; // seulement sa propre équipe
+            if (!TeamClassifier.matchesTeam(leader.getLedTeam(), participant.getActivity())) continue; // seulement sa propre équipe (ou son canal)
             if (participantRepository.findByCompetitionIdAndUserId(competitionId, userId).isPresent()) continue;
             participantRepository.save(GameCompetitionParticipant.builder()
                     .competitionId(competitionId)
                     .userId(userId)
-                    .team(leader.getLedTeam())
+                    .team(TeamClassifier.teamOf(leader.getLedTeam()).name())
                     .build());
         }
 
@@ -238,7 +238,7 @@ public class GameCompetitionService {
                 .orElseThrow(() -> ApiException.unauthorized("Utilisateur inconnu."));
         if (leader.getLedTeam() == null) return List.of();
         return competitionRepository.findAllByOrderByCreatedAtDesc().stream()
-                .filter(c -> competitionTeamRepository.findByCompetitionIdAndTeam(c.getCompetitionId(), leader.getLedTeam()).isPresent())
+                .filter(c -> competitionTeamRepository.findByCompetitionIdAndTeam(c.getCompetitionId(), TeamClassifier.teamOf(leader.getLedTeam()).name()).isPresent())
                 .map(this::toResponse)
                 .toList();
     }

@@ -293,6 +293,11 @@
     window.RccSession.init().then(function (session) {
         if (!session) return;
         currentProfile = session.profile;
+        // Chaque agent voit son planning et ses performances en direct dès sa connexion.
+        if (session.profile === "AGENT" && window.RccAgentLive) {
+            document.getElementById("agentLive").style.display = "";
+            RccAgentLive.mount(document.getElementById("agentLive"));
+        }
 
         document.getElementById("personalGreeting").textContent =
             "Bonjour, " + (session.user.name || session.user.username) + " 👋";

@@ -594,16 +594,12 @@ public class WorkflowService {
      *  TEAM_LEADER existe déjà comme rôle applicatif normal (voir UserRoleRepository) ; ledTeam,
      *  lui, n'est renseigné que pour ces comptes-là (voir User.ledTeam). */
     private User findTeamLeaderForTeam(String team) {
-        return userRoleRepository.findByRoleNameIgnoreCase("TEAM_LEADER").stream()
-                .map(com.ecobank.rccportal.model.UserRole::getUser)
-                .filter(u -> u.getLedTeam() != null && u.getLedTeam().equalsIgnoreCase(team))
-                .findFirst()
-                // Team Leader désigné par le seul service « Team Leader … » (sans rôle explicite) :
-                // User.ledTeam reste la source de vérité de l'équipe menée.
-                .or(() -> userRepository.findAll().stream()
-                        .filter(u -> u.getLedTeam() != null && u.getLedTeam().equalsIgnoreCase(team))
-                        .findFirst())
-                .orElse(null);
+        // Team Leader du canal (Tchat, Rafiki) d'abord, puis celui du pôle — rôle TEAM_LEADER, sinon désigné par le
+        // seul service « Team Leader … » (User.ledTeam reste la source de vérité de l'équipe menée).
+        User leader = com.ecobank.rccportal.util.TeamClassifier.leaderFor(team, userRoleRepository.findByRoleNameIgnoreCase("TEAM_LEADER").stream()
+                .map(com.ecobank.rccportal.model.UserRole::getUser).distinct().toList(), User::getLedTeam);
+        if (leader != null) return leader;
+        return com.ecobank.rccportal.util.TeamClassifier.leaderFor(team, userRepository.findAll().stream().filter(u -> u.getLedTeam() != null).toList(), User::getLedTeam);
     }
 
     /** Alerte tous les comptes ADMIN — un agent bloqué de soumettre son congé faute de Team

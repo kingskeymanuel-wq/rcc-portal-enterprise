@@ -69,16 +69,41 @@ public class TeamLeaderService {
                 });
     }
 
+    /** Activité écrite sur un agent ajouté à une équipe de canal (Tchat, Rafiki). */
+    private static final java.util.Map<String, String> CHANNEL_TO_ACTIVITY = java.util.Map.of("TCHAT", "INBOUND TCHAT", "RAFIKI", "INBOUND RAFIKI");
+
+    /** Code de l'équipe menée tel qu'affecté (INBOUND_VOICE, INBOUND_MAIL, TCHAT, RAFIKI, CIB, OUTBOUND). */
+    @Transactional(readOnly = true)
+    public String ledTeamCode(AuthenticatedUser requester) {
+        User leader = userRepository.findFirstByUsernameIgnoreCase(requester.username())
+                .orElseThrow(() -> ApiException.unauthorized("Utilisateur inconnu."));
+        if (leader.getLedTeam() == null || leader.getLedTeam().isBlank()) {
+            throw ApiException.forbidden("Aucune équipe ne vous a été affectée. Contactez votre administrateur.");
+        }
+        return leader.getLedTeam().trim().toUpperCase().replace(' ', '_');
+    }
+
+    /** Canal mené (TCHAT / RAFIKI) ou null pour une équipe entière. */
+    @Transactional(readOnly = true)
+    public String ledChannel(AuthenticatedUser requester) {
+        String code = ledTeamCode(requester);
+        return TeamClassifier.isChannel(code) ? code : null;
+    }
+
+    private static boolean inTeam(String ledCode, User u) {
+        return TeamClassifier.belongsTo(ledCode, u.getActivity(), null);
+    }
+
     /**
      * Recherche des agents éligibles à rejoindre mon équipe (pas déjà dedans, pas un compte de
      * management) — pour le bouton "Ajouter un agent" de l'onglet Membres.
      */
     @Transactional(readOnly = true)
     public List<UserDirectoryResponse> searchAddableAgents(AuthenticatedUser requester, String query) {
-        TeamClassifier.Team team = requireLedTeam(requester);
+        String code = ledTeamCode(requester);
         String q = query == null ? "" : query.trim().toLowerCase();
         return userRepository.findAll().stream()
-                .filter(u -> TeamClassifier.classify(u.getActivity()) != team)
+                .filter(u -> !inTeam(code, u))
                 .filter(u -> !isManagementAccount(u.getId()))
                 .filter(u -> q.isEmpty()
                         || (u.getName() != null && u.getName().toLowerCase().contains(q))
@@ -92,12 +117,13 @@ public class TeamLeaderService {
     /** Ajoute un agent existant à mon équipe — positionne son équipe (activity) sur la mienne. */
     @Transactional
     public void addMember(AuthenticatedUser requester, Long userId) {
-        TeamClassifier.Team team = requireLedTeam(requester);
+        String code = ledTeamCode(requester);
+        TeamClassifier.Team team = TeamClassifier.teamOf(code);
         User user = userRepository.findById(userId).orElseThrow(() -> ApiException.notFound("Unknown user."));
         if (isManagementAccount(userId)) {
             throw ApiException.badRequest("Ce compte porte un rôle de management — il ne peut pas être ajouté à une équipe opérationnelle.");
         }
-        user.setActivity(TEAM_TO_ACTIVITY.get(team));
+        user.setActivity(CHANNEL_TO_ACTIVITY.getOrDefault(code, TEAM_TO_ACTIVITY.get(team)));
         userRepository.save(user);
     }
 
@@ -110,9 +136,9 @@ public class TeamLeaderService {
      */
     @Transactional
     public void removeMember(AuthenticatedUser requester, Long userId, boolean resigned) {
-        TeamClassifier.Team team = requireLedTeam(requester);
+        String code = ledTeamCode(requester);
         User user = userRepository.findById(userId).orElseThrow(() -> ApiException.notFound("Unknown user."));
-        if (TeamClassifier.classify(user.getActivity()) != team) {
+        if (!inTeam(code, user)) {
             throw ApiException.forbidden("Cet agent ne fait pas partie de votre équipe.");
         }
         user.setActivity(null);
@@ -130,18 +156,17 @@ public class TeamLeaderService {
         if (leader.getLedTeam() == null || leader.getLedTeam().isBlank()) {
             throw ApiException.forbidden("Aucune équipe ne vous a été affectée. Contactez votre administrateur.");
         }
-        try {
-            return TeamClassifier.Team.valueOf(leader.getLedTeam());
-        } catch (IllegalArgumentException e) {
-            throw ApiException.forbidden("Affectation d'équipe invalide. Contactez votre administrateur.");
-        }
+        // Tchat et Rafiki relèvent de l'Inbound Mail (mêmes indicateurs de reporting), restreints à leur canal ailleurs.
+        TeamClassifier.Team team = TeamClassifier.teamOf(leader.getLedTeam());
+        if (team == TeamClassifier.Team.OTHER) throw ApiException.forbidden("Affectation d'équipe invalide. Contactez votre administrateur.");
+        return team;
     }
 
     @Transactional(readOnly = true)
     public List<UserDirectoryResponse> teamMembers(AuthenticatedUser requester) {
-        TeamClassifier.Team team = requireLedTeam(requester);
+        String code = ledTeamCode(requester);
         return userRepository.findAll().stream()
-                .filter(u -> TeamClassifier.classify(u.getActivity()) == team)
+                .filter(u -> inTeam(code, u))
                 .map(this::toDirectory)
                 .sorted((a, b) -> String.valueOf(a.fullName()).compareToIgnoreCase(String.valueOf(b.fullName())))
                 .toList();
@@ -150,9 +175,9 @@ public class TeamLeaderService {
     /** Détails complets (id, contrat, résidence) — pour la fiche agent éditable de l'onglet Membres. */
     @Transactional(readOnly = true)
     public List<UserResponse> teamMembersFull(AuthenticatedUser requester) {
-        TeamClassifier.Team team = requireLedTeam(requester);
+        String code = ledTeamCode(requester);
         return userRepository.findAll().stream()
-                .filter(u -> TeamClassifier.classify(u.getActivity()) == team)
+                .filter(u -> inTeam(code, u))
                 .map(u -> userService.getById(u.getId()))
                 .sorted((a, b) -> String.valueOf(a.fullName()).compareToIgnoreCase(String.valueOf(b.fullName())))
                 .toList();
@@ -160,16 +185,15 @@ public class TeamLeaderService {
 
     @Transactional(readOnly = true)
     public List<PerformanceResponse> teamReporting(AuthenticatedUser requester, YearMonth month) {
-        TeamClassifier.Team team = requireLedTeam(requester);
+        String code = ledTeamCode(requester);
         return reportingService.teamSummary(month != null ? month : YearMonth.now()).stream()
-                .filter(r -> TeamClassifier.classify(r.activity()) == team)
+                .filter(r -> TeamClassifier.belongsTo(code, r.activity(), null))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<AttendanceRecordResponse> teamAttendance(AuthenticatedUser requester, LocalDate date) {
-        TeamClassifier.Team team = requireLedTeam(requester);
-        Set<String> teamUsernames = teamUsernames(team);
+        Set<String> teamUsernames = teamUsernames(ledTeamCode(requester));
         return attendanceService.forDate(date).stream()
                 .filter(a -> teamUsernames.contains(a.matricule() == null ? "" : a.matricule().toLowerCase()))
                 .toList();
@@ -177,16 +201,21 @@ public class TeamLeaderService {
 
     @Transactional(readOnly = true)
     public List<QualityEvaluationResponse> teamQualityEvaluations(AuthenticatedUser requester) {
-        TeamClassifier.Team team = requireLedTeam(requester);
-        Set<String> teamUsernames = teamUsernames(team);
+        Set<String> teamUsernames = teamUsernames(ledTeamCode(requester));
         return qualityEvaluationService.listAll().stream()
                 .filter(e -> teamUsernames.contains(e.agentMatricule() == null ? "" : e.agentMatricule().toLowerCase()))
                 .toList();
     }
 
-    private Set<String> teamUsernames(TeamClassifier.Team team) {
+    /** Identifiants des agents de l'équipe menée. */
+    @Transactional(readOnly = true)
+    public Set<String> teamUsernames(AuthenticatedUser requester) {
+        return teamUsernames(ledTeamCode(requester));
+    }
+
+    private Set<String> teamUsernames(String ledCode) {
         return userRepository.findAll().stream()
-                .filter(u -> TeamClassifier.classify(u.getActivity()) == team)
+                .filter(u -> inTeam(ledCode, u))
                 .map(u -> u.getUsername() == null ? "" : u.getUsername().toLowerCase())
                 .collect(Collectors.toSet());
     }

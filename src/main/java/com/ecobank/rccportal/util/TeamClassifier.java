@@ -52,4 +52,78 @@ public final class TeamClassifier {
         }
         return team;
     }
+
+    // ───────────── Canaux digitaux de l'Inbound Mail : Tchat et Rafiki ─────────────
+
+    /** Codes d'équipe menée (User.ledTeam) propres à un canal : un Team Leader Tchat ou Rafiki. */
+    public static final java.util.Set<String> CHANNELS = java.util.Set.of("TCHAT", "RAFIKI");
+
+    public static boolean isChannel(String code) {
+        return code != null && CHANNELS.contains(code.trim().toUpperCase());
+    }
+
+    /** Canal d'un agent : « RAFIKI » ou « TCHAT » (activité ou service AGENT_TCHAT / AGENT_RAFIKI), sinon null. */
+    public static String channel(String activity, java.util.Collection<String> serviceCodes) {
+        String a = activity == null ? "" : activity.toUpperCase();
+        if (a.contains("RAFIKI")) return "RAFIKI";
+        if (a.contains("TCHAT") || a.contains("CHAT")) return "TCHAT";
+        if (serviceCodes != null) {
+            for (String c : serviceCodes) {
+                if (c == null) continue;
+                String u = c.toUpperCase();
+                if (u.contains("RAFIKI")) return "RAFIKI";
+                if (u.contains("TCHAT")) return "TCHAT";
+            }
+        }
+        return null;
+    }
+
+    /** Équipe du reporting d'un code d'équipe menée : TCHAT / RAFIKI relèvent de l'Inbound Mail. */
+    public static Team teamOf(String ledTeam) {
+        if (ledTeam == null || ledTeam.isBlank()) return Team.OTHER;
+        String code = ledTeam.trim().toUpperCase().replace(' ', '_');
+        if (CHANNELS.contains(code)) return Team.INBOUND_MAIL;
+        try {
+            return Team.valueOf(code);
+        } catch (IllegalArgumentException e) {
+            return classify(ledTeam);
+        }
+    }
+
+    /** L'agent fait-il partie de l'équipe menée ? Un Team Leader Tchat ne voit que le Tchat ; celui de l'Inbound Mail voit tout le pôle. */
+    public static boolean belongsTo(String ledTeam, String activity, java.util.Collection<String> serviceCodes) {
+        Team team = teamOf(ledTeam);
+        if (team == Team.OTHER || classify(activity, serviceCodes) != team) return false;
+        return !isChannel(ledTeam) || ledTeam.trim().equalsIgnoreCase(channel(activity, serviceCodes));
+    }
+
+    /** Équipes menées pouvant encadrer cet agent, de la plus précise à la plus large (TCHAT puis INBOUND_MAIL). */
+    public static java.util.List<String> leaderCodesFor(String activity, java.util.Collection<String> serviceCodes) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        Team team = classify(activity, serviceCodes);
+        String ch = team == Team.INBOUND_MAIL ? channel(activity, serviceCodes) : null;
+        if (ch != null) out.add(ch);
+        if (team != Team.OTHER) out.add(team.name());
+        return out;
+    }
+
+    /** L'agent (champ Activité libre) relève-t-il de cette équipe (code d'équipe ou libellé d'activité) ? */
+    public static boolean matchesTeam(String team, String activity) {
+        if (team == null || team.isBlank()) return false;
+        if (team.trim().equalsIgnoreCase(activity == null ? "" : activity.trim())) return true;
+        return belongsTo(team, activity, null);
+    }
+
+    /** Team Leader d'un agent parmi des candidats : celui de son canal (Tchat, Rafiki) d'abord, puis celui de son pôle. */
+    public static <U> U leaderFor(String activity, java.util.Collection<U> leaders, java.util.function.Function<U, String> ledTeam) {
+        java.util.List<String> codes = new java.util.ArrayList<>(leaderCodesFor(activity, null));
+        if (activity != null && !activity.isBlank()) codes.add(activity.trim());
+        for (String code : codes) {
+            for (U u : leaders) {
+                String led = ledTeam.apply(u);
+                if (led != null && led.trim().replace(' ', '_').equalsIgnoreCase(code.replace(' ', '_'))) return u;
+            }
+        }
+        return null;
+    }
 }

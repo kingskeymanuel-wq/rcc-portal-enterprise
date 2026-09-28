@@ -8,7 +8,7 @@
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <link rel="stylesheet" th:href="@{/css/support-requests.css}">
-    <link rel="stylesheet" th:href="@{/css/excelliam-portal.css}">
+    <link rel="stylesheet" th:href="@{/css/planning-builder.css}">
     <link rel="stylesheet" th:href="@{/css/meetings.css}">
     <link rel="stylesheet" th:href="@{/css/qa-team.css}">
     <link rel="stylesheet" th:href="@{/css/team-perf-files.css}">
@@ -85,6 +85,9 @@
         .tl-meet-steps span { display: flex; gap: .5rem; align-items: flex-start; padding: .6rem .7rem; border-radius: .9rem; background: #F5F8FC; font-size: .8rem; color: #33415C; }
         .tl-meet-steps b { flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #0057B8; color: #fff; font-size: .72rem; }
         @media (max-width: 767px) { .tl-hero-actions { align-items: stretch; width: 100%; } .tl-hero { padding: 1.2rem; } }
+        /* Portails Team Leader Tchat / Rafiki : couleurs du canal (mêmes que les portails agents). */
+        .tl-hero[data-channel="TCHAT"] { background: linear-gradient(120deg, #0B6E6E 0%, #0B8A8A 45%, #5B3CC4 100%); }
+        .tl-hero[data-channel="RAFIKI"] { background: linear-gradient(120deg, #0C3C96 0%, #1877F2 50%, #D6249F 100%); }
         .tl-status-badge.PLANNED, .tl-status-badge.PENDING { background: #fff3cd; color: #7a5b00; }
         .tl-status-badge.DONE, .tl-status-badge.CONFIRMED { background: #d1f2e0; color: #0a6b3f; }
         .tl-status-badge.NO_SHOW, .tl-status-badge.CANCELLED { background: #fde2e2; color: #b02a2a; }
@@ -219,9 +222,9 @@
                             <div id="tlMembersList"></div>
                         </div>
 
-                        <!-- ===================== PLANNING (comme Excelliam, avec envoi pour validation) ===================== -->
+                        <!-- ===================== PLANNING (construit et publié par le Team Leader) ===================== -->
                         <div id="tlPanePlanning" class="card-body" style="display:none;">
-                            <p class="text-muted small mb-2"><i class="bi bi-info-circle"></i> Construisez le planning de votre équipe, puis <b>publiez-le directement</b> (en ligne tout de suite, les agents sont prévenus) <b>ou</b>, si vous le souhaitez, envoyez-le à Excelliam pour validation — dans ce cas, cliquez "Mise à jour" une fois validé.</p>
+                            <p class="text-muted small mb-2"><i class="bi bi-info-circle"></i> Construisez le planning de votre équipe puis <b>publiez-le</b> : il est en ligne tout de suite et chaque agent le voit dans son portail (il est prévenu).</p>
 
                             <div class="exc-shift-legend mb-2">
                                 <span class="exc-shift-chip"><span class="dot"></span> 07h–16h (M)</span>
@@ -251,18 +254,16 @@
                             </div>
 
                             <div class="d-flex justify-content-end align-items-center gap-2 mt-2 flex-wrap">
-                                <small class="text-muted me-auto"><i class="bi bi-info-circle"></i> L'envoi à Excelliam est facultatif.</small>
-                                <button type="button" class="btn btn-outline-primary" id="tlPlanSubmitBtn"><i class="bi bi-send-fill"></i> Envoyer à Excelliam pour validation</button>
-                                <button type="button" class="btn btn-primary" id="tlPlanPublishDirectBtn"><i class="bi bi-lightning-charge-fill"></i> Publier directement</button>
+                                <button type="button" class="btn btn-primary" id="tlPlanPublishDirectBtn"><i class="bi bi-lightning-charge-fill"></i> Publier le planning</button>
                             </div>
 
                             <hr>
 
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h6 class="mb-0">État du planning envoyé sur cette période</h6>
+                                <h6 class="mb-0">État de mon planning sur cette période</h6>
                                 <div class="d-flex gap-2">
                                     <button type="button" class="btn btn-sm btn-outline-secondary" id="tlPlanRefreshStatusBtn"><i class="bi bi-arrow-clockwise"></i> Actualiser</button>
-                                    <button type="button" class="btn btn-sm btn-success d-none" id="tlPlanPublishBtn"><i class="bi bi-check2-circle"></i> Mise à jour</button>
+                                    <button type="button" class="btn btn-sm btn-success d-none" id="tlPlanPublishBtn"><i class="bi bi-check2-circle"></i> Publier les plannings en attente</button>
                                 </div>
                             </div>
                             <div id="tlPlanStatusList"><p class="text-muted small">Choisissez une période puis cliquez "Actualiser".</p></div>

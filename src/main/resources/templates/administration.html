@@ -103,7 +103,7 @@
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label small">Rôle (optionnel — laisser vide pour un agent ou QA normal)</label>
-                                <input type="text" class="form-control" id="newUserRole" placeholder="ADMIN, RH, EXCELLIAM, SUPERVISOR, TEAM_LEADER (laisser vide sinon)">
+                                <input type="text" class="form-control" id="newUserRole" placeholder="ADMIN, RH, SUPERVISOR, TEAM_LEADER (laisser vide sinon)">
                                 <p class="text-muted" style="font-size:.75rem;">Le profil QA vient du <strong>Service</strong> ci-dessous, pas de ce champ — n'y mettez jamais « QA ».</p>
                             </div>
                             <div class="col-md-4">
@@ -697,9 +697,6 @@
                     <div>
                         <p class="mb-0"><strong>Identifiant :</strong> <span id="userDetailUsername">—</span></p>
                         <p class="mb-0"><strong>Statut :</strong> <span id="userDetailActive">—</span></p>
-                        <button type="button" class="btn btn-sm btn-outline-warning mt-2" id="excelliamResetPasswordBtn" style="display:none;">
-                            <i class="bi bi-key"></i> Réinitialiser le mot de passe Excelliam
-                        </button>
                     </div>
                 </div>
 
@@ -744,11 +741,13 @@
                         <select class="form-select form-select-sm" id="editLedTeam">
                             <option value="">— Aucune —</option>
                             <option value="INBOUND_VOICE">Inbound Voix</option>
-                            <option value="INBOUND_MAIL">Inbound Mail / Rafiki</option>
+                            <option value="INBOUND_MAIL">Inbound Mail (tout le pôle)</option>
+                            <option value="TCHAT">Tchat</option>
+                            <option value="RAFIKI">Rafiki</option>
                             <option value="CIB">CIB</option>
                             <option value="OUTBOUND">Outbound</option>
                         </select>
-                        <div class="form-text small">Requis pour que ce Team Leader reçoive les demandes de congé de son équipe (voir Portail Excelliam / RH).</div>
+                        <div class="form-text small">Requis pour que ce Team Leader reçoive les demandes de congé de son équipe (voir Portail RH).</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small">Nature du contrat</label>

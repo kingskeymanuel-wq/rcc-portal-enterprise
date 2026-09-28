@@ -15,6 +15,7 @@
           rel="stylesheet">
 
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/agent-live.css}">
 
 </head>
 
@@ -34,6 +35,8 @@
 
                 <!-- Bannière d'accueil — image/texte modifiables par Admin ou QA (communication) -->
                 <p class="text-muted mb-2" id="personalGreeting"></p>
+                <!-- Agent : son planning et ses performances, en direct dès la connexion -->
+                <div id="agentLive" style="display:none;"></div>
                 <div class="card dashboard-card shadow-sm mb-4 position-relative text-white" id="heroBanner"
                      style="min-height:280px;border:none;overflow:hidden;background:linear-gradient(120deg,#0057B8,#003E8A);background-size:cover;background-position:center;">
                     <div class="position-absolute top-0 start-0 w-100 h-100" style="background:rgba(0,20,50,.45);"></div>
@@ -171,6 +174,7 @@
 <script th:src="@{/js/session.js}"></script>
 <script th:src="@{/js/external-tools.js}"></script>
 <script th:src="@{/js/richtext-editor.js}"></script>
+<script th:src="@{/js/agent-live.js}"></script>
 <script th:src="@{/js/dashboard.js}"></script>
 
 </body>

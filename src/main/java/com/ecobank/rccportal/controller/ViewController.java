@@ -74,12 +74,6 @@ public class ViewController {
         return "hr-parcours";
     }
 
-    /** Portail Excelliam — prestataire qui planifie les shifts mensuels par équipe pour le
-     *  compte d'Ecobank. Dashboard dédié, distinct du portail RH mais même esprit visuel. */
-    @GetMapping("/excelliam")
-    public String excelliamPortal() {
-        return "excelliam";
-    }
 
     /** Ancien favori conservé pour compatibilité. Le portail RH est désormais accessible sous /rh. */
     @GetMapping("/hr-parcours")

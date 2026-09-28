@@ -49,15 +49,15 @@ class TeamLeaderPlanningTest {
         return u;
     }
 
-    private PlanifyShiftsRequest request(Boolean toExcelliam, String... usernames) {
+    private PlanifyShiftsRequest request(String... usernames) {
         List<PlanifyShiftsRequest.AgentShiftAssignment> list = new ArrayList<>();
         for (String u : usernames) list.add(new PlanifyShiftsRequest.AgentShiftAssignment(u, "M"));
-        return new PlanifyShiftsRequest(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 3), list, toExcelliam);
+        return new PlanifyShiftsRequest(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 3), list);
     }
 
     @Test
     void directPublicationIsLiveImmediatelyAndAgentsAreNotified() {
-        var r = svc.submitTeamPlanning(TL, request(false, "yao", "zie"));
+        var r = svc.submitTeamPlanning(TL, request("yao", "zie"));
         assertEquals(2, r.agentsPlanified());
         assertEquals(6, r.entriesCreated());
         assertTrue(saved.stream().allMatch(s -> "APPROVED".equals(s.getApprovalStatus()) && "TEAM_LEADER".equals(s.getOrigin())));
@@ -67,19 +67,21 @@ class TeamLeaderPlanningTest {
         verify(roles, never()).findByRoleNameIgnoreCase("EXCELLIAM");   // Excelliam n'est pas sollicité
     }
 
+    /** Plannings envoyés à Excelliam avant la suppression de son portail : le Team Leader les publie lui-même. */
     @Test
-    void sendingToExcelliamKeepsTheValidationFlow() {
-        svc.submitTeamPlanning(TL, request(true, "yao"));
-        assertTrue(saved.stream().allMatch(s -> "PENDING".equals(s.getApprovalStatus())));
-        verify(roles).findByRoleNameIgnoreCase("EXCELLIAM");
-        saved.clear();
-        svc.submitTeamPlanning(TL, request(null, "yao"));               // ancien appel sans l'option : comme avant
-        assertTrue(saved.stream().allMatch(s -> "PENDING".equals(s.getApprovalStatus())));
+    void plansLeftWaitingForExcelliamArePublishedByTheTeamLeader() {
+        User yao = users.findFirstByUsernameIgnoreCase("yao").orElseThrow();
+        AgentSchedule pending = AgentSchedule.builder().user(yao).workDate(LocalDate.of(2026, 10, 1)).build();
+        pending.setApprovalStatus("PENDING");
+        pending.setOrigin("TEAM_LEADER");
+        when(schedules.findByWorkDateBetween(any(), any())).thenReturn(List.of(pending));
+        assertEquals(1, svc.publishTeamPlanning(TL, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31)));
+        assertEquals("APPROVED", pending.getApprovalStatus());
     }
 
     @Test
     void agentsOfAnotherTeamAreRefused() {
-        ApiException e = assertThrows(ApiException.class, () -> svc.submitTeamPlanning(TL, request(false, "ama")));
+        ApiException e = assertThrows(ApiException.class, () -> svc.submitTeamPlanning(TL, request("ama")));
         assertTrue(e.getMessage().contains("n'appartient pas à votre équipe"));
     }
 }

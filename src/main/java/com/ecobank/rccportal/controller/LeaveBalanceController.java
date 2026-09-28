@@ -62,7 +62,7 @@ public class LeaveBalanceController {
                     .orElse(null);
             if (ledTeam == null || ledTeam.isBlank()) return List.of();
             return service.getAllBalances(year).stream()
-                    .filter(b -> ledTeam.equalsIgnoreCase(b.team()))
+                    .filter(b -> com.ecobank.rccportal.util.TeamClassifier.matchesTeam(ledTeam, b.team()))
                     .toList();
         }
 

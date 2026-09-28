@@ -1,7 +1,5 @@
-/* Portail Excelliam — même système que hr-portal.css (.hr-card, .hr-kpi, .team-tile, etc.),
-   teinte violette distinctive (cohérente avec .badge-level.excelliam déjà utilisé ailleurs
-   dans le portail, #A78BFA) pour que le prestataire distingue son espace au premier coup d'œil
-   sans jamais douter d'être dans le bon portail. */
+/* Constructeur de planning (onglet Planning du portail Team Leader) — barre de période, choix des
+   shifts, légende et récapitulatif. Repris de l'ancien portail Excelliam (supprimé). */
 :root{--exc-purple:#7C3AED;--exc-purple-light:#A78BFA}
 
 .exc-hero{background:linear-gradient(120deg,#2b1054,#5b21b6 55%,#7c3aed)}

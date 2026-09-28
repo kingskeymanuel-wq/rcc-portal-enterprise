@@ -133,9 +133,8 @@ public class QualityEvaluationService {
         var team = com.ecobank.rccportal.util.TeamClassifier.classify(agent.getActivity());
         if (team == com.ecobank.rccportal.util.TeamClassifier.Team.OTHER) return;
 
-        User teamLeader = userRepository.findAll().stream()
-                .filter(u -> team.name().equalsIgnoreCase(u.getLedTeam()) && hasRole(u, "team_leader"))
-                .findFirst().orElse(null);
+        User teamLeader = com.ecobank.rccportal.util.TeamClassifier.leaderFor(agent.getActivity(),
+                userRepository.findAll().stream().filter(u -> u.getLedTeam() != null && hasRole(u, "team_leader")).toList(), User::getLedTeam);
         if (teamLeader == null) return;
 
         String evaluatorLabel = evaluator != null ? (evaluator.getName() != null ? evaluator.getName() : evaluator.getUsername()) : "QA";

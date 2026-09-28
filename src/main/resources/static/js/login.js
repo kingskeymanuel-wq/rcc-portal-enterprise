@@ -33,7 +33,6 @@ function networkErrorMessage(error) {
   }
   return "Erreur de la page de connexion (" + (msg || "inconnue") + "). Rechargez la page avec Ctrl+F5.";
 }
-let excelliamPasswordModal = null;
 
 /* ==========================================================
    ELEMENTS
@@ -66,18 +65,6 @@ const otpButton =
 const otpError =
     document.getElementById("otp-error");
 
-const excelliamNewPassword =
-    document.getElementById("excelliam-new-password");
-
-const excelliamConfirmPassword =
-    document.getElementById("excelliam-confirm-password");
-
-const excelliamPasswordButton =
-    document.getElementById("excelliam-password-submit");
-
-const excelliamPasswordError =
-    document.getElementById("excelliam-password-error");
-
 /* ==========================================================
    INITIALISATION
 ========================================================== */
@@ -91,16 +78,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     otpModal =
         new bootstrap.Modal(modalElement);
-
-  }
-
-  const excelliamModalElement =
-      document.getElementById("excelliamPasswordModal");
-
-  if (excelliamModalElement) {
-
-    excelliamPasswordModal =
-        new bootstrap.Modal(excelliamModalElement);
 
   }
 
@@ -167,22 +144,6 @@ function hideOtpError() {
   otpError.textContent = "";
 
   otpError.classList.remove("show");
-
-}
-
-function showExcelliamPasswordError(message) {
-
-  excelliamPasswordError.textContent = message;
-
-  excelliamPasswordError.classList.add("show");
-
-}
-
-function hideExcelliamPasswordError() {
-
-  excelliamPasswordError.textContent = "";
-
-  excelliamPasswordError.classList.remove("show");
 
 }
 
@@ -370,17 +331,7 @@ loginForm.addEventListener("submit", async function (event) {
      * LoginChallengeResponse
      */
 
-    // Compte EXCELLIAM reconnu mais sans mot de passe encore défini (première connexion, ou
-    // après réinitialisation par un admin) — propose l'écran de création plutôt qu'une erreur.
-    if (data.requiresPasswordSetup) {
-
-      showExcelliamPasswordModal();
-
-      return;
-
-    }
-
-    // Compte EXCELLIAM (prestataire externe, pas de MFA possible — voir AuthService.initiateLogin) :
+    // Session ouverte sans MFA (compte de test — voir AuthService.initiateLogin) :
     // le cookie de session est déjà posé côté serveur dans cette même réponse, rien à faire ici
     // d'autre que rediriger — jamais d'écran OTP affiché pour ce cas.
     if (!data.twoFactorRequired && data.session) {
@@ -711,98 +662,6 @@ function escapeHtmlLogin(s) {
     return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
   });
 }
-
-/* ==========================================================
-   EXCELLIAM — création du mot de passe à la première connexion
-========================================================== */
-
-function showExcelliamPasswordModal() {
-
-  excelliamNewPassword.value = "";
-  excelliamConfirmPassword.value = "";
-  hideExcelliamPasswordError();
-
-  if (excelliamPasswordModal) {
-    excelliamPasswordModal.show();
-  }
-
-  excelliamNewPassword.focus();
-
-}
-
-excelliamPasswordButton.addEventListener("click", async () => {
-
-  hideExcelliamPasswordError();
-
-  const newPwd = excelliamNewPassword.value;
-  const confirmPwd = excelliamConfirmPassword.value;
-
-  if (!newPwd || newPwd.length < 8) {
-    showExcelliamPasswordError("Le mot de passe doit contenir au moins 8 caractères.");
-    return;
-  }
-
-  if (newPwd !== confirmPwd) {
-    showExcelliamPasswordError("Les deux mots de passe ne correspondent pas.");
-    return;
-  }
-
-  excelliamPasswordButton.disabled = true;
-
-  try {
-
-    const response = await fetchWithTimeout(
-        API + "/excelliam/set-password",
-        {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: username.value.trim(),
-            newPassword: newPwd
-          })
-        },
-        showExcelliamPasswordError
-    );
-
-    const data = await parseJsonSafe(response);
-
-    excelliamPasswordButton.disabled = false;
-
-    if (!response.ok) {
-      showExcelliamPasswordError(data.message || "Impossible de créer le mot de passe.");
-      return;
-    }
-
-    if (excelliamPasswordModal) {
-      excelliamPasswordModal.hide();
-    }
-
-    // Mot de passe créé — on relance directement la connexion avec ce même mot de passe,
-    // plutôt que de forcer l'utilisateur à retaper son username/mot de passe une seconde fois.
-    password.value = newPwd;
-    loginForm.dispatchEvent(new Event("submit", { cancelable: true }));
-
-  } catch (error) {
-
-    excelliamPasswordButton.disabled = false;
-    console.error(error);
-
-    if (error && error.name === "AbortError") {
-
-      showExcelliamPasswordError(
-          "Le serveur met trop de temps à répondre. Réessayez dans un instant."
-      );
-
-    } else {
-
-      showExcelliamPasswordError(networkErrorMessage(error));
-
-    }
-
-  }
-
-});
 
 /* ==========================================================
    DEBUG

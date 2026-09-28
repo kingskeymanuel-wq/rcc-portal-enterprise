@@ -35,7 +35,10 @@ public class TeamLeaderController {
     @GetMapping("/my-team")
     public java.util.Map<String, String> myTeam(@AuthenticationPrincipal AuthenticatedUser requester) {
         requireTeamLeaderOrAdmin(requester);
-        return java.util.Map.of("team", teamLeaderService.requireLedTeam(requester).name());
+        // team : pôle du reporting (INBOUND_MAIL pour Tchat / Rafiki) ; channel : canal mené, vide pour une équipe entière.
+        String channel = teamLeaderService.ledChannel(requester);
+        return java.util.Map.of("team", teamLeaderService.requireLedTeam(requester).name(), "channel", channel == null ? "" : channel,
+                "ledTeam", teamLeaderService.ledTeamCode(requester));
     }
 
     @GetMapping("/members")
@@ -106,6 +109,11 @@ public class TeamLeaderController {
         requireTeamLeaderOrAdmin(requester);
         YearMonth target = (month != null && !month.isBlank()) ? YearMonth.parse(month) : YearMonth.now();
         var team = teamLeaderService.requireLedTeam(requester);
-        return alertEngineService.listForMonthAndTeam(target, team);
+        List<PerformanceAlertResponse> alerts = alertEngineService.listForMonthAndTeam(target, team);
+        if (teamLeaderService.ledChannel(requester) == null) return alerts;
+        // Team Leader Tchat / Rafiki : seulement les alertes de ses agents.
+        java.util.Set<Long> ids = teamLeaderService.teamMembers(requester).stream()
+                .map(u -> u.id() == null ? null : u.id().longValue()).filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+        return alerts.stream().filter(a -> a.userId() != null && ids.contains(a.userId())).toList();
     }
 }

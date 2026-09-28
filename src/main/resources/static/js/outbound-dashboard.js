@@ -1334,6 +1334,10 @@
         if (window.RccSession) {
             window.RccSession.init().then(function (session) {
                 if (!session) return;
+                if (session.profile === "AGENT" && window.RccAgentLive) {
+                    document.getElementById("agentLive").style.display = "";
+                    RccAgentLive.mount(document.getElementById("agentLive"));
+                }
                 var isAdmin = session.profile === "ADMIN";
                 var isQa = session.profile === "QA";
                 var isSupervisor = session.profile === "SUPERVISOR";

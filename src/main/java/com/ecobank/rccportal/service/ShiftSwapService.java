@@ -198,7 +198,7 @@ public class ShiftSwapService {
         User teamLeader = findUser(teamLeaderUsername);
 
         String requesterTeam = entity.getRequester().getActivity();
-        if (teamLeader.getLedTeam() == null || !teamLeader.getLedTeam().equalsIgnoreCase(requesterTeam)) {
+        if (teamLeader.getLedTeam() == null || !com.ecobank.rccportal.util.TeamClassifier.matchesTeam(teamLeader.getLedTeam(), requesterTeam)) {
             throw ApiException.forbidden("Cette permutation concerne une équipe que vous ne dirigez pas.");
         }
         if (!"PENDING".equals(entity.getTeamLeaderStatus())) {
@@ -282,7 +282,7 @@ public class ShiftSwapService {
         User teamLeader = findUser(teamLeaderUsername);
         if (teamLeader.getLedTeam() == null || teamLeader.getLedTeam().isBlank()) return List.of();
         return shiftSwapRequestRepository.findByTeamLeaderStatusOrderByCreatedAtAsc("PENDING").stream()
-                .filter(s -> teamLeader.getLedTeam().equalsIgnoreCase(s.getRequester().getActivity()))
+                .filter(s -> com.ecobank.rccportal.util.TeamClassifier.matchesTeam(teamLeader.getLedTeam(), s.getRequester().getActivity()))
                 .map(this::toResponse)
                 .toList();
     }
@@ -298,7 +298,7 @@ public class ShiftSwapService {
         if (teamLeader.getLedTeam() == null || teamLeader.getLedTeam().isBlank()) return List.of();
         return shiftSwapRequestRepository.findAll(org.springframework.data.domain.Sort.by(
                         org.springframework.data.domain.Sort.Direction.DESC, "createdAt")).stream()
-                .filter(s -> teamLeader.getLedTeam().equalsIgnoreCase(s.getRequester().getActivity()))
+                .filter(s -> com.ecobank.rccportal.util.TeamClassifier.matchesTeam(teamLeader.getLedTeam(), s.getRequester().getActivity()))
                 .map(this::toResponse)
                 .toList();
     }
@@ -323,11 +323,8 @@ public class ShiftSwapService {
 
     private User findTeamLeaderForTeam(String team) {
         if (team == null || team.isBlank()) return null;
-        return userRoleRepository.findByRoleNameIgnoreCase("TEAM_LEADER").stream()
-                .map(UserRole::getUser)
-                .filter(u -> u.getLedTeam() != null && u.getLedTeam().equalsIgnoreCase(team))
-                .findFirst()
-                .orElse(null);
+        return com.ecobank.rccportal.util.TeamClassifier.leaderFor(team, userRoleRepository.findByRoleNameIgnoreCase("TEAM_LEADER").stream()
+                .map(UserRole::getUser).distinct().toList(), User::getLedTeam);
     }
 
     private String labelFor(User u) {

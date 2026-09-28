@@ -261,46 +261,12 @@ public class AuthService {
             );
         }
 
-        // -------------------------------------------------
-        // ⚠ COMPTE EXCELLIAM — pas de MFA, aucun compte AD Ecobank
-        // -------------------------------------------------
-        // Le prestataire Excelliam n'existe pas dans l'Active Directory Ecobank : la gateway
-        // MFA (conçue pour les employés Ecobank) ne peut donc jamais lui envoyer de code. On
-        // authentifie directement ici (mot de passe hashé local, voir User.password) et on
-        // ouvre la session tout de suite — jamais de ChallengeService.create() pour ce rôle.
+        // Le portail Excelliam (prestataire planning) a été supprimé : ses comptes n'ont plus d'accès au RCC Portal.
         User excelliamUser = userRepository.findFirstByUsernameIgnoreCase(normalizedUsername).orElse(null);
         if (excelliamUser != null && "excelliam".equalsIgnoreCase(getPrimaryRole(excelliamUser))) {
-
-            // Le statut actif est vérifié EN PREMIER, avant même de révéler si un mot de passe
-            // existe déjà ou si celui saisi est correct — un compte Excelliam désactivé par
-            // l'admin (exigence sécurité explicite : accès au portail Excelliam uniquement si
-            // actif en base) ne doit donner AUCUNE information supplémentaire, ni permettre de
-            // créer un mot de passe, ni tenter une connexion.
-            assertAccountUsable(excelliamUser);
-
-            if (excelliamUser.getPassword() == null || excelliamUser.getPassword().isBlank()) {
-                // Première connexion (ou mot de passe réinitialisé par un admin) — aucun mot de
-                // passe local encore défini. Le frontend doit proposer l'écran de création,
-                // jamais un message "identifiants incorrects" qui n'aiderait pas l'utilisateur.
-                log.info("[EXCELLIAM] Password setup required for username={}", normalizedUsername);
-                return new LoginChallengeResponse(null, null, false, null, true);
-            }
-
-            if (!passwordEncoder.matches(password, excelliamUser.getPassword())) {
-                log.warn("[EXCELLIAM] Invalid password for username={}", normalizedUsername);
-                registerFailedAttempt(excelliamUser);
-                throw ApiException.unauthorized("invalid_credentials", "Incorrect username or password.");
-            }
-
-            log.warn("[EXCELLIAM] Authentication without MFA (username={}) — external provider, not in Ecobank AD", normalizedUsername);
-
-            excelliamUser.setFailedAttempts(0);
-            excelliamUser.setAccountLocked(false);
-            userRepository.save(excelliamUser);
-            recordLoginEvent(excelliamUser, "login_success");
-
-            SessionTokens tokens = issueSession(excelliamUser, null);
-            return new LoginChallengeResponse(null, null, false, tokens, false);
+            log.warn("[EXCELLIAM] Connexion refusée (portail supprimé) username={}", normalizedUsername);
+            throw ApiException.forbidden("portal_removed",
+                    "Le portail Excelliam a été supprimé : ce compte n'a plus d'accès au RCC Portal. Contactez l'administrateur.");
         }
 
         TestBypassProperties.Account bypassAccount = findBypassAccount(normalizedUsername);
@@ -616,78 +582,6 @@ public class AuthService {
     private void cleanupExpiredPendingLogins() {
         pendingLogins.values().removeIf(PendingLogin::isExpired);
     }
-
-    // =========================================================
-    // EXCELLIAM — création du mot de passe à la première connexion
-    // =========================================================
-
-    /** Longueur minimale imposée pour un mot de passe Excelliam créé par l'utilisateur —
-     *  ces comptes n'ont aucune politique de mot de passe imposée par l'AD Ecobank (ils n'y
-     *  sont pas), donc le portail doit appliquer sa propre exigence minimale. */
-    private static final int EXCELLIAM_MIN_PASSWORD_LENGTH = 8;
-
-    /**
-     * Crée le mot de passe d'un compte EXCELLIAM lors de sa toute première connexion —
-     * jamais utilisable pour CHANGER un mot de passe déjà défini (voir le contrôle
-     * password == null ci-dessous) : une vraie réinitialisation reste une action admin
-     * distincte (désactiver puis réactiver le compte remet le champ à null côté admin —
-     * voir requestExcelliamPasswordReset ci-après), jamais un endpoint self-service qui
-     * accepterait n'importe qui connaissant juste le username.
-     *
-     * Le statut actif est vérifié EN PREMIER, avant toute autre chose — même exigence de
-     * sécurité que initiateLogin() : un compte désactivé ne doit jamais pouvoir se créer un
-     * mot de passe, qu'il en ait déjà un ou non.
-     */
-    @Transactional
-    public void setExcelliamPassword(String username, String newPassword) {
-        String normalizedUsername = normalize(username);
-        if (normalizedUsername.isBlank()) {
-            throw ApiException.badRequest("Username is required.");
-        }
-        if (newPassword == null || newPassword.length() < EXCELLIAM_MIN_PASSWORD_LENGTH) {
-            throw ApiException.badRequest(
-                    "Le mot de passe doit contenir au moins " + EXCELLIAM_MIN_PASSWORD_LENGTH + " caractères.");
-        }
-
-        User user = userRepository.findFirstByUsernameIgnoreCase(normalizedUsername)
-                .orElseThrow(() -> ApiException.unauthorized("invalid_credentials", "Incorrect username or password."));
-
-        if (!"excelliam".equalsIgnoreCase(getPrimaryRole(user))) {
-            // Message volontairement identique au cas "compte inconnu" — ne jamais révéler
-            // qu'un username existe mais n'est pas Excelliam.
-            throw ApiException.unauthorized("invalid_credentials", "Incorrect username or password.");
-        }
-
-        assertAccountUsable(user);
-
-        if (user.getPassword() != null && !user.getPassword().isBlank()) {
-            throw ApiException.forbidden(
-                    "password_already_set",
-                    "Un mot de passe existe déjà pour ce compte. Contactez un administrateur pour le réinitialiser.");
-        }
-
-        user.setPassword(passwordEncoder.encode(newPassword));
-        userRepository.save(user);
-        log.warn("[EXCELLIAM] Password created at first login (username={})", normalizedUsername);
-    }
-
-    /** Réservé à un administrateur (vérifié côté controller) — remet le mot de passe d'un
-     *  compte EXCELLIAM à null, pour que la personne repasse par setExcelliamPassword() à sa
-     *  prochaine connexion (mot de passe oublié, ou rotation de sécurité demandée). Ne
-     *  fonctionne QUE sur un compte EXCELLIAM — jamais sur un compte AD Ecobank, dont le mot
-     *  de passe n'est de toute façon jamais stocké ici. */
-    @Transactional
-    public void requestExcelliamPasswordReset(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> ApiException.notFound("Unknown user."));
-        if (!"excelliam".equalsIgnoreCase(getPrimaryRole(user))) {
-            throw ApiException.badRequest("Cette action n'est possible que pour un compte Excelliam.");
-        }
-        user.setPassword(null);
-        userRepository.save(user);
-        log.warn("[EXCELLIAM] Password reset requested by admin (username={})", user.getUsername());
-    }
-
 
     // =========================================================
     // MODE BYPASS TEST
@@ -1041,6 +935,8 @@ public class AuthService {
                 put("TEAM_LEADER_INBOUND_VOICE", "TEAM_LEADER");
                 put("TEAM_LEADER_INBOUND_MAIL", "TEAM_LEADER");
                 put("TEAM_LEADER_OUTBOUND", "TEAM_LEADER");
+                put("TEAM_LEADER_TCHAT", "TEAM_LEADER");
+                put("TEAM_LEADER_RAFIKI", "TEAM_LEADER");
                 put("AGENT_INBOUND", "AGENT");
                 put("AGENT_OUTBOUND", "AGENT");
                 put("AGENT_TCHAT", "AGENT");

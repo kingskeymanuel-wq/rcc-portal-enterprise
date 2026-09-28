@@ -179,6 +179,8 @@ public class UserService {
                 put("TEAM_LEADER_INBOUND_VOICE", "/team-leader");
                 put("TEAM_LEADER_INBOUND_MAIL", "/team-leader");
                 put("TEAM_LEADER_OUTBOUND", "/team-leader");
+                put("TEAM_LEADER_TCHAT", "/team-leader");
+                put("TEAM_LEADER_RAFIKI", "/team-leader");
                 put("AGENT_OUTBOUND", "/outbound-dashboard");
                 put("AGENT_TCHAT", "/portail-tchat");
                 put("AGENT_RAFIKI", "/portail-rafiki");
@@ -271,8 +273,8 @@ public class UserService {
         if (request.residencePlace() != null) user.setResidencePlace(request.residencePlace().isBlank() ? null : request.residencePlace().trim());
         if (request.ledTeam() != null) {
             String lt = request.ledTeam().isBlank() ? null : request.ledTeam().trim().toUpperCase();
-            if (lt != null && !java.util.Set.of("INBOUND_VOICE", "INBOUND_MAIL", "CIB", "OUTBOUND").contains(lt)) {
-                throw ApiException.badRequest("ledTeam must be one of INBOUND_VOICE, INBOUND_MAIL, CIB, OUTBOUND.");
+            if (lt != null && !java.util.Set.of("INBOUND_VOICE", "INBOUND_MAIL", "TCHAT", "RAFIKI", "CIB", "OUTBOUND").contains(lt)) {
+                throw ApiException.badRequest("ledTeam must be one of INBOUND_VOICE, INBOUND_MAIL, TCHAT, RAFIKI, CIB, OUTBOUND.");
             }
             user.setLedTeam(lt);
         }
@@ -673,6 +675,8 @@ public class UserService {
                 put("TEAM_LEADER_INBOUND_VOICE", "TEAM_LEADER");
                 put("TEAM_LEADER_INBOUND_MAIL", "TEAM_LEADER");
                 put("TEAM_LEADER_OUTBOUND", "TEAM_LEADER");
+                put("TEAM_LEADER_TCHAT", "TEAM_LEADER");
+                put("TEAM_LEADER_RAFIKI", "TEAM_LEADER");
                 put("AGENT_INBOUND", "AGENT");
                 put("AGENT_OUTBOUND", "AGENT");
                 put("AGENT_TCHAT", "AGENT");

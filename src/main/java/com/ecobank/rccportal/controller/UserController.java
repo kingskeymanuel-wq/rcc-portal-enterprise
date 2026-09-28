@@ -119,16 +119,6 @@ public class UserController {
         return userService.revokeAllSessions(userId);
     }
 
-    /** Réservé à l'admin — remet à zéro le mot de passe d'un compte Excelliam (mot de passe
-     *  oublié, ou rotation de sécurité). La personne recrée son mot de passe à sa prochaine
-     *  connexion (voir AuthController.setExcelliamPassword). Ne fonctionne QUE sur un compte
-     *  Excelliam — voir AuthService.requestExcelliamPasswordReset. */
-    @PostMapping("/{userId}/excelliam-password-reset")
-    public java.util.Map<String, String> resetExcelliamPassword(@PathVariable Long userId, @AuthenticationPrincipal AuthenticatedUser requester) {
-        requireAdmin(requester);
-        authService.requestExcelliamPasswordReset(userId);
-        return java.util.Map.of("message", "Mot de passe réinitialisé — l'utilisateur devra en recréer un à sa prochaine connexion.");
-    }
 
     /**
      * Fiche détaillée d'un utilisateur : infos de base + rôles + services attribués,

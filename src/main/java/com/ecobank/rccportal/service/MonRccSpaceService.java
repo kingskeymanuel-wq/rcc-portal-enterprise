@@ -44,7 +44,7 @@ public class MonRccSpaceService {
             Map.entry("/dashboard", "Portail agent"), Map.entry("/portail-tchat", "Portail agent Tchat"), Map.entry("/portail-rafiki", "Portail agent Rafiki"),
             Map.entry("/outbound-dashboard", "Portail Outbound"), Map.entry("/team-leader", "Portail Team Leader"), Map.entry("/qa", "Portail Quality Assurance"),
             Map.entry("/qa-supervisor", "Portail Head QA"), Map.entry("/rh", "Portail RH"), Map.entry("/supervisor", "Portail Superviseur"),
-            Map.entry("/agence", "Portail Agence"), Map.entry("/excelliam", "Portail Excelliam"), Map.entry("/training", "Centre de formation"));
+            Map.entry("/agence", "Portail Agence"), Map.entry("/training", "Centre de formation"));
 
     private final UserRepository users;
     private final JdbcTemplate jdbc;
@@ -104,7 +104,6 @@ public class MonRccSpaceService {
             case "RH" -> "/rh";
             case "SUPERVISOR" -> "/supervisor";
             case "AGENCE" -> "/agence";
-            case "EXCELLIAM" -> "/excelliam";
             default -> "/dashboard";
         };
     }
@@ -155,7 +154,7 @@ public class MonRccSpaceService {
         switch (profile) {
             case "TEAM_LEADER" -> {
                 String led = self.ledTeam() == null ? classifierTeam : self.ledTeam().toUpperCase(Locale.ROOT);
-                add.accept(others.stream().filter(m -> m.isAgent() && led != null && led.equals(classifierOf(m.team()))).limit(40).toList(), "Mon équipe");
+                add.accept(others.stream().filter(m -> m.isAgent() && led != null && (led.equals(m.team()) || led.equals(classifierOf(m.team())))).limit(40).toList(), "Mon équipe");
                 add.accept(others.stream().filter(Member::isSupervisor).limit(3).toList(), "Superviseur");
                 add.accept(others.stream().filter(Member::isTeamLeader).limit(10).toList(), "Team Leaders");
                 add.accept(others.stream().filter(Member::isQa).limit(6).toList(), "Quality Assurance");
@@ -177,7 +176,9 @@ public class MonRccSpaceService {
             }
             case "AGENCE" -> add.accept(others.stream().filter(m -> m.isAgence() && Objects.equals(m.branch(), self.branch())).limit(30).toList(), "Mon agence");
             default -> {
-                add.accept(others.stream().filter(m -> m.isTeamLeader() && classifierTeam != null && classifierTeam.equalsIgnoreCase(m.ledTeam())).toList(), "Mon Team Leader");
+                // Team Leader de son canal (Tchat, Rafiki) d'abord, puis celui du pôle.
+                add.accept(others.stream().filter(m -> m.isTeamLeader() && self.team() != null && self.team().equalsIgnoreCase(m.ledTeam())).toList(), "Mon Team Leader");
+                if (out.isEmpty()) add.accept(others.stream().filter(m -> m.isTeamLeader() && classifierTeam != null && classifierTeam.equalsIgnoreCase(m.ledTeam())).toList(), "Mon Team Leader");
                 add.accept(others.stream().filter(m -> m.isAgent() && self.team() != null && self.team().equals(m.team())).limit(30).toList(), "Mon équipe");
                 add.accept(others.stream().filter(Member::isQa).limit(4).toList(), "Quality Assurance");
             }
@@ -274,7 +275,7 @@ public class MonRccSpaceService {
                 if (team != null) t.add(new Tile("bi-people", "Mon équipe", TEAM_LABELS.getOrDefault(team, team), mates + " agent(s)", portal, null));
             }
             case "TEAM_LEADER" -> {
-                long size = all.stream().filter(m -> m.active() && m.isAgent() && team != null && team.equals(classifierOf(m.team()))).count();
+                long size = all.stream().filter(m -> m.active() && m.isAgent() && team != null && (team.equals(m.team()) || team.equals(classifierOf(m.team())))).count();
                 t.add(new Tile("bi-people", "Mon équipe", String.valueOf(size), "agent(s) actif(s)", "/team-leader", null));
                 t.add(new Tile("bi-file-earmark-spreadsheet", "Performances hebdo", "Importer", "rapport de mon équipe", "/team-leader", null));
             }
