@@ -403,7 +403,7 @@
         getJson("/api/schedule/team?from=" + from + "&to=" + to).then(function (entries) {
             var mine = entries.filter(function (e) { return e.origin === "TEAM_LEADER"; });
             if (!mine.length) {
-                $("tlPlanStatusList").innerHTML = '<p class="text-muted small">Aucun planning envoyé par vous sur cette période.</p>';
+                $("tlPlanStatusList").innerHTML = '<p class="text-muted small">Aucun planning créé par vous sur cette période.</p>';
                 $("tlPlanPublishBtn").classList.add("d-none");
                 return;
             }
@@ -433,7 +433,8 @@
             });
         });
 
-        $("tlPlanSubmitBtn").addEventListener("click", function () {
+        // Deux façons de finaliser : publication directe, ou envoi (facultatif) à Excelliam pour validation.
+        function submitPlanning(sendToExcelliam) {
             var from = $("tlPlanFrom").value, to = $("tlPlanTo").value;
             var resultBox = $("tlPlanResult");
             if (!from || !to) { resultBox.className = "text-danger"; resultBox.textContent = "Choisissez une période."; return; }
@@ -445,24 +446,29 @@
                 assignments.push({ username: row.getAttribute("data-username"), shiftCode: row.querySelector(".tl-plan-shift").value });
             });
             if (!assignments.length) { resultBox.className = "text-danger"; resultBox.textContent = "Cochez au moins un agent."; return; }
+            if (!sendToExcelliam && !confirm("Publier ce planning maintenant ? Il sera immédiatement visible par les " + assignments.length + " agent(s) concerné(s), sans validation Excelliam.")) return;
 
             resultBox.className = "text-muted";
-            resultBox.textContent = "Envoi à Excelliam…";
+            resultBox.textContent = sendToExcelliam ? "Envoi à Excelliam…" : "Publication…";
             fetch("/api/schedule/team/submit", {
                 method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ periodFrom: from, periodTo: to, assignments: assignments })
+                body: JSON.stringify({ periodFrom: from, periodTo: to, assignments: assignments, sendToExcelliam: sendToExcelliam })
             })
                 .then(readImportResponse)
                 .then(function (result) {
                     resultBox.className = "text-success";
-                    resultBox.textContent = result.agentsPlanified + " agent(s) envoyé(s) à Excelliam (" + result.entriesCreated + " jour(s) au total).";
+                    resultBox.textContent = sendToExcelliam
+                        ? result.agentsPlanified + " agent(s) envoyé(s) à Excelliam (" + result.entriesCreated + " jour(s) au total)."
+                        : "Planning publié : " + result.agentsPlanified + " agent(s), " + result.entriesCreated + " jour(s) — en ligne et agents prévenus.";
                     loadPlanningStatus();
                 })
                 .catch(function (e) {
                     resultBox.className = "text-danger";
                     resultBox.textContent = "Erreur : " + e.message;
                 });
-        });
+        }
+        $("tlPlanSubmitBtn").addEventListener("click", function () { submitPlanning(true); });
+        $("tlPlanPublishDirectBtn").addEventListener("click", function () { submitPlanning(false); });
 
         $("tlPlanRefreshStatusBtn").addEventListener("click", loadPlanningStatus);
 

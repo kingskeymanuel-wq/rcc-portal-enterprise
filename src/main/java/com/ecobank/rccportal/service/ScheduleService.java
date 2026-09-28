@@ -755,8 +755,10 @@ public class ScheduleService {
     public com.ecobank.rccportal.dto.PlanifyShiftsResult submitTeamPlanning(
             com.ecobank.rccportal.security.AuthenticatedUser requester, com.ecobank.rccportal.dto.PlanifyShiftsRequest request) {
         if (!"team_leader".equalsIgnoreCase(requester.role())) {
-            throw ApiException.forbidden("Seul un Team Leader peut soumettre un planning à Excelliam.");
+            throw ApiException.forbidden("Seul un Team Leader peut créer le planning de son équipe.");
         }
+        // L'envoi à Excelliam est facultatif : sans envoi, le planning est publié directement.
+        boolean toExcelliam = request == null || !Boolean.FALSE.equals(request.sendToExcelliam());
         User teamLeader = userRepository.findFirstByUsernameIgnoreCase(requester.username())
                 .orElseThrow(() -> ApiException.unauthorized("Unknown user."));
         String ownTeam = teamLeader.getLedTeam();
@@ -775,6 +777,8 @@ public class ScheduleService {
 
         int agentsPlanified = 0, entriesCreated = 0;
         List<String> unknownUsernames = new ArrayList<>();
+        java.util.function.Predicate<User> inOwnTeam = teamMember(ownTeam);
+        List<User> plannedAgents = new ArrayList<>();
 
         for (com.ecobank.rccportal.dto.PlanifyShiftsRequest.AgentShiftAssignment a : request.assignments()) {
             if (a.username() == null || a.username().isBlank()) continue;
@@ -791,10 +795,11 @@ public class ScheduleService {
                 unknownUsernames.add(a.username());
                 continue;
             }
-            if (user.getActivity() == null || !ownTeam.equalsIgnoreCase(user.getActivity())) {
+            if (!inOwnTeam.test(user)) {
                 throw ApiException.forbidden("L'agent \"" + a.username() + "\" n'appartient pas à votre équipe (" + ownTeam + ").");
             }
             agentsPlanified++;
+            plannedAgents.add(user);
 
             for (LocalDate d = request.periodFrom(); !d.isAfter(request.periodTo()); d = d.plusDays(1)) {
                 final User scheduleUser = user;
@@ -806,12 +811,24 @@ public class ScheduleService {
                 schedule.setPlannedStartTime(isOff ? null : def.start());
                 schedule.setPlannedEndTime(isOff ? null : def.end());
                 schedule.setOvernightCrossesMidnight(!isOff && def.overnight());
-                schedule.setApprovalStatus("PENDING");
+                schedule.setApprovalStatus(toExcelliam ? "PENDING" : "APPROVED");
                 schedule.setRejectionReason(null);
                 schedule.setOrigin("TEAM_LEADER");
                 agentScheduleRepository.save(schedule);
                 entriesCreated++;
             }
+        }
+
+        if (!toExcelliam) {
+            // Publication directe : en ligne tout de suite (planning agent, retards, reporting) ; chaque agent est prévenu.
+            String who = teamLeader.getName() != null && !teamLeader.getName().isBlank() ? teamLeader.getName() : teamLeader.getUsername();
+            String msg = "📅 Votre planning du " + request.periodFrom().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                    + " au " + request.periodTo().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + " a été publié par " + who + ".";
+            for (User agent : plannedAgents) {
+                notificationRepository.save(com.ecobank.rccportal.model.RccNotification.builder()
+                        .targetUser(agent).content(msg).isRead(false).build());
+            }
+            return new com.ecobank.rccportal.dto.PlanifyShiftsResult(agentsPlanified, entriesCreated, unknownUsernames);
         }
 
         String content = "Le Team Leader de l'équipe " + ownTeam + " a soumis un nouveau planning à valider ("
@@ -847,10 +864,11 @@ public class ScheduleService {
             throw ApiException.badRequest("Un motif est requis pour refuser un planning.");
         }
 
+        java.util.function.Predicate<User> inTeam = teamMember(team);
         List<AgentSchedule> pending = agentScheduleRepository.findByWorkDateBetween(from, to).stream()
                 .filter(s -> "PENDING".equals(s.getApprovalStatus()))
                 .filter(s -> "TEAM_LEADER".equals(s.getOrigin()))
-                .filter(s -> team.equalsIgnoreCase(s.getUser().getActivity()))
+                .filter(s -> inTeam.test(s.getUser()))
                 .toList();
         if (pending.isEmpty()) {
             throw ApiException.badRequest("Aucun planning soumis par le Team Leader en attente pour cette équipe sur cette période.");
@@ -892,10 +910,11 @@ public class ScheduleService {
             throw ApiException.forbidden("Vous ne dirigez aucune équipe.");
         }
 
+        java.util.function.Predicate<User> inOwnTeam = teamMember(ownTeam);
         List<AgentSchedule> validated = agentScheduleRepository.findByWorkDateBetween(from, to).stream()
                 .filter(s -> "VALIDATED".equals(s.getApprovalStatus()))
                 .filter(s -> "TEAM_LEADER".equals(s.getOrigin()))
-                .filter(s -> ownTeam.equalsIgnoreCase(s.getUser().getActivity()))
+                .filter(s -> inOwnTeam.test(s.getUser()))
                 .toList();
         if (validated.isEmpty()) {
             throw ApiException.badRequest("Aucun planning validé par Excelliam en attente de mise à jour pour votre équipe sur cette période.");
@@ -905,6 +924,28 @@ public class ScheduleService {
             agentScheduleRepository.save(s);
         }
         return validated.size();
+    }
+
+    /**
+     * L'agent appartient-il à l'équipe (code INBOUND_VOICE, INBOUND_MAIL, CIB, OUTBOUND) ?
+     * Le champ Activité est libre (« INBOUND VOICE », « Conseiller Inbound »…) et parfois vide :
+     * même reconnaissance que le reste du portail (Activité, sinon services attribués).
+     * Résultat mis en cache par appel (une requête par agent, pas par jour de planning).
+     */
+    private java.util.function.Predicate<User> teamMember(String team) {
+        Map<Long, Boolean> cache = new HashMap<>();
+        String wanted = team == null ? "" : team.trim().toUpperCase().replace(' ', '_');
+        return u -> {
+            if (u == null || wanted.isEmpty()) return false;
+            if (team.equalsIgnoreCase(u.getActivity())) return true;
+            return cache.computeIfAbsent(u.getId(), id -> {
+                List<String> codes = userServiceAssignmentRepository.findServicesByUserId(id).stream()
+                        .filter(a -> a.getService() != null && a.getService().getCode() != null)
+                        .map(a -> a.getService().getCode()).toList();
+                com.ecobank.rccportal.util.TeamClassifier.Team t = com.ecobank.rccportal.util.TeamClassifier.classify(u.getActivity(), codes);
+                return t != com.ecobank.rccportal.util.TeamClassifier.Team.OTHER && t.name().equals(wanted);
+            });
+        };
     }
 
     /** Team Leader dont User.ledTeam correspond à l'équipe donnée — même logique que

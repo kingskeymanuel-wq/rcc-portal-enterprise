@@ -212,7 +212,7 @@
 
                         <!-- ===================== PLANNING (comme Excelliam, avec envoi pour validation) ===================== -->
                         <div id="tlPanePlanning" class="card-body" style="display:none;">
-                            <p class="text-muted small mb-2"><i class="bi bi-info-circle"></i> Construisez le planning de votre équipe comme le fait Excelliam, envoyez-le pour validation, puis cliquez "Mise à jour" une fois validé pour le rendre effectif pour tout le monde.</p>
+                            <p class="text-muted small mb-2"><i class="bi bi-info-circle"></i> Construisez le planning de votre équipe, puis <b>publiez-le directement</b> (en ligne tout de suite, les agents sont prévenus) <b>ou</b>, si vous le souhaitez, envoyez-le à Excelliam pour validation — dans ce cas, cliquez "Mise à jour" une fois validé.</p>
 
                             <div class="exc-shift-legend mb-2">
                                 <span class="exc-shift-chip"><span class="dot"></span> 07h–16h (M)</span>
@@ -241,8 +241,10 @@
                                 <span id="tlPlanResult" class="text-muted"></span>
                             </div>
 
-                            <div class="d-flex justify-content-end gap-2 mt-2">
-                                <button type="button" class="btn btn-outline-primary" id="tlPlanSubmitBtn"><i class="bi bi-send-fill"></i> Envoyer à Excelliam</button>
+                            <div class="d-flex justify-content-end align-items-center gap-2 mt-2 flex-wrap">
+                                <small class="text-muted me-auto"><i class="bi bi-info-circle"></i> L'envoi à Excelliam est facultatif.</small>
+                                <button type="button" class="btn btn-outline-primary" id="tlPlanSubmitBtn"><i class="bi bi-send-fill"></i> Envoyer à Excelliam pour validation</button>
+                                <button type="button" class="btn btn-primary" id="tlPlanPublishDirectBtn"><i class="bi bi-lightning-charge-fill"></i> Publier directement</button>
                             </div>
 
                             <hr>

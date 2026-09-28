@@ -13,8 +13,16 @@ import java.util.List;
 public record PlanifyShiftsRequest(
         LocalDate periodFrom,
         LocalDate periodTo,
-        List<AgentShiftAssignment> assignments
+        List<AgentShiftAssignment> assignments,
+        /* Planning d'un Team Leader : true = envoi à Excelliam pour validation (flux historique),
+           false = publication directe, le planning est en ligne tout de suite. Null = true
+           (compatibilité des anciens appels). */
+        Boolean sendToExcelliam
 ) {
+    public PlanifyShiftsRequest(LocalDate periodFrom, LocalDate periodTo, List<AgentShiftAssignment> assignments) {
+        this(periodFrom, periodTo, assignments, null);
+    }
+
     /** shiftCode doit être un des 4 shifts fixes de ScheduleService.FIXED_SHIFTS ("M","M2","A","N"),
      *  ou "OFF" pour retirer un agent du planning de cette période sans lui assigner d'horaire. */
     public record AgentShiftAssignment(String username, String shiftCode) {
