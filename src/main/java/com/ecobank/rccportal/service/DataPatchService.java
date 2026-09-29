@@ -34,11 +34,17 @@ public class DataPatchService {
     /** Planning Team Inbound Voix d'octobre 2026, agents Inbound Voix, Team Leaders, libellé « Réseaux sociaux ». */
     public static final String INBOUND_VOIX_2026_10 = "INBOUND_VOIX_2026_10";
 
+    /** TEAM_ASSIGNMENT_LOCKED à True pour tous les comptes, et True par défaut en base pour les comptes à venir. */
+    public static final String TEAM_ASSIGNMENT_LOCKED_TRUE = "TEAM_ASSIGNMENT_LOCKED_TRUE";
+
     public static final List<Patch> PATCHES = List.of(new Patch(INBOUND_VOIX_2026_10,
             "Team Inbound Voix — planning d'octobre 2026 et rôles",
             "Planning d'octobre 2026 des 32 agents Inbound Voix (fichier Exceliam) ; chacun reçoit le rôle « Agent Inbound Voice », "
                     + "le service Agent Inbound et l'équipe Inbound Voix, sans aucun accès Team Leader. Team Leaders : KOUAO Noël et "
-                    + "FOUANGOUP Angèle (Inbound Voix), LOUM Olivia (Inbound Mail). Le canal Tchat devient « Réseaux sociaux »."));
+                    + "FOUANGOUP Angèle (Inbound Voix), LOUM Olivia (Inbound Mail). Le canal Tchat devient « Réseaux sociaux »."),
+            new Patch(TEAM_ASSIGNMENT_LOCKED_TRUE, "TEAM_ASSIGNMENT_LOCKED = True pour tous",
+                    "Met la colonne TEAM_ASSIGNMENT_LOCKED de dbo.USERS à True sur tous les comptes, et sa valeur par défaut en base "
+                            + "à True : tout nouveau compte (portail, import, connexion AD, ou ajout direct en SQL) est créé à True."));
 
     static final String PLANNING_FILE = "data/planning/inbound-voix-2026-10.csv";
     static final String AGENT_ROLE = "Agent Inbound Voice";
@@ -98,6 +104,7 @@ public class DataPatchService {
         ensureTable();
         String result = switch (code) {
             case INBOUND_VOIX_2026_10 -> inboundVoix(by);
+            case TEAM_ASSIGNMENT_LOCKED_TRUE -> teamAssignmentLockedTrue();
             default -> throw com.ecobank.rccportal.util.ApiException.notFound("Correctif inconnu : " + code);
         };
         jdbc.update("""
@@ -109,6 +116,21 @@ public class DataPatchService {
         auditLogService.record(by, "DATA_PATCH", code + " — " + summary);
         log.warn("[DATA PATCH] {} appliqué :\n{}", code, result);
         return result;
+    }
+
+    // ───────────── TEAM_ASSIGNMENT_LOCKED = True ─────────────
+
+    String teamAssignmentLockedTrue() {
+        int n = jdbc.update("UPDATE dbo.USERS SET TEAM_ASSIGNMENT_LOCKED = 1 WHERE TEAM_ASSIGNMENT_LOCKED = 0 OR TEAM_ASSIGNMENT_LOCKED IS NULL");
+        // Valeur par défaut de la colonne : l'ancienne contrainte (DEFAULT 0) est remplacée par DEFAULT 1.
+        jdbc.execute("""
+                DECLARE @c SYSNAME = (SELECT dc.name FROM sys.default_constraints dc
+                    JOIN sys.columns col ON col.object_id = dc.parent_object_id AND col.column_id = dc.parent_column_id
+                    WHERE dc.parent_object_id = OBJECT_ID('dbo.USERS') AND col.name = 'TEAM_ASSIGNMENT_LOCKED');
+                IF @c IS NOT NULL EXEC('ALTER TABLE dbo.USERS DROP CONSTRAINT [' + @c + ']');
+                ALTER TABLE dbo.USERS ADD CONSTRAINT DF_USERS_TEAM_ASSIGNMENT_LOCKED DEFAULT 1 FOR TEAM_ASSIGNMENT_LOCKED;""");
+        Integer total = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.USERS", Integer.class);
+        return n + " compte(s) passé(s) à True (" + total + " compte(s) au total, tous à True). Valeur par défaut en base : True.";
     }
 
     // ───────────── Team Inbound Voix — octobre 2026 ─────────────

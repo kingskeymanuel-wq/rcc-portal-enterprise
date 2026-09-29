@@ -317,7 +317,7 @@ public class AdminDataService {
                     in.putIfAbsent("ACCOUNT_EXPIRED", false);
                     in.putIfAbsent("CREDENTIALS_EXPIRED", false);
                     in.putIfAbsent("FAILED_ATTEMPTS", 0);
-                    in.putIfAbsent("TEAM_ASSIGNMENT_LOCKED", false);
+                    in.putIfAbsent("TEAM_ASSIGNMENT_LOCKED", true);
                     return insertRow(t, in, true, by);
                 }
                 default -> {

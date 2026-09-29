@@ -512,7 +512,7 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         addColumnIfMissing("USERS", "ACTIVITY", "ALTER TABLE dbo.USERS ADD ACTIVITY NVARCHAR(100) NULL");
         addColumnIfMissing("USERS", "RESIDENCE_PLACE", "ALTER TABLE dbo.USERS ADD RESIDENCE_PLACE NVARCHAR(200) NULL");
         addColumnIfMissing("USERS", "LED_TEAM", "ALTER TABLE dbo.USERS ADD LED_TEAM NVARCHAR(30) NULL");
-        addColumnIfMissing("USERS", "TEAM_ASSIGNMENT_LOCKED", "ALTER TABLE dbo.USERS ADD TEAM_ASSIGNMENT_LOCKED BIT NOT NULL DEFAULT 0");
+        addColumnIfMissing("USERS", "TEAM_ASSIGNMENT_LOCKED", "ALTER TABLE dbo.USERS ADD TEAM_ASSIGNMENT_LOCKED BIT NOT NULL CONSTRAINT DF_USERS_TEAM_ASSIGNMENT_LOCKED DEFAULT 1");
         // Les comptes de test/démo (agent.conseiller, agent.qa, agent.admin, it.admin, rh.test)
         // existaient avant cette fonctionnalité — ils sont exemptés explicitement à CHAQUE
         // démarrage, sans dépendre d'une condition qui peut cesser d'être vraie (l'ancien
