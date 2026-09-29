@@ -288,6 +288,7 @@
     function loadMembers() {
         getJson("/api/team-leader/members/full").then(function (members) {
             var container = $("tlMembersList");
+            if ($("tlMembersCount")) $("tlMembersCount").textContent = members.length;
             if (!members.length) { container.innerHTML = '<p class="text-muted text-center">Aucun agent dans cette équipe.</p>'; return; }
             container.innerHTML = members.map(function (u, idx) {
                 var statusBadge = u.active ? '<span class="badge bg-success">Actif</span>' : '<span class="badge bg-secondary">Inactif</span>';
@@ -322,18 +323,71 @@
         });
     }
 
-    /** Retrait d'un agent — demande d'abord confirmation, puis distingue démission (désactive
-     *  aussi le compte, visible immédiatement RH/Superviseur/Reporting) d'un simple changement
-     *  d'équipe (le compte reste actif, juste sorti de ma liste). */
+    /** Message d'erreur lisible (le serveur renvoie { error: { message } }). */
+    function errorOf(res) {
+        return res.text().then(function (t) {
+            var msg = t;
+            try { var p = JSON.parse(t); if (p && p.error && p.error.message) msg = p.error.message; } catch (e) { /* texte brut */ }
+            return Promise.reject(new Error(msg || "HTTP " + res.status));
+        });
+    }
+
+    /** Retrait d'un agent : changement d'équipe (compte actif) ou sortie du centre (motif, compte désactivé, tracé au RH). */
+    var removeMemberModal = null, removeTarget = null;
     function removeMemberFlow(userId, name) {
-        if (!confirm("Retirer " + name + " de votre équipe ?")) return;
-        var resigned = confirm("Est-ce une démission ? (le compte sera aussi désactivé — OK = oui, Annuler = non, simple changement d'équipe)");
-        fetch("/api/team-leader/members/" + userId + "?resigned=" + resigned, { method: "DELETE", credentials: "same-origin" })
+        removeTarget = userId;
+        $("tlRemoveMemberName").textContent = name;
+        document.querySelector('input[name="tlRemoveMode"][value="TRANSFER"]').checked = true;
+        $("tlRemoveDepartureFields").style.display = "none";
+        $("tlRemoveComment").value = "";
+        $("tlRemoveError").textContent = "";
+        if (!removeMemberModal) removeMemberModal = new bootstrap.Modal($("tlRemoveMemberModal"));
+        removeMemberModal.show();
+    }
+
+    function wireRemoveMember() {
+        Array.prototype.forEach.call(document.querySelectorAll('input[name="tlRemoveMode"]'), function (r) {
+            r.addEventListener("change", function () {
+                $("tlRemoveDepartureFields").style.display = this.value === "DEPARTURE" && this.checked ? "" : "none";
+            });
+        });
+        $("tlRemoveConfirmBtn").addEventListener("click", function () {
+            var btn = this;
+            var mode = document.querySelector('input[name="tlRemoveMode"]:checked').value;
+            var url = "/api/team-leader/members/" + removeTarget + "?mode=" + mode +
+                (mode === "DEPARTURE" ? "&reason=" + encodeURIComponent($("tlRemoveReason").value) + "&comment=" + encodeURIComponent($("tlRemoveComment").value) : "");
+            btn.disabled = true;
+            fetch(url, { method: "DELETE", credentials: "same-origin" })
+                .then(function (res) { return res.ok || res.status === 204 ? null : errorOf(res); })
+                .then(function () { removeMemberModal.hide(); loadMembers(); loadReporting(); })
+                .catch(function (e) { $("tlRemoveError").textContent = e.message; })
+                .then(function () { btn.disabled = false; });
+        });
+    }
+
+    /** Export Excel du planning de mon équipe pour le mois choisi (grille réimportable). */
+    function exportPlanning() {
+        var month = $("tlPlanExportMonth").value;
+        if (!month) { alert("Choisissez le mois à exporter."); return; }
+        var parts = month.split("-"), last = new Date(Number(parts[0]), Number(parts[1]), 0).getDate();
+        var btn = $("tlPlanExportBtn"), original = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Export…';
+        fetch("/api/schedule/team/export?from=" + month + "-01&to=" + month + "-" + String(last).padStart(2, "0"), { credentials: "same-origin" })
             .then(function (res) {
-                if (!res.ok && res.status !== 204) return res.text().then(function (t) { return Promise.reject(new Error(t || "HTTP " + res.status)); });
-                loadMembers();
+                if (!res.ok) return errorOf(res);
+                var name = (res.headers.get("Content-Disposition") || "").match(/filename="?([^"]+)"?/);
+                return res.blob().then(function (blob) {
+                    var a = document.createElement("a");
+                    a.href = URL.createObjectURL(blob);
+                    a.download = name ? name[1] : "planning_" + month + ".xlsx";
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+                });
             })
-            .catch(function (e) { alert("Erreur : " + e.message); });
+            .catch(function (e) { alert("Export impossible : " + e.message); })
+            .then(function () { btn.disabled = false; btn.innerHTML = original; });
     }
 
     var addMemberModal = null, addMemberSearchTimer = null;
@@ -487,7 +541,10 @@
         });
     }
 
+    var addedCount = 0;
     function openAddMemberModal() {
+        addedCount = 0;
+        $("tlAddMemberDone").textContent = "";
         $("tlAddMemberSearch").value = "";
         $("tlAddMemberResults").innerHTML = "";
         addMemberModal.show();
@@ -506,13 +563,18 @@
             }).join("");
             Array.prototype.forEach.call(box.querySelectorAll(".tl-add-candidate-btn"), function (btn) {
                 btn.addEventListener("click", function () {
+                    btn.disabled = true;
                     fetch("/api/team-leader/members/" + btn.getAttribute("data-id"), { method: "POST", credentials: "same-origin" })
-                        .then(function (res) {
-                            if (!res.ok && res.status !== 204) return res.text().then(function (t) { return Promise.reject(new Error(t || "HTTP " + res.status)); });
-                            addMemberModal.hide();
+                        .then(function (res) { return res.ok || res.status === 204 ? null : errorOf(res); })
+                        .then(function () {
+                            // La fenêtre reste ouverte : on peut en ajouter plusieurs à la suite.
+                            btn.className = "btn btn-sm btn-success";
+                            btn.innerHTML = '<i class="bi bi-check-lg"></i> Ajouté';
+                            addedCount++;
+                            $("tlAddMemberDone").textContent = addedCount + " agent(s) ajouté(s) à votre équipe";
                             loadMembers();
                         })
-                        .catch(function (e) { alert("Erreur : " + e.message); });
+                        .catch(function (e) { btn.disabled = false; alert("Erreur : " + e.message); });
                 });
             });
         }).catch(function (e) {
@@ -1611,6 +1673,9 @@
         qaCoachingModal = new bootstrap.Modal($("tlQaCoachingModal"));
         addMemberModal = new bootstrap.Modal($("tlAddMemberModal"));
         $("tlAddMemberBtn").addEventListener("click", openAddMemberModal);
+        wireRemoveMember();
+        $("tlPlanExportMonth").value = currentMonthValue();
+        $("tlPlanExportBtn").addEventListener("click", exportPlanning);
         wirePlanningTab();
         $("tlAddMemberSearch").addEventListener("input", function () {
             clearTimeout(addMemberSearchTimer);

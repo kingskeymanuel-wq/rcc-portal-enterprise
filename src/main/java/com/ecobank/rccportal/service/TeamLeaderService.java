@@ -33,6 +33,13 @@ public class TeamLeaderService {
     private final QualityEvaluationService qualityEvaluationService;
     private final UserService userService;
     private final com.ecobank.rccportal.repository.UserRoleRepository userRoleRepository;
+    private HrOrganizationService hrOrganization;
+
+    /** Sorties d'agents tracées côté RH — injection facultative (absente des tests unitaires). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setHrOrganization(HrOrganizationService hrOrganization) {
+        this.hrOrganization = hrOrganization;
+    }
 
     public TeamLeaderService(UserRepository userRepository, ReportingService reportingService,
                               AttendanceService attendanceService, QualityEvaluationService qualityEvaluationService,
@@ -136,15 +143,36 @@ public class TeamLeaderService {
      */
     @Transactional
     public void removeMember(AuthenticatedUser requester, Long userId, boolean resigned) {
+        removeMember(requester, userId, resigned ? "DEPARTURE" : "TRANSFER", resigned ? "DEMISSION" : null, null);
+    }
+
+    /**
+     * Retrait d'un agent de mon équipe :
+     * <ul>
+     *   <li>TRANSFER : il quitte seulement mon équipe (compte actif, à placer ailleurs par un autre Team Leader ou le RH) ;</li>
+     *   <li>DEPARTURE : il quitte le centre (démission, fin de contrat, fin de stage…) — compte désactivé et sortie
+     *       tracée côté RH (onglet Sorties, réintégration possible), motif obligatoire.</li>
+     * </ul>
+     */
+    @Transactional
+    public void removeMember(AuthenticatedUser requester, Long userId, String mode, String reason, String comment) {
         String code = ledTeamCode(requester);
         User user = userRepository.findById(userId).orElseThrow(() -> ApiException.notFound("Unknown user."));
         if (!inTeam(code, user)) {
             throw ApiException.forbidden("Cet agent ne fait pas partie de votre équipe.");
         }
-        user.setActivity(null);
-        if (resigned) {
+        if ("DEPARTURE".equalsIgnoreCase(mode)) {
+            if (reason == null || !HrOrganizationService.DEPARTURE_REASONS.contains(reason)) {
+                throw ApiException.badRequest("Choisissez le motif de la sortie.");
+            }
+            String note = "Retiré par son Team Leader (" + requester.username() + ")" + (comment == null || comment.isBlank() ? "" : " — " + comment.trim());
+            if (hrOrganization != null) {
+                hrOrganization.recordDepartureForTeamLeader(requester.username(), userId, reason, note);
+                user = userRepository.findById(userId).orElse(user);
+            }
             user.setAccountEnabled(false);
         }
+        user.setActivity(null);
         userRepository.save(user);
     }
 

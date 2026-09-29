@@ -297,15 +297,33 @@ public class HrOrganizationService {
         User u = users.findById(userId).orElseThrow(() -> ApiException.notFound("Collaborateur introuvable."));
         if (Boolean.FALSE.equals(u.getAccountEnabled())) throw ApiException.badRequest("Ce collaborateur est déjà sorti des effectifs.");
         if (u.getUsername() != null && u.getUsername().equalsIgnoreCase(requester.username())) throw ApiException.badRequest("Vous ne pouvez pas enregistrer votre propre sortie.");
+        String country = writeDeparture(u, reason, date, comment, requester.username());
+        return departures(requester, country).stream().filter(d -> d.userId().equals(userId) && d.reintegratedAt() == null).findFirst().orElse(null);
+    }
+
+    /**
+     * Sortie enregistrée par le Team Leader de l'agent (bouton « Retirer » de son portail) : même trace que
+     * côté RH (onglet Sorties, réintégration possible), le droit sur l'agent étant vérifié par TeamLeaderService.
+     */
+    @Transactional
+    public void recordDepartureForTeamLeader(String teamLeaderUsername, Long userId, String reason, String comment) {
+        if (reason == null || !DEPARTURE_REASONS.contains(reason)) throw ApiException.badRequest("Motif de sortie invalide.");
+        User u = users.findById(userId).orElseThrow(() -> ApiException.notFound("Collaborateur introuvable."));
+        if (Boolean.FALSE.equals(u.getAccountEnabled())) throw ApiException.badRequest("Ce collaborateur est déjà sorti des effectifs.");
+        writeDeparture(u, reason, LocalDate.now(), comment, teamLeaderUsername);
+    }
+
+    /** Désactive le compte et trace la sortie (population / équipe du parcours au moment du départ). */
+    private String writeDeparture(User u, String reason, LocalDate date, String comment, String recordedBy) {
         LocalDate when = date != null ? date : LocalDate.now();
         String cmt = comment == null || comment.isBlank() ? null : (comment.trim().length() > 500 ? comment.trim().substring(0, 500) : comment.trim());
         String country = country(u.getAffiliateBranch());
-        Person p = people(country).stream().filter(x -> x.userId().equals(userId)).findFirst().orElse(null);
+        Person p = people(country).stream().filter(x -> x.userId().equals(u.getId())).findFirst().orElse(null);
         u.setAccountEnabled(false);
         users.save(u);
         jdbc.update("INSERT INTO dbo.HrDepartures (UserId, Reason, DepartureDate, Comment, Population, HrTeam, CountryCode, RecordedBy) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                userId, reason, java.sql.Date.valueOf(when), cmt, p == null ? null : p.population(), p == null ? null : p.team(), country, requester.username());
-        return departures(requester, country).stream().filter(d -> d.userId().equals(userId) && d.reintegratedAt() == null).findFirst().orElse(null);
+                u.getId(), reason, java.sql.Date.valueOf(when), cmt, p == null ? null : p.population(), p == null ? null : p.team(), country, recordedBy);
+        return country;
     }
 
     @Transactional(readOnly = true)

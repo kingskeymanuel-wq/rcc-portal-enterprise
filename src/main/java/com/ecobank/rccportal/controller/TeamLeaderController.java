@@ -70,14 +70,17 @@ public class TeamLeaderController {
         teamLeaderService.addMember(requester, userId);
     }
 
-    /** Retire un agent de mon équipe — resigned=true si démission (désactive aussi le compte,
-     *  visible immédiatement RH/Superviseur/Reporting). */
+    /** Retire un agent de mon équipe — mode=TRANSFER (change d'équipe, compte actif) ou DEPARTURE (sortie du
+     *  centre : motif obligatoire, compte désactivé, tracé côté RH). resigned=true reste accepté (= démission). */
     @DeleteMapping("/members/{userId}")
     @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     public void removeMember(@PathVariable Long userId, @RequestParam(defaultValue = "false") boolean resigned,
+                             @RequestParam(required = false) String mode, @RequestParam(required = false) String reason,
+                             @RequestParam(required = false) String comment,
                              @AuthenticationPrincipal AuthenticatedUser requester) {
         requireTeamLeaderOrAdmin(requester);
-        teamLeaderService.removeMember(requester, userId, resigned);
+        String m = mode != null && !mode.isBlank() ? mode : (resigned ? "DEPARTURE" : "TRANSFER");
+        teamLeaderService.removeMember(requester, userId, m, reason != null ? reason : (resigned ? "DEMISSION" : null), comment);
     }
 
     @GetMapping("/reporting")

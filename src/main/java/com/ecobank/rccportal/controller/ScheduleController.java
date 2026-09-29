@@ -23,13 +23,28 @@ public class ScheduleController {
     private final ScheduleService scheduleService;
     private final com.ecobank.rccportal.service.PlanningComplianceService planningComplianceService;
     private final com.ecobank.rccportal.repository.UserRepository userRepository;
+    private final com.ecobank.rccportal.service.PlanningExportService planningExportService;
 
     public ScheduleController(ScheduleService scheduleService,
                               com.ecobank.rccportal.service.PlanningComplianceService planningComplianceService,
-                              com.ecobank.rccportal.repository.UserRepository userRepository) {
+                              com.ecobank.rccportal.repository.UserRepository userRepository,
+                              com.ecobank.rccportal.service.PlanningExportService planningExportService) {
         this.scheduleService = scheduleService;
         this.planningComplianceService = planningComplianceService;
         this.userRepository = userRepository;
+        this.planningExportService = planningExportService;
+    }
+
+    /** Export Excel du planning (grille Exceliam, réimportable) — Team Leader : son équipe ; QA / RH / Superviseur / Admin : équipe choisie. */
+    @GetMapping("/team/export")
+    public org.springframework.http.ResponseEntity<byte[]> exportTeamPlanning(@RequestParam String from, @RequestParam String to,
+                                                                            @RequestParam(required = false) String team,
+                                                                            @AuthenticationPrincipal AuthenticatedUser requester) {
+        var export = planningExportService.export(requester, team, LocalDate.parse(from), LocalDate.parse(to));
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + export.filename() + "\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(export.content());
     }
 
     @PostMapping(value = "/import", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
