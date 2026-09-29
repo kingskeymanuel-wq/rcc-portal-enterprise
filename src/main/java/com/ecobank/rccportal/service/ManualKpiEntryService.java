@@ -341,6 +341,53 @@ public class ManualKpiEntryService {
     }
 
     /**
+     * Import du fichier KPI par un Team Leader, depuis son onglet Reporting : même lecture que l'import QA, mais
+     * limitée à SON équipe — seuls ses agents sont reconnus (identifiant ou nom), aucun compte n'est créé et aucune
+     * autre équipe n'est touchée ; les lignes d'autres personnes sont listées comme non capturées. Le reporting de
+     * l'équipe et la page « Ma performance » de chaque agent se mettent à jour aussitôt (même source de données).
+     */
+    @Transactional
+    public KpiImportResult importForTeamLeader(MultipartFile file, YearMonth period, String teamLeaderUsername,
+                                               java.util.function.Predicate<User> inTeam) {
+        if (file == null || file.isEmpty()) throw ApiException.badRequest("Le fichier est requis.");
+        User enteredBy = userRepository.findFirstByUsernameIgnoreCase(teamLeaderUsername)
+                .orElseThrow(() -> ApiException.unauthorized("Unknown user."));
+        Map<String, User> members = new HashMap<>();
+        for (User u : userRepository.findAll()) {
+            if (u.getName() != null && !u.getName().isBlank() && inTeam.test(u)) members.put(normalizeName(u.getName()), u);
+        }
+        if (members.isEmpty()) throw ApiException.badRequest("Aucun agent dans votre équipe : ajoutez vos membres avant d'importer leurs KPI.");
+        ImportContext ctx = new ImportContext(enteredBy, members, null, null, null);
+        ctx.restrictTo = inTeam;
+        KpiFileReader.Result read;
+        try {
+            read = KpiFileReader.read(file.getBytes(), file.getOriginalFilename(), file.getContentType());
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw ApiException.badRequest("Impossible de lire ce fichier : " + e.getMessage());
+        }
+        if (read.kind() == KpiFileReader.Kind.IMAGE) {
+            throw ApiException.badRequest("Importez le fichier Excel (ou CSV/PDF) des KPI plutôt qu'une capture d'écran.");
+        }
+        try (Workbook workbook = read.workbook()) {
+            processWorkbook(workbook, period, ctx);
+        } catch (IOException e) {
+            throw ApiException.badRequest("Impossible de lire le fichier Excel : " + e.getMessage());
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw ApiException.badRequest("Fichier Excel invalide ou mal formé : " + e.getMessage());
+        }
+        auditLogService.record(teamLeaderUsername, "IMPORT_EXCEL_KPI_TEAM_LEADER",
+                "Fichier : " + (file.getOriginalFilename() != null ? file.getOriginalFilename() : "(sans nom)") + " — "
+                        + ctx.rowsProcessed + " ligne(s), " + ctx.entriesCreated + " valeur(s) capturée(s), " + ctx.unresolvedNames.size() + " hors équipe/inconnu(s)");
+        return new KpiImportResult(ctx.rowsProcessed, ctx.entriesCreated, 0, 0, new ArrayList<>(ctx.unresolvedNames),
+                importIntelligenceService.summarizeAnomalies(ctx.valueAnomalies, ctx.nameResolutionNotes),
+                ctx.preview, ctx.entriesCreated > ctx.preview.size(), ctx.importBatchId, ctx.numericCellsDetected, ctx.skippedValues);
+    }
+
+    /**
      * Import KPI depuis une capture d'écran — sans fichier Excel. Claude (vision) lit
      * l'image et en extrait un tableau structuré agent/métrique/valeur ; le reste du pipeline
      * (résolution d'agent, création de compte à la volée, rattachement filiale/service/équipe,
@@ -455,6 +502,8 @@ public class ManualKpiEntryService {
         final List<com.ecobank.rccportal.dto.KpiImportResult.SkippedValue> skippedValues = new ArrayList<>();
         int numericCellsDetected = 0;
         final int previewCap = 80;
+        /** Import d'un Team Leader : seuls les agents de son équipe sont reconnus, aucun compte n'est créé. */
+        java.util.function.Predicate<User> restrictTo;
 
         ImportContext(User enteredBy, Map<String, User> usersByNormalizedName,
                      com.ecobank.rccportal.model.RccService importService, String importCountryCode, String importTeam) {
@@ -1087,6 +1136,7 @@ public class ManualKpiEntryService {
      */
     private User resolveUser(String cellValue, ImportContext ctx) {
         User byUsername = userRepository.findFirstByUsernameIgnoreCase(cellValue).orElse(null);
+        if (byUsername != null && ctx.restrictTo != null && !ctx.restrictTo.test(byUsername)) byUsername = null;
         if (byUsername != null) return linkToTeamIfMissing(byUsername, ctx);
 
         String normalized = normalizeName(cellValue);
@@ -1109,6 +1159,10 @@ public class ManualKpiEntryService {
             }
         }
 
+        if (ctx.restrictTo != null) {
+            // Team Leader : un nom absent de son équipe n'est jamais créé ni rattaché à un autre agent.
+            return null;
+        }
         User created = User.builder()
                 .username(generateUsername(cellValue))
                 .name(cellValue.trim().length() > 200 ? cellValue.trim().substring(0, 200) : cellValue.trim())

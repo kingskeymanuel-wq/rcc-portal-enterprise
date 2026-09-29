@@ -197,6 +197,20 @@
 
                         <!-- ===================== REPORTING ÉQUIPE ===================== -->
                         <div id="tlPaneReporting" class="card-body">
+                            <!-- Import du fichier KPI de l'équipe : reporting et performance de chaque agent mis à jour aussitôt -->
+                            <div class="tl-kpi-import mb-3">
+                                <div class="tl-kpi-import-head">
+                                    <span class="tl-kpi-ico"><i class="bi bi-file-earmark-spreadsheet-fill"></i></span>
+                                    <div><b>Importer le fichier KPI de mon équipe</b>
+                                        <small>Excel, CSV ou PDF du reporting : chaque agent de votre équipe voit ses indicateurs tout de suite dans « Ma performance » et il est prévenu. Les lignes d'autres équipes sont ignorées.</small></div>
+                                </div>
+                                <div class="tl-kpi-import-form">
+                                    <input type="month" id="tlKpiImportMonth" class="form-control form-control-sm" aria-label="Mois des KPI">
+                                    <input type="file" id="tlKpiImportFile" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf,.txt">
+                                    <button type="button" class="btn btn-sm btn-primary" id="tlKpiImportBtn"><i class="bi bi-cloud-arrow-up-fill"></i> Importer et mettre à jour</button>
+                                </div>
+                                <div id="tlKpiImportResult" class="small mt-2" hidden></div>
+                            </div>
                             <div class="row g-2 mb-3 align-items-end">
                                 <div class="col-md-3">
                                     <label class="form-label small mb-1">Mois</label>

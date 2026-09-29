@@ -86,7 +86,10 @@ public class RafOrchestrator {
 
     /** Réponse tirée du web ; {@code null} si rien trouvé et {@code quiet} (repli silencieux). */
     private RalphSearchResponse webAnswer(RafRequest request, String query, boolean nothingInternal, boolean quiet) {
-        List<com.ecobank.rccportal.dto.WebSearchResultItem> results = webAvailable() ? web.search(query) : List.of();
+        List<com.ecobank.rccportal.dto.WebSearchResultItem> raw = webAvailable() ? web.search(query) : List.of();
+        // Seulement les pages qui traitent vraiment de la question (plus de résultats Wikipédia sans rapport).
+        List<String> terms = IntentRouter.contentTerms(SearchText.queryTerms(dataProtection.sanitize(query)));
+        List<com.ecobank.rccportal.dto.WebSearchResultItem> results = RafWebResearch.relevant(raw, terms);
         if (results.isEmpty()) {
             if (quiet) return null;
             String md = "fr".equals(request.lang())
@@ -96,10 +99,11 @@ public class RafOrchestrator {
             return new RalphSearchResponse(md, List.of(), "NONE", List.of(), 10, List.of("Web"), "WEB", List.of(),
                     SmallTalkAgent.starters().subList(0, 3), null, false, List.of("recherche web sans résultat"));
         }
-        String md = RafWebResearch.markdown(query, results, nothingInternal, request.lang());
+        // RAF lit les pages et répond avec ses mots : pas de liens à ouvrir (cartes « Source web » supprimées).
+        String md = web.humanAnswer(query, results, terms, request.lang());
         remember(request, new RafDialogueState(null, request.question(), request.entities(), null, null, List.of()), md);
         boolean official = results.stream().anyMatch(r -> r.url() != null && r.url().contains("ecobank.com"));
-        return new RalphSearchResponse(md, List.of(), "WEB", results, official ? 60 : 45,
+        return new RalphSearchResponse(md, List.of(), "WEB", List.of(), official ? 60 : 45,
                 List.of(official ? "Web (site officiel Ecobank)" : "Web"), "WEB", List.of(),
                 List.of(), null, false,
                 List.of("recherche externe (question assainie, sans données client) : " + results.size() + " résultat(s)"));

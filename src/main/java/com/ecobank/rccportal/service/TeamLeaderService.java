@@ -343,6 +343,24 @@ public class TeamLeaderService {
         userRepository.save(user);
     }
 
+    /** Appartenance à l'équipe menée par l'appelant (même règle que la liste des membres). */
+    @Transactional(readOnly = true)
+    public java.util.function.Predicate<User> memberPredicate(AuthenticatedUser requester) {
+        String code = ledTeamCode(requester);
+        return u -> u != null && inTeam(code, u);
+    }
+
+    /** Prévient chaque membre actif de l'équipe (ex. : KPI du mois importés par le Team Leader). */
+    @Transactional
+    public int notifyTeam(AuthenticatedUser requester, String content) {
+        String code = ledTeamCode(requester);
+        int n = 0;
+        for (User u : userRepository.findAll()) {
+            if (inTeam(code, u) && !Boolean.FALSE.equals(u.getAccountEnabled())) { notify(u, content); n++; }
+        }
+        return n;
+    }
+
     /** Équipe dirigée par l'appelant — jamais nul pour un Team Leader correctement configuré. */
     @Transactional(readOnly = true)
     public TeamClassifier.Team requireLedTeam(AuthenticatedUser requester) {

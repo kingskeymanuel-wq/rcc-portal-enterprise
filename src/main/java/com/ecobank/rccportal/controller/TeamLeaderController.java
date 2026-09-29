@@ -18,11 +18,14 @@ public class TeamLeaderController {
 
     private final TeamLeaderService teamLeaderService;
     private final com.ecobank.rccportal.service.AlertEngineService alertEngineService;
+    private final com.ecobank.rccportal.service.ManualKpiEntryService manualKpiEntryService;
 
     public TeamLeaderController(TeamLeaderService teamLeaderService,
-                                com.ecobank.rccportal.service.AlertEngineService alertEngineService) {
+                                com.ecobank.rccportal.service.AlertEngineService alertEngineService,
+                                com.ecobank.rccportal.service.ManualKpiEntryService manualKpiEntryService) {
         this.teamLeaderService = teamLeaderService;
         this.alertEngineService = alertEngineService;
+        this.manualKpiEntryService = manualKpiEntryService;
     }
 
     private void requireTeamLeaderOrAdmin(AuthenticatedUser requester) {
@@ -60,6 +63,29 @@ public class TeamLeaderController {
                                                                                      @AuthenticationPrincipal AuthenticatedUser requester) {
         requireTeamLeaderOrAdmin(requester);
         return teamLeaderService.searchCandidates(requester, q);
+    }
+
+    /**
+     * Onglet Reporting : le Team Leader importe le fichier Excel des KPI du mois de SON équipe. Le reporting de
+     * l'équipe et la performance de chaque agent se mettent à jour aussitôt ; chaque agent est prévenu.
+     */
+    @PostMapping(value = "/kpi-import", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public com.ecobank.rccportal.dto.KpiImportResult importKpi(@RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+                                                                 @RequestParam String period,
+                                                                 @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireTeamLeaderOrAdmin(requester);
+        java.time.YearMonth month;
+        try {
+            month = java.time.YearMonth.parse(period);
+        } catch (Exception e) {
+            throw com.ecobank.rccportal.util.ApiException.badRequest("Mois attendu au format AAAA-MM.");
+        }
+        var result = manualKpiEntryService.importForTeamLeader(file, month, requester.username(), teamLeaderService.memberPredicate(requester));
+        if (result.entriesCreated() > 0) {
+            String label = month.getMonth().getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.FRENCH) + " " + month.getYear();
+            teamLeaderService.notifyTeam(requester, "📊 Vos indicateurs de " + label + " ont été mis à jour par votre Team Leader : retrouvez-les dans « Ma performance ».");
+        }
+        return result;
     }
 
     /** Ajoute un agent existant à mon équipe. */

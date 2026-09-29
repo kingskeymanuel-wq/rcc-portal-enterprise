@@ -149,4 +149,21 @@ class KpiImportAnyFileTest {
         assertEquals(',', KpiFileReader.detectDelimiter(List.of("Nom,Score", "A,85.5", "B,90.2")));
         assertEquals('\t', KpiFileReader.detectDelimiter(List.of("Nom\tScore", "A\t85,5")));
     }
+
+    /** Import par un Team Leader : seuls les agents de son équipe sont mis à jour, personne n'est créé. */
+    @Test
+    void teamLeaderImportOnlyTouchesHisTeam() {
+        String csv = "Nom;Taux de décroché;Note qualité\n"
+                + "TRAORE Awa;91 %;80\n"
+                + "KOUASSI Koffi;70 %;60\n"
+                + "DIALLO Moussa;50 %;40\n";
+        when(userRepository.findFirstByUsernameIgnoreCase("tl")).thenReturn(Optional.of(new User()));
+        KpiImportResult r = service.importForTeamLeader(new MockMultipartFile("file", "kpi.csv", null, csv.getBytes(StandardCharsets.UTF_8)),
+                YearMonth.of(2026, 9), "tl", u -> u == awa);
+        assertNum("91", value(awa, "TAUX_DE_DECROCHE"));
+        assertNull(value(koffi, "TAUX_DE_DECROCHE"), "agent d'une autre équipe : jamais modifié");
+        assertEquals(0, r.usersAutoCreated());
+        assertTrue(r.unknownMatricules().containsAll(List.of("KOUASSI Koffi", "DIALLO Moussa")));
+        verify(userRepository, never()).save(any());
+    }
 }

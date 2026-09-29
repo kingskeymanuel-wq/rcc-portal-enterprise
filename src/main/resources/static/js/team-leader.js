@@ -76,6 +76,37 @@
 
     // ===================== REPORTING ÉQUIPE =====================
 
+    /** Import du fichier KPI du mois par le Team Leader : son équipe uniquement, reporting rafraîchi aussitôt. */
+    function importTeamKpi() {
+        var file = $("tlKpiImportFile").files[0];
+        var month = $("tlKpiImportMonth").value || $("tlReportingMonth").value || currentMonthValue();
+        var box = $("tlKpiImportResult");
+        box.hidden = false;
+        if (!file) { box.innerHTML = '<div class="tl-kpi-err">Choisissez le fichier KPI à importer.</div>'; return; }
+        var btn = $("tlKpiImportBtn");
+        btn.disabled = true;
+        box.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Import en cours…';
+        var fd = new FormData();
+        fd.append("file", file);
+        fd.append("period", month);
+        fetch("/api/team-leader/kpi-import", { method: "POST", credentials: "same-origin", body: fd })
+            .then(function (res) { return res.ok ? res.json() : errorOf(res); })
+            .then(function (r) {
+                var skipped = (r.skippedValues || []).length;
+                var others = r.unknownMatricules || [];
+                box.innerHTML = '<div class="tl-kpi-ok"><i class="bi bi-check-circle-fill"></i> <b>' + r.entriesCreated + ' indicateur(s)</b> mis à jour pour ' +
+                    r.rowsProcessed + ' ligne(s) — le reporting ci-dessous et la page « Ma performance » de vos agents sont à jour, ils ont été prévenus.</div>' +
+                    (others.length ? '<div class="tl-kpi-warn"><i class="bi bi-info-circle"></i> ' + others.length + ' nom(s) hors de votre équipe ou inconnu(s), ignoré(s) : ' +
+                        escapeHtml(others.slice(0, 12).join(", ")) + (others.length > 12 ? "…" : "") + '</div>' : '') +
+                    (skipped && !others.length ? '<div class="tl-kpi-warn">' + skipped + ' valeur(s) non capturée(s).</div>' : '');
+                $("tlKpiImportFile").value = "";
+                $("tlReportingMonth").value = month;
+                loadReporting();
+            })
+            .catch(function (e) { box.innerHTML = '<div class="tl-kpi-err"><i class="bi bi-exclamation-triangle-fill"></i> ' + escapeHtml(e.message) + '</div>'; })
+            .finally(function () { btn.disabled = false; });
+    }
+
     function loadReporting() {
         var month = $("tlReportingMonth").value || currentMonthValue();
         getJson("/api/team-leader/reporting?month=" + encodeURIComponent(month)).then(function (rows) {
@@ -1791,6 +1822,8 @@
         }).catch(function () { /* titre par défaut */ });
 
         $("tlReportingApplyBtn").addEventListener("click", loadReporting);
+        $("tlKpiImportMonth").value = currentMonthValue();
+        $("tlKpiImportBtn").addEventListener("click", importTeamKpi);
         $("tlSalesApplyBtn").addEventListener("click", loadSales);
         $("tlRdvApplyBtn").addEventListener("click", loadRdv);
 

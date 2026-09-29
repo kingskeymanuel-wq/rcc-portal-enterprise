@@ -34,6 +34,14 @@ public class RafWebResearch {
     private final WebSearchClient client;
     private final DataProtectionService dataProtection;
 
+    /** Reformulation naturelle de la synthèse (facultative : sans clé, synthèse locale par extraits). */
+    private com.ecobank.rccportal.service.AnthropicClient writer;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setWriter(com.ecobank.rccportal.service.AnthropicClient writer) {
+        this.writer = writer;
+    }
+
     public RafWebResearch(WebSearchClient client, DataProtectionService dataProtection) {
         this.client = client;
         this.dataProtection = dataProtection;
@@ -61,6 +69,76 @@ public class RafWebResearch {
         String safe = dataProtection.sanitize(question == null ? "" : question).trim();
         if (safe.isEmpty()) return List.of();
         return client.searchWide(safe);
+    }
+
+    /** « l&#039;atropine », « &amp; »… : entités HTML des extraits remises en texte. */
+    static String clean(String s) {
+        if (s == null) return "";
+        return s.replace("&#039;", "'").replace("&#39;", "'").replace("&apos;", "'").replace("&quot;", "\"").replace("&amp;", "&")
+                .replace("&lt;", "<").replace("&gt;", ">").replace("&nbsp;", " ").replaceAll("<[^>]+>", " ").replaceAll("\\s+", " ").trim();
+    }
+
+    /**
+     * Garde seulement les résultats qui parlent vraiment de la question : la majorité de ses mots métier doit
+     * apparaître dans le titre ou l'extrait (« nerveux », « client » isolés ne suffisent plus — fini les pages
+     * Wikipédia sans rapport). Les pages officielles Ecobank passent en tête.
+     */
+    public static List<WebSearchResultItem> relevant(List<WebSearchResultItem> results, List<String> terms) {
+        List<String> t = terms == null ? List.of() : terms.stream().filter(x -> x != null && x.length() >= 3).distinct().toList();
+        if (t.isEmpty() || results == null) return List.of();
+        int needed = Math.max(1, (int) Math.ceil(t.size() * 0.6));
+        List<WebSearchResultItem> out = new java.util.ArrayList<>();
+        for (WebSearchResultItem r : results) {
+            String hay = " " + com.ecobank.rccportal.util.SearchText.normalize(clean(r.title()) + " " + clean(r.snippet())) + " ";
+            long hits = t.stream().filter(term -> hay.contains(term)).count();
+            if (hits >= needed) out.add(new WebSearchResultItem(clean(r.title()), clean(r.snippet()), r.url()));
+        }
+        out.sort(java.util.Comparator.comparing(r -> r.url() != null && r.url().toLowerCase(Locale.ROOT).contains("ecobank") ? 0 : 1));
+        return out;
+    }
+
+    /**
+     * Réponse rédigée comme par un conseiller : RAF lit les extraits et répond avec ses mots, sans renvoyer
+     * de liens à ouvrir. Avec Claude configuré, la synthèse est reformulée (uniquement à partir des extraits,
+     * question assainie) ; sinon, RAF assemble les phrases les plus pertinentes.
+     */
+    public String humanAnswer(String question, List<WebSearchResultItem> results, List<String> terms, String lang) {
+        boolean fr = lang == null || lang.toLowerCase(Locale.ROOT).startsWith("fr");
+        List<WebSearchResultItem> top = results.subList(0, Math.min(5, results.size()));
+        boolean official = top.stream().anyMatch(r -> r.url() != null && r.url().toLowerCase(Locale.ROOT).contains("ecobank"));
+        String written = null;
+        if (writer != null && writer.isConfigured()) {
+            StringBuilder extracts = new StringBuilder();
+            for (int i = 0; i < top.size(); i++) {
+                extracts.append("[").append(i + 1).append("] ").append(host(top.get(i).url()).replace("🔗 ", "")).append(" — ")
+                        .append(top.get(i).title()).append(" : ").append(top.get(i).snippet()).append("\n");
+            }
+            try {
+                written = writer.chat(
+                        (fr ? "Tu es RAF, l'assistant des conseillers du centre de relation client Ecobank. Réponds en français, "
+                            : "You are RAF, the assistant of Ecobank contact-centre agents. Answer in English, ")
+                                + (fr ? "comme un collègue expérimenté : 2 à 5 phrases claires, sans liste de liens, sans URL, sans inventer. "
+                                      + "Utilise UNIQUEMENT les extraits fournis. S'ils ne répondent pas vraiment à la question, dis-le simplement en une phrase."
+                                      : "like an experienced colleague: 2 to 5 clear sentences, no list of links, no URL, no invention. "
+                                      + "Use ONLY the extracts provided. If they do not really answer the question, say so in one sentence."),
+                        (fr ? "Question : " : "Question: ") + dataProtection.sanitize(question) + "\n\n" + (fr ? "Extraits :\n" : "Extracts:\n") + extracts,
+                        400, 15);
+            } catch (RuntimeException e) {
+                written = null; // indisponible : synthèse locale
+            }
+        }
+        if (written == null || written.isBlank()) {
+            StringBuilder all = new StringBuilder();
+            for (WebSearchResultItem r : top) all.append(r.snippet()).append(r.snippet().endsWith(".") ? " " : ". ");
+            String best = com.ecobank.rccportal.util.SearchText.bestSentences(all.toString(), terms, 3, 600);
+            written = (fr ? "D'après ce que j'ai trouvé" + (official ? " sur le site officiel d'Ecobank" : "") + " : "
+                          : "From what I found" + (official ? " on Ecobank's official website" : "") + ": ") + best.replaceAll("\\s+", " ").trim();
+        }
+        java.util.LinkedHashSet<String> hosts = new java.util.LinkedHashSet<>();
+        for (WebSearchResultItem r : top) hosts.add(host(r.url()).replace("🔗 ", ""));
+        return "🌐 " + written.trim() + "\n\n_" + (fr ? "Sources consultées : " : "Sources: ") + String.join(", ", hosts) + ". "
+                + (fr ? "Information externe au portail : vérifiez-la avant de la communiquer au client — les procédures internes restent la référence."
+                      : "External information: check it before sharing with the customer — internal procedures remain the reference.") + "_";
     }
 
     /** Réponse lisible : synthèse des meilleurs extraits + sources numérotées. */

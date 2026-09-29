@@ -101,6 +101,33 @@ public class RafCatalog {
         }
     }
 
+    /** Documents joints (Word, Excel, PowerPoint, PDF…) : RAF lit leur contenu pour répondre, sans renvoyer de lien. */
+    private com.ecobank.rccportal.repository.AttachmentRepository attachments;
+    private com.ecobank.rccportal.service.DocumentPreviewService documents;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setDocuments(com.ecobank.rccportal.repository.AttachmentRepository attachments,
+                      com.ecobank.rccportal.service.DocumentPreviewService documents) {
+        this.attachments = attachments;
+        this.documents = documents;
+    }
+
+    private String attachmentText(Integer articleId) {
+        if (attachments == null || documents == null || articleId == null) return "";
+        StringBuilder sb = new StringBuilder();
+        try {
+            for (var a : attachments.findByEntityTypeAndEntityId("KnowledgeArticle", articleId)) {
+                if (a.getStorageUrl() == null || !a.getStorageUrl().startsWith("/kb-files/")) continue;
+                String t = documents.text(a.getStorageUrl());
+                if (!t.isBlank()) sb.append(' ').append(a.getFileName() == null ? "" : a.getFileName()).append(" : ").append(t);
+                if (sb.length() > 300_000) break;
+            }
+        } catch (RuntimeException ignored) {
+            // document illisible : l'article reste indexé sur son contenu
+        }
+        return sb.toString();
+    }
+
     public void invalidate() {
         builtAt = 0;
     }
@@ -127,7 +154,8 @@ public class RafCatalog {
                         .map(a -> new VerifiedQaDoc(a.questionId(), a.question(), a.answer(), a.explanation(), a.category(), a.tags()))
                         .toList()),
                 load("articles", () -> articleRepository.findAll().stream()
-                        .map(a -> new ArticleDoc(a.getArticleId(), a.getTitle(), a.getTags(), SearchText.stripHtml(a.getContentHtml()),
+                        .map(a -> new ArticleDoc(a.getArticleId(), a.getTitle(), a.getTags(),
+                                (SearchText.stripHtml(a.getContentHtml()) + " " + attachmentText(a.getArticleId())).trim(),
                                 a.getCountry() != null ? a.getCountry().getCountryCode() : null))
                         .toList()),
                 load("formations", () -> courseRepository.findAll().stream()

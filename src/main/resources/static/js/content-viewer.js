@@ -88,31 +88,71 @@ window.RccViewer = (function () {
         return (f.mimeType && f.mimeType.indexOf("image/") === 0) || /\.(png|jpe?g|gif|webp|bmp|svg)($|\?)/i.test(f.fileName || f.url || "");
     }
 
-    /** Fichier : PDF et images affichés dans la fenêtre ; autres formats (Word, Excel…) à télécharger. */
+    var DV_CSS = ".dv-body{background:#f4f6fa;border-radius:.6rem;padding:1rem;max-height:75vh;overflow:auto}" +
+        ".dv-doc{background:#fff;max-width:860px;margin:0 auto;padding:2rem 2.2rem;border-radius:.4rem;box-shadow:0 4px 18px rgba(0,32,84,.08);font-size:.95rem;line-height:1.55;color:#1f2a3d}" +
+        ".dv-doc h3,.dv-doc h4,.dv-doc h5{color:#0B3D91;font-weight:800;margin:1rem 0 .5rem}.dv-doc p{margin:0 0 .45rem}.dv-gap{height:.4rem}" +
+        ".dv-table-wrap{overflow:auto;margin:.6rem 0}.dv-table{border-collapse:collapse;width:100%;font-size:.85rem;background:#fff}" +
+        ".dv-table td,.dv-table th{border:1px solid #dfe5ee;padding:.3rem .5rem;vertical-align:top}.dv-table th{background:#eef3fb;color:#0B3D91;text-align:left}" +
+        ".dv-grid tr:first-child td{background:#eef3fb;font-weight:700}.dv-table td.num{text-align:right;font-variant-numeric:tabular-nums}.dv-more{text-align:center;color:#8a97ab}" +
+        ".dv-tabs{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.6rem}.dv-tabs button{border:1px solid #dce4f0;background:#fff;border-radius:999px;padding:.25rem .8rem;font-size:.8rem;font-weight:700}" +
+        ".dv-tabs button.on{background:#0057B8;color:#fff;border-color:#0057B8}" +
+        ".dv-slides{display:flex;flex-direction:column;gap:1rem;max-width:900px;margin:0 auto}.dv-slide{position:relative;background:#fff;border-radius:.6rem;padding:1.4rem 1.6rem;box-shadow:0 4px 18px rgba(0,32,84,.08);aspect-ratio:16/9;overflow:auto}" +
+        ".dv-slide h4{color:#0B3D91;font-weight:800}.dv-slide-no{position:absolute;top:.5rem;right:.8rem;font-size:.75rem;color:#8a97ab;font-weight:700}" +
+        ".dv-img{max-width:100%;height:auto;display:block;margin:.5rem auto;border-radius:.3rem}.dv-pre{white-space:pre-wrap;background:#fff;padding:1rem;border-radius:.4rem}" +
+        ".dv-note{font-size:.78rem;color:#8a5a00;background:#fff6e5;border-radius:.4rem;padding:.35rem .6rem;margin-bottom:.8rem}.dv-warn{background:#fdecec;color:#b42318;padding:1rem;border-radius:.5rem}";
+
+    function ensureDocStyles() {
+        if (document.getElementById("rccDocViewerCss")) return;
+        var st = document.createElement("style");
+        st.id = "rccDocViewerCss";
+        st.textContent = DV_CSS;
+        document.head.appendChild(st);
+    }
+
+    /**
+     * Fichier : tout s'ouvre directement dans la fenêtre, sans téléchargement — PDF et images tels quels,
+     * Word, Excel, PowerPoint, texte et CSV convertis en aperçu par le serveur (/api/kb/files/preview).
+     */
     function openFile(file, fromBack) {
         var url = file.url;
         var name = file.fileName || url;
-        var footer = '<a class="btn btn-sm btn-outline-secondary" href="' + escapeHtml(url) + '" download><i class="bi bi-download"></i> Télécharger</a>';
-        var body;
         if (file.mimeType === "text/uri-list" || /^https?:\/\//i.test(url) && url.indexOf(window.location.origin) !== 0) {
             // Lien externe : la plupart des sites interdisent leur affichage dans une fenêtre intégrée.
-            body = '<div class="text-center py-4"><i class="bi bi-link-45deg fs-1 text-primary"></i>' +
+            show(name, '<div class="text-center py-4"><i class="bi bi-link-45deg fs-1 text-primary"></i>' +
                 '<p class="mb-3">Ce document est un lien vers un site externe, qui ne peut pas s\'afficher dans le portail.</p>' +
-                '<a class="btn btn-primary" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">Ouvrir le lien</a></div>';
-            footer = "";
-        } else if (isPdf(file)) {
-            body = '<iframe src="' + escapeHtml(url) + '#view=FitH" title="' + escapeHtml(name) + '" ' +
-                'style="width:100%;height:75vh;border:0;border-radius:.5rem;background:#f1f3f5;"></iframe>';
-        } else if (isImage(file)) {
-            body = '<div class="text-center"><img src="' + escapeHtml(url) + '" alt="' + escapeHtml(name) + '" class="img-fluid rounded" style="max-height:75vh;"></div>';
-        } else {
-            body = '<div class="text-center py-4"><i class="bi bi-file-earmark-text fs-1 text-primary"></i>' +
-                '<p class="mb-1 fw-semibold">' + escapeHtml(name) + '</p>' +
-                '<p class="text-muted small mb-3">Ce format ne peut pas être affiché directement dans le navigateur.</p>' +
-                '<a class="btn btn-primary" href="' + escapeHtml(url) + '" download><i class="bi bi-download"></i> Télécharger</a></div>';
-            footer = "";
+                '<a class="btn btn-primary" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">Ouvrir le lien</a></div>', "", fromBack);
+            return;
         }
-        show(name, body, footer, fromBack);
+        if (isPdf(file)) {
+            show(name, '<iframe src="' + escapeHtml(url) + '#view=FitH" title="' + escapeHtml(name) + '" ' +
+                'style="width:100%;height:78vh;border:0;border-radius:.5rem;background:#f1f3f5;"></iframe>', "", fromBack);
+            return;
+        }
+        if (isImage(file)) {
+            show(name, '<div class="text-center"><img src="' + escapeHtml(url) + '" alt="' + escapeHtml(name) + '" class="img-fluid rounded" style="max-height:78vh;"></div>', "", fromBack);
+            return;
+        }
+        ensureDocStyles();
+        show(name, '<div class="text-center text-muted py-5"><span class="spinner-border spinner-border-sm"></span> Ouverture du document…</div>', "", fromBack);
+        getJson("/api/kb/files/preview?url=" + encodeURIComponent(url) + "&name=" + encodeURIComponent(name)).then(function (p) {
+            var body;
+            if (p.kind === "html" && p.html) body = '<div class="dv-body">' + p.html + "</div>";
+            else if (p.kind === "pdf") body = '<iframe src="' + escapeHtml(url) + '#view=FitH" style="width:100%;height:78vh;border:0;border-radius:.5rem;"></iframe>';
+            else if (p.kind === "image") body = '<div class="text-center"><img src="' + escapeHtml(url) + '" class="img-fluid rounded" style="max-height:78vh;" alt=""></div>';
+            else body = '<div class="text-center py-4 text-muted"><i class="bi bi-file-earmark fs-1"></i><p class="mt-2 mb-0">Ce type de fichier ne peut pas être affiché.</p></div>';
+            show(name, body, "", true);
+            var bodyEl = document.getElementById("rccViewerBody");
+            bodyEl.addEventListener("click", function (e) {
+                var t = e.target.closest("[data-dv-sheet]");
+                if (!t) return;
+                bodyEl.querySelectorAll("[data-dv-sheet]").forEach(function (x) { x.classList.toggle("on", x === t); });
+                bodyEl.querySelectorAll("[data-dv-sheet-pane]").forEach(function (pane) {
+                    pane.hidden = pane.getAttribute("data-dv-sheet-pane") !== t.getAttribute("data-dv-sheet");
+                });
+            });
+        }).catch(function (e) {
+            show(name, '<div class="alert alert-warning mb-0">Impossible d\'afficher ce document : ' + escapeHtml(e.message) + "</div>", "", true);
+        });
     }
 
     function attachmentsHtml(attachments) {
