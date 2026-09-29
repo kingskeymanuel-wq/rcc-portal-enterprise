@@ -8,6 +8,7 @@
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <link rel="stylesheet" th:href="@{/css/agent-live.css}">
+    <link rel="stylesheet" th:href="@{/css/agent-trainings.css}">
     <style>
         .ob-chat-scroll { max-height: 60vh; overflow-y: auto; padding: 4px; }
         .ob-chat-msg { max-width: 82%; margin-bottom: .6rem; display: flex; }
@@ -108,6 +109,9 @@
                         <p class="text-muted mb-0">Votre tableau de bord Outbound — suivez vos ventes et vos rendez-vous clients</p>
                     </div>
                 </div>
+
+                <!-- Formations de l'agent Outbound / Télévente (agent-trainings.js) -->
+                <div id="agentTrainings"></div>
 
                 <div class="row g-3 mb-4">
                     <div class="col-6 col-lg-3">
@@ -562,6 +566,7 @@
 <script th:src="@{/js/rcc-api.js}"></script>
 <script th:src="@{/js/session.js}"></script>
 <script th:src="@{/js/agent-live.js}"></script>
+<script th:src="@{/js/agent-trainings.js}"></script>
 <script th:src="@{/js/outbound-dashboard.js}"></script>
 </body>
 </html>

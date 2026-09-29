@@ -349,13 +349,38 @@
     var welcomeShown = false;
 
     /** Exemples cliquables à la première ouverture — RAF montre ce qu'il sait faire. */
+    /**
+     * À l'ouverture : la conversation du jour est réaffichée (elle suit l'agent de page en page et survit à un
+     * redémarrage du serveur) ; sans historique, RAF propose ses suggestions d'accueil.
+     */
     function showWelcome(thread) {
         if (welcomeShown) return;
         welcomeShown = true;
-        fetch("/api/ralph/welcome?lang=" + encodeURIComponent(getRafLanguage()), { credentials: "same-origin" })
-            .then(function (res) { return res.ok ? res.json() : null; })
-            .then(function (w) { if (w) appendSuggestions(thread, w.suggestions); })
+        fetch("/api/ralph/history", { credentials: "same-origin" })
+            .then(function (res) { return res.ok ? res.json() : []; })
+            .catch(function () { return []; })
+            .then(function (turns) {
+                if (turns && turns.length) {
+                    var sep = document.createElement("div");
+                    sep.className = "text-center text-muted small my-2";
+                    sep.textContent = "— Conversation du jour —";
+                    thread.appendChild(sep);
+                    turns.forEach(function (tr) {
+                        if (tr.question) appendMessage(thread, tr.question, "user");
+                        if (tr.answer) appendMessage(thread, "", "bot").innerHTML = renderRafMarkdown(tr.answer);
+                    });
+                    scrollDown(thread);
+                    return;
+                }
+                return fetch("/api/ralph/welcome?lang=" + encodeURIComponent(getRafLanguage()), { credentials: "same-origin" })
+                    .then(function (res) { return res.ok ? res.json() : null; })
+                    .then(function (w) { if (w) appendSuggestions(thread, w.suggestions); });
+            })
             .catch(function () {});
+    }
+
+    function rememberOpen(open) {
+        try { sessionStorage.setItem("raf_open", open ? "1" : "0"); } catch (e) { /* stockage indisponible */ }
     }
 
     var lastQuestionWasVoice = false;
@@ -610,13 +635,24 @@
                 panel.classList.remove("d-none");
                 input.focus();
                 showWelcome(thread);
+                rememberOpen(true);
             }, 480);
         });
 
         closeBtn.addEventListener("click", function () {
             panel.classList.add("d-none");
             fab.classList.remove("d-none");
+            rememberOpen(false);
         });
+
+        // RAF ouvert sur la page précédente : il reste ouvert, avec la conversation en cours.
+        try {
+            if (sessionStorage.getItem("raf_open") === "1") {
+                fab.classList.add("d-none");
+                panel.classList.remove("d-none");
+                showWelcome(thread);
+            }
+        } catch (e) { /* stockage indisponible */ }
 
         if (resetBtn) {
             resetBtn.addEventListener("click", function () { resetConversation(thread); });

@@ -38,7 +38,7 @@
             }).join("");
 
             var select = $("roleToAssign");
-            select.innerHTML = roles.map(function (r) {
+            if (select) select.innerHTML = roles.map(function (r) {
                 return '<option value="' + r.id + '">' + escapeHtml(r.name) + "</option>";
             }).join("");
         }).catch(function (e) { console.error(e); });
@@ -91,7 +91,7 @@
 
         getJson("/api/admin/services").then(function (services) {
             var select = $("serviceToAssign");
-            select.innerHTML = services.map(function (s) {
+            if (select) select.innerHTML = services.map(function (s) {
                 return '<option value="' + s.id + '">' + escapeHtml(s.name) + "</option>";
             }).join("");
         }).catch(function (e) { console.error(e); });

@@ -190,7 +190,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (accessResolver != null && !"GET".equalsIgnoreCase(request.getMethod()) && response.getStatus() < 400) {
             String path = request.getRequestURI();
             if (path.startsWith("/api/admin/") || path.startsWith("/api/users") || path.startsWith("/api/hr/")
-                    || path.startsWith("/api/team-leader/members")) {
+                    || path.startsWith("/api/team-leader/members") || path.startsWith("/api/tab-permissions")
+                    || path.startsWith("/api/teams") || path.startsWith("/api/services")) {
                 accessResolver.evictAll();
             }
         }

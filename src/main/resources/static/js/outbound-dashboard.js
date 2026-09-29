@@ -1338,6 +1338,12 @@
                     document.getElementById("agentLive").style.display = "";
                     RccAgentLive.mount(document.getElementById("agentLive"));
                 }
+                if (window.RccAgentTrainings && document.getElementById("agentTrainings")) {
+                    RccAgentTrainings.mount(document.getElementById("agentTrainings"), {
+                        kicker: "Formation Outbound & Télévente",
+                        subtitle: "Techniques de vente, produits et scripts d'appel de votre équipe — reprenez là où vous vous êtes arrêté."
+                    });
+                }
                 var isAdmin = session.profile === "ADMIN";
                 var isQa = session.profile === "QA";
                 var isSupervisor = session.profile === "SUPERVISOR";

@@ -54,7 +54,9 @@ public class TrainingService {
             List<TrainingFormation> all = formationRepository.findAllByOrderByScheduledDateAscScheduledTimeAsc();
             return all.stream()
                     .filter(f -> f.getTargetTeam() == null || f.getTargetTeam().isBlank()
-                            || currentUserTeam == null || f.getTargetTeam().equalsIgnoreCase(currentUserTeam))
+                            || currentUserTeam == null || f.getTargetTeam().equalsIgnoreCase(currentUserTeam)
+                            // Équipe cible écrite en code (« OUTBOUND ») ou en libellé : un agent Télévente relève de l'Outbound.
+                            || com.ecobank.rccportal.util.TeamClassifier.matchesTeam(f.getTargetTeam(), currentUserTeam))
                     .map(f -> toResponse(f, currentUserId))
                     .collect(Collectors.toList());
         } catch (Exception e) {

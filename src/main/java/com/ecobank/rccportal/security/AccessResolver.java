@@ -62,7 +62,7 @@ public class AccessResolver {
     }
 
     /** Rôle de base correspondant au NOM d'un rôle (base ou libellé métier), null s'il n'en désigne aucun. */
-    static String roleOfName(String name) {
+    public static String roleOfName(String name) {
         if (name == null || name.isBlank()) return null;
         String n = java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "").trim().toUpperCase(Locale.ROOT).replace('_', ' ');
         if (n.equals("ADMIN") || n.startsWith("ADMINISTRAT")) return "ADMIN";

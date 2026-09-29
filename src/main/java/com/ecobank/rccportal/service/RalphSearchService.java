@@ -105,6 +105,11 @@ public class RalphSearchService {
         return translationService.translate(text, "auto", targetLang).translatedText();
     }
 
+    /** Fil de conversation RAF du jour (widget réaffiché après un changement de page ou un redémarrage). */
+    public java.util.List<RafConversationMemoryService.Turn> conversationToday(String username) {
+        return conversationMemoryService.today(username);
+    }
+
     /** Efface le fil de conversation courant de l'agent — nouvelle conversation explicite. */
     public void resetConversation(String username) {
         conversationMemoryService.clear(username);

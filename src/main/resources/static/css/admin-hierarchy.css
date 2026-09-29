@@ -1,0 +1,75 @@
+/* ===== Administration : organigramme hiérarchique ===== */
+.content { min-width: 0; }
+.ah-card { background: #fff; border: 1px solid #EEF1F5; border-radius: 1.3rem; box-shadow: 0 10px 26px rgba(0, 32, 84, .06); padding: 1.2rem 1.3rem; margin-bottom: 1.5rem; position: relative; }
+.ah-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: .8rem; margin-bottom: 1rem; }
+.ah-head h5 { font-weight: 800; color: #122240; }
+.ah-tools { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.ah-search { position: relative; }
+.ah-search i { position: absolute; left: .75rem; top: 50%; transform: translateY(-50%); color: #8A97AB; }
+.ah-search input { border: 1px solid #DCE4F0; border-radius: 999px; padding: .4rem .9rem .4rem 2rem; font-size: .85rem; min-width: 230px; outline: none; }
+.ah-seg { display: flex; padding: .2rem; border-radius: 999px; background: #EEF2F8; }
+.ah-seg button { border: 0; background: transparent; border-radius: 999px; padding: .3rem .75rem; font-size: .78rem; font-weight: 700; color: #4B5A70; }
+.ah-seg button.on { background: #0057B8; color: #fff; }
+.ah-inactive { font-size: .8rem; color: #4B5A70; display: flex; gap: .3rem; align-items: center; }
+.ah-expand { border: 1px solid #DCE4F0; background: #fff; border-radius: 999px; padding: .35rem .8rem; font-size: .78rem; font-weight: 700; color: #33415C; }
+
+.ah-counts { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: .5rem; margin-bottom: 1rem; }
+.ah-kpi { display: flex; flex-direction: column; border-radius: 1rem; padding: .6rem .75rem; background: #F6F8FC; --c: #0057B8; }
+.ah-kpi .bi { color: var(--c); }
+.ah-kpi b { font-size: 1.35rem; font-weight: 800; color: #122240; line-height: 1.1; }
+.ah-kpi span { font-size: .72rem; color: #6B7A90; font-weight: 600; }
+.sup { --c: #1B1F6B; } .rh { --c: #C2185B; } .hqa { --c: #7357D8; } .qa { --c: #8E6CEF; } .tl { --c: #0057B8; }
+.agent { --c: #0F9D6C; } .admin { --c: #475569; } .agence { --c: #D97706; } .todo { --c: #B42318; } .warnk { --c: #D97706; }
+
+.ah-flash { position: sticky; top: .5rem; z-index: 5; display: none; margin-bottom: .6rem; padding: .55rem .9rem; border-radius: .8rem; font-size: .86rem; font-weight: 600; }
+.ah-flash.show { display: block; }
+.ah-flash.ok { background: #E6F6EE; color: #0B7A52; } .ah-flash.ko { background: #FDECEC; color: #B42318; }
+
+.ah-branch { margin-left: 1.3rem; padding-left: 1rem; border-left: 2px dashed #D5DEEC; }
+.ah-sec { margin: 1.2rem 0 .6rem; font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: #6B7A90; }
+.ah-level, .ah-team { border: 1px solid #EEF1F5; border-left: 4px solid var(--c); border-radius: 1rem; margin-bottom: .7rem; background: #fff; }
+.ah-team { --c: #0057B8; }
+.ah-team.noteam { --c: #B42318; }
+.ah-level > header, .ah-team > header { display: flex; align-items: center; gap: .7rem; padding: .7rem .9rem; cursor: pointer; }
+.ah-level header h6, .ah-team header h6 { margin: 0; font-weight: 800; color: #122240; }
+.ah-level header small, .ah-team header small { color: #6B7A90; font-size: .76rem; }
+.ah-level header > div, .ah-team header > div { flex: 1; min-width: 0; }
+.ah-level-ico { width: 36px; height: 36px; flex-shrink: 0; border-radius: .8rem; display: flex; align-items: center; justify-content: center; color: #fff; background: var(--c); }
+.ah-count { font-size: .76rem; font-weight: 800; background: #EEF2F8; color: #33415C; border-radius: 999px; padding: .15rem .6rem; white-space: nowrap; }
+.ah-count.tl { background: #EAF2FF; color: #0057B8; }
+.ah-caret { color: #8A97AB; transition: transform .2s ease; }
+.open > header .ah-caret { transform: rotate(180deg); }
+.ah-people { display: none; padding: 0 .9rem .9rem; }
+.open > .ah-people { display: block; }
+.ah-sub { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: #8A97AB; margin: .5rem 0 .35rem; }
+.ah-agents { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap: .5rem; }
+.ah-person { border: 1px solid #EEF1F5; border-radius: .9rem; padding: .6rem .7rem; background: #FBFCFE; margin-bottom: .5rem; }
+.ah-agents .ah-person { margin: 0; }
+.ah-person.warn { border-color: #F7D9A8; background: #FFFBF3; }
+.ah-person.off { opacity: .6; }
+.ah-id { display: flex; align-items: center; gap: .6rem; margin-bottom: .4rem; }
+.ah-av { width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: .72rem; color: #fff; background: var(--c); }
+.ah-name { flex: 1; min-width: 0; }
+.ah-name b { display: block; font-size: .88rem; color: #122240; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ah-name small { font-size: .72rem; color: #8A97AB; }
+.ah-profile { font-weight: 800; color: #0057B8; }
+.ah-off { color: #B42318; font-weight: 700; }
+.ah-open { border: 0; background: transparent; color: #8A97AB; }
+.ah-open:hover { color: #0057B8; }
+.ah-tags { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; margin-top: .25rem; }
+.ah-lbl { font-size: .68rem; font-weight: 800; text-transform: uppercase; color: #8A97AB; width: 62px; }
+.ah-chip { display: inline-flex; align-items: center; gap: .25rem; font-size: .75rem; font-weight: 700; border-radius: 999px; padding: .12rem .2rem .12rem .6rem; }
+.ah-chip.role { background: #EAF2FF; color: #0B4FA8; }
+.ah-chip.svc { background: #E6F6EE; color: #0B7A52; }
+.ah-chip button { border: 0; background: rgba(255, 255, 255, .8); color: inherit; width: 18px; height: 18px; border-radius: 50%; line-height: 1; font-weight: 800; padding: 0; }
+.ah-chip button:hover { background: #B42318; color: #fff; }
+.ah-none { font-size: .75rem; color: #B0BAC9; font-style: italic; }
+.ah-add { border: 1px dashed #BFD0E6; background: #fff; border-radius: 999px; font-size: .74rem; font-weight: 700; color: #0057B8; padding: .12rem .5rem; max-width: 160px; }
+.ah-warn { margin: .4rem 0 0; padding-left: 1.1rem; font-size: .76rem; color: #8A4B06; }
+.ah-empty { color: #8A97AB; font-size: .85rem; padding: .6rem 0; text-align: center; }
+
+@media (max-width: 700px) {
+    .ah-branch { margin-left: .4rem; padding-left: .5rem; }
+    .ah-search input { min-width: 0; width: 100%; }
+    .ah-lbl { width: 100%; }
+}

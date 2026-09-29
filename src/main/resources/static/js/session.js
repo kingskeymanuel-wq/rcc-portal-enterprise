@@ -671,11 +671,6 @@ window.RccSession = (function () {
     }
 
     /**
-     * Changement fait par l'administrateur pendant la session (rôle, service, équipe dirigée, désactivation) :
-     * l'accès est relu côté serveur à chaque requête ; ici on le détecte pour basculer tout de suite vers le
-     * bon portail au lieu d'attendre une reconnexion.
-     */
-    /**
      * Session disponible 24h/24 : tant qu'une page du portail est ouverte (même en arrière-plan), elle signale sa
      * présence toutes les 4 minutes et le serveur prolonge la session. Au retour sur l'onglet ou à la sortie de
      * veille du poste, la session est reprise aussitôt — aucune déconnexion pour inactivité.
@@ -694,36 +689,52 @@ window.RccSession = (function () {
         window.addEventListener("focus", ping);
     }
 
+    /**
+     * Changement fait par l'administrateur pendant la session (rôle, service, équipe dirigée, onglets, fonctionnalités,
+     * désactivation) : l'accès est relu côté serveur à chaque requête ; ici, l'empreinte d'accès est relue toutes les
+     * 15 s (et au retour sur l'onglet). Si le profil change → bascule vers le bon portail ; si seuls les onglets,
+     * fonctionnalités ou l'équipe changent → la page se recharge pour appliquer les nouveaux droits.
+     */
     function watchAccessChanges(user, profile) {
-        var signature = String(user.role || "") + "|" + String(user.service || "");
+        var roleSig = String(user.role || "") + "|" + String(user.service || "");
+        var baseline = null;
         var shown = false;
-        setInterval(function () {
-            if (document.hidden || shown) return;
-            fetch("/api/auth/me", { credentials: "same-origin" }).then(function (res) {
+
+        function banner(text, target) {
+            shown = true;
+            var bar = document.createElement("div");
+            bar.className = "rcc-access-changed";
+            bar.style.cssText = "position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:3000;max-width:92vw;" +
+                "background:#0B3D91;color:#fff;border-radius:14px;padding:.75rem 1rem;box-shadow:0 14px 34px rgba(0,0,0,.25);font-size:.92rem;display:flex;gap:.8rem;align-items:center;flex-wrap:wrap";
+            bar.innerHTML = '<i class="bi bi-shield-check"></i><span>' + text + '</span><button type="button" class="btn btn-sm btn-light fw-bold">' +
+                (target ? "Ouvrir mon portail" : "Actualiser maintenant") + '</button>';
+            document.body.appendChild(bar);
+            function go() { if (target) window.location.href = target; else window.location.reload(); }
+            bar.querySelector("button").addEventListener("click", go);
+            setTimeout(go, target ? 6000 : 4000);
+        }
+
+        function check() {
+            if (shown) return;
+            fetch("/api/auth/access-signature", { credentials: "same-origin", cache: "no-store" }).then(function (res) {
                 if (res.status === 401 || res.status === 403) { window.location.href = "/login"; return null; }
                 return res.ok ? res.json() : null;
-            }).then(function (me) {
-                if (!me || !me.username) return;
-                if (String(me.role || "") + "|" + String(me.service || "") === signature) return;
-                shown = true;
-                var newProfile = computeProfile(me);
-                var bar = document.createElement("div");
-                bar.className = "rcc-access-changed";
-                bar.style.cssText = "position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:3000;max-width:92vw;" +
-                    "background:#0B3D91;color:#fff;border-radius:14px;padding:.75rem 1rem;box-shadow:0 14px 34px rgba(0,0,0,.25);font-size:.92rem;display:flex;gap:.8rem;align-items:center;flex-wrap:wrap";
-                bar.innerHTML = '<i class="bi bi-shield-check"></i><span>Vos accès ont été mis à jour par l\'administrateur : ' +
-                    (PROFILE_LABELS[newProfile] || newProfile) + '.</span><button type="button" class="btn btn-sm btn-light fw-bold">Ouvrir mon portail</button>';
-                document.body.appendChild(bar);
-                function go() {
-                    fetch("/api/users/me/team-status", { credentials: "same-origin" })
-                        .then(function (r) { return r.ok ? r.json() : {}; })
-                        .then(function (st) { window.location.href = st.redirectTo || "/dashboard"; })
-                        .catch(function () { window.location.href = "/dashboard"; });
+            }).then(function (a) {
+                if (!a) return;
+                if (a.active === false) { window.location.href = "/login"; return; }
+                if (baseline === null) { baseline = a.signature; return; }
+                if (a.signature === baseline) return;
+                if (String(a.role || "") + "|" + String(a.service || "") !== roleSig) {
+                    var newProfile = computeProfile(a);
+                    banner("Vos accès ont été mis à jour par l'administrateur : " + (PROFILE_LABELS[newProfile] || newProfile) + ".", a.redirectTo || "/dashboard");
+                } else {
+                    banner("Vos droits (équipe, onglets ou fonctionnalités) ont été mis à jour par l'administrateur — la page s'actualise.", null);
                 }
-                bar.querySelector("button").addEventListener("click", go);
-                setTimeout(go, 6000);
             }).catch(function () { /* réseau : on réessaiera */ });
-        }, 30000);
+        }
+        check();
+        setInterval(function () { if (!document.hidden) check(); }, 15000);
+        document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") check(); });
     }
 
     function init() {

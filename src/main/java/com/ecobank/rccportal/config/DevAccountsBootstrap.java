@@ -105,8 +105,14 @@ public class DevAccountsBootstrap implements CommandLineRunner {
         // PasswordEncoder, pas du mot de passe en clair "BYPASS" des autres comptes de test.
         boolean isExcelliam = account.getRole() != null && "excelliam".equalsIgnoreCase(account.getRole().trim());
 
+        // Rôle, service, équipe, équipe dirigée et agence du compte de test ne sont posés qu'à sa CRÉATION :
+        // ensuite, c'est l'administrateur qui décide. Les réimposer à chaque démarrage (ancien comportement)
+        // annulait silencieusement, après chaque mise à jour/redémarrage depuis IntelliJ, les changements faits
+        // dans Administration sur ces comptes.
+        boolean[] isNew = { false };
         User user = userRepository.findFirstByUsernameIgnoreCase(account.getUsername())
                 .orElseGet(() -> {
+                    isNew[0] = true;
                     User created = User.builder()
                             .username(account.getUsername())
                             .name(account.getName())
@@ -129,6 +135,10 @@ public class DevAccountsBootstrap implements CommandLineRunner {
             user.setPassword(passwordEncoder.encode(account.getPassword()));
             userRepository.save(user);
             log.warn("[Bootstrap] Compte EXCELLIAM {} migré vers un mot de passe hashé (plus de bypass MFA).", account.getUsername());
+        }
+
+        if (!isNew[0]) {
+            return;
         }
 
         if (account.getRole() != null && !account.getRole().isBlank()) {

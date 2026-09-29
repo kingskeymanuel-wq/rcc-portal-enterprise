@@ -20,15 +20,25 @@ public class AdministrationController {
     private final UserFeaturePermissionService userFeaturePermissionService;
     private final CurrentUserAccessService currentUserAccessService;
     private final com.ecobank.rccportal.service.EffectiveAccessService effectiveAccessService;
+    private final com.ecobank.rccportal.service.AdminHierarchyService hierarchyService;
 
     public AdministrationController(AdministrationService administrationService,
                                     UserFeaturePermissionService userFeaturePermissionService,
                                     CurrentUserAccessService currentUserAccessService,
-                                    com.ecobank.rccportal.service.EffectiveAccessService effectiveAccessService) {
+                                    com.ecobank.rccportal.service.EffectiveAccessService effectiveAccessService,
+                                    com.ecobank.rccportal.service.AdminHierarchyService hierarchyService) {
+        this.hierarchyService = hierarchyService;
         this.administrationService = administrationService;
         this.userFeaturePermissionService = userFeaturePermissionService;
         this.currentUserAccessService = currentUserAccessService;
         this.effectiveAccessService = effectiveAccessService;
+    }
+
+    /** Organigramme : Superviseur, RH, Head QA et QA, Team Leaders et agents par équipe — rôles et services de chacun. */
+    @GetMapping("/hierarchy")
+    public com.ecobank.rccportal.service.AdminHierarchyService.Hierarchy hierarchy(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return hierarchyService.hierarchy();
     }
 
     /** Accès effectif d'un utilisateur (profil, équipe menée, portail) et ce qui manque — fiche utilisateur de l'admin. */

@@ -15,6 +15,7 @@
           rel="stylesheet">
 
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/admin-hierarchy.css}">
 
     <style>
         .directory-branch { border: 1px solid rgba(0,0,0,.08); border-radius: .5rem; margin-bottom: .75rem; overflow: hidden; }
@@ -270,6 +271,9 @@
                         <div id="usernameDuplicatesResult"></div>
                     </div>
                 </div>
+
+                <!-- Organigramme hiérarchique : rôles et services de chacun, modifiables sur place (admin-hierarchy.js) -->
+                <div class="ah-card" id="adminHierarchy"></div>
 
                 <!-- Annuaire complet, organisé par filiale puis service/équipe — c'est ici la
                      vraie "gestion des utilisateurs" (featureCode "users") : pas de portail
@@ -826,6 +830,7 @@
 <script th:src="@{/js/users.js}"></script>
 <script th:src="@{/js/administration.js}"></script>
 <script th:src="@{/js/admin-agency.js}"></script>
+<script th:src="@{/js/admin-hierarchy.js}"></script>
 
 </body>
 </html>

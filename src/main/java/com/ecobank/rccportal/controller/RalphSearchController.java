@@ -111,6 +111,16 @@ public class RalphSearchController {
         return webSearchClient.diagnose();
     }
 
+    /** Fil de conversation RAF du jour — réaffiché par le widget sur chaque page, même après un redémarrage. */
+    @GetMapping("/history")
+    public java.util.List<java.util.Map<String, Object>> history(@AuthenticationPrincipal AuthenticatedUser requester) {
+        if (requester == null) return java.util.List.of();
+        return ralphSearchService.conversationToday(requester.username()).stream()
+                .map(t -> java.util.Map.<String, Object>of("question", t.question() == null ? "" : t.question(),
+                        "answer", t.answer() == null ? "" : t.answer(), "at", t.at().toString()))
+                .toList();
+    }
+
     /** Efface le fil de conversation courant de l'agent — repart d'une conversation neuve avec RAF. */
     @PostMapping("/reset-conversation")
     public void resetConversation(@AuthenticationPrincipal AuthenticatedUser requester) {

@@ -1,0 +1,38 @@
+/* ===== « Mes formations » dans les portails agent ===== */
+.at-root { background: #fff; border: 1px solid #EEF1F5; border-radius: 1.3rem; box-shadow: 0 10px 26px rgba(0, 32, 84, .06); padding: 1.2rem 1.3rem; margin-bottom: 1.4rem; }
+.at-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: .6rem; margin-bottom: .9rem; }
+.at-kicker { font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #7357D8; }
+.at-head h5 { margin: .15rem 0; font-weight: 800; color: #122240; }
+.at-head small { color: #6B7A90; }
+.at-all { text-decoration: none; font-weight: 700; font-size: .82rem; border-radius: 999px; padding: .4rem .9rem; background: #F1E9FF; color: #5B3FC4; }
+.at-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .55rem; margin-bottom: .9rem; }
+.at-stat { display: flex; flex-direction: column; background: #F6F8FC; border-radius: 1rem; padding: .6rem .8rem; --c: #7357D8; }
+.at-stat .bi { color: var(--c); }
+.at-stat b { font-size: 1.3rem; font-weight: 800; color: #122240; }
+.at-stat span { font-size: .74rem; color: #6B7A90; }
+.at-stat.s1 { --c: #0057B8; } .at-stat.s2 { --c: #10A36A; } .at-stat.s3 { --c: #D97706; }
+.at-filters { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .9rem; }
+.at-filters button { border: 1px solid #DCE4F0; background: #fff; border-radius: 999px; padding: .32rem .8rem; font-size: .8rem; font-weight: 700; color: #33415C; }
+.at-filters button span { background: #EEF2F8; border-radius: 999px; padding: 0 .45rem; margin-left: .2rem; font-size: .7rem; }
+.at-filters button.on { background: linear-gradient(135deg, #5B3FC4, #0057B8); color: #fff; border-color: transparent; }
+.at-filters button.on span { background: rgba(255, 255, 255, .25); }
+.at-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: .75rem; }
+.at-card { display: flex; flex-direction: column; gap: .4rem; border: 1px solid #EEF1F5; border-top: 4px solid #CBD5E1; border-radius: 1rem; padding: .8rem .9rem; background: #FBFCFE; transition: transform .15s ease, box-shadow .15s ease; }
+.at-card:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(0, 32, 84, .08); }
+.at-card.doing { border-top-color: #0057B8; } .at-card.done { border-top-color: #10A36A; }
+.at-top { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; }
+.at-badge { font-size: .68rem; font-weight: 800; border-radius: 999px; padding: .1rem .55rem; background: #EAF2FF; color: #0B4FA8; }
+.at-badge.must { background: #FDECEC; color: #B42318; }
+.at-when { margin-left: auto; font-size: .72rem; color: #6B7A90; }
+.at-card h6 { margin: 0; font-weight: 800; color: #122240; }
+.at-card p { margin: 0; font-size: .8rem; color: #4B5A70; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.at-meta { display: flex; gap: .8rem; font-size: .75rem; color: #6B7A90; }
+.at-progress { display: flex; align-items: center; gap: .5rem; margin-top: auto; }
+.at-bar { flex: 1; height: 7px; background: #EEF2F8; border-radius: 999px; overflow: hidden; }
+.at-bar i { display: block; height: 100%; background: linear-gradient(90deg, #5B3FC4, #0057B8, #10A36A); border-radius: 999px; }
+.at-progress b { font-size: .8rem; color: #122240; min-width: 3rem; text-align: right; }
+.at-btn { border: 0; border-radius: 999px; padding: .45rem .9rem; font-weight: 800; font-size: .82rem; color: #fff; background: #0057B8; }
+.at-btn.todo { background: linear-gradient(135deg, #5B3FC4, #0057B8); }
+.at-btn.done { background: #E6F6EE; color: #0B7A52; }
+.at-btn:disabled { opacity: .6; }
+.at-empty { grid-column: 1 / -1; text-align: center; color: #8A97AB; padding: 1.6rem 1rem; border: 1px dashed #DCE4F0; border-radius: 1rem; }

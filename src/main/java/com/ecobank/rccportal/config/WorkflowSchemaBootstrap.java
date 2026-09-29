@@ -634,6 +634,19 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
                     ReintegratedBy NVARCHAR(100) NULL
                 )
                 """);
+        // Mémoire de RAF : fil de conversation du jour, conservé à travers les changements de page et les
+        // redémarrages du serveur (numéros masqués, purge après 7 jours — voir RafConversationMemoryService).
+        createIfMissing("RafTurns", """
+                CREATE TABLE dbo.RafTurns (
+                    TurnId BIGINT IDENTITY PRIMARY KEY,
+                    Username NVARCHAR(100) NOT NULL,
+                    Question NVARCHAR(4000) NULL,
+                    Answer NVARCHAR(MAX) NULL,
+                    Cleared BIT NOT NULL DEFAULT 0,
+                    At DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    INDEX IX_RafTurns_User (Username, At)
+                )
+                """);
         // Workflow de supervision : missions confiées par le Superviseur (Head RCC) à ses Team Leaders et par le
         // Head QA à ses agents QA / formateurs, avec l'historique de chaque étape (création, prise en charge, rendu,
         // validation, renvoi pour reprise).
