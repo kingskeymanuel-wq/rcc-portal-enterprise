@@ -4,8 +4,9 @@ import com.ecobank.rccportal.dto.LoginChallengeResponse;
 import com.ecobank.rccportal.dto.LoginRequest;
 import com.ecobank.rccportal.dto.MfaRequest;
 import com.ecobank.rccportal.security.AuthenticatedUser;
+import com.ecobank.rccportal.security.JwtService;
+import com.ecobank.rccportal.security.SessionCookies;
 import com.ecobank.rccportal.service.AuthService;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -14,13 +15,12 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    /** Doit correspondre exactement au nom lu par JwtAuthenticationFilter. */
-    private static final String ACCESS_COOKIE = "eco_access_token";
-
     private final AuthService authService;
+    private final JwtService jwtService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, JwtService jwtService) {
         this.authService = authService;
+        this.jwtService = jwtService;
     }
 
     /**
@@ -59,7 +59,7 @@ public class AuthController {
     public LoginChallengeResponse login(@RequestBody LoginRequest request, HttpServletResponse response) {
         LoginChallengeResponse result = authService.initiateLogin(request.username(), request.password());
         if (!result.twoFactorRequired() && result.session() != null) {
-            setAccessCookie(response, result.session().accessToken());
+            setSessionCookies(response, result.session());
         }
         return result;
     }
@@ -74,7 +74,7 @@ public class AuthController {
     public AuthService.SessionTokens validateOtp(@RequestBody MfaRequest request,
                                                  HttpServletResponse response) {
         AuthService.SessionTokens tokens = authService.completeLogin(request.challengeId(), request.otp());
-        setAccessCookie(response, tokens.accessToken());
+        setSessionCookies(response, tokens);
         return tokens;
     }
 
@@ -94,25 +94,26 @@ public class AuthController {
     @PostMapping("/logout")
     public void logout(@RequestHeader(value = "Refresh-Token", required = false) String refreshToken,
                        @AuthenticationPrincipal AuthenticatedUser user,
+                       jakarta.servlet.http.HttpServletRequest request,
                        HttpServletResponse response) {
+        if (refreshToken == null || refreshToken.isBlank()) refreshToken = SessionCookies.read(request, SessionCookies.REFRESH);
         authService.logout(refreshToken, user != null ? user.username() : null, user != null ? user.role() : null);
-        clearAccessCookie(response);
+        SessionCookies.clear(response);
     }
 
-    private void setAccessCookie(HttpServletResponse response, String accessToken) {
-        Cookie cookie = new Cookie(ACCESS_COOKIE, accessToken);
-        cookie.setHttpOnly(true);
-        cookie.setPath("/");
-        cookie.setMaxAge(60 * 60); // 1h — aligné sur rcc.auth.jwt-access-expires-in-minutes
-        // cookie.setSecure(true); // à activer dès que le portail est servi en HTTPS (pas le cas en local http://localhost)
-        response.addCookie(cookie);
+    /**
+     * Maintien de session : appelé toutes les quelques minutes par chaque page ouverte (session.js).
+     * Le filtre JWT renouvelle le jeton au passage — la session ne tombe jamais pour inactivité.
+     */
+    @GetMapping("/keepalive")
+    public java.util.Map<String, Object> keepalive(@AuthenticationPrincipal AuthenticatedUser user) {
+        return java.util.Map.of("active", user != null, "at", java.time.Instant.now().toString());
     }
 
-    private void clearAccessCookie(HttpServletResponse response) {
-        Cookie cookie = new Cookie(ACCESS_COOKIE, "");
-        cookie.setHttpOnly(true);
-        cookie.setPath("/");
-        cookie.setMaxAge(0);
-        response.addCookie(cookie);
+    /** Jeton d'accès + jeton de renouvellement, gardés tant que la session n'est pas fermée (voir SessionCookies). */
+    private void setSessionCookies(HttpServletResponse response, AuthService.SessionTokens tokens) {
+        int maxAge = jwtService.refreshMaxAgeSeconds();
+        SessionCookies.write(response, SessionCookies.ACCESS, tokens.accessToken(), maxAge);
+        if (tokens.refreshToken() != null) SessionCookies.write(response, SessionCookies.REFRESH, tokens.refreshToken(), maxAge);
     }
 }

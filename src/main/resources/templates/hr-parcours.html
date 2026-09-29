@@ -11,6 +11,7 @@
     <link rel="stylesheet" th:href="@{/css/hr-portal.css}">
     <link rel="stylesheet" th:href="@{/css/qa-team.css}">
     <link rel="stylesheet" th:href="@{/css/hr-org.css}">
+    <link rel="stylesheet" th:href="@{/css/hr-live.css}">
 </head>
 <body>
 <div class="layout">
@@ -55,6 +56,7 @@
                     <nav class="hr-tabs mb-4" id="hrTabs" role="tablist">
                         <button type="button" class="active" data-tab="overview"><i class="bi bi-grid-1x2"></i> Vue d'ensemble</button>
                         <button type="button" data-tab="org"><i class="bi bi-diagram-3"></i> Parcours &amp; équipes <b id="tabCountOrg"></b></button>
+                        <button type="button" data-tab="live"><i class="bi bi-broadcast"></i> Plannings en direct <b id="tabCountLive"></b></button>
                         <button type="button" data-tab="perf"><i class="bi bi-graph-up-arrow"></i> Performance</button>
                         <button type="button" data-tab="leave"><i class="bi bi-calendar2-check"></i> Congés <b id="tabCountLeave"></b></button>
                         <button type="button" data-tab="exits"><i class="bi bi-box-arrow-right"></i> Sorties <b id="tabCountExits"></b></button>
@@ -86,9 +88,9 @@
                                 <div class="hr-card h-100" id="followup">
                                     <div class="hr-card-head"><div><h3><i class="bi bi-activity"></i> Indicateurs RH</h3><p>Calculés sur l'effectif RCC</p></div></div>
                                     <div class="hr-followup-kpis">
-                                        <div class="followup-kpi"><span class="fk-ic" style="background:#fff3db;color:#c77700"><i class="bi bi-arrow-left-right"></i></span><div><b id="kpiTurnover">—</b><span>Taux de rotation</span><small>comptes inactifs / effectif</small></div></div>
-                                        <div class="followup-kpi"><span class="fk-ic" style="background:#ffe8eb;color:#b42333"><i class="bi bi-person-dash"></i></span><div><b id="kpiAbsenteeism">—</b><span>Taux d'absentéisme</span><small>en congé / effectif actif</small></div></div>
-                                        <div class="followup-kpi"><span class="fk-ic" style="background:#eee9ff;color:#7357d8"><i class="bi bi-mortarboard"></i></span><div><b id="kpiFormationRate">—</b><span>Taux de formation</span><small>progression moyenne</small></div></div>
+                                        <div class="followup-kpi" data-go="exits" role="button" tabindex="0" title="Voir les sorties"><span class="fk-ic" style="background:#fff3db;color:#c77700"><i class="bi bi-arrow-left-right"></i></span><div><b id="kpiTurnover">—</b><span>Taux de rotation</span><small id="kpiTurnoverSub">sorties sur 12 mois / effectif</small></div></div>
+                                        <div class="followup-kpi" data-go="live" role="button" tabindex="0" title="Voir les plannings du jour"><span class="fk-ic" style="background:#ffe8eb;color:#b42333"><i class="bi bi-person-dash"></i></span><div><b id="kpiAbsenteeism">—</b><span>Taux d'absentéisme</span><small id="kpiAbsenteeismSub">congés + absences au planning, aujourd'hui</small></div></div>
+                                        <div class="followup-kpi" data-go="growth" role="button" tabindex="0" title="Voir la formation"><span class="fk-ic" style="background:#eee9ff;color:#7357d8"><i class="bi bi-mortarboard"></i></span><div><b id="kpiFormationRate">—</b><span>Taux de formation</span><small id="kpiFormationSub">collaborateurs ayant terminé une leçon</small></div></div>
                                     </div>
                                 </div>
                             </div>
@@ -96,9 +98,10 @@
                                 <div class="hr-card h-100" id="control">
                                     <div class="hr-card-head"><div><h3><i class="bi bi-shield-check"></i> Centre de contrôle RH</h3><p>Équipe → service → agent, sans dupliquer les données RCC</p></div><a href="/reports" class="hr-btn hr-btn-soft hr-btn-sm"><i class="bi bi-bar-chart"></i> Reporting RCC</a></div>
                                     <div class="control-grid">
-                                        <div class="control-card clickable" data-kind="contracts" role="button" tabindex="0"><span class="cc-ic" style="background:#e7f0ff;color:#1769e0"><i class="bi bi-file-earmark-person"></i></span><div><b>Contrats &amp; dossiers</b><span>Filiale, équipe, type et statut de contrat.</span><span class="control-badge" id="badgeContracts">—</span></div><i class="bi bi-chevron-right cc-go"></i></div>
-                                        <div class="control-card clickable" data-kind="leave" role="button" tabindex="0"><span class="cc-ic" style="background:#fff3db;color:#c77700"><i class="bi bi-calendar2-check"></i></span><div><b>Congés</b><span>Demandes et soldes par agent.</span><span class="control-badge" id="badgeLeave">—</span></div><i class="bi bi-chevron-right cc-go"></i></div>
+                                        <div class="control-card clickable" data-kind="contracts" role="button" tabindex="0"><span class="cc-ic" style="background:#e7f0ff;color:#1769e0"><i class="bi bi-file-earmark-person"></i></span><div><b>Contrats &amp; dossiers</b><span>Filiale, équipe, type et statut de contrat.</span><span class="control-badges" id="badgeContractsBox"><span class="control-badge" id="badgeContracts">—</span></span></div><i class="bi bi-chevron-right cc-go"></i></div>
+                                        <div class="control-card clickable" data-kind="leave" role="button" tabindex="0"><span class="cc-ic" style="background:#fff3db;color:#c77700"><i class="bi bi-calendar2-check"></i></span><div><b>Congés</b><span>Demandes et soldes par agent.</span><span class="control-badges"><span class="control-badge" id="badgeLeave">—</span><span class="control-badge leave-today" id="badgeLeaveToday" hidden></span></span></div><i class="bi bi-chevron-right cc-go"></i></div>
                                         <div class="control-card clickable" data-kind="performance" role="button" tabindex="0"><span class="cc-ic" style="background:#e6f8f0;color:#10a36a"><i class="bi bi-graph-up-arrow"></i></span><div><b>Performance</b><span>Indicateurs du reporting opérationnel.</span><span class="control-badge" id="badgePerformance">—</span></div><i class="bi bi-chevron-right cc-go"></i></div>
+                                        <div class="control-card clickable" data-go="live" role="button" tabindex="0"><span class="cc-ic" style="background:#ffe8eb;color:#d6336c"><i class="bi bi-broadcast"></i></span><div><b>Plannings &amp; shifts en direct</b><span>Qui est en poste, en pause, en retard ou en congé.</span><span class="control-badges" id="badgeLiveBox"><span class="control-badge">—</span></span></div><i class="bi bi-chevron-right cc-go"></i></div>
                                     </div>
                                 </div>
                             </div>
@@ -150,6 +153,14 @@
                     </div>
 
                     <!-- ============ PERFORMANCE ============ -->
+                    <!-- ============ PLANNINGS & SHIFTS EN DIRECT ============ -->
+                    <div class="hr-pane" data-pane="live">
+                        <div class="hr-card">
+                            <div class="hr-card-head"><div><h3><i class="bi bi-broadcast"></i> Plannings &amp; shifts en direct — <span data-hro-country-label>Côte d'Ivoire</span></h3><p>Planning de chaque équipe et statut réel de la pointeuse, actualisé chaque minute</p></div><a href="/shift" class="hr-btn hr-btn-soft hr-btn-sm"><i class="bi bi-clock-history"></i> Suivi de shift détaillé</a></div>
+                            <div id="hrLiveRoot"></div>
+                        </div>
+                    </div>
+
                     <div class="hr-pane" data-pane="perf">
                         <div class="hr-card">
                             <div class="hr-card-head flex-wrap">
@@ -370,6 +381,7 @@
 <script th:src="@{/js/session.js}"></script>
 <script th:src="@{/js/team-performance.js}"></script>
 <script th:src="@{/js/hr-org.js}"></script>
+<script th:src="@{/js/hr-live.js}"></script>
 <script th:src="@{/js/hr-parcours.js}"></script>
 </body>
 </html>

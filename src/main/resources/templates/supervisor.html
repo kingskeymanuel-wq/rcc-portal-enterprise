@@ -7,6 +7,7 @@
     <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}" rel="stylesheet">
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/supervision.css}">
     <link rel="stylesheet" th:href="@{/css/qa-team.css}">
     <link rel="stylesheet" th:href="@{/css/support-requests.css}">
     <style>
@@ -30,7 +31,7 @@
                         <h2><i class="bi bi-binoculars-fill"></i> Portail Superviseur</h2>
                         <p class="text-muted mb-0">Vue 360 sur le management — reporting et qualité de toutes les équipes</p>
                     </div>
-                    <span class="badge bg-secondary sv-readonly-badge"><i class="bi bi-eye"></i> Lecture seule</span>
+                    <span class="badge bg-primary sv-readonly-badge"><i class="bi bi-diagram-3"></i> Pilotage des sous-responsables</span>
                 </div>
 
                 <!-- Demandes d'aide agent (accès, outils, matériel, difficulté) — support-requests.js -->
@@ -73,14 +74,17 @@
                 </div>
 
                 <ul class="nav sv-tab-nav mb-3 flex-nowrap overflow-auto">
-                    <li class="nav-item"><button type="button" class="btn nav-link active" id="svTabReportingBtn"><i class="bi bi-diagram-3"></i> Reporting d'équipe</button></li>
+                    <li class="nav-item"><button type="button" class="btn nav-link active" id="svTabWorkflowBtn"><i class="bi bi-diagram-3-fill"></i> Workflow de supervision</button></li>
+                    <li class="nav-item"><button type="button" class="btn nav-link" id="svTabReportingBtn"><i class="bi bi-diagram-3"></i> Reporting d'équipe</button></li>
                     <li class="nav-item"><button type="button" class="btn nav-link" id="svTabQaBtn"><i class="bi bi-patch-check"></i> Évaluations QA</button></li>
                     <li class="nav-item"><button type="button" class="btn nav-link" id="svTabCrmBtn"><i class="bi bi-telephone-outbound-fill"></i> CRM Outbound</button></li>
                     <li class="nav-item"><button type="button" class="btn nav-link" id="svTabQaTeamBtn"><i class="bi bi-people-fill"></i> Équipe QA</button></li>
                 </ul>
 
                 <!-- ===================== REPORTING D'ÉQUIPE ===================== -->
-                <div id="svPaneReporting" class="sv-tab-pane">
+                <div id="svPaneWorkflow" class="sv-tab-pane"><div id="spManager"></div></div>
+
+                <div id="svPaneReporting" class="sv-tab-pane" style="display:none;">
                     <div class="card dashboard-card shadow-sm mb-4">
                         <div class="card-body">
                             <div class="row g-2 mb-3 align-items-end">
@@ -247,6 +251,7 @@
 <script th:src="@{/js/support-requests.js}"></script>
 <script th:src="@{/js/qa-team.js}"></script>
 <script th:src="@{/js/team-performance.js}"></script>
+<script th:src="@{/js/supervision.js}"></script>
 <script th:src="@{/js/supervisor.js}"></script>
 </body>
 </html>

@@ -15,9 +15,11 @@ import java.util.Map;
 public class HrOrganizationController {
 
     private final HrOrganizationService hr;
+    private final com.ecobank.rccportal.service.HrLiveService live;
 
-    public HrOrganizationController(HrOrganizationService hr) {
+    public HrOrganizationController(HrOrganizationService hr, com.ecobank.rccportal.service.HrLiveService live) {
         this.hr = hr;
+        this.live = live;
     }
 
     @GetMapping("/organisation")
@@ -36,6 +38,22 @@ public class HrOrganizationController {
     public HrOrganizationService.HrPerformance performance(@RequestParam(required = false) String country, @RequestParam(required = false) String month,
                                                            @AuthenticationPrincipal AuthenticatedUser requester) {
         return hr.performance(requester, country, month);
+    }
+
+    /** Tuiles « Indicateurs RH » et « Centre de contrôle RH » : valeurs réelles de la filiale. */
+    @GetMapping("/indicators")
+    public com.ecobank.rccportal.service.HrLiveService.Indicators indicators(@RequestParam(required = false) String country,
+                                                                            @RequestParam(required = false) String month,
+                                                                            @AuthenticationPrincipal AuthenticatedUser requester) {
+        return live.indicators(requester, country, month);
+    }
+
+    /** Plannings et shifts de toutes les équipes de la filiale, statut en direct (pointeuse) pour aujourd'hui. */
+    @GetMapping("/live-planning")
+    public com.ecobank.rccportal.service.HrLiveService.LivePlanning livePlanning(@RequestParam(required = false) String country,
+                                                                                @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate date,
+                                                                                @AuthenticationPrincipal AuthenticatedUser requester) {
+        return live.livePlanning(requester, country, date);
     }
 
     @GetMapping("/departures")

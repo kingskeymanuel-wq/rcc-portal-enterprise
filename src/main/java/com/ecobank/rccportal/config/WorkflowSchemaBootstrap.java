@@ -634,6 +634,39 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
                     ReintegratedBy NVARCHAR(100) NULL
                 )
                 """);
+        // Workflow de supervision : missions confiées par le Superviseur (Head RCC) à ses Team Leaders et par le
+        // Head QA à ses agents QA / formateurs, avec l'historique de chaque étape (création, prise en charge, rendu,
+        // validation, renvoi pour reprise).
+        createIfMissing("SupervisionTasks", """
+                CREATE TABLE dbo.SupervisionTasks (
+                    TaskId BIGINT IDENTITY PRIMARY KEY,
+                    Scope NVARCHAR(20) NOT NULL,
+                    ManagerUsername NVARCHAR(100) NOT NULL,
+                    AssigneeUserId BIGINT NOT NULL,
+                    Title NVARCHAR(200) NOT NULL,
+                    Details NVARCHAR(2000) NULL,
+                    Category NVARCHAR(30) NULL,
+                    Priority NVARCHAR(10) NOT NULL DEFAULT 'NORMALE',
+                    DueDate DATE NULL,
+                    Status NVARCHAR(20) NOT NULL DEFAULT 'A_FAIRE',
+                    AssigneeComment NVARCHAR(1000) NULL,
+                    ManagerComment NVARCHAR(1000) NULL,
+                    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    UpdatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                    SubmittedAt DATETIME2 NULL,
+                    ValidatedAt DATETIME2 NULL
+                )
+                """);
+        createIfMissing("SupervisionTaskEvents", """
+                CREATE TABLE dbo.SupervisionTaskEvents (
+                    EventId BIGINT IDENTITY PRIMARY KEY,
+                    TaskId BIGINT NOT NULL,
+                    Actor NVARCHAR(100) NOT NULL,
+                    Action NVARCHAR(20) NOT NULL,
+                    Comment NVARCHAR(1000) NULL,
+                    At DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+                )
+                """);
         // Fichiers de performance par équipe (ex. « Performances MAILS du 21 au 27 septembre ») : une ligne par
         // agent et par période, indicateurs de l'équipe en JSON. Lu par la QA, le Team Leader et l'agent lui-même.
         createIfMissing("TeamPerfRecords", """

@@ -65,7 +65,7 @@ public class WorkflowController {
             // ou RH qui est filtré par filiale) — voir WorkflowService.listLeaveRequestsForTeamLeader.
             return workflowService.listLeaveRequestsForTeamLeader(requester.username());
         }
-        return workflowService.listLeaveRequestsForHr(requester.username(), isAdmin || isSupervisor || isExcelliam);
+        return workflowService.listLeaveRequestsForHr(requester.username(), isAdmin || isSupervisor || isExcelliam || isRh);
     }
 
     /** Team Leader destinataire des demandes d'aide de l'agent connecté (affiché dans le formulaire). */

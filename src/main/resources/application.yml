@@ -23,6 +23,11 @@ spring:
       maximum-pool-size: 10
       minimum-idle: 2
       connection-timeout: 15000
+      # Portail 24h/24 : connexions entretenues et renouvelées avant que SQL Server ou le réseau ne les coupe
+      # (sinon la première requête du matin échoue après une nuit sans activité).
+      keepalive-time: 300000
+      max-lifetime: 1800000
+      validation-timeout: 5000
   jpa:
     hibernate:
       ddl-auto: none
@@ -193,6 +198,8 @@ rcc:
     timeout-seconds: 60
   auth:
     jwt-secret: ${RCC_JWT_SECRET:ChangeThisSecretKeyForProduction123456789}
+    # Session glissante : le jeton d'accès (60 min) est renouvelé automatiquement tant qu'une page est ouverte,
+    # et repris par le jeton de renouvellement (30 jours) après une veille — pas de déconnexion pour inactivité.
     jwt-access-expires-in-minutes: 60
     jwt-refresh-expires-in-days: 30
     bcrypt-rounds: 12

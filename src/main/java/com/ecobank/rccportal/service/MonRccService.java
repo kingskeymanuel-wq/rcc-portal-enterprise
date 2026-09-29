@@ -502,29 +502,9 @@ public class MonRccService {
         // Filiale : la fiche peut porter le code ISO2 (« CI ») ou ISO3 (« CIV ») → comparaison normalisée.
         // Équipe : User.activity est un champ libre souvent vide → si elle ne se classe pas, on déduit
         // l'équipe des services attribués (AGENT_INBOUND → Inbound Voix, AGENT_INBOUND_MAIL → Mail…).
-        String wantedCountry = country2(request.countryCode());
-        String wantedService = request.serviceCode() == null || request.serviceCode().isBlank() ? null : request.serviceCode().trim();
-        String wantedTeam = request.activity() == null || request.activity().isBlank() ? null : request.activity().trim();
-        List<User> byCountry = userRepository.findAll().stream()
-                .filter(u -> !Boolean.FALSE.equals(u.getAccountEnabled()))
-                .filter(u -> wantedCountry == null || wantedCountry.equalsIgnoreCase(country2(u.getAffiliateBranch())))
-                .toList();
-        Map<Long, List<String>> serviceCodes = new HashMap<>();
-        java.util.function.Function<User, List<String>> codesOf = u -> serviceCodes.computeIfAbsent(u.getId(), id ->
-                userServiceAssignmentRepository.findServicesByUserId(id).stream()
-                        .filter(a -> a.getService() != null && a.getService().getCode() != null)
-                        .map(a -> a.getService().getCode()).toList());
-        List<User> byService = byCountry.stream()
-                .filter(u -> wantedService == null || codesOf.apply(u).stream().anyMatch(wantedService::equalsIgnoreCase))
-                .toList();
-        List<User> matching = byService.stream()
-                .filter(u -> wantedTeam == null || com.ecobank.rccportal.util.TeamClassifier.classify(u.getActivity(), codesOf.apply(u)).name().equalsIgnoreCase(wantedTeam))
-                .toList();
+        List<User> matching = broadcastAudience(request.countryCode(), request.serviceCode(), request.activity());
         if (matching.isEmpty()) {
-            throw ApiException.badRequest("Aucun destinataire : " + byCountry.size() + " utilisateur(s) actif(s) dans la filiale"
-                    + (wantedService != null ? ", dont " + byService.size() + " avec ce service" : "")
-                    + (wantedTeam != null ? ", dont 0 dans cette équipe" : "")
-                    + ". Élargissez la cible (laissez un filtre sur « Tous »).");
+            throw ApiException.badRequest("Aucun destinataire actif pour cette cible. Élargissez la cible (laissez un filtre sur « Tous »).");
         }
 
         RccNotification last = null;
@@ -535,6 +515,37 @@ public class MonRccService {
         return toResponse(last);
     }
 
+
+    /**
+     * Destinataires réels d'une diffusion (comptes actifs) — même règle pour la notification, l'e-mail et
+     * l'aperçu « N destinataires » de la page Diffusion. Filiale : code ISO2 ou ISO3 ; équipe : Inbound Voix,
+     * Inbound Mail (tout le pôle), Tchat, Rafiki, CIB, Outbound — déduite de l'équipe ou des services attribués.
+     */
+    @Transactional(readOnly = true)
+    public List<User> broadcastAudience(String countryCode, String serviceCode, String activity) {
+        String wantedCountry = country2(countryCode);
+        String wantedService = serviceCode == null || serviceCode.isBlank() ? null : serviceCode.trim();
+        String wantedTeam = activity == null || activity.isBlank() ? null : activity.trim().toUpperCase(java.util.Locale.ROOT);
+        List<User> out = new java.util.ArrayList<>();
+        for (User u : userRepository.findAll()) {
+            if (Boolean.FALSE.equals(u.getAccountEnabled())) continue;
+            if (wantedCountry != null && !wantedCountry.equalsIgnoreCase(country2OrDefault(u.getAffiliateBranch()))) continue;
+            if (wantedService == null && wantedTeam == null) { out.add(u); continue; }
+            List<String> codes = userServiceAssignmentRepository.findServicesByUserId(u.getId()).stream()
+                    .filter(x -> x.getService() != null && x.getService().getCode() != null)
+                    .map(x -> x.getService().getCode()).toList();
+            if (wantedService != null && codes.stream().noneMatch(wantedService::equalsIgnoreCase)) continue;
+            if (wantedTeam != null && !com.ecobank.rccportal.util.TeamClassifier.belongsTo(wantedTeam, u.getActivity(), codes)) continue;
+            out.add(u);
+        }
+        return out;
+    }
+
+    /** Filiale d'un collaborateur : sans filiale renseignée, Côte d'Ivoire (comme le portail RH). */
+    static String country2OrDefault(String branch) {
+        String c = country2(branch);
+        return c == null ? "CI" : c;
+    }
 
     // ---------- Permissions ----------
 

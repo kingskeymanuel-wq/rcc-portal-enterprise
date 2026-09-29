@@ -7,6 +7,7 @@
     <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}" rel="stylesheet">
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/supervision.css}">
     <link rel="stylesheet" th:href="@{/css/hr-portal.css}">
     <link rel="stylesheet" th:href="@{/css/qa-team.css}">
     <style>
@@ -34,6 +35,9 @@
                 </div>
 
                 <div id="qasError" class="alert alert-danger d-none"></div>
+                <!-- Workflow de supervision : missions reçues du Superviseur, puis supervision de l'équipe QA -->
+                <div id="spMine" hidden></div>
+                <div id="spManager"></div>
                 <div class="qas-card mb-3" id="qaTeamMount"></div>
 
                 <div class="row g-3 mb-3">
@@ -97,7 +101,15 @@
 <script th:src="@{/js/rcc-api.js}"></script>
 <script th:src="@{/js/session.js}"></script>
 <script th:src="@{/js/qa-team.js}"></script>
+<script th:src="@{/js/supervision.js}"></script>
 <script th:src="@{/js/qa-supervisor.js}"></script>
-<script>document.addEventListener("DOMContentLoaded", function () { RccQaTeam.mount(document.getElementById("qaTeamMount")); });</script>
+<script>document.addEventListener("DOMContentLoaded", function () {
+    RccQaTeam.mount(document.getElementById("qaTeamMount"));
+    RccSession.init().then(function (s) {
+        if (!s) return;
+        RccSupervision.mountAssignee(document.getElementById("spMine"));
+        RccSupervision.mountManager(document.getElementById("spManager"), { scope: "QA" });
+    });
+});</script>
 </body>
 </html>

@@ -172,7 +172,8 @@ public class UserController {
         if (!isAdmin && !isRh && !isSupervisor) {
             throw ApiException.forbidden("Only Human Resources, a Supervisor or an administrator can view contract tracking.");
         }
-        return userService.listContractsForHr(requester.username(), isAdmin || isSupervisor);
+        // Le portail RH couvre les deux filiales (sélecteur Côte d'Ivoire / Togo) : filtrage par filiale côté page.
+        return userService.listContractsForHr(requester.username(), isAdmin || isSupervisor || isRh);
     }
 
     /** Aperçu : comptes « RCC » / sans équipe rapprochés de leur double qui a une vraie équipe. */

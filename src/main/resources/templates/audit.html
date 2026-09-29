@@ -8,6 +8,7 @@
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <link rel="stylesheet" th:href="@{/css/audit-usage.css}">
+    <link rel="stylesheet" th:href="@{/css/audit-admin.css}">
 </head>
 <body>
 <div class="layout">
@@ -49,98 +50,100 @@
                     <div id="usBody"></div>
                 </div>
 
+                <!-- ===================== DIFFUSION ===================== -->
                 <div id="auPaneBroadcast" style="display:none;">
-                <div class="row g-4 mb-4">
-                    <div class="col-lg-6">
-                        <div class="card shadow-sm h-100">
-                            <div class="card-body">
-                                <h5 class="card-title mb-3"><i class="bi bi-megaphone"></i> Diffuser une notification</h5>
-                                <form id="broadcastForm">
-                                    <div class="mb-2">
-                                        <label class="form-label small">Message</label>
-                                        <textarea id="contentInput" class="form-control" rows="3" maxlength="500" required></textarea>
-                                    </div>
-                                    <p class="text-muted small mb-1">Cible — laissez sur « Tous » pour une diffusion globale.</p>
-                                    <div class="row g-2 mb-2">
-                                        <div class="col-4">
-                                            <select class="form-select form-select-sm" id="broadcastCountry">
-                                                <option value="">— Toutes filiales —</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-4">
-                                            <select class="form-select form-select-sm" id="broadcastService">
-                                                <option value="">— Tous services —</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-4">
-                                            <select class="form-select form-select-sm" id="broadcastActivity">
-                                                <option value="">— Toutes équipes —</option>
-                                                <option value="INBOUND_VOICE">Inbound Voix</option>
-                                                <option value="INBOUND_MAIL">Inbound Mail / Rafiki</option>
-                                                <option value="CIB">CIB</option>
-                                                <option value="OUTBOUND">Outbound</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="bi bi-send"></i> Envoyer
-                                    </button>
-                                </form>
-                                <div id="broadcastResult" class="small mt-2"></div>
-                                <p class="text-muted small mt-2 mb-0">
-                                    <i class="bi bi-info-circle"></i>
-                                    Retrouvez toutes les notifications reçues sur <a th:href="@{/notifications}">la page dédiée</a>.
-                                </p>
+                    <form id="bcForm" class="bc-grid" novalidate>
+                        <section class="bc-card bc-compose">
+                            <div class="bc-step"><span>1</span><div><h6>Canal</h6><small>Notification dans le portail, e-mail, ou les deux.</small></div></div>
+                            <div class="bc-channels" id="bcChannels">
+                                <label class="on"><input type="checkbox" value="NOTIF" checked><i class="bi bi-bell-fill"></i><span><b>Notification portail</b><small>Cloche et page Notifications</small></span></label>
+                                <label><input type="checkbox" value="EMAIL"><i class="bi bi-envelope-fill"></i><span><b>E-mail</b><small>Adresse renseignée sur la fiche</small></span></label>
                             </div>
-                        </div>
-                    </div>
 
-                    <div class="col-lg-6">
-                        <div class="card shadow-sm h-100">
-                            <div class="card-body">
-                                <h5 class="card-title mb-3"><i class="bi bi-envelope"></i> Envoyer un e-mail à tous les utilisateurs</h5>
-                                <form id="broadcastEmailForm">
-                                    <div class="mb-2">
-                                        <label class="form-label small">Objet</label>
-                                        <input type="text" id="emailSubjectInput" class="form-control" maxlength="200" required>
-                                    </div>
-                                    <div class="mb-2">
-                                        <label class="form-label small">Message</label>
-                                        <textarea id="emailBodyInput" class="form-control" rows="3" maxlength="2000" required></textarea>
-                                    </div>
-                                    <button type="submit" class="btn btn-outline-primary">
-                                        <i class="bi bi-send"></i> Envoyer par e-mail
-                                    </button>
-                                </form>
-                                <div id="broadcastEmailResult" class="small mt-2"></div>
+                            <div class="bc-step"><span>2</span><div><h6>Message</h6><small>Clair et court : il s'affiche tel quel.</small></div></div>
+                            <div class="bc-field" id="bcSubjectWrap" hidden>
+                                <label for="bcSubject">Objet de l'e-mail</label>
+                                <input type="text" id="bcSubject" maxlength="200" placeholder="Ex. Maintenance du portail ce soir à 22 h">
                             </div>
-                        </div>
-                    </div>
+                            <div class="bc-field">
+                                <label for="bcContent">Message</label>
+                                <textarea id="bcContent" rows="5" maxlength="500" placeholder="Rédigez votre message…"></textarea>
+                                <div class="bc-count"><span id="bcCount">0</span> / <span id="bcMax">500</span></div>
+                            </div>
+
+                            <div class="bc-step"><span>3</span><div><h6>Destinataires</h6><small>Laissez « Toutes » pour une diffusion globale.</small></div></div>
+                            <div class="bc-label">Filiale</div>
+                            <div class="bc-chips" id="bcCountries"><button type="button" class="on" data-v="">Toutes</button></div>
+                            <div class="bc-label">Équipe</div>
+                            <div class="bc-chips" id="bcTeams">
+                                <button type="button" class="on" data-v="">Toutes</button>
+                                <button type="button" data-v="INBOUND_VOICE"><i class="bi bi-headset"></i> Inbound Voix</button>
+                                <button type="button" data-v="INBOUND_MAIL"><i class="bi bi-envelope-open"></i> Inbound Mail</button>
+                                <button type="button" data-v="TCHAT"><i class="bi bi-chat-text"></i> Tchat</button>
+                                <button type="button" data-v="RAFIKI"><i class="bi bi-chat-heart"></i> Rafiki</button>
+                                <button type="button" data-v="CIB"><i class="bi bi-building"></i> CIB</button>
+                                <button type="button" data-v="OUTBOUND"><i class="bi bi-telephone-outbound"></i> Outbound</button>
+                            </div>
+                            <div class="bc-field bc-service">
+                                <label for="bcService">Service précis <small>(facultatif)</small></label>
+                                <select id="bcService"><option value="">Tous les services</option></select>
+                            </div>
+
+                            <div class="bc-actions">
+                                <button type="submit" class="bc-send" id="bcSend"><i class="bi bi-send-fill"></i> <span id="bcSendLabel">Envoyer</span></button>
+                                <button type="button" class="bc-reset" id="bcReset">Effacer</button>
+                            </div>
+                            <div id="bcResult" class="bc-result" hidden></div>
+                        </section>
+
+                        <aside class="bc-side">
+                            <section class="bc-card bc-audience">
+                                <h6><i class="bi bi-people-fill"></i> Audience</h6>
+                                <div class="bc-aud-num"><b id="bcAudTotal">…</b><small>destinataire(s) actif(s)</small></div>
+                                <div class="bc-aud-row"><i class="bi bi-envelope-at"></i> <span id="bcAudEmail">…</span> avec une adresse e-mail</div>
+                                <div class="bc-aud-countries" id="bcAudCountries"></div>
+                                <div class="bc-aud-target" id="bcAudTarget">Tout le portail</div>
+                            </section>
+                            <section class="bc-card bc-preview">
+                                <h6><i class="bi bi-eye"></i> Aperçu</h6>
+                                <div class="bc-notif">
+                                    <span class="bc-notif-ico"><i class="bi bi-megaphone-fill"></i></span>
+                                    <div><b id="bcPrevSubject">Annonce RCC</b><p id="bcPrevText">Votre message apparaîtra ici.</p><small>À l'instant · Administration</small></div>
+                                </div>
+                                <p class="bc-hint"><i class="bi bi-info-circle"></i> Les destinataires retrouvent l'annonce sur <a th:href="@{/notifications}">la page Notifications</a>.</p>
+                            </section>
+                            <section class="bc-card bc-history">
+                                <h6><i class="bi bi-clock-history"></i> Envoyées aujourd'hui</h6>
+                                <ul id="bcHistory"><li class="bc-empty">Aucune diffusion depuis l'ouverture de la page.</li></ul>
+                            </section>
+                        </aside>
+                    </form>
                 </div>
 
-                </div>
-
+                <!-- ===================== JOURNAL DE CONNEXIONS ===================== -->
                 <div id="auPaneLogins" style="display:none;">
-                <div class="card shadow-sm">
-                    <div class="card-body">
-                        <h5 class="card-title mb-3"><i class="bi bi-clipboard-check"></i> Journal de connexions</h5>
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle">
-                                <thead>
-                                <tr>
-                                    <th>Utilisateur</th>
-                                    <th>Événement</th>
-                                    <th>Date / heure</th>
-                                    <th>Adresse IP</th>
-                                </tr>
-                                </thead>
-                                <tbody id="loginsBody">
-                                <tr><td colspan="4" class="text-center text-muted">Chargement…</td></tr>
-                                </tbody>
-                            </table>
+                    <div class="us-kpis" id="lgKpis"></div>
+                    <div class="lg-toolbar">
+                        <div class="lg-filters">
+                            <div class="bc-chips" id="lgCountries"></div>
+                            <div class="bc-chips lg-events" id="lgEvents">
+                                <button type="button" class="on" data-v="">Tous</button>
+                                <button type="button" data-v="login_success"><i class="bi bi-check-circle"></i> Réussies</button>
+                                <button type="button" data-v="login_failed"><i class="bi bi-x-circle"></i> Échecs</button>
+                                <button type="button" data-v="locked"><i class="bi bi-lock"></i> Verrouillages</button>
+                            </div>
+                        </div>
+                        <div class="us-tools">
+                            <div class="us-search"><i class="bi bi-search"></i><input id="lgSearch" type="search" placeholder="Nom, équipe ou adresse IP…"></div>
+                            <div class="us-days" id="lgPeriod">
+                                <button type="button" data-days="1">Aujourd'hui</button>
+                                <button type="button" class="on" data-days="7">7 j</button>
+                                <button type="button" data-days="0">Tout</button>
+                            </div>
                         </div>
                     </div>
-                </div>
+                    <div class="lg-refresh"><i class="bi bi-arrow-repeat"></i> Mis à jour automatiquement · <span id="lgUpdated">…</span></div>
+                    <div id="lgBody"><div class="lg-empty">Chargement…</div></div>
                 </div>
 
             </div>

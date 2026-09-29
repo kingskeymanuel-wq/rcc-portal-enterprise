@@ -675,6 +675,25 @@ window.RccSession = (function () {
      * l'accès est relu côté serveur à chaque requête ; ici on le détecte pour basculer tout de suite vers le
      * bon portail au lieu d'attendre une reconnexion.
      */
+    /**
+     * Session disponible 24h/24 : tant qu'une page du portail est ouverte (même en arrière-plan), elle signale sa
+     * présence toutes les 4 minutes et le serveur prolonge la session. Au retour sur l'onglet ou à la sortie de
+     * veille du poste, la session est reprise aussitôt — aucune déconnexion pour inactivité.
+     */
+    function keepSessionAlive() {
+        function ping() {
+            return fetch("/api/auth/keepalive", { credentials: "same-origin", cache: "no-store" }).then(function (res) {
+                return res.ok ? res.json() : null;
+            }).then(function (r) {
+                if (r && r.active === false) window.location.href = "/login";
+            }).catch(function () { /* réseau coupé : nouvel essai au prochain battement */ });
+        }
+        setInterval(ping, 4 * 60 * 1000);
+        document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") ping(); });
+        window.addEventListener("online", ping);
+        window.addEventListener("focus", ping);
+    }
+
     function watchAccessChanges(user, profile) {
         var signature = String(user.role || "") + "|" + String(user.service || "");
         var shown = false;
@@ -766,6 +785,7 @@ window.RccSession = (function () {
                     var pollSec = Math.max(30, Number(window.RccPreferences && window.RccPreferences.get ? window.RccPreferences.get("notifPollSeconds") : 60) || 60);
                     setInterval(function () { if (!document.hidden) refreshNotificationBadge(); }, pollSec * 1000);
                     watchAccessChanges(user, profile);
+                    keepSessionAlive();
                     return { user: user, profile: profile, isOutboundAgent: isOutboundAgent, channelPortal: channelPortal };
                 });
             })

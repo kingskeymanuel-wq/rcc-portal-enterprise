@@ -104,6 +104,10 @@ public class HrOrganizationService {
     // ── Classement ────────────────────────────────────────────────────────
 
     /** Code filiale sur 2 lettres (« CIV » → « CI », « TGO » → « TG ») ; sans filiale renseignée → CI. */
+    public static String countryOf(String branch) {
+        return country(branch);
+    }
+
     static String country(String branch) {
         if (branch == null || branch.isBlank()) return "CI";
         String b = branch.trim().toUpperCase(Locale.ROOT);

@@ -68,7 +68,11 @@
 
     // ===================== ONGLETS =====================
 
+    var workflowMounted = false;
     var TAB_DEFS = [
+        { btn: "svTabWorkflowBtn", pane: "svPaneWorkflow", onShow: function () {
+            if (!workflowMounted && window.RccSupervision) { workflowMounted = true; RccSupervision.mountManager($("spManager"), { scope: "RCC" }); }
+        } },
         { btn: "svTabReportingBtn", pane: "svPaneReporting", onShow: loadReporting },
         { btn: "svTabQaBtn", pane: "svPaneQa", onShow: loadQa },
         { btn: "svTabCrmBtn", pane: "svPaneCrm", onShow: function () { loadCrmCampaigns(); } },
@@ -393,7 +397,8 @@
         wireQa();
         wireCrmSubTabs();
         initCrmDefaults();
-        loadReporting();
+        activateTab(TAB_DEFS[0]);
+        loadReporting(); // chiffres du haut (agents suivis, score QA) dès l'ouverture
     }
 
     document.addEventListener("DOMContentLoaded", init);

@@ -198,6 +198,31 @@ public class ShiftService {
         return out;
     }
 
+    /**
+     * Statut en direct de tous ceux qui ont pointé aujourd'hui, en une seule requête (clé : identifiant en
+     * minuscules) — pour la vue « Plannings &amp; shifts en direct » du portail RH.
+     */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, com.ecobank.rccportal.dto.LiveShiftStatusResponse> liveStatusByUsername() {
+        LocalDateTime from = LocalDate.now().atStartOfDay();
+        LocalDateTime to = LocalDate.now().atTime(LocalTime.MAX);
+        java.util.Map<String, List<ShiftEvent>> byUser = new java.util.LinkedHashMap<>();
+        for (ShiftEvent e : shiftEventRepository.findByOccurredAtBetweenOrderByUser_UsernameAscOccurredAtAsc(from, to)) {
+            if (e.getUser() == null || e.getUser().getUsername() == null) continue;
+            byUser.computeIfAbsent(e.getUser().getUsername().toLowerCase(), k -> new java.util.ArrayList<>()).add(e);
+        }
+        LocalDateTime now = LocalDateTime.now();
+        java.util.Map<String, com.ecobank.rccportal.dto.LiveShiftStatusResponse> out = new java.util.HashMap<>();
+        byUser.forEach((username, events) -> {
+            User user = events.get(0).getUser();
+            ShiftTimeline t = timelineOf(events);
+            out.put(username, new com.ecobank.rccportal.dto.LiveShiftStatusResponse(user.getUsername(),
+                    user.getName() != null ? user.getName() : user.getUsername(), null, t.state(), t.stateSince(),
+                    t.lastDisconnectedAt(), t.lastReconnectedAt(), t.absenceMinutes(now), t.absences().size()));
+        });
+        return out;
+    }
+
     /** Vue globale QA/admin — tous les agents, pour un jour donné. */
     @Transactional(readOnly = true)
     public List<ShiftEventResponse> forDate(LocalDate date) {

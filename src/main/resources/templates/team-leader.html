@@ -7,6 +7,7 @@
     <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}" rel="stylesheet">
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/supervision.css}">
     <link rel="stylesheet" th:href="@{/css/support-requests.css}">
     <link rel="stylesheet" th:href="@{/css/planning-builder.css}">
     <link rel="stylesheet" th:href="@{/css/meetings.css}">
@@ -138,6 +139,9 @@
                         </div>
                     </div>
                 </section>
+                <!-- Workflow de supervision : missions confiées par le responsable (supervision.js) -->
+                <div id="spMine" hidden></div>
+
 
                 <div id="tlNoTeamWarning" class="alert alert-warning" style="display:none;">
                     <i class="bi bi-exclamation-triangle"></i> Aucune équipe ne vous a été affectée. Contactez votre administrateur.
@@ -747,6 +751,8 @@
 <script th:src="@{/js/meetings.js}"></script>
 <script th:src="@{/js/team-performance.js}"></script>
 <script th:src="@{/js/team-perf-files.js}"></script>
+<script th:src="@{/js/supervision.js}"></script>
 <script th:src="@{/js/team-leader.js}"></script>
+<script>document.addEventListener("DOMContentLoaded", function () { RccSession.init().then(function (s) { if (s) RccSupervision.mountAssignee(document.getElementById("spMine")); }); });</script>
 </body>
 </html>

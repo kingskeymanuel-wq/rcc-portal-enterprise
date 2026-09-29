@@ -83,6 +83,43 @@ public class JwtService {
         }
     }
 
+    /** Jeton lu sans lever d'erreur : null si signature invalide ou mal formé ; expiré signalé mais lisible. */
+    public record Parsed(Claims claims, boolean expired) {}
+
+    public Parsed parseLenient(String token) {
+        if (token == null || token.isBlank()) return null;
+        try {
+            return new Parsed(Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload(), false);
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            return new Parsed(e.getClaims(), true);
+        } catch (JwtException | IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Session glissante : nouveau jeton d'accès, mêmes informations, nouvelle échéance — émis tant que
+     * l'utilisateur a une page ouverte ou revient avec un jeton de renouvellement valide.
+     */
+    public String renewAccessToken(Claims old, String role, String service) {
+        Instant now = Instant.now();
+        return Jwts.builder()
+                .subject(old.getSubject())
+                .claim("role", role != null ? role : old.get("role", String.class))
+                .claim("service", service)
+                .claim("team", service)
+                .claim("name", old.get("name", String.class))
+                .claim("email", old.get("email", String.class))
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plus(properties.getJwtAccessExpiresInMinutes(), ChronoUnit.MINUTES)))
+                .signWith(key)
+                .compact();
+    }
+
+    public int refreshMaxAgeSeconds() {
+        return (int) Math.min(Integer.MAX_VALUE, properties.getJwtRefreshExpiresInDays() * 86400L);
+    }
+
     public record GeneratedRefreshToken(String token, UUID jti, Instant expiresAt) {
     }
 }

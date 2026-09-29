@@ -33,7 +33,9 @@ import java.util.List;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private static final String ACCESS_COOKIE = "eco_access_token";
+    private static final String ACCESS_COOKIE = SessionCookies.ACCESS;
+    /** Au-delà, le jeton est ré-émis à la prochaine requête (session glissante). */
+    private static final long RENEW_AFTER_MS = 5 * 60 * 1000L;
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtService jwtService;
@@ -59,8 +61,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             try {
 
-                Claims claims =
-                        jwtService.parseClaims(token);
+                JwtService.Parsed parsed = jwtService.parseLenient(token);
+                if (parsed == null) throw new IllegalArgumentException("invalid token");
+                Claims claims = parsed.claims();
+                boolean renew;
+                if (parsed.expired()) {
+                    // Jeton d'accès échu (poste en veille, page fermée la nuit…) : repris par le jeton de
+                    // renouvellement du même utilisateur, sans demander de se reconnecter.
+                    JwtService.Parsed refresh = jwtService.parseLenient(SessionCookies.read(request, SessionCookies.REFRESH));
+                    if (refresh == null || refresh.expired() || claims.getSubject() == null
+                            || !claims.getSubject().equalsIgnoreCase(refresh.claims().getSubject())) {
+                        throw new IllegalArgumentException("session expired");
+                    }
+                    renew = true;
+                } else {
+                    java.util.Date iat = claims.getIssuedAt();
+                    renew = iat == null || System.currentTimeMillis() - iat.getTime() > RENEW_AFTER_MS;
+                }
 
                 String username =
                         claims.getSubject();
@@ -99,6 +116,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     } catch (RuntimeException dbUnavailable) {
                         // base indisponible : on garde le rôle du jeton
                     }
+                }
+
+                if (username != null && !username.isBlank() && renew) {
+                    // Session glissante : chaque activité (y compris le maintien automatique de la page) prolonge
+                    // la session — personne n'est déconnecté pour être resté longtemps sans cliquer.
+                    SessionCookies.write(response, SessionCookies.ACCESS, jwtService.renewAccessToken(claims, role, service),
+                            jwtService.refreshMaxAgeSeconds());
                 }
 
                 if (username != null && !username.isBlank()) {

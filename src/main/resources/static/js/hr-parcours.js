@@ -9,6 +9,7 @@
     var formations = [];
     var tasks = [];
     var reporting = [];
+    var indicators = null; // /api/hr/indicators — valeurs réelles calculées côté serveur
     var performanceChart = null;
     var currentDossierUserId = null;
     var teamRosterModal = null;
@@ -167,19 +168,30 @@
             (mergedDuplicates ? " · " + mergedDuplicates + " doublon" + (mergedDuplicates > 1 ? "s" : "") + " fusionné" + (mergedDuplicates > 1 ? "s" : "") : "");
         var bar = el("kpiActiveBar");
         if (bar) setTimeout(function () { bar.style.width = (employees.length ? activeEmployees.length / employees.length * 100 : 0) + "%"; }, 80);
-        countUp(el("kpiLeave"), onLeave.length);
+        if (!indicators) countUp(el("kpiLeave"), onLeave.length);
         el("kpiPending").textContent = pending.length + " demande" + (pending.length > 1 ? "s" : "") + " en attente";
         countUp(el("kpiTraining"), activeTraining.length);
+        if (indicators) {
+            countUp(el("kpiLeave"), indicators.onLeaveToday + indicators.absentToday);
+            el("kpiPending").textContent = indicators.leavePending + " demande(s) en attente";
+        }
         var perfValues = (Array.isArray(reporting) ? reporting : []).map(function (r) { return r.performanceGlobale; }).filter(function (v) { return v != null; });
         var avgPerf = perfValues.length ? perfValues.reduce(function (a, b) { return a + Number(b); }, 0) / perfValues.length : null;
         el("kpiPerformance").textContent = avgPerf === null ? "—" : avgPerf.toFixed(1) + "%";
         el("kpiPerformanceSub").textContent = avgPerf === null ? "Aucun KPI importé ce mois" : perfValues.length + " agent" + (perfValues.length > 1 ? "s" : "") + " mesuré" + (perfValues.length > 1 ? "s" : "");
+        if (indicators && avgPerf === null && indicators.performanceAvg != null) {
+            el("kpiPerformance").textContent = indicators.performanceAvg.toFixed(1) + "%";
+            el("kpiPerformanceSub").textContent = indicators.performanceMeasured + " agent(s) mesuré(s)";
+        }
         if (el("tabCountPeople")) el("tabCountPeople").textContent = employees.length || "";
         if (el("tabCountLeave")) el("tabCountLeave").textContent = pending.length || "";
 
         var progress = activeTraining.filter(function (f) { return typeof f.myProgressPercent === "number"; });
         var avgProgress = progress.length ? progress.reduce(function (a, f) { return a + f.myProgressPercent; }, 0) / progress.length : null;
         el("kpiTrainingProgress").textContent = avgProgress === null ? "Parcours RCC disponibles" : Math.round(avgProgress) + "% de progression moyenne";
+        if (indicators && indicators.avgTrainingProgress != null) {
+            el("kpiTrainingProgress").textContent = Math.round(indicators.avgTrainingProgress) + "% de progression moyenne · " + indicators.trainedPeople + " formé(s)";
+        }
     }
 
     function renderTeams() {
@@ -401,14 +413,25 @@
     }
 
     function renderControlBadges() {
+        if (indicators) {
+            el("badgeContractsBox").innerHTML = '<span class="control-badge">' + indicators.contracts + ' dossier(s) actif(s)</span>' +
+                (indicators.contractsExpiring30 ? '<span class="control-badge warn">' + indicators.contractsExpiring30 + ' fin sous 30 j</span>' : '') +
+                (indicators.contractsExpired ? '<span class="control-badge danger">' + indicators.contractsExpired + ' contrat(s) échu(s)</span>' : '') +
+                (indicators.contractsMissing ? '<span class="control-badge warn">' + indicators.contractsMissing + ' sans type de contrat</span>' : '');
+            el("badgeLeave").textContent = indicators.leavePending + " en attente";
+            el("badgeLeave").className = "control-badge" + (indicators.leavePending ? " warn" : "");
+            el("badgeLeaveToday").hidden = !indicators.onLeaveToday;
+            el("badgeLeaveToday").textContent = indicators.onLeaveToday + " en congé aujourd'hui";
+            el("badgePerformance").textContent = indicators.performanceAvg == null ? "Aucun KPI importé pour ce mois"
+                : pctText(indicators.performanceAvg) + " moyen · " + indicators.performanceMeasured + " agent(s)";
+            return;
+        }
         el("badgeContracts").textContent = employees.length + " dossier(s)";
-
         var pending = leaves.filter(function (x) { return String(x.status || "").toUpperCase() === "PENDING"; }).length;
         el("badgeLeave").textContent = pending + " en attente";
-
         var perfValues = (Array.isArray(reporting) ? reporting : []).map(function (r) { return r.performanceGlobale; }).filter(function (v) { return v != null; });
         var avgPerf = perfValues.length ? (perfValues.reduce(function (a, b) { return a + Number(b); }, 0) / perfValues.length) : null;
-        el("badgePerformance").textContent = avgPerf === null ? "—" : avgPerf.toFixed(1) + "% moyen";
+        el("badgePerformance").textContent = avgPerf === null ? "Aucun KPI importé pour ce mois" : avgPerf.toFixed(1) + "% moyen";
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -561,18 +584,38 @@
         return '<div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">' + escapeHtml(label) + '</span><span>' + escapeHtml(val(value)) + '</span></div>';
     }
 
+    function pctText(v) { return v == null ? "—" : String(v).replace(".", ",") + " %"; }
+
+    /** Indicateurs RH : valeurs calculées côté serveur (sorties, congés, planning, formation) pour la filiale choisie. */
     function renderHrFollowupKpis() {
+        if (indicators) {
+            el("kpiTurnover").textContent = pctText(indicators.turnoverRate);
+            el("kpiTurnoverSub").textContent = indicators.departures12m + " sortie(s) sur 12 mois · " + indicators.departuresMonth + " ce mois";
+            el("kpiAbsenteeism").textContent = pctText(indicators.absenteeismRate);
+            el("kpiAbsenteeismSub").textContent = indicators.onLeaveToday + " en congé · " + indicators.absentToday + " absent(s) au planning aujourd'hui";
+            el("kpiFormationRate").textContent = pctText(indicators.trainingRate);
+            el("kpiFormationSub").textContent = indicators.trainedPeople + " formé(s) sur " + indicators.active +
+                (indicators.avgTrainingProgress != null ? " · progression moyenne " + pctText(indicators.avgTrainingProgress) : "");
+            return;
+        }
         var inactive = employees.filter(function (u) { return normalizeStatus(u) === "INACTIF"; }).length;
         el("kpiTurnover").textContent = employees.length ? ((inactive / employees.length) * 100).toFixed(1) + "%" : "—";
-
         var activeEmployees = employees.filter(function (u) { return normalizeStatus(u) === "ACTIF"; });
-        var onLeaveToday = leaves.filter(function (x) { return String(x.status || "").toUpperCase() === "APPROVED" && x.periodFrom && x.periodTo; }).length;
+        var today = new Date().toISOString().slice(0, 10);
+        var onLeaveToday = leaves.filter(function (x) { return String(x.status || "").toUpperCase() === "APPROVED" && x.periodFrom <= today && x.periodTo >= today; }).length;
         el("kpiAbsenteeism").textContent = activeEmployees.length ? ((onLeaveToday / activeEmployees.length) * 100).toFixed(1) + "%" : "—";
+        el("kpiFormationRate").textContent = "—";
+    }
 
-        var activeTraining = formations.filter(function (f) { return !f.status || !["ARCHIVED", "CLOSED", "TERMINEE"].includes(String(f.status).toUpperCase()); });
-        var progress = activeTraining.filter(function (f) { return typeof f.myProgressPercent === "number"; });
-        var avgProgress = progress.length ? progress.reduce(function (a, f) { return a + f.myProgressPercent; }, 0) / progress.length : null;
-        el("kpiFormationRate").textContent = avgProgress === null ? "—" : Math.round(avgProgress) + "%";
+    /** Badge de la tuile « Plannings & shifts en direct » et compteur de l'onglet. */
+    function renderLiveBadge() {
+        var sum = window.RccHrLive && window.RccHrLive.summary();
+        if (!sum) return;
+        var on = sum.EN_POSTE || 0, late = (sum.EN_RETARD || 0) + (sum.NON_POINTE || 0), pause = sum.EN_PAUSE || 0;
+        el("badgeLiveBox").innerHTML = '<span class="control-badge ok">' + on + ' en poste</span>' +
+            (pause ? '<span class="control-badge warn">' + pause + ' en pause</span>' : '') +
+            (late ? '<span class="control-badge danger">' + late + ' en retard / non pointé(s)</span>' : '');
+        el("tabCountLive").textContent = on || "";
     }
 
     function renderEmployees() {
@@ -668,6 +711,7 @@
         el("hrLoading").classList.remove("d-none");
         el("hrApp").classList.add("d-none");
         var month = el("hrMonth").value || monthNow();
+        var country = (window.RccHr && window.RccHr.country) || "CI";
         var results = await Promise.all([
             api("/api/users/hr/contracts"),
             api("/api/workflow/requests/hr/leave"),
@@ -675,10 +719,11 @@
             api("/api/training/formations"),
             api("/api/workflow/tasks/oversight"),
             api("/api/reporting/team?month=" + encodeURIComponent(month)),
-            api("/api/sync/status")
+            api("/api/sync/status"),
+            api("/api/hr/indicators?country=" + country + "&month=" + encodeURIComponent(month))
         ]);
         // Filiale choisie en haut du portail (Côte d'Ivoire / Togo) : tout le portail s'y limite.
-        var country = (window.RccHr && window.RccHr.country) || "CI";
+        indicators = results[7] && !results[7].__error ? results[7] : null;
         employees = dedupeEmployees((Array.isArray(results[0]) ? results[0] : []).filter(function (u) { return countryOf(u.affiliateBranch) === country; }));
         leaves = filterByHrScope(Array.isArray(results[1]) ? results[1] : []);
         balances = filterByHrScope(Array.isArray(results[2]) ? results[2] : []);
@@ -690,6 +735,7 @@
         renderKpis(); renderTeams(); renderLeaves(); renderSync(results[6]); renderEmployees(); renderTeamGrid(); renderTraining(); renderFollowup(); renderHrFollowupKpis(); renderPerformance(); renderControlBadges();
         el("hrLoading").classList.add("d-none"); el("hrApp").classList.remove("d-none");
         requestAnimationFrame(moveInk);
+        if (window.RccHrLive) window.RccHrLive.load(true).then(renderLiveBadge);
         el("lastRefresh").textContent = "Actualisé à " + new Date().toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"});
     }
 
@@ -705,6 +751,7 @@
         Array.prototype.forEach.call(document.querySelectorAll(".hr-pane"), function (p) { p.classList.toggle("active", p.getAttribute("data-pane") === name); });
         moveInk();
         if (name === "overview" && performanceChart) performanceChart.resize();
+        if (name === "live" && window.RccHrLive) window.RccHrLive.load(true).then(renderLiveBadge);
         try { history.replaceState(null, "", "#" + name); } catch (e) { /* ignore */ }
     }
 
@@ -716,7 +763,7 @@
         var hash = (location.hash || "").replace("#", "");
         var legacy = { employees: "people", followup: "growth", training: "growth", leave: "leave" };
         hash = legacy[hash] || hash;
-        if (["overview", "org", "perf", "people", "leave", "exits", "growth"].indexOf(hash) !== -1) showTab(hash);
+        if (["overview", "org", "live", "perf", "people", "leave", "exits", "growth"].indexOf(hash) !== -1) showTab(hash);
     }
 
     function init() {
@@ -732,6 +779,11 @@
         el("employeeSearch").addEventListener("input", renderEmployees);
         el("teamSearch").addEventListener("input", renderTeamGrid);
         el("openLeaveControlBtn").addEventListener("click", function () { openControlDetail("leave"); });
+        if (window.RccHrLive) window.RccHrLive.mount(el("hrLiveRoot"));
+        Array.prototype.forEach.call(document.querySelectorAll(".followup-kpi[data-go]"), function (k) {
+            k.addEventListener("click", function () { showTab(k.getAttribute("data-go")); });
+            k.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showTab(k.getAttribute("data-go")); } });
+        });
         wireTabs();
         el("consolidationApplyBtn").addEventListener("click", applyConsolidation);
         el("employeeStatus").addEventListener("change", renderEmployees);
@@ -747,7 +799,10 @@
         });
 
         Array.prototype.forEach.call(document.querySelectorAll(".control-card.clickable"), function (card) {
-            card.addEventListener("click", function () { openControlDetail(card.getAttribute("data-kind")); });
+            card.addEventListener("click", function () {
+                if (card.getAttribute("data-go")) showTab(card.getAttribute("data-go"));
+                else openControlDetail(card.getAttribute("data-kind"));
+            });
             card.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); card.click(); } });
         });
 
