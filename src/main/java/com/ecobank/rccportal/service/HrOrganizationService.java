@@ -109,11 +109,7 @@ public class HrOrganizationService {
     }
 
     static String country(String branch) {
-        if (branch == null || branch.isBlank()) return "CI";
-        String b = branch.trim().toUpperCase(Locale.ROOT);
-        if (b.startsWith("CI") || b.contains("IVOIRE")) return "CI";
-        if (b.startsWith("TG") || b.contains("TOGO")) return "TG";
-        return b.length() > 2 ? b.substring(0, 2) : b;
+        return com.ecobank.rccportal.util.Affiliates.countryOf(branch); // « K01 » = Côte d'Ivoire
     }
 
     private static String fold(String s) {

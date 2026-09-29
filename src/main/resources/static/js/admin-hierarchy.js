@@ -101,7 +101,7 @@
             '<label>Nom complet<input name="name" value="' + esc(d.name || "") + '"></label>' +
             '<label>Identifiant (AD)<input name="username" value="' + esc(d.username || "") + '"></label>' +
             '<label>E-mail<input name="email" type="email" value="' + esc(d.email || "") + '"></label>' +
-            '<label>Filiale<input name="affiliateBranch" list="ahCountries" value="' + esc(d.affiliateBranch || "") + '" placeholder="CI, TG…"></label>' +
+            '<label>Filiale<input name="affiliateBranch" list="ahCountries" value="' + esc(d.affiliateBranch || "") + '" placeholder="K01 (Côte d\'Ivoire), TG…"></label>' +
             '<label>Genre' + sel("gender", ["", "F", "M"], d.gender, ["—", "Femme", "Homme"]) + '</label>' +
             '<label>Équipe (activité)' + sel("activity", [""].concat(act), d.activity, ["— Aucune —"].concat(act)) + '</label>' +
             '<label>Nature du contrat' + sel("contractType", ["", "Ecobank", "Outsource"], d.contractType) + '</label>' +

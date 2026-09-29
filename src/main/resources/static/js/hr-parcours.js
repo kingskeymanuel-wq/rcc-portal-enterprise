@@ -142,6 +142,8 @@
     /** « CIV » / « CI » / vide → CI ; « TGO » / « TG » → TG (même règle que le serveur). */
     function countryOf(branch) {
         var b = String(branch || "").trim().toUpperCase();
+        if (b === "K01" || b === "CIV") return "CI"; // code d'agence Ecobank Côte d'Ivoire
+        if (b === "TGO") return "TG";
         if (!b || b.indexOf("CI") === 0 || b.indexOf("IVOIRE") !== -1) return "CI";
         if (b.indexOf("TG") === 0 || b.indexOf("TOGO") !== -1) return "TG";
         return b.slice(0, 2);

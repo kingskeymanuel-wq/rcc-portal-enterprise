@@ -60,6 +60,7 @@
 
     function filialeLabel(code) {
         if (!code) return "Sans filiale";
+        if (String(code).toUpperCase() === "K01") code = "CI"; // code d'agence Ecobank Côte d'Ivoire
         return (FILIALE_LABELS[code] || code) + " (" + code + ")";
     }
 
@@ -79,7 +80,7 @@
     function groupByFilialeAndService(users) {
         var groups = {};
         users.forEach(function (u) {
-            var filiale = u.affiliateBranch || ""; // "" = pas de filiale — jamais de faux libellé "Sans filiale"
+            var filiale = u.affiliateBranch === "K01" ? "CI" : (u.affiliateBranch || ""); // K01 = Côte d'Ivoire ; "" = pas de filiale — jamais de faux libellé "Sans filiale"
             var regrouped = regroupRccTeams(u.service || "", u.activity || null); // "" = pas de service
             var service = regrouped.service;
             var team = regrouped.team;
