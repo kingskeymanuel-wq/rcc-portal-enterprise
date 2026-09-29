@@ -19,13 +19,24 @@ public class AdministrationController {
     private final AdministrationService administrationService;
     private final UserFeaturePermissionService userFeaturePermissionService;
     private final CurrentUserAccessService currentUserAccessService;
+    private final com.ecobank.rccportal.service.EffectiveAccessService effectiveAccessService;
 
     public AdministrationController(AdministrationService administrationService,
                                     UserFeaturePermissionService userFeaturePermissionService,
-                                    CurrentUserAccessService currentUserAccessService) {
+                                    CurrentUserAccessService currentUserAccessService,
+                                    com.ecobank.rccportal.service.EffectiveAccessService effectiveAccessService) {
         this.administrationService = administrationService;
         this.userFeaturePermissionService = userFeaturePermissionService;
         this.currentUserAccessService = currentUserAccessService;
+        this.effectiveAccessService = effectiveAccessService;
+    }
+
+    /** Accès effectif d'un utilisateur (profil, équipe menée, portail) et ce qui manque — fiche utilisateur de l'admin. */
+    @GetMapping("/users/{userId}/effective-access")
+    public com.ecobank.rccportal.service.EffectiveAccessService.EffectiveAccess effectiveAccess(@PathVariable Long userId,
+                                                                                               @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return effectiveAccessService.of(userId);
     }
 
     @GetMapping("/roles")

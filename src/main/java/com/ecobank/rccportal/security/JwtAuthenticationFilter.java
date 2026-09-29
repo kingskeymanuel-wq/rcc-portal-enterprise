@@ -38,6 +38,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
 
+    /** Accès réel relu en base : un changement fait dans Administration s'applique sans reconnexion. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AccessResolver accessResolver;
+
     public JwtAuthenticationFilter(JwtService jwtService) {
         this.jwtService = jwtService;
     }
@@ -78,6 +82,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 String name =
                         claims.get("name", String.class);
+
+                if (username != null && !username.isBlank() && accessResolver != null) {
+                    try {
+                        AccessResolver.Access live = accessResolver.resolve(username);
+                        if (live != null) {
+                            if (!live.enabled()) {
+                                // Compte désactivé par l'administrateur ou le RH : plus aucun accès, tout de suite.
+                                SecurityContextHolder.clearContext();
+                                filterChain.doFilter(request, response);
+                                return;
+                            }
+                            role = live.role() != null ? live.role() : role;
+                            service = live.service();
+                        }
+                    } catch (RuntimeException dbUnavailable) {
+                        // base indisponible : on garde le rôle du jeton
+                    }
+                }
 
                 if (username != null && !username.isBlank()) {
 
@@ -138,6 +160,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 request,
                 response
         );
+
+        // Action d'administration réussie (rôles, services, équipe menée, activation, membres d'équipe, sorties RH) :
+        // l'accès des personnes concernées est relu tout de suite, sur tous les portails.
+        if (accessResolver != null && !"GET".equalsIgnoreCase(request.getMethod()) && response.getStatus() < 400) {
+            String path = request.getRequestURI();
+            if (path.startsWith("/api/admin/") || path.startsWith("/api/users") || path.startsWith("/api/hr/")
+                    || path.startsWith("/api/team-leader/members")) {
+                accessResolver.evictAll();
+            }
+        }
     }
 
     /**

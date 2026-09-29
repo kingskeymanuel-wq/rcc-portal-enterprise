@@ -409,6 +409,38 @@ public class AdministrationService {
                 .orElseThrow(() -> ApiException.notFound("Unknown role."));
         userRoleRepository.save(UserRole.builder().user(user).role(role).build());
         log.info("Role assigned (userId={}, role={})", userId, role.getName());
+
+        // Le rôle choisi prend effet partout : son service métier (et donc l'équipe menée d'un Team Leader, le
+        // profil QA, RH, Superviseur…) est attribué d'office, quelle que soit la voie utilisée dans l'écran admin.
+        String serviceCode = serviceForRoleName(role.getName());
+        if (serviceCode != null) {
+            serviceRepository.findByCodeIgnoreCase(serviceCode).ifPresent(s -> assignService(userId, s.getId()));
+        }
+    }
+
+    /**
+     * Service métier impliqué par le NOM d'un rôle : « Team Leader Inbound Voice » → TEAM_LEADER_INBOUND_VOICE,
+     * « Head RCC (Superviseur) » → SUPERVISEUR, « Superviseur Qualité Assurance » → SUPERVISEUR_QA, « RH » → RH…
+     * Null quand le rôle ne désigne ni équipe ni métier précis (ex. « team_leader » seul : l'équipe se choisit).
+     */
+    static String serviceForRoleName(String roleName) {
+        if (roleName == null) return null;
+        String n = java.text.Normalizer.normalize(roleName, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "")
+                .toUpperCase(java.util.Locale.ROOT).replace('_', ' ').trim();
+        if (n.contains("TEAM LEADER")) {
+            if (n.contains("VOICE") || n.contains("VOIX")) return "TEAM_LEADER_INBOUND_VOICE";
+            if (n.contains("RAFIKI")) return "TEAM_LEADER_RAFIKI";
+            if (n.contains("TCHAT") || n.contains("CHAT")) return "TEAM_LEADER_TCHAT";
+            if (n.contains("MAIL")) return "TEAM_LEADER_INBOUND_MAIL";
+            if (n.contains("OUTBOUND") || n.contains("TELEVENTE") || n.contains("DIGITAL")) return "TEAM_LEADER_OUTBOUND";
+            if (n.contains("CIB")) return "TEAM_LEADER_CIB";
+            return null;
+        }
+        if (n.contains("QUALIT")) return n.contains("SUPERVISEUR") || n.contains("HEAD") ? "SUPERVISEUR_QA" : "QUALITY_ASSURANCE";
+        if (n.equals("RH") || n.contains("RESSOURCES HUMAINES")) return "RH";
+        if (n.contains("SUPERVISEUR") || n.contains("HEAD RCC") || n.equals("SUPERVISOR")) return "SUPERVISEUR";
+        if (n.equals("FORMATEUR")) return "FORMATEUR";
+        return null;
     }
 
     @Transactional
@@ -418,6 +450,27 @@ public class AdministrationService {
                 .toList();
         userRoleRepository.deleteAll(matches);
         log.info("Role(s) removed (userId={}, roleId={}, count={})", userId, roleId, matches.size());
+
+        // Retirer un rôle retire aussi ce qu'il donnait (service métier, équipe menée), sauf si un autre rôle
+        // encore attribué le donne aussi : la personne perd réellement le portail correspondant.
+        List<String> remaining = userRoleRepository.findByUser_Id(userId).stream()
+                .filter(ur -> ur.getRole() != null).map(ur -> ur.getRole().getName()).toList();
+        for (UserRole removed : matches) {
+            String name = removed.getRole() == null ? null : removed.getRole().getName();
+            boolean teamLeaderRole = name != null && name.toUpperCase(java.util.Locale.ROOT).replace('_', ' ').contains("TEAM LEADER");
+            if (teamLeaderRole && remaining.stream().noneMatch(r -> r.toUpperCase(java.util.Locale.ROOT).replace('_', ' ').contains("TEAM LEADER"))) {
+                userServiceAssignmentRepository.findByUserId(userId).stream()
+                        .filter(us -> us.getService() != null && us.getService().getCode() != null && us.getService().getCode().toUpperCase().startsWith("TEAM_LEADER_"))
+                        .map(us -> us.getService().getId()).distinct().toList()
+                        .forEach(sid -> removeService(userId, sid));
+                userRepository.findById(userId).ifPresent(u -> { u.setLedTeam(null); userRepository.save(u); });
+                continue;
+            }
+            String code = serviceForRoleName(name);
+            if (code != null && remaining.stream().noneMatch(r -> code.equals(serviceForRoleName(r)))) {
+                serviceRepository.findByCodeIgnoreCase(code).ifPresent(s -> removeService(userId, s.getId()));
+            }
+        }
     }
 
     /**
@@ -480,7 +533,8 @@ public class AdministrationService {
             "TEAM_LEADER_INBOUND_MAIL", "INBOUND_MAIL",
             "TEAM_LEADER_OUTBOUND", "OUTBOUND",
             "TEAM_LEADER_TCHAT", "TCHAT",
-            "TEAM_LEADER_RAFIKI", "RAFIKI"
+            "TEAM_LEADER_RAFIKI", "RAFIKI",
+            "TEAM_LEADER_CIB", "CIB"
     );
 
     /**
@@ -504,7 +558,8 @@ public class AdministrationService {
             java.util.Map.entry("AGENT_RAFIKI", "INBOUND RAFIKI"),
             java.util.Map.entry("TEAM_LEADER_OUTBOUND", "OUTBOUND"),
             java.util.Map.entry("TEAM_LEADER_TCHAT", "INBOUND TCHAT"),
-            java.util.Map.entry("TEAM_LEADER_RAFIKI", "INBOUND RAFIKI")
+            java.util.Map.entry("TEAM_LEADER_RAFIKI", "INBOUND RAFIKI"),
+            java.util.Map.entry("TEAM_LEADER_CIB", "CIB")
     );
 
     @Transactional

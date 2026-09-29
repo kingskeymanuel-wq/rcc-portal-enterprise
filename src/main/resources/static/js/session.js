@@ -670,6 +670,43 @@ window.RccSession = (function () {
         document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") flush(); });
     }
 
+    /**
+     * Changement fait par l'administrateur pendant la session (rôle, service, équipe dirigée, désactivation) :
+     * l'accès est relu côté serveur à chaque requête ; ici on le détecte pour basculer tout de suite vers le
+     * bon portail au lieu d'attendre une reconnexion.
+     */
+    function watchAccessChanges(user, profile) {
+        var signature = String(user.role || "") + "|" + String(user.service || "");
+        var shown = false;
+        setInterval(function () {
+            if (document.hidden || shown) return;
+            fetch("/api/auth/me", { credentials: "same-origin" }).then(function (res) {
+                if (res.status === 401 || res.status === 403) { window.location.href = "/login"; return null; }
+                return res.ok ? res.json() : null;
+            }).then(function (me) {
+                if (!me || !me.username) return;
+                if (String(me.role || "") + "|" + String(me.service || "") === signature) return;
+                shown = true;
+                var newProfile = computeProfile(me);
+                var bar = document.createElement("div");
+                bar.className = "rcc-access-changed";
+                bar.style.cssText = "position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:3000;max-width:92vw;" +
+                    "background:#0B3D91;color:#fff;border-radius:14px;padding:.75rem 1rem;box-shadow:0 14px 34px rgba(0,0,0,.25);font-size:.92rem;display:flex;gap:.8rem;align-items:center;flex-wrap:wrap";
+                bar.innerHTML = '<i class="bi bi-shield-check"></i><span>Vos accès ont été mis à jour par l\'administrateur : ' +
+                    (PROFILE_LABELS[newProfile] || newProfile) + '.</span><button type="button" class="btn btn-sm btn-light fw-bold">Ouvrir mon portail</button>';
+                document.body.appendChild(bar);
+                function go() {
+                    fetch("/api/users/me/team-status", { credentials: "same-origin" })
+                        .then(function (r) { return r.ok ? r.json() : {}; })
+                        .then(function (st) { window.location.href = st.redirectTo || "/dashboard"; })
+                        .catch(function () { window.location.href = "/dashboard"; });
+                }
+                bar.querySelector("button").addEventListener("click", go);
+                setTimeout(go, 6000);
+            }).catch(function () { /* réseau : on réessaiera */ });
+        }, 30000);
+    }
+
     function init() {
         wireGlobalSearch();
         return fetch("/api/auth/me", { credentials: "same-origin" })
@@ -728,6 +765,7 @@ window.RccSession = (function () {
                     // Vérification périodique (onglet visible uniquement) pour signaler les nouvelles notifications.
                     var pollSec = Math.max(30, Number(window.RccPreferences && window.RccPreferences.get ? window.RccPreferences.get("notifPollSeconds") : 60) || 60);
                     setInterval(function () { if (!document.hidden) refreshNotificationBadge(); }, pollSec * 1000);
+                    watchAccessChanges(user, profile);
                     return { user: user, profile: profile, isOutboundAgent: isOutboundAgent, channelPortal: channelPortal };
                 });
             })

@@ -457,7 +457,7 @@
      * Comparaison insensible à la casse sur le NOM du rôle réel (voir WorkflowSchemaBootstrap).
      */
     var ROLE_SERVICE_FILTER = [
-        { roleMatch: /team leader/i, serviceCodes: ["TEAM_LEADER_INBOUND_VOICE", "TEAM_LEADER_INBOUND_MAIL", "TEAM_LEADER_TCHAT", "TEAM_LEADER_RAFIKI", "TEAM_LEADER_OUTBOUND"] },
+        { roleMatch: /team leader/i, serviceCodes: ["TEAM_LEADER_INBOUND_VOICE", "TEAM_LEADER_INBOUND_MAIL", "TEAM_LEADER_TCHAT", "TEAM_LEADER_RAFIKI", "TEAM_LEADER_OUTBOUND", "TEAM_LEADER_CIB"] },
         { roleMatch: /agent/i, serviceCodes: ["AGENT_INBOUND", "AGENT_OUTBOUND", "AGENT_INBOUND_MAIL", "AGENT_TCHAT", "AGENT_RAFIKI", "AGENT_CIB"] },
         { roleMatch: /^quality assurance$/i, serviceCodes: ["QUALITY_ASSURANCE", "FORMATEUR", "COMMUNICATION"] }
     ];
@@ -487,8 +487,27 @@
         return postJson("/api/admin/users/" + userId + "/services", { serviceId: Number(target.id) }).catch(function () {});
     }
 
+    /** Accès effectif : profil réel, équipe menée, portail d'arrivée et ce qui manque (appliqué tout de suite sur son portail). */
+    function loadEffectiveAccess(userId) {
+        var box = document.getElementById("userEffectiveAccess");
+        if (!box) return;
+        getJson("/api/admin/users/" + userId + "/effective-access").then(function (a) {
+            if (String(currentDetailUserId) !== String(userId)) return;
+            var warn = (a.warnings || []).map(function (w) { return '<div class="small text-danger mt-1"><i class="bi bi-exclamation-triangle-fill"></i> ' + escapeHtml(w) + '</div>'; }).join("");
+            box.innerHTML = '<div class="border rounded-3 p-2 ' + (a.warnings && a.warnings.length ? "border-warning bg-warning-subtle" : "border-success bg-success-subtle") + '">' +
+                '<div class="small fw-bold mb-1"><i class="bi bi-shield-check"></i> Accès effectif (appliqué immédiatement sur son portail)</div>' +
+                '<div class="d-flex flex-wrap gap-2 small">' +
+                '<span class="badge text-bg-primary">' + escapeHtml(a.profileLabel) + '</span>' +
+                (a.ledTeamLabel ? '<span class="badge text-bg-info">Équipe dirigée : ' + escapeHtml(a.ledTeamLabel) + '</span>' : "") +
+                (a.team ? '<span class="badge text-bg-light border">Équipe : ' + escapeHtml(a.team) + '</span>' : "") +
+                '<span class="badge text-bg-light border">Portail : ' + escapeHtml(a.portal) + '</span>' +
+                (a.active ? "" : '<span class="badge text-bg-danger">Désactivé</span>') + '</div>' + warn + '</div>';
+        }).catch(function () { box.innerHTML = ""; });
+    }
+
     function openUserDetail(userId) {
         currentDetailUserId = userId;
+        loadEffectiveAccess(userId);
         getJson("/api/users/" + userId).then(function (detail) {
             document.getElementById("userDetailName").textContent = detail.name || detail.username;
             document.getElementById("userDetailUsername").textContent = detail.username;

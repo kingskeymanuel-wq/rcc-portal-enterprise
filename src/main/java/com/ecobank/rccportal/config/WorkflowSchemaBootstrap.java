@@ -907,6 +907,7 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         // Team Leaders des canaux digitaux : même portail Team Leader, restreint aux agents de leur canal.
         seedServiceIfMissing("TEAM_LEADER_TCHAT", "Team Leader Tchat", "Responsable de l'équipe Tchat (live chat)", 22);
         seedServiceIfMissing("TEAM_LEADER_RAFIKI", "Team Leader Rafiki", "Responsable de l'équipe Rafiki (réseaux sociaux)", 23);
+        seedServiceIfMissing("TEAM_LEADER_CIB", "Team Leader CIB", "Responsable de l'équipe CIB", 24);
 
         createIfMissing("USERS", """
                 CREATE TABLE dbo.USERS (

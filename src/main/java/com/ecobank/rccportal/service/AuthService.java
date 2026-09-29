@@ -142,6 +142,9 @@ public class AuthService {
     private static final Duration PENDING_LOGIN_TTL = Duration.ofMinutes(10);
 
     private final UserRepository userRepository;
+    /** Règle unique du rôle / service de portail (connexion, jeton, chaque requête). */
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ecobank.rccportal.security.AccessResolver accessResolver;
     private final UserRoleRepository userRoleRepository;
     private final com.ecobank.rccportal.repository.RoleRepository roleRepository;
     private final UserServiceAssignmentRepository userServiceAssignmentRepository;
@@ -905,168 +908,22 @@ public class AuthService {
     // ROLES
     // =========================================================
 
-    /**
-     * Rôles "de base" reconnus par TOUT le système de permissions du portail (comparaison
-     * insensible à la casse partout : "admin".equalsIgnoreCase(requester.role()), etc.).
-     * Un utilisateur peut avoir PLUSIEURS rôles en base (dbo.ROLES/USER_ROLES) — certains
-     * décoratifs/informatifs (ex. "Formateur", "Team Leader Inbound Voice", "Head RCC
-     * (Superviseur)") qui ne correspondent à AUCUNE de ces chaînes exactes. Si un tel rôle
-     * décoratif était choisi comme rôle JWT, l'utilisateur perdrait l'accès à tout le portail
-     * (chaque vérification de permission échouerait) — d'où cette priorité stricte, dans
-     * l'ordre du plus large accès au plus restreint.
-     */
-    private static final List<String> KNOWN_BASE_ROLES = List.of("admin", "rh", "excelliam", "supervisor", "team_leader", "agent");
 
-    /**
-     * Codes de service (dbo.SERVICES.CODE, voir WorkflowSchemaBootstrap) qui doivent, à défaut
-     * de Rôle de base explicite (dbo.ROLES), suffire à eux seuls à déterminer le rôle JWT — donc
-     * l'accès au portail. Sans ce repli, un utilisateur à qui l'admin n'a attribué QUE le
-     * service "RH"/"Superviseur"/"Team Leader ..." (sans lui donner en plus le Rôle du même nom)
-     * se retrouverait bloqué à la connexion ("no_role", voir plus haut) alors que
-     * l'attribution du service seul est précisément le geste attendu (voir AdministrationService
-     * .assignService()). QUALITY_ASSURANCE est volontairement absent d'ici : le profil QA est
-     * déjà déterminé séparément à partir du Service (voir getPrimaryService() / computeProfile()
-     * côté client), jamais du rôle JWT.
-     */
-    private static final java.util.LinkedHashMap<String, String> SERVICE_CODE_TO_BASE_ROLE =
-            new java.util.LinkedHashMap<>() {{
-                put("RH", "RH");
-                put("SUPERVISEUR", "SUPERVISOR");
-                put("TEAM_LEADER_INBOUND_VOICE", "TEAM_LEADER");
-                put("TEAM_LEADER_INBOUND_MAIL", "TEAM_LEADER");
-                put("TEAM_LEADER_OUTBOUND", "TEAM_LEADER");
-                put("TEAM_LEADER_TCHAT", "TEAM_LEADER");
-                put("TEAM_LEADER_RAFIKI", "TEAM_LEADER");
-                put("AGENT_INBOUND", "AGENT");
-                put("AGENT_OUTBOUND", "AGENT");
-                put("AGENT_TCHAT", "AGENT");
-                put("AGENT_RAFIKI", "AGENT");
-                put("AGENT_INBOUND_MAIL", "AGENT");
-                put("AGENT_CIB", "AGENT");
-                put("AGENCE_CAISSIER", "AGENCE");
-                put("AGENCE_GESTIONNAIRE", "AGENCE");
-                put("AGENCE", "AGENCE");
-            }};
 
+    /** Rôle de portail — même règle que chaque requête (AccessResolver) : le plus élevé des rôles, services et équipe menée. */
     private String getPrimaryRole(User user) {
-
-        if (user == null ||
-                user.getId() == null) {
-
-            return null;
-        }
-
-        List<UserRole> roles =
-                userRoleRepository
-                        .findRolesByUserId(
-                                user.getId()
-                        );
-
-        // Cherche d'abord un rôle de base connu, dans l'ordre de priorité — jamais un rôle
-        // décoratif choisi au hasard qui bloquerait tout accès au portail.
-        if (roles != null) {
-            for (String baseRole : KNOWN_BASE_ROLES) {
-                for (UserRole userRole : roles) {
-                    if (userRole.getRole() != null && baseRole.equalsIgnoreCase(userRole.getRole().getName())) {
-                        return userRole.getRole().getName();
-                    }
-                }
-            }
-        }
-
-        // Aucun Rôle de base trouvé — repli sur les Services attribués (voir
-        // SERVICE_CODE_TO_BASE_ROLE ci-dessus), avant le repli dégradé plus bas.
-        List<UserServiceAssignment> services =
-                userServiceAssignmentRepository.findServicesByUserId(user.getId());
-        if (services != null) {
-            for (String code : SERVICE_CODE_TO_BASE_ROLE.keySet()) {
-                for (UserServiceAssignment assignment : services) {
-                    if (assignment.getService() != null && code.equalsIgnoreCase(assignment.getService().getCode())) {
-                        return SERVICE_CODE_TO_BASE_ROLE.get(code);
-                    }
-                }
-            }
-        }
-
-        if (roles == null || roles.isEmpty()) {
-            return null;
-        }
-
-        // Aucun rôle de base ni service reconnu parmi ceux attribués — repli sur le premier
-        // rôle, comme avant ce correctif (comportement dégradé mais pas pire qu'auparavant).
-        UserRole userRole =
-                roles.get(0);
-
-        if (userRole.getRole() == null) {
-            return null;
-        }
-
-        return userRole
-                .getRole()
-                .getName();
+        if (user == null || user.getId() == null) return null;
+        return accessResolver.compute(user).role();
     }
 
     // =========================================================
     // SERVICES
     // =========================================================
 
-    /**
-     * Codes de la famille Quality Assurance, dans l'ordre de priorité à utiliser comme service
-     * "principal" (JWT `service`, donc requester.service()) quand plusieurs sont attribués en
-     * même temps — ex. un Superviseur QA qui porte aussi le service Quality Assurance de base
-     * (voir AdministrationService.assignService(), qui l'attribue automatiquement). Sans cet
-     * ordre, `services.get(0)` renverrait un résultat arbitraire (ordre d'attribution), ce qui
-     * ferait échouer de façon imprévisible les vérifications "quality assurance" utilisées dans
-     * une trentaine de contrôleurs (QualityEvaluationController, TrainingApiController...).
-     */
-    private static final List<String> QA_FAMILY_SERVICE_PRIORITY =
-            List.of("SUPERVISEUR_QA", "QUALITY_ASSURANCE", "FORMATEUR", "COMMUNICATION");
 
     private String getPrimaryService(User user) {
-
-        if (user == null ||
-                user.getId() == null) {
-
-            return null;
-        }
-
-        List<UserServiceAssignment> services =
-                userServiceAssignmentRepository
-                        .findServicesByUserId(
-                                user.getId()
-                        );
-
-        if (services == null ||
-                services.isEmpty()) {
-
-            return null;
-        }
-
-        for (String code : QA_FAMILY_SERVICE_PRIORITY) {
-            for (UserServiceAssignment assignment : services) {
-                if (assignment.getService() != null && code.equalsIgnoreCase(assignment.getService().getCode())) {
-                    return code;
-                }
-            }
-        }
-
-        UserServiceAssignment assignment =
-                services.get(0);
-
-        RccService service =
-                assignment.getService();
-
-        if (service == null) {
-            return null;
-        }
-
-        if (service.getCode() != null &&
-                !service.getCode().isBlank()) {
-
-            return service.getCode();
-        }
-
-        return service.getName();
+        if (user == null || user.getId() == null) return null;
+        return accessResolver.compute(user).service();
     }
 
     // =========================================================
