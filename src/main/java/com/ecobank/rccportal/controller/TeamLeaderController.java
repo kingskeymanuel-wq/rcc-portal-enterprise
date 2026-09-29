@@ -56,10 +56,10 @@ public class TeamLeaderController {
 
     /** Recherche d'agents éligibles à rejoindre mon équipe — bouton "Ajouter un agent". */
     @GetMapping("/members/candidates")
-    public List<UserDirectoryResponse> candidates(@RequestParam(required = false) String q,
-                                                   @AuthenticationPrincipal AuthenticatedUser requester) {
+    public List<com.ecobank.rccportal.service.TeamLeaderService.Candidate> candidates(@RequestParam(required = false) String q,
+                                                                                     @AuthenticationPrincipal AuthenticatedUser requester) {
         requireTeamLeaderOrAdmin(requester);
-        return teamLeaderService.searchAddableAgents(requester, q);
+        return teamLeaderService.searchCandidates(requester, q);
     }
 
     /** Ajoute un agent existant à mon équipe. */

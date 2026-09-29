@@ -84,4 +84,32 @@ class TeamLeaderPlanningTest {
         ApiException e = assertThrows(ApiException.class, () -> svc.submitTeamPlanning(TL, request("ama")));
         assertTrue(e.getMessage().contains("n'appartient pas à votre équipe"));
     }
+
+    /** Jours choisis dans le calendrier sur plusieurs semaines / mois : seuls ces jours sont planifiés. */
+    @Test
+    void chosenDaysAcrossWeeksAndMonthsArePlannedOnly() {
+        List<PlanifyShiftsRequest.AgentShiftAssignment> a = List.of(new PlanifyShiftsRequest.AgentShiftAssignment("yao", "M"));
+        List<LocalDate> days = List.of(LocalDate.of(2026, 10, 5), LocalDate.of(2026, 10, 12), LocalDate.of(2026, 11, 2));
+        var r = svc.submitTeamPlanning(TL, new PlanifyShiftsRequest(null, null, a, days, false));
+        assertEquals(3, r.entriesCreated());
+        assertEquals(new HashSet<>(days), saved.stream().map(AgentSchedule::getWorkDate).collect(java.util.stream.Collectors.toSet()));
+        assertTrue(saved.stream().allMatch(s -> "M".equals(s.getShiftCode())));
+    }
+
+    @Test
+    void otherDaysCanBeSetToRest() {
+        List<PlanifyShiftsRequest.AgentShiftAssignment> a = List.of(new PlanifyShiftsRequest.AgentShiftAssignment("yao", "A"));
+        var r = svc.submitTeamPlanning(TL, new PlanifyShiftsRequest(null, null, a,
+                List.of(LocalDate.of(2026, 10, 5), LocalDate.of(2026, 10, 7)), true));
+        assertEquals(3, r.entriesCreated(), "5 et 7 en A, le 6 en repos");
+        assertEquals("OFF", saved.stream().filter(s -> s.getWorkDate().getDayOfMonth() == 6).findFirst().orElseThrow().getShiftCode());
+        assertEquals(2, saved.stream().filter(s -> "A".equals(s.getShiftCode())).count());
+    }
+
+    @Test
+    void moreThanSixMonthsIsRefused() {
+        List<PlanifyShiftsRequest.AgentShiftAssignment> a = List.of(new PlanifyShiftsRequest.AgentShiftAssignment("yao", "M"));
+        assertThrows(ApiException.class, () -> svc.submitTeamPlanning(TL, new PlanifyShiftsRequest(null, null, a,
+                List.of(LocalDate.of(2026, 10, 1), LocalDate.of(2027, 6, 1)), false)));
+    }
 }

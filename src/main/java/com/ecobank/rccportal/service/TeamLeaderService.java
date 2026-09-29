@@ -35,6 +35,20 @@ public class TeamLeaderService {
     private final com.ecobank.rccportal.repository.UserRoleRepository userRoleRepository;
     private HrOrganizationService hrOrganization;
 
+    private com.ecobank.rccportal.repository.UserServiceAssignmentRepository userServices;
+    private com.ecobank.rccportal.repository.RccServiceRepository services;
+    private com.ecobank.rccportal.repository.RccNotificationRepository notifications;
+
+    /** Synchronisation du service agent et notifications — injection facultative (absente des tests unitaires). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setSync(com.ecobank.rccportal.repository.UserServiceAssignmentRepository userServices,
+                 com.ecobank.rccportal.repository.RccServiceRepository services,
+                 com.ecobank.rccportal.repository.RccNotificationRepository notifications) {
+        this.userServices = userServices;
+        this.services = services;
+        this.notifications = notifications;
+    }
+
     /** Sorties d'agents tracées côté RH — injection facultative (absente des tests unitaires). */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     void setHrOrganization(HrOrganizationService hrOrganization) {
@@ -69,12 +83,48 @@ public class TeamLeaderService {
      *  jamais éligible pour être ajouté à une équipe Team Leader. Même logique que
      *  UserService.teamStatus() pour repérer un "simple agent". */
     private boolean isManagementAccount(Long userId) {
-        return userRoleRepository.findRolesByUserId(userId).stream()
-                .anyMatch(ur -> {
-                    String n = ur.getRole() != null ? ur.getRole().getName() : null;
-                    return n != null && !"AGENT".equalsIgnoreCase(n.trim());
-                });
+        return managementLabel(userId) != null;
     }
+
+    /** Rôles de base qui font d'un compte un compte de management/support (jamais membre d'une équipe). */
+    private static final java.util.Set<String> MANAGEMENT_ROLES = java.util.Set.of("ADMIN", "RH", "SUPERVISOR", "TEAM_LEADER", "EXCELLIAM", "AGENCE");
+
+    /**
+     * Libellé du profil de management d'un compte (« Team Leader », « RH »…), null pour un agent. Les rôles
+     * d'agent (« agent », « Agent Inbound », « Agent Tchat »…) et Qualité ne comptent pas : l'ancienne règle
+     * (« tout rôle autre que AGENT ») excluait à tort la plupart des agents de la recherche.
+     */
+    String managementLabel(Long userId) {
+        List<String> roleNames = userRoleRepository.findRolesByUserId(userId).stream()
+                .map(ur -> ur.getRole() != null ? ur.getRole().getName() : null).filter(java.util.Objects::nonNull).toList();
+        return managementLabel(roleNames, currentServiceCodes(userId));
+    }
+
+    static String managementLabel(List<String> roleNames, List<String> serviceCodes) {
+        for (String n : roleNames) {
+            String base = com.ecobank.rccportal.security.AccessResolver.roleOfName(n);
+            if (base != null && MANAGEMENT_ROLES.contains(base)) return MANAGEMENT_LABELS.getOrDefault(base, base);
+        }
+        for (String code : serviceCodes) {
+            String c = code == null ? "" : code.toUpperCase();
+            if (c.startsWith("TEAM_LEADER_")) return "Team Leader";
+            if (c.equals("SUPERVISEUR_QA")) return "Head QA";
+            if (c.equals("SUPERVISEUR")) return "Superviseur";
+            if (c.equals("RH")) return "RH";
+        }
+        return null;
+    }
+
+    private static final java.util.Map<String, String> MANAGEMENT_LABELS = java.util.Map.of("ADMIN", "Administrateur", "RH", "RH",
+            "SUPERVISOR", "Superviseur", "TEAM_LEADER", "Team Leader", "EXCELLIAM", "Excelliam", "AGENCE", "Agence");
+
+    /** Service agent de chaque équipe : aligné automatiquement quand un agent change d'équipe. */
+    static final java.util.Map<String, String> TEAM_TO_AGENT_SERVICE = java.util.Map.of(
+            "INBOUND_VOICE", "AGENT_INBOUND", "INBOUND_MAIL", "AGENT_INBOUND_MAIL", "TCHAT", "AGENT_TCHAT",
+            "RAFIKI", "AGENT_RAFIKI", "CIB", "AGENT_CIB", "OUTBOUND", "AGENT_OUTBOUND");
+
+    static final java.util.Map<String, String> TEAM_LABELS = java.util.Map.of("INBOUND_VOICE", "Inbound Voix", "INBOUND_MAIL", "Inbound Mail",
+            "TCHAT", "Tchat", "RAFIKI", "Rafiki", "CIB", "CIB", "OUTBOUND", "Outbound");
 
     /** Activité écrite sur un agent ajouté à une équipe de canal (Tchat, Rafiki). */
     private static final java.util.Map<String, String> CHANNEL_TO_ACTIVITY = java.util.Map.of("TCHAT", "INBOUND TCHAT", "RAFIKI", "INBOUND RAFIKI");
@@ -97,41 +147,158 @@ public class TeamLeaderService {
         return TeamClassifier.isChannel(code) ? code : null;
     }
 
-    private static boolean inTeam(String ledCode, User u) {
+    private boolean inTeam(String ledCode, User u) {
         return TeamClassifier.belongsTo(ledCode, u.getActivity(), null);
     }
 
+    /** Personne trouvée par la recherche élargie de l'onglet Membres. */
+    public record Candidate(Long id, String username, String fullName, String email, String country, String team, String teamLabel,
+                            String currentLeader, List<String> services, boolean active, boolean inMyTeam, boolean addable, String reason) {}
+
     /**
-     * Recherche des agents éligibles à rejoindre mon équipe (pas déjà dedans, pas un compte de
-     * management) — pour le bouton "Ajouter un agent" de l'onglet Membres.
+     * Recherche élargie : tout le monde (toutes équipes, toutes filiales, sans équipe), sur le nom, l'identifiant,
+     * l'e-mail, l'équipe, le service ou la filiale. Chaque résultat indique son équipe actuelle et son Team Leader ;
+     * un agent d'une autre équipe peut être transféré dans la mienne. Seuls les comptes de management et les comptes
+     * désactivés ne peuvent pas être ajoutés (la raison est affichée).
      */
     @Transactional(readOnly = true)
-    public List<UserDirectoryResponse> searchAddableAgents(AuthenticatedUser requester, String query) {
+    public List<Candidate> searchCandidates(AuthenticatedUser requester, String query) {
         String code = ledTeamCode(requester);
-        String q = query == null ? "" : query.trim().toLowerCase();
-        return userRepository.findAll().stream()
-                .filter(u -> !inTeam(code, u))
-                .filter(u -> !isManagementAccount(u.getId()))
-                .filter(u -> q.isEmpty()
-                        || (u.getName() != null && u.getName().toLowerCase().contains(q))
-                        || (u.getUsername() != null && u.getUsername().toLowerCase().contains(q)))
-                .map(this::toDirectory)
-                .sorted((a, b) -> String.valueOf(a.fullName()).compareToIgnoreCase(String.valueOf(b.fullName())))
-                .limit(20)
-                .toList();
+        String q = fold(query);
+        // Rôles et services de tout le monde en deux requêtes (et non plusieurs par personne) : recherche rapide.
+        java.util.Map<Long, List<String>> codes = new java.util.HashMap<>();
+        java.util.Map<Long, List<String>> names = new java.util.HashMap<>();
+        if (userServices != null) {
+            for (var a : userServices.findAll()) {
+                if (a.getService() == null || a.getUser() == null) continue;
+                Long uid = a.getUser().getId();
+                if (a.getService().getCode() != null) codes.computeIfAbsent(uid, k -> new java.util.ArrayList<>()).add(a.getService().getCode());
+                names.computeIfAbsent(uid, k -> new java.util.ArrayList<>()).add(a.getService().getName() != null ? a.getService().getName() : a.getService().getCode());
+            }
+        }
+        java.util.Map<Long, List<String>> roles = new java.util.HashMap<>();
+        for (var ur : userRoleRepository.findAll()) {
+            if (ur.getUser() != null && ur.getRole() != null) roles.computeIfAbsent(ur.getUser().getId(), k -> new java.util.ArrayList<>()).add(ur.getRole().getName());
+        }
+        List<User> leaders = userRepository.findAll().stream().filter(u -> u.getLedTeam() != null && !u.getLedTeam().isBlank()).toList();
+        List<Candidate> out = new java.util.ArrayList<>();
+        for (User u : userRepository.findAll()) {
+            if (u.getUsername() != null && u.getUsername().equalsIgnoreCase(requester.username())) continue;
+            List<String> c = codes.getOrDefault(u.getId(), List.of());
+            String team = teamCodeOf(u.getActivity(), c);
+            String teamLabel = team == null ? "Sans équipe" : TEAM_LABELS.getOrDefault(team, team);
+            String country = HrOrganizationService.countryOf(u.getAffiliateBranch());
+            if (!q.isEmpty()) {
+                String hay = fold(String.join(" ", String.valueOf(u.getName()), String.valueOf(u.getUsername()), String.valueOf(u.getEmail()),
+                        String.valueOf(u.getActivity()), teamLabel, country, "CI".equals(country) ? "cote d'ivoire" : "togo",
+                        String.join(" ", names.getOrDefault(u.getId(), List.of()))));
+                boolean all = true;
+                for (String word : q.split("\\s+")) if (!hay.contains(word)) { all = false; break; }
+                if (!all) continue;
+            }
+            boolean active = !Boolean.FALSE.equals(u.getAccountEnabled());
+            boolean mine = TeamClassifier.belongsTo(code, u.getActivity(), c);
+            String management = managementLabel(roles.getOrDefault(u.getId(), List.of()), c);
+            String reason = mine ? "Déjà dans votre équipe" : management != null ? "Compte de management (" + management + ")"
+                    : !active ? "Compte désactivé — réintégration par le RH" : null;
+            User leader = team == null ? null : TeamClassifier.leaderFor(u.getActivity(), leaders, User::getLedTeam);
+            out.add(new Candidate(u.getId(), u.getUsername(), u.getName() != null ? u.getName() : u.getUsername(), u.getEmail(), country,
+                    team, teamLabel, leader == null ? null : (leader.getName() != null ? leader.getName() : leader.getUsername()),
+                    names.getOrDefault(u.getId(), List.of()), active, mine, reason == null, reason));
+        }
+        out.sort(java.util.Comparator.comparing((Candidate x) -> x.addable() ? 0 : x.inMyTeam() ? 2 : 1)
+                .thenComparing(x -> x.team() == null ? 0 : 1)
+                .thenComparing(x -> String.valueOf(x.fullName()), String.CASE_INSENSITIVE_ORDER));
+        return out.size() > 60 ? out.subList(0, 60) : out;
     }
 
-    /** Ajoute un agent existant à mon équipe — positionne son équipe (activity) sur la mienne. */
+    /** Compatibilité : ancien format (annuaire) des seules personnes ajoutables. */
+    @Transactional(readOnly = true)
+    public List<UserDirectoryResponse> searchAddableAgents(AuthenticatedUser requester, String query) {
+        return searchCandidates(requester, query).stream().filter(Candidate::addable)
+                .map(c -> userRepository.findById(c.id()).map(this::toDirectory).orElse(null)).filter(java.util.Objects::nonNull).toList();
+    }
+
+    static String teamCodeOf(String activity, List<String> serviceCodes) {
+        String channel = TeamClassifier.channel(activity, serviceCodes);
+        if (channel != null) return channel;
+        TeamClassifier.Team t = TeamClassifier.classify(activity, serviceCodes);
+        return t == TeamClassifier.Team.OTHER ? null : t.name();
+    }
+
+    private static String fold(String s) {
+        return s == null ? "" : java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase().trim();
+    }
+
+    /**
+     * Ajoute une personne à mon équipe (y compris un agent d'une autre équipe : transfert). Synchronisation
+     * automatique : son équipe (activity) et son service agent sont alignés sur mon équipe — son portail, son
+     * planning, son reporting, la QA et le RH le voient aussitôt dans mon équipe ; lui et son ancien Team
+     * Leader sont notifiés.
+     */
     @Transactional
     public void addMember(AuthenticatedUser requester, Long userId) {
         String code = ledTeamCode(requester);
         TeamClassifier.Team team = TeamClassifier.teamOf(code);
         User user = userRepository.findById(userId).orElseThrow(() -> ApiException.notFound("Unknown user."));
-        if (isManagementAccount(userId)) {
-            throw ApiException.badRequest("Ce compte porte un rôle de management — il ne peut pas être ajouté à une équipe opérationnelle.");
+        String management = managementLabel(userId);
+        if (management != null) {
+            throw ApiException.badRequest("Ce compte est un compte de management (" + management + ") : il ne peut pas être ajouté à une équipe opérationnelle.");
+        }
+        if (Boolean.FALSE.equals(user.getAccountEnabled())) {
+            throw ApiException.badRequest("Ce compte est désactivé : sa réintégration se fait depuis le portail RH (onglet Sorties).");
+        }
+        List<String> before = currentServiceCodes(userId);
+        String oldTeam = teamCodeOf(user.getActivity(), before);
+        User oldLeader = null;
+        if (oldTeam != null && !oldTeam.equals(code)) {
+            List<User> leaders = userRepository.findAll().stream().filter(u -> u.getLedTeam() != null && !u.getLedTeam().isBlank()).toList();
+            oldLeader = TeamClassifier.leaderFor(user.getActivity(), leaders, User::getLedTeam);
         }
         user.setActivity(CHANNEL_TO_ACTIVITY.getOrDefault(code, TEAM_TO_ACTIVITY.get(team)));
         userRepository.save(user);
+        syncAgentService(user, code);
+
+        String leaderName = requester.name() != null && !requester.name().isBlank() ? requester.name() : requester.username();
+        String teamLabel = TEAM_LABELS.getOrDefault(code, code);
+        notify(user, "Vous avez rejoint l'équipe " + teamLabel + " de " + leaderName + ". Votre portail, votre planning et votre suivi sont mis à jour.");
+        if (oldLeader != null && (oldLeader.getUsername() == null || !oldLeader.getUsername().equalsIgnoreCase(requester.username()))) {
+            notify(oldLeader, (user.getName() != null ? user.getName() : user.getUsername()) + " a été transféré(e) de votre équipe vers l'équipe "
+                    + teamLabel + " de " + leaderName + ".");
+        }
+    }
+
+    private List<String> currentServiceCodes(Long userId) {
+        if (userServices == null) return List.of();
+        return userServices.findServicesByUserId(userId).stream()
+                .filter(a -> a.getService() != null && a.getService().getCode() != null)
+                .map(a -> a.getService().getCode()).toList();
+    }
+
+    /** Un seul service agent, celui de la nouvelle équipe ; les autres services (QA, formation…) restent. */
+    private void syncAgentService(User user, String teamCode) {
+        if (userServices == null || services == null) return;
+        String wanted = TEAM_TO_AGENT_SERVICE.get(teamCode);
+        if (wanted == null) return;
+        boolean has = false;
+        for (var a : userServices.findByUserId(user.getId())) {
+            String c = a.getService() == null || a.getService().getCode() == null ? "" : a.getService().getCode().toUpperCase();
+            if (c.equals(wanted)) { has = true; continue; }
+            if (TEAM_TO_AGENT_SERVICE.containsValue(c)) userServices.delete(a);
+        }
+        if (!has) {
+            services.findByCodeIgnoreCase(wanted).ifPresent(svc -> userServices.save(
+                    com.ecobank.rccportal.model.UserServiceAssignment.builder().user(user).service(svc).build()));
+        }
+    }
+
+    private void notify(User target, String content) {
+        if (notifications == null || target == null) return;
+        try {
+            notifications.save(com.ecobank.rccportal.model.RccNotification.builder().targetUser(target).content(content).isRead(false).build());
+        } catch (RuntimeException ignored) {
+            // notification best-effort
+        }
     }
 
     /**

@@ -492,10 +492,30 @@
             });
         });
 
+        // Deux façons de choisir les jours : une période continue (du … au …) ou des jours précis dans le
+        // calendrier, sur plusieurs semaines et plusieurs mois (plan-day-picker.js).
+        var planMode = "range";
+        var dayPicker = window.RccDayPicker ? RccDayPicker.mount($("tlPlanDayPicker"), {}) : null;
+        $("tlPlanMode").addEventListener("click", function (e) {
+            var b = e.target.closest("[data-mode]");
+            if (!b) return;
+            planMode = b.getAttribute("data-mode");
+            Array.prototype.forEach.call(this.querySelectorAll("[data-mode]"), function (x) { x.classList.toggle("on", x === b); });
+            $("tlPlanDaysBox").hidden = planMode !== "days";
+            $("tlPlanFrom").closest(".exc-period-bar").querySelectorAll("input[type=date], #tlPlanPeriodLabel, .exc-period-bar > span").forEach(function (el) {
+                el.style.display = planMode === "days" ? "none" : "";
+            });
+        });
+
         // Publication directe : en ligne tout de suite, chaque agent est prévenu.
         function submitPlanning() {
             var from = $("tlPlanFrom").value, to = $("tlPlanTo").value;
             var resultBox = $("tlPlanResult");
+            var days = planMode === "days" && dayPicker ? dayPicker.days() : null;
+            if (days) {
+                if (!days.length) { resultBox.className = "text-danger"; resultBox.textContent = "Choisissez au moins un jour dans le calendrier."; return; }
+                from = days[0]; to = days[days.length - 1];
+            }
             if (!from || !to) { resultBox.className = "text-danger"; resultBox.textContent = "Choisissez une période."; return; }
 
             var assignments = [];
@@ -505,13 +525,14 @@
                 assignments.push({ username: row.getAttribute("data-username"), shiftCode: row.querySelector(".tl-plan-shift").value });
             });
             if (!assignments.length) { resultBox.className = "text-danger"; resultBox.textContent = "Cochez au moins un agent."; return; }
-            if (!confirm("Publier ce planning maintenant ? Il sera immédiatement visible par les " + assignments.length + " agent(s) concerné(s).")) return;
+            if (!confirm("Publier ce planning maintenant" + (days ? " (" + days.length + " jour(s) choisi(s))" : "") + " ? Il sera immédiatement visible par les " + assignments.length + " agent(s) concerné(s).")) return;
 
             resultBox.className = "text-muted";
             resultBox.textContent = "Publication…";
             fetch("/api/schedule/team/submit", {
                 method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ periodFrom: from, periodTo: to, assignments: assignments })
+                body: JSON.stringify({ periodFrom: from, periodTo: to, assignments: assignments,
+                    days: days, restOnOtherDays: days ? $("tlPlanRestOthers").checked : null })
             })
                 .then(readImportResponse)
                 .then(function (result) {
@@ -551,34 +572,78 @@
         searchAddableAgents("");
     }
 
+    var candidateFilter = "all";
+    var lastCandidates = [];
+
+    /**
+     * Recherche élargie : tout le monde (toutes équipes, filiales, sans équipe) par nom, identifiant, e-mail, équipe,
+     * service ou filiale. Un agent d'une autre équipe peut être transféré ; son équipe, son service agent et son
+     * portail sont synchronisés automatiquement, lui et son ancien Team Leader sont notifiés.
+     */
     function searchAddableAgents(q) {
+        $("tlAddMemberResults").innerHTML = '<p class="text-muted small text-center mb-0">Recherche…</p>';
         getJson("/api/team-leader/members/candidates?q=" + encodeURIComponent(q)).then(function (list) {
-            var box = $("tlAddMemberResults");
-            if (!list.length) { box.innerHTML = '<p class="text-muted small text-center mb-0">Aucun agent trouvé.</p>'; return; }
-            box.innerHTML = list.map(function (u) {
-                return '<div class="d-flex justify-content-between align-items-center border rounded p-2">' +
-                    '<div><div>' + escapeHtml(u.fullName || u.username) + '</div><div class="small text-muted">' + escapeHtml(u.activity || "Non classée") + ' · ' + escapeHtml(u.affiliateBranch || "—") + '</div></div>' +
-                    '<button type="button" class="btn btn-sm btn-primary tl-add-candidate-btn" data-id="' + u.id + '">Ajouter</button>' +
-                    '</div>';
-            }).join("");
-            Array.prototype.forEach.call(box.querySelectorAll(".tl-add-candidate-btn"), function (btn) {
-                btn.addEventListener("click", function () {
-                    btn.disabled = true;
-                    fetch("/api/team-leader/members/" + btn.getAttribute("data-id"), { method: "POST", credentials: "same-origin" })
-                        .then(function (res) { return res.ok || res.status === 204 ? null : errorOf(res); })
-                        .then(function () {
-                            // La fenêtre reste ouverte : on peut en ajouter plusieurs à la suite.
-                            btn.className = "btn btn-sm btn-success";
-                            btn.innerHTML = '<i class="bi bi-check-lg"></i> Ajouté';
-                            addedCount++;
-                            $("tlAddMemberDone").textContent = addedCount + " agent(s) ajouté(s) à votre équipe";
-                            loadMembers();
-                        })
-                        .catch(function (e) { btn.disabled = false; alert("Erreur : " + e.message); });
-                });
-            });
+            lastCandidates = list || [];
+            renderCandidates();
         }).catch(function (e) {
             $("tlAddMemberResults").innerHTML = '<p class="text-danger small mb-0">Erreur : ' + escapeHtml(e.message) + '</p>';
+        });
+    }
+
+    function renderCandidates() {
+        var box = $("tlAddMemberResults");
+        var counts = { all: lastCandidates.length, none: 0, other: 0 };
+        lastCandidates.forEach(function (u) { if (!u.team) counts.none++; else if (!u.inMyTeam) counts.other++; });
+        $("tlAddMemberFilters").innerHTML = [["all", "Tous"], ["none", "Sans équipe"], ["other", "Autres équipes"]].map(function (f) {
+            return '<button type="button" class="btn btn-sm ' + (candidateFilter === f[0] ? "btn-primary" : "btn-outline-secondary") + '" data-cf="' + f[0] + '">' +
+                f[1] + ' <span class="badge ' + (candidateFilter === f[0] ? "bg-light text-primary" : "bg-secondary") + '">' + counts[f[0]] + '</span></button>';
+        }).join("");
+        var list = lastCandidates.filter(function (u) {
+            return candidateFilter === "all" || (candidateFilter === "none" ? !u.team : (u.team && !u.inMyTeam));
+        });
+        if (!list.length) { box.innerHTML = '<p class="text-muted small text-center mb-0">Personne ne correspond à cette recherche.</p>'; return; }
+        box.innerHTML = list.map(function (u) {
+            var teamBadge = u.team ? '<span class="badge ' + (u.inMyTeam ? "bg-success" : "bg-primary-subtle text-primary") + '">' + escapeHtml(u.teamLabel) + '</span>'
+                : '<span class="badge bg-warning-subtle text-warning-emphasis">Sans équipe</span>';
+            var btn = u.addable
+                ? '<button type="button" class="btn btn-sm ' + (u.team ? "btn-outline-primary" : "btn-primary") + ' tl-add-candidate-btn" data-id="' + u.id + '" data-transfer="' + (u.team ? "1" : "") + '">' +
+                  (u.team ? '<i class="bi bi-arrow-left-right"></i> Transférer ici' : '<i class="bi bi-person-plus"></i> Ajouter') + '</button>'
+                : '<span class="small text-muted text-end" style="max-width:170px">' + escapeHtml(u.reason || "") + '</span>';
+            return '<div class="d-flex justify-content-between align-items-center gap-2 border rounded p-2' + (u.addable ? "" : " bg-light") + '">' +
+                '<div class="min-w-0"><div class="fw-semibold">' + escapeHtml(u.fullName || u.username) + ' <small class="text-muted fw-normal">' + escapeHtml(u.username || "") + '</small></div>' +
+                '<div class="small text-muted d-flex flex-wrap gap-1 align-items-center">' + teamBadge +
+                (u.currentLeader && !u.inMyTeam ? '<span>TL : ' + escapeHtml(u.currentLeader) + '</span>' : '') +
+                '<span>· ' + escapeHtml(u.country || "—") + '</span>' +
+                (u.services && u.services.length ? '<span>· ' + escapeHtml(u.services.join(", ")) + '</span>' : '') + '</div></div>' + btn + '</div>';
+        }).join("");
+    }
+
+    function wireCandidateActions() {
+        $("tlAddMemberFilters").addEventListener("click", function (e) {
+            var f = e.target.closest("[data-cf]");
+            if (!f) return;
+            candidateFilter = f.getAttribute("data-cf");
+            renderCandidates();
+        });
+        $("tlAddMemberResults").addEventListener("click", function (e) {
+            var btn = e.target.closest(".tl-add-candidate-btn");
+            if (!btn) return;
+            var u = lastCandidates.filter(function (x) { return String(x.id) === btn.getAttribute("data-id"); })[0];
+            if (u && u.team && !confirm("Transférer " + (u.fullName || u.username) + " de l'équipe " + u.teamLabel +
+                    (u.currentLeader ? " (" + u.currentLeader + ")" : "") + " vers votre équipe ?\n\nSon portail, son planning et son suivi basculent tout de suite ; son ancien Team Leader est prévenu.")) return;
+            btn.disabled = true;
+            fetch("/api/team-leader/members/" + btn.getAttribute("data-id"), { method: "POST", credentials: "same-origin" })
+                .then(function (res) { return res.ok || res.status === 204 ? null : errorOf(res); })
+                .then(function () {
+                    // La fenêtre reste ouverte : on peut en ajouter plusieurs à la suite.
+                    btn.className = "btn btn-sm btn-success";
+                    btn.innerHTML = '<i class="bi bi-check-lg"></i> Dans votre équipe';
+                    if (u) { u.inMyTeam = true; u.addable = false; }
+                    addedCount++;
+                    $("tlAddMemberDone").textContent = addedCount + " agent(s) ajouté(s) à votre équipe — synchronisé partout";
+                    loadMembers();
+                })
+                .catch(function (err) { btn.disabled = false; alert("Erreur : " + err.message); });
         });
     }
 
@@ -1677,6 +1742,7 @@
         $("tlPlanExportMonth").value = currentMonthValue();
         $("tlPlanExportBtn").addEventListener("click", exportPlanning);
         wirePlanningTab();
+        wireCandidateActions();
         $("tlAddMemberSearch").addEventListener("input", function () {
             clearTimeout(addMemberSearchTimer);
             var q = this.value;

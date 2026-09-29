@@ -251,8 +251,19 @@
                                 <span class="exc-shift-chip"><span class="dot"></span> 21h–06h (N)</span>
                             </div>
 
+                            <div class="tl-plan-mode" id="tlPlanMode" role="group" aria-label="Mode de sélection des jours">
+                                <button type="button" class="on" data-mode="range"><i class="bi bi-arrow-left-right"></i> Période continue</button>
+                                <button type="button" data-mode="days"><i class="bi bi-calendar3"></i> Jours choisis (semaines / mois)</button>
+                            </div>
+                            <div id="tlPlanDaysBox" hidden>
+                                <div id="tlPlanDayPicker"></div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="tlPlanRestOthers">
+                                    <label class="form-check-label small" for="tlPlanRestOthers">Mettre en repos (OFF) les jours non choisis entre le premier et le dernier jour</label>
+                                </div>
+                            </div>
                             <div class="exc-period-bar mb-3">
-                                <label class="small fw-semibold mb-0">Période :</label>
+                                <label class="small fw-semibold mb-0" id="tlPlanPeriodLabel">Période :</label>
                                 <input type="date" class="form-control form-control-sm" id="tlPlanFrom">
                                 <span class="small text-muted">au</span>
                                 <input type="date" class="form-control form-control-sm" id="tlPlanTo">
@@ -549,14 +560,15 @@
 
                 <!-- ===================== MODALE — AJOUTER UN AGENT ===================== -->
                 <div class="modal fade" id="tlAddMemberModal" tabindex="-1">
-                    <div class="modal-dialog">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
                         <div class="modal-content">
                             <div class="modal-header"><h5 class="modal-title"><i class="bi bi-person-plus-fill"></i> Ajouter des agents à mon équipe</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                             <div class="modal-body">
-                                <p class="small text-muted mb-2">Un agent ajouté rejoint votre équipe tout de suite (reporting, planning, QA). Vous pouvez en ajouter plusieurs à la suite.</p>
-                                <input type="text" class="form-control mb-2" id="tlAddMemberSearch" placeholder="Rechercher un agent par nom ou identifiant…">
-                                <div id="tlAddMemberResults" class="d-flex flex-column gap-1" style="max-height:320px;overflow:auto;"></div>
+                                <p class="small text-muted mb-2">Cherchez n'importe qui : sans équipe, ou dans une autre équipe (transfert). La personne rejoint votre équipe tout de suite — son équipe, son service agent, son portail, son planning, la QA et le RH sont synchronisés automatiquement. Vous pouvez en ajouter plusieurs à la suite.</p>
+                                <input type="text" class="form-control mb-2" id="tlAddMemberSearch" placeholder="Nom, identifiant, e-mail, équipe, service ou filiale…">
+                                <div id="tlAddMemberFilters" class="d-flex flex-wrap gap-1 mb-2"></div>
+                                <div id="tlAddMemberResults" class="d-flex flex-column gap-1" style="max-height:420px;overflow:auto;"></div>
                             </div>
                             <div class="modal-footer"><span class="small text-success me-auto" id="tlAddMemberDone"></span>
                                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Terminé</button></div>
@@ -752,6 +764,7 @@
 <script th:src="@{/js/team-performance.js}"></script>
 <script th:src="@{/js/team-perf-files.js}"></script>
 <script th:src="@{/js/supervision.js}"></script>
+<script th:src="@{/js/plan-day-picker.js}"></script>
 <script th:src="@{/js/team-leader.js}"></script>
 <script>document.addEventListener("DOMContentLoaded", function () { RccSession.init().then(function (s) { if (s) RccSupervision.mountAssignee(document.getElementById("spMine")); }); });</script>
 </body>

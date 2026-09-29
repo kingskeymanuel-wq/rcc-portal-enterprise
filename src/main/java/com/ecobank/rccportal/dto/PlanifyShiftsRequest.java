@@ -12,8 +12,16 @@ import java.util.List;
 public record PlanifyShiftsRequest(
         LocalDate periodFrom,
         LocalDate periodTo,
-        List<AgentShiftAssignment> assignments
+        List<AgentShiftAssignment> assignments,
+        /** Jours précis choisis dans le calendrier (sur plusieurs semaines ou mois) ; vide = tous les jours de la période. */
+        List<LocalDate> days,
+        /** true : les jours NON choisis entre le premier et le dernier jour choisi passent en repos (OFF). */
+        Boolean restOnOtherDays
 ) {
+
+    public PlanifyShiftsRequest(LocalDate periodFrom, LocalDate periodTo, List<AgentShiftAssignment> assignments) {
+        this(periodFrom, periodTo, assignments, null, null);
+    }
 
     /** shiftCode doit être un des 4 shifts fixes de ScheduleService.FIXED_SHIFTS ("M","M2","A","N"),
      *  ou "OFF" pour retirer un agent du planning de cette période sans lui assigner d'horaire. */

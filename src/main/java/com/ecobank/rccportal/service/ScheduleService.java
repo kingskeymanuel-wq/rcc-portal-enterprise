@@ -776,12 +776,23 @@ public class ScheduleService {
         if (request == null || request.assignments() == null || request.assignments().isEmpty()) {
             throw ApiException.badRequest("Au moins un agent doit être coché.");
         }
-        if (request.periodFrom() == null || request.periodTo() == null) {
-            throw ApiException.badRequest("La période (du/au) est requise.");
+        // Jours à planifier : jours précis choisis dans le calendrier (sur des semaines ou des mois), sinon toute la période.
+        java.util.TreeSet<LocalDate> chosen = new java.util.TreeSet<>();
+        if (request.days() != null) request.days().stream().filter(java.util.Objects::nonNull).forEach(chosen::add);
+        if (chosen.isEmpty()) {
+            if (request.periodFrom() == null || request.periodTo() == null) {
+                throw ApiException.badRequest("Choisissez une période ou des jours dans le calendrier.");
+            }
+            if (request.periodFrom().isAfter(request.periodTo())) {
+                throw ApiException.badRequest("La date de début doit précéder la date de fin.");
+            }
+            for (LocalDate d = request.periodFrom(); !d.isAfter(request.periodTo()); d = d.plusDays(1)) chosen.add(d);
         }
-        if (request.periodFrom().isAfter(request.periodTo())) {
-            throw ApiException.badRequest("La date de début doit précéder la date de fin.");
+        if (java.time.temporal.ChronoUnit.DAYS.between(chosen.first(), chosen.last()) > 186) {
+            throw ApiException.badRequest("Planifiez au plus 6 mois à la fois.");
         }
+        boolean restOnOtherDays = Boolean.TRUE.equals(request.restOnOtherDays());
+        LocalDate periodFrom = chosen.first(), periodTo = chosen.last();
 
         int agentsPlanified = 0, entriesCreated = 0;
         List<String> unknownUsernames = new ArrayList<>();
@@ -809,16 +820,19 @@ public class ScheduleService {
             agentsPlanified++;
             plannedAgents.add(user);
 
-            for (LocalDate d = request.periodFrom(); !d.isAfter(request.periodTo()); d = d.plusDays(1)) {
+            for (LocalDate d = periodFrom; !d.isAfter(periodTo); d = d.plusDays(1)) {
+                boolean selected = chosen.contains(d);
+                if (!selected && !restOnOtherDays) continue;
+                boolean off = isOff || !selected;
                 final User scheduleUser = user;
                 final LocalDate day = d;
                 AgentSchedule schedule = agentScheduleRepository.findByUserAndWorkDate(user, day)
                         .orElseGet(() -> AgentSchedule.builder().user(scheduleUser).workDate(day).build());
-                schedule.setShiftCode(isOff ? "OFF" : code);
-                schedule.setShiftLabel(isOff ? "Repos hebdomadaire" : def.label());
-                schedule.setPlannedStartTime(isOff ? null : def.start());
-                schedule.setPlannedEndTime(isOff ? null : def.end());
-                schedule.setOvernightCrossesMidnight(!isOff && def.overnight());
+                schedule.setShiftCode(off ? "OFF" : code);
+                schedule.setShiftLabel(off ? "Repos hebdomadaire" : def.label());
+                schedule.setPlannedStartTime(off ? null : def.start());
+                schedule.setPlannedEndTime(off ? null : def.end());
+                schedule.setOvernightCrossesMidnight(!off && def.overnight());
                 schedule.setApprovalStatus("APPROVED");
                 schedule.setRejectionReason(null);
                 schedule.setOrigin("TEAM_LEADER");
@@ -829,8 +843,10 @@ public class ScheduleService {
 
         // Publication directe : en ligne tout de suite (planning agent, retards, reporting) ; chaque agent est prévenu.
         String who = teamLeader.getName() != null && !teamLeader.getName().isBlank() ? teamLeader.getName() : teamLeader.getUsername();
-        String msg = "📅 Votre planning du " + request.periodFrom().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
-                + " au " + request.periodTo().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + " a été publié par " + who + ".";
+        String msg = "📅 Votre planning du " + periodFrom.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                + " au " + periodTo.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                + (request.days() != null && !request.days().isEmpty() ? " (" + chosen.size() + " jour(s) choisi(s))" : "")
+                + " a été publié par " + who + ".";
         for (User agent : plannedAgents) {
             notificationRepository.save(com.ecobank.rccportal.model.RccNotification.builder()
                     .targetUser(agent).content(msg).isRead(false).build());
