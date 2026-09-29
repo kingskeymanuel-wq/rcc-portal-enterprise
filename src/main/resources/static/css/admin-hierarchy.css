@@ -73,3 +73,36 @@
     .ah-search input { min-width: 0; width: 100%; }
     .ah-lbl { width: 100%; }
 }
+
+/* Filiale → hiérarchie */
+.ah-filiale { border: 1px solid #DCE4F0; border-left: 5px solid #122240; border-radius: 1.1rem; margin-bottom: .9rem; background: #FAFBFD; --c: #122240; }
+.ah-filiale > header { display: flex; align-items: center; gap: .7rem; padding: .8rem 1rem; cursor: pointer; }
+.ah-filiale > header h6 { margin: 0; font-weight: 800; color: #122240; font-size: 1rem; }
+.ah-filiale > header small { color: #6B7A90; font-size: .76rem; }
+.ah-filiale > header > div { flex: 1; min-width: 0; }
+.ah-filiale > .ah-people { padding: 0 1rem 1rem; }
+
+/* Accès (Agent / Team Leader d'une équipe) */
+.ah-access { border: 1px solid #BFD0E6; background: #F3F7FD; border-radius: 999px; font-size: .75rem; font-weight: 700; color: #0B4FA8; padding: .15rem .55rem; max-width: 100%; }
+.ah-chip.lvl { background: #EEF2F8; color: #33415C; padding-right: .6rem; }
+.ah-hint { font-size: .72rem; color: #8A97AB; }
+.ah-ghost { font-size: .72rem; font-weight: 700; color: #B45309; background: #FEF3C7; border-radius: 999px; padding: .12rem .55rem; }
+.ah-ghostbar { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; background: #FFF7E6; border: 1px solid #F7D9A8; border-radius: 1rem; padding: .7rem .9rem; margin-bottom: .6rem; }
+.ah-ghostbar > .bi { font-size: 1.4rem; color: #B45309; }
+.ah-ghostbar > div { flex: 1; min-width: 200px; }
+.ah-ghostbar b { display: block; color: #7C3F00; font-size: .9rem; }
+.ah-ghostbar small { color: #8A4B06; font-size: .76rem; }
+.ah-ghostlist { border: 1px solid #F7D9A8; border-radius: 1rem; padding: .6rem .9rem; margin-bottom: 1rem; background: #fff; max-height: 360px; overflow: auto; }
+.ah-ghostlist label { display: block; padding: .3rem 0; border-bottom: 1px dashed #F1E3C8; font-size: .84rem; }
+.ah-ghostlist label small { color: #6B7A90; }
+
+/* Fiche modifiable sur place */
+.ah-person.editing { border-color: #9DBBE6; background: #F5F9FF; }
+.ah-edit { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 1fr)); gap: .45rem .7rem; margin-top: .6rem; padding-top: .6rem; border-top: 1px dashed #BFD0E6; }
+.ah-edit label { display: flex; flex-direction: column; font-size: .7rem; font-weight: 800; text-transform: uppercase; color: #6B7A90; gap: .15rem; }
+.ah-edit input, .ah-edit select { border: 1px solid #DCE4F0; border-radius: .55rem; padding: .3rem .5rem; font-size: .82rem; font-weight: 500; text-transform: none; color: #122240; background: #fff; min-width: 0; }
+.ah-edit .ah-check { flex-direction: row; align-items: center; gap: .4rem; align-self: end; padding-bottom: .35rem; }
+.ah-edit-actions { grid-column: 1 / -1; display: flex; gap: .5rem; justify-content: flex-end; margin-top: .3rem; }
+.ah-btn { border: 1px solid #DCE4F0; background: #fff; border-radius: 999px; padding: .35rem .9rem; font-size: .8rem; font-weight: 700; color: #33415C; }
+.ah-btn.primary { background: #0057B8; border-color: #0057B8; color: #fff; }
+.ah-btn:disabled { opacity: .6; }

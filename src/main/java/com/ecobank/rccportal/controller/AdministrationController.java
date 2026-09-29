@@ -41,6 +41,27 @@ public class AdministrationController {
         return hierarchyService.hierarchy();
     }
 
+    public record SetAccessRequest(String level, String team) {}
+
+    /** Accès choisi dans l'organigramme : Agent (éventuellement d'une équipe) ou Team Leader d'une équipe. */
+    @PutMapping("/users/{userId}/access")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void setAccess(@PathVariable Long userId, @RequestBody SetAccessRequest request,
+                          @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        administrationService.setAccess(userId, request.level(), request.team());
+    }
+
+    public record UserIdsRequest(List<Long> userIds) {}
+
+    /** Repasse en agent les comptes Team Leader uniquement par le champ équipe menée (voir AdministrationService). */
+    @PostMapping("/hierarchy/clear-led-team")
+    public java.util.Map<String, Integer> clearLedTeam(@RequestBody UserIdsRequest request,
+                                                       @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return java.util.Map.of("fixed", administrationService.clearLedTeamOnly(request.userIds()));
+    }
+
     /** Accès effectif d'un utilisateur (profil, équipe menée, portail) et ce qui manque — fiche utilisateur de l'admin. */
     @GetMapping("/users/{userId}/effective-access")
     public com.ecobank.rccportal.service.EffectiveAccessService.EffectiveAccess effectiveAccess(@PathVariable Long userId,

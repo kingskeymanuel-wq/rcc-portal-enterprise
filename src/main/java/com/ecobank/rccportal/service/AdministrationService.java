@@ -641,6 +641,100 @@ public class AdministrationService {
                 });
     }
 
+    /** Service agent de chaque équipe — voir SERVICE_CODE_TO_LED_TEAM pour les services Team Leader. */
+    static final java.util.Map<String, String> TEAM_TO_AGENT_SERVICE = java.util.Map.of(
+            "INBOUND_VOICE", "AGENT_INBOUND",
+            "INBOUND_MAIL", "AGENT_INBOUND_MAIL",
+            "OUTBOUND", "AGENT_OUTBOUND",
+            "TCHAT", "AGENT_TCHAT",
+            "RAFIKI", "AGENT_RAFIKI",
+            "CIB", "AGENT_CIB"
+    );
+
+    private static boolean isTeamLeaderRoleName(String name) {
+        return "TEAM_LEADER".equals(com.ecobank.rccportal.security.AccessResolver.roleOfName(name));
+    }
+
+    /**
+     * Accès choisi par l'administrateur dans l'organigramme, appliqué en une fois :
+     * <ul>
+     *   <li>« AGENT » : retire tout ce qui rend Team Leader (rôles Team Leader…, services Team Leader …, équipe
+     *       menée) ; si une équipe est donnée, ajoute le service agent de cette équipe (les autres services agent
+     *       sont conservés).</li>
+     *   <li>« TEAM_LEADER » + équipe : équipe menée et service Team Leader de cette équipe, les autres services
+     *       Team Leader sont retirés (une seule équipe menée).</li>
+     * </ul>
+     */
+    @Transactional
+    public void setAccess(Long userId, String level, String team) {
+        User user = userRepository.findById(userId).orElseThrow(() -> ApiException.notFound("Unknown user."));
+        String lvl = level == null ? "" : level.trim().toUpperCase(java.util.Locale.ROOT);
+        String t = team == null || team.isBlank() ? null : team.trim().toUpperCase(java.util.Locale.ROOT);
+        if (t != null && !TEAM_TO_AGENT_SERVICE.containsKey(t)) {
+            throw ApiException.badRequest("Équipe inconnue : " + team + ".");
+        }
+        switch (lvl) {
+            case "AGENT" -> {
+                userRoleRepository.findByUser_Id(userId).stream()
+                        .filter(ur -> ur.getRole() != null && isTeamLeaderRoleName(ur.getRole().getName()))
+                        .forEach(userRoleRepository::delete);
+                userServiceAssignmentRepository.findByUserId(userId).stream()
+                        .filter(us -> us.getService() != null && us.getService().getCode() != null
+                                && us.getService().getCode().toUpperCase(java.util.Locale.ROOT).startsWith("TEAM_LEADER_"))
+                        .forEach(userServiceAssignmentRepository::delete);
+                user.setLedTeam(null);
+                userRepository.save(user);
+                if (t != null) {
+                    serviceRepository.findByCodeIgnoreCase(TEAM_TO_AGENT_SERVICE.get(t))
+                            .ifPresent(s -> assignService(userId, s.getId()));
+                }
+                log.info("[ADMIN] Accès Agent appliqué (userId={}, équipe={})", userId, t);
+            }
+            case "TEAM_LEADER" -> {
+                if (t == null) throw ApiException.badRequest("Choisissez l'équipe menée par ce Team Leader.");
+                String code = "TEAM_LEADER_" + t;
+                RccService svc = serviceRepository.findByCodeIgnoreCase(code)
+                        .orElseThrow(() -> ApiException.badRequest("Service " + code + " introuvable."));
+                userServiceAssignmentRepository.findByUserId(userId).stream()
+                        .filter(us -> us.getService() != null && us.getService().getCode() != null
+                                && us.getService().getCode().toUpperCase(java.util.Locale.ROOT).startsWith("TEAM_LEADER_")
+                                && !us.getService().getCode().equalsIgnoreCase(code))
+                        .forEach(userServiceAssignmentRepository::delete);
+                assignService(userId, svc.getId());
+                user = userRepository.findById(userId).orElse(user);
+                user.setLedTeam(t);
+                userRepository.save(user);
+                log.info("[ADMIN] Accès Team Leader appliqué (userId={}, équipe={})", userId, t);
+            }
+            default -> throw ApiException.badRequest("Accès attendu : AGENT ou TEAM_LEADER.");
+        }
+    }
+
+    /**
+     * « Team Leaders fantômes » : comptes Team Leader uniquement par le champ équipe menée (aucun rôle ni service
+     * Team Leader). Efface ce champ pour les comptes donnés — ils retrouvent leur accès agent — et ne touche à
+     * aucun vrai Team Leader, même si son identifiant est passé par erreur. Renvoie le nombre de comptes corrigés.
+     */
+    @Transactional
+    public int clearLedTeamOnly(List<Long> userIds) {
+        int fixed = 0;
+        for (Long id : userIds == null ? List.<Long>of() : userIds) {
+            User user = userRepository.findById(id).orElse(null);
+            if (user == null || user.getLedTeam() == null || user.getLedTeam().isBlank()) continue;
+            boolean tlRole = userRoleRepository.findByUser_Id(id).stream()
+                    .anyMatch(ur -> ur.getRole() != null && isTeamLeaderRoleName(ur.getRole().getName()));
+            boolean tlService = userServiceAssignmentRepository.findByUserId(id).stream()
+                    .anyMatch(us -> us.getService() != null && us.getService().getCode() != null
+                            && us.getService().getCode().toUpperCase(java.util.Locale.ROOT).startsWith("TEAM_LEADER_"));
+            if (tlRole || tlService) continue;
+            user.setLedTeam(null);
+            userRepository.save(user);
+            fixed++;
+        }
+        log.info("[ADMIN] Équipe menée effacée pour {} compte(s) Team Leader sans rôle ni service Team Leader.", fixed);
+        return fixed;
+    }
+
     // ── Mapping ──────────────────────────────────────────────────────────
 
     private RoleResponse toRoleResponse(Role role) {

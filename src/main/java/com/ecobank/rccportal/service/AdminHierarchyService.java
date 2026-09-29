@@ -22,7 +22,8 @@ public class AdminHierarchyService {
 
     public record Person(Long id, String username, String name, String email, String country, boolean active,
                          String level, String profile, String team, String ledTeam,
-                         List<Item> roles, List<Item> services, List<String> warnings) {}
+                         List<Item> roles, List<Item> services, List<String> warnings,
+                         String branch, String activity, String leaderSource) {}
 
     public record TeamBlock(String code, String label, List<Person> leaders, List<Person> agents) {}
 
@@ -80,8 +81,24 @@ public class AdminHierarchyService {
         return t == TeamClassifier.Team.OTHER ? null : t.name();
     }
 
+    /**
+     * D'où vient l'accès Team Leader : « ROLE » (rôle Team Leader…), « SERVICE » (service Team Leader …) ou
+     * « LED_TEAM » quand seul le champ équipe menée le donne — cas typique d'un ancien Team Leader ou d'une
+     * saisie erronée, signalé à l'administrateur pour qu'il repasse la personne en agent d'un clic.
+     */
+    static String leaderSourceOf(String level, List<Item> roles, List<String> serviceCodes) {
+        if (!level.equals("TEAM_LEADER")) return null;
+        if (roles.stream().anyMatch(r -> "TEAM_LEADER".equals(AccessResolver.roleOfName(r.name())))) return "ROLE";
+        if (serviceCodes.stream().anyMatch(c -> up(c).startsWith("TEAM_LEADER_"))) return "SERVICE";
+        return "LED_TEAM";
+    }
+
     static List<String> warningsOf(String level, String team, boolean active, List<Item> roles, List<String> serviceCodes) {
         List<String> w = new ArrayList<>();
+        if (active && "LED_TEAM".equals(leaderSourceOf(level, roles, serviceCodes))) {
+            w.add("Team Leader uniquement par le champ « équipe menée » (aucun rôle ni service Team Leader) : "
+                    + "si ce n'est pas un Team Leader, choisissez « Agent » dans Accès.");
+        }
         if (!active) w.add("Compte désactivé : aucun accès au portail.");
         if (level.equals("TEAM_LEADER") && team == null) w.add("Team Leader sans équipe : ajoutez un service « Team Leader … » pour lui donner son portail.");
         if (level.equals("AGENT") && team == null) w.add("Agent sans équipe : ajoutez un service agent (Inbound, Outbound, Tchat, Rafiki, Mail, CIB).");
@@ -117,7 +134,8 @@ public class AdminHierarchyService {
             String name = rs.getString("NAME");
             people.add(new Person(id, rs.getString("USERNAME"), name == null || name.isBlank() ? rs.getString("USERNAME") : name,
                     rs.getString("EMAIL"), HrOrganizationService.countryOf(rs.getString("AFFILIATE_BRANCH")), active, level, profile, team, led,
-                    r, s, warningsOf(level, team, active, r, codes)));
+                    r, s, warningsOf(level, team, active, r, codes),
+                    rs.getString("AFFILIATE_BRANCH"), rs.getString("ACTIVITY"), leaderSourceOf(level, r, codes)));
         });
         return build(people);
     }
@@ -144,6 +162,7 @@ public class AdminHierarchyService {
             counts.put(l, by.getOrDefault(l, List.of()).size());
         }
         counts.put("WARNINGS", (int) people.stream().filter(p -> p.active() && !p.warnings().isEmpty()).count());
+        counts.put("GHOST_LEADERS", (int) people.stream().filter(p -> p.active() && "LED_TEAM".equals(p.leaderSource())).count());
         return new Hierarchy(by.getOrDefault("SUPERVISEUR", List.of()), by.getOrDefault("RH", List.of()), by.getOrDefault("HEAD_QA", List.of()),
                 by.getOrDefault("QA", List.of()), teams, by.getOrDefault("ADMIN", List.of()), by.getOrDefault("AGENCE", List.of()),
                 by.getOrDefault("A_CLASSER", List.of()), counts);

@@ -275,7 +275,7 @@
                 <!-- Organigramme hiérarchique : rôles et services de chacun, modifiables sur place (admin-hierarchy.js) -->
                 <div class="ah-card" id="adminHierarchy"></div>
 
-                <!-- Annuaire complet, organisé par filiale puis service/équipe — c'est ici la
+                <!-- Annuaire complet, organisé par filiale puis niveau hiérarchique / équipe (synchronisé avec l'organigramme) — c'est ici la
                      vraie "gestion des utilisateurs" (featureCode "users") : pas de portail
                      séparé depuis la fusion dans /administration, donc masqué via
                      data-feature-code plutôt qu'un lien de sidebar (voir session.js
@@ -285,7 +285,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5 class="card-title mb-0">
                                 <i class="bi bi-diagram-3-fill"></i>
-                                Annuaire — par filiale et service
+                                Annuaire — par filiale et hiérarchie
                             </h5>
                             <input type="text" id="directoryFilter" class="form-control form-control-sm"
                                    style="max-width: 260px;" placeholder="Filtrer un nom, un identifiant...">
@@ -737,8 +737,13 @@
                         <label class="form-label small">Équipe</label>
                         <select class="form-select form-select-sm" id="editActivity">
                             <option value="">— Aucune —</option>
-                            <option value="INBOUND">Inbound</option>
+                            <option value="INBOUND VOICE">Inbound Voix</option>
+                            <option value="INBOUND MAIL">Inbound Mail</option>
+                            <option value="INBOUND TCHAT">Tchat</option>
+                            <option value="INBOUND RAFIKI">Rafiki</option>
+                            <option value="CIB">CIB</option>
                             <option value="OUTBOUND">Outbound</option>
+                            <option value="RESOLUTION">Résolution</option>
                             <option value="OPERATION">Operation</option>
                             <option value="QA">QA</option>
                         </select>
