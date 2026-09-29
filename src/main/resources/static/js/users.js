@@ -76,15 +76,57 @@
         return { service: service, team: team };
     }
 
+    // ===== Synchronisation avec l'organigramme =====
+    // L'annuaire range chacun exactement comme l'organigramme (même calcul serveur, /api/admin/hierarchy) :
+    // niveau d'accès réel (Superviseur, RH, Head QA, QA, Team Leader / Agent par équipe, Admin, Agence, À classer).
+    // Toute modification faite dans l'un ou l'autre émet « rcc:access-changed » et les deux se rechargent.
+
+    var hierarchyById = {}; // id utilisateur → personne de l'organigramme (niveau, équipe, profil)
+
+    var TEAM_LABELS = { INBOUND_VOICE: "Inbound Voix", INBOUND_MAIL: "Inbound Mail", TCHAT: "Tchat", RAFIKI: "Rafiki", CIB: "CIB", OUTBOUND: "Outbound" };
+    var LEVEL_GROUPS = {
+        SUPERVISEUR: [1, "Superviseur · Head RCC"], RH: [2, "Ressources Humaines"], HEAD_QA: [3, "Head QA"],
+        QA: [4, "Quality Assurance & formateurs"], ADMIN: [40, "Administrateurs"], AGENCE: [41, "Agences"], A_CLASSER: [50, "À classer (aucun portail)"]
+    };
+    var TEAM_ORDER = ["INBOUND_VOICE", "INBOUND_MAIL", "TCHAT", "RAFIKI", "CIB", "OUTBOUND"];
+    var SUB_LEADERS = "Team Leaders", SUB_AGENTS = "Agents";
+    var LEVEL_LABELS = { SUPERVISEUR: "Superviseur", RH: "RH", HEAD_QA: "Head QA", QA: "Quality Assurance", TEAM_LEADER: "Team Leader", AGENT: "Agent", ADMIN: "Administrateur", AGENCE: "Agence", A_CLASSER: "À classer" };
+
+    function changed(source) {
+        if (window.RccAccessLevel) window.RccAccessLevel.notify(source);
+        else loadUsers();
+    }
+
+    /** Groupe hiérarchique d'une personne connue de l'organigramme : { key, label, order, team (sous-groupe) }. */
+    function hierarchyGroup(h) {
+        if (h.level === "TEAM_LEADER" || h.level === "AGENT") {
+            var sub = h.level === "TEAM_LEADER" ? SUB_LEADERS : SUB_AGENTS;
+            if (!h.team) return { key: "~SANS_EQUIPE", label: "Sans équipe", order: 30, team: sub };
+            var idx = TEAM_ORDER.indexOf(h.team);
+            return { key: "~T_" + h.team, label: "Équipe " + (TEAM_LABELS[h.team] || h.team), order: 10 + (idx === -1 ? 9 : idx), team: sub };
+        }
+        var g = LEVEL_GROUPS[h.level] || LEVEL_GROUPS.A_CLASSER;
+        return { key: "~L_" + h.level, label: g[1], order: g[0], team: null };
+    }
+
     function groupByFilialeAndService(users) {
         var groups = {};
         users.forEach(function (u) {
             var filiale = u.affiliateBranch || ""; // "" = pas de filiale — jamais de faux libellé "Sans filiale"
-            var regrouped = regroupRccTeams(u.service || "", u.activity || null); // "" = pas de service
-            var service = regrouped.service;
-            var team = regrouped.team;
+            var h = hierarchyById[u.id];
+            var service, team, label, order;
+            if (h) {
+                var hg = hierarchyGroup(h);
+                service = hg.key; team = hg.team; label = hg.label; order = hg.order;
+            } else {
+                var regrouped = regroupRccTeams(u.service || "", u.activity || null); // "" = pas de service
+                service = regrouped.service;
+                team = regrouped.team;
+                label = serviceLabel(service);
+                order = 100;
+            }
             if (!groups[filiale]) groups[filiale] = { label: filialeLabel(filiale), services: {} };
-            if (!groups[filiale].services[service]) groups[filiale].services[service] = { label: serviceLabel(service), teams: {}, direct: [] };
+            if (!groups[filiale].services[service]) groups[filiale].services[service] = { label: label, order: order, teams: {}, direct: [] };
             var svc = groups[filiale].services[service];
             if (team) {
                 if (!svc.teams[team]) svc.teams[team] = [];
@@ -102,6 +144,20 @@
             ? '<button class="btn btn-sm btn-outline-success toggle-status-btn" data-id="' + u.id + '" data-active="true">Actif</button>'
             : '<button class="btn btn-sm btn-outline-secondary toggle-status-btn" data-id="' + u.id + '" data-active="false">Inactif</button>';
         var contractInfo = [u.contractType, u.contractStatus].filter(Boolean).join(" · ");
+        var h = hierarchyById[u.id];
+        var accessInfo = h
+            ? '<span class="badge text-bg-primary">' + escapeHtml(LEVEL_LABELS[h.level] || h.level) + '</span>' +
+              (h.team ? ' <span class="badge text-bg-light border">' + escapeHtml(TEAM_LABELS[h.team] || h.team) + '</span>' : "") +
+              (h.warnings && h.warnings.length && h.active ? ' <span class="text-danger" title="' + escapeHtml(h.warnings.join("\n")) + '"><i class="bi bi-exclamation-triangle-fill"></i></span>' : "")
+            : (u.role ? escapeHtml(u.role) : "—");
+        var accessBtn = h && currentProfile === "ADMIN" && window.RccAccessLevel
+            ? '<button class="btn btn-sm btn-outline-primary toggle-access-btn" data-id="' + u.id + '">' +
+              '<i class="bi bi-shield-lock"></i> Niveau d\'accès</button> '
+            : "";
+        var accessPanel = accessBtn
+            ? '<div class="w-100 inline-access-panel" id="inline-access-' + u.id + '" style="display:none;">' +
+              window.RccAccessLevel.controlHtml({ id: u.id, level: h.level, team: h.team, name: u.fullName || u.username }) + '</div>'
+            : "";
         return '<div class="directory-user-row flex-wrap">' +
             '<img src="' + (u.photoUrl || "/images/avatar.png") + '" alt="" class="rounded-circle me-2" ' +
             'style="width:32px;height:32px;object-fit:cover;flex-shrink:0;">' +
@@ -110,16 +166,18 @@
             '<span class="text-muted small">(' + escapeHtml(u.username) + ')</span> ' +
             statusBadge +
             '<div class="text-muted small">' +
-            (u.role ? escapeHtml(u.role) : "—") +
+            accessInfo +
             (contractInfo ? " · " + escapeHtml(contractInfo) : "") +
             '</div>' +
             '</div>' +
+            accessBtn +
             '<button class="btn btn-sm btn-outline-secondary toggle-roles-btn" data-id="' + u.id + '">' +
             '<i class="bi bi-person-badge"></i> Rôles</button> ' +
             '<button class="btn btn-sm btn-outline-secondary view-sessions-btn" data-id="' + u.id + '" data-name="' + escapeHtml(u.fullName) + '">' +
             '<i class="bi bi-router"></i> Connexions</button> ' +
             '<button class="btn btn-sm btn-outline-primary view-detail-btn" data-id="' + u.id + '">' +
             '<i class="bi bi-pencil"></i> Voir / Modifier</button>' +
+            accessPanel +
             '<div class="w-100 inline-roles-panel" id="inline-roles-' + u.id + '" style="display:none;"></div>' +
             '<div class="w-100 inline-sessions-panel" id="inline-sessions-' + u.id + '" style="display:none;"></div>' +
             '</div>';
@@ -206,6 +264,7 @@
                         // en compte. La ligne (badge de rôle affiché) se met à jour au prochain
                         // chargement normal de la liste, sans que ce soit gênant ici.
                         loadRolesInto(panel, userId);
+                        changed("annuaire-inline");
                     }).catch(function (e) {
                         alert("Erreur : " + e.message);
                         cb.checked = !cb.checked;
@@ -222,8 +281,11 @@
         var term = (filterTerm || "").trim().toLowerCase();
 
         var filtered = !term ? directoryUsers : directoryUsers.filter(function (u) {
+            var h = hierarchyById[u.id];
+            var access = h ? ((LEVEL_LABELS[h.level] || "") + " " + (TEAM_LABELS[h.team] || "")).toLowerCase() : "";
             return (u.fullName || "").toLowerCase().indexOf(term) !== -1 ||
-                (u.username || "").toLowerCase().indexOf(term) !== -1;
+                (u.username || "").toLowerCase().indexOf(term) !== -1 ||
+                access.indexOf(term) !== -1;
         });
 
         if (!filtered.length) {
@@ -240,7 +302,8 @@
         container.innerHTML = filialeKeys.map(function (fKey) {
             var filiale = groups[fKey];
             var serviceKeys = Object.keys(filiale.services).sort(function (a, b) {
-                return filiale.services[a].label.localeCompare(filiale.services[b].label);
+                var sa = filiale.services[a], sb = filiale.services[b];
+                return (sa.order - sb.order) || sa.label.localeCompare(sb.label);
             });
             var totalCount = serviceKeys.reduce(function (sum, sk) {
                 var svc = filiale.services[sk];
@@ -250,7 +313,10 @@
             var servicesHtml = serviceKeys.map(function (sKey) {
                 var service = filiale.services[sKey];
                 var serviceCount = Object.values(service.teams).reduce(function (n, us) { return n + us.length; }, 0) + service.direct.length;
-                var teamKeys = Object.keys(service.teams).sort();
+                // Team Leaders avant les agents, comme dans l'organigramme.
+                var teamKeys = Object.keys(service.teams).sort(function (a, b) {
+                    return ((b === SUB_LEADERS) - (a === SUB_LEADERS)) || a.localeCompare(b);
+                });
 
                 var teamsHtml = teamKeys.map(function (team) {
                     var teamUsers = service.teams[team];
@@ -317,6 +383,16 @@
                 openUserDetail(btn.getAttribute("data-id"));
             });
         });
+        Array.prototype.forEach.call(container.querySelectorAll(".toggle-access-btn"), function (btn) {
+            btn.addEventListener("click", function (evt) {
+                evt.stopPropagation();
+                var panel = document.getElementById("inline-access-" + btn.getAttribute("data-id"));
+                panel.style.display = panel.style.display === "none" ? "" : "none";
+            });
+        });
+        if (window.RccAccessLevel) {
+            window.RccAccessLevel.wire(container, "annuaire", function (msg, ok) { if (!ok) alert("Erreur : " + msg); });
+        }
         Array.prototype.forEach.call(container.querySelectorAll(".toggle-roles-btn"), function (btn) {
             btn.addEventListener("click", function (evt) {
                 evt.stopPropagation();
@@ -338,14 +414,26 @@
                 var verb = isActive ? "désactiver" : "activer";
                 if (!confirm("Voulez-vous vraiment " + verb + " ce compte ?")) return;
                 sendJson("/api/users/" + id + "/" + action, "POST")
-                    .then(loadUsers)
+                    .then(function () { changed("annuaire"); })
                     .catch(function (e) { alert("Erreur : " + e.message); });
             });
         });
     }
 
     function loadUsers() {
-        getJson("/api/users").then(function (users) {
+        // L'organigramme (réservé à l'admin) donne le niveau d'accès réel de chacun : sans lui, repli sur le
+        // rangement historique par service.
+        var hierarchy = currentProfile === "ADMIN"
+            ? getJson("/api/admin/hierarchy").catch(function () { return null; })
+            : Promise.resolve(null);
+        Promise.all([getJson("/api/users"), hierarchy]).then(function (r) {
+            var users = r[0], d = r[1];
+            hierarchyById = {};
+            if (d) {
+                var all = [].concat(d.supervisors, d.rh, d.headQa, d.qa, d.admins, d.agencies, d.unclassified);
+                d.teams.forEach(function (t) { all = all.concat(t.leaders, t.agents); });
+                all.forEach(function (p) { if (p) hierarchyById[p.id] = p; });
+            }
             directoryUsers = users;
             renderDirectoryTree(document.getElementById("directoryFilter").value);
         }).catch(function (e) {
@@ -386,7 +474,7 @@
         Array.prototype.forEach.call(body.querySelectorAll(".approve-btn"), function (btn) {
             btn.addEventListener("click", function () {
                 postJson("/api/users/" + encodeURIComponent(btn.getAttribute("data-username")) + "/approve")
-                    .then(function () { loadPending(); loadUsers(); })
+                    .then(function () { loadPending(); changed("annuaire"); })
                     .catch(function (e) { alert("Erreur : " + e.message); });
             });
         });
@@ -394,7 +482,7 @@
             btn.addEventListener("click", function () {
                 if (!confirm("Rejeter ce compte ?")) return;
                 postJson("/api/users/" + encodeURIComponent(btn.getAttribute("data-username")) + "/reject")
-                    .then(function () { loadPending(); loadUsers(); })
+                    .then(function () { loadPending(); changed("annuaire"); })
                     .catch(function (e) { alert("Erreur : " + e.message); });
             });
         });
@@ -527,12 +615,12 @@
 
             var rolesContainer = document.getElementById("userDetailRoles");
             renderBadgeList(rolesContainer, detail.roles || [], function (roleId) {
-                del("/api/admin/users/" + userId + "/roles/" + roleId).then(function () { openUserDetail(userId); });
+                del("/api/admin/users/" + userId + "/roles/" + roleId).then(function () { openUserDetail(userId); changed("annuaire"); });
             });
 
             var servicesContainer = document.getElementById("userDetailServices");
             renderBadgeList(servicesContainer, detail.services || [], function (serviceId) {
-                del("/api/admin/users/" + userId + "/services/" + serviceId).then(function () { openUserDetail(userId); });
+                del("/api/admin/users/" + userId + "/services/" + serviceId).then(function () { openUserDetail(userId); changed("annuaire"); });
             });
 
             var addRoleRow = document.getElementById("userDetailAddRole");
@@ -654,7 +742,7 @@
                 checkbox.addEventListener("change", function () {
                     var code = checkbox.getAttribute("data-code");
                     sendJson("/api/admin/users/" + userId + "/permissions/" + code, "PUT", { isAllowed: checkbox.checked })
-                        .then(function () { renderPermissions(userId, container, detail); })
+                        .then(function () { renderPermissions(userId, container, detail); changed("annuaire"); })
                         .catch(function (e) { alert("Erreur : " + e.message); });
                 });
             });
@@ -663,7 +751,7 @@
                     evt.preventDefault();
                     var code = link.getAttribute("data-code");
                     del("/api/admin/users/" + userId + "/permissions/" + code)
-                        .then(function () { renderPermissions(userId, container, detail); })
+                        .then(function () { renderPermissions(userId, container, detail); changed("annuaire"); })
                         .catch(function (e) { alert("Erreur : " + e.message); });
                 });
             });
@@ -699,7 +787,7 @@
 
             sendJson("/api/users/" + currentDetailUserId, "PUT", payload)
                 .then(function () {
-                    loadUsers();
+                    changed("annuaire");
                     var modalEl = document.getElementById("userDetailModal");
                     var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
                     modal.hide();
@@ -755,7 +843,7 @@
                 .then(function () {
                     document.getElementById("createUserSection").style.display = "none";
                     document.getElementById("createUserForm").reset();
-                    loadUsers();
+                    changed("annuaire");
                 })
                 .catch(function (e) { alert("Erreur : " + e.message); });
         });
@@ -769,14 +857,14 @@
             var userId = currentDetailUserId;
             postJson("/api/admin/users/" + userId + "/roles", { roleId: Number(roleId) })
                 .then(function () { return autoAssignServiceForRole(userId, roleName); })
-                .then(function () { openUserDetail(userId); })
+                .then(function () { openUserDetail(userId); changed("annuaire"); })
                 .catch(function (e) { alert("Erreur : " + e.message); });
         });
         document.getElementById("addServiceBtn").addEventListener("click", function () {
             var serviceId = document.getElementById("serviceSelect").value;
             if (!serviceId || !currentDetailUserId) return;
             postJson("/api/admin/users/" + currentDetailUserId + "/services", { serviceId: Number(serviceId) })
-                .then(function () { openUserDetail(currentDetailUserId); })
+                .then(function () { openUserDetail(currentDetailUserId); changed("annuaire"); })
                 .catch(function (e) { alert("Erreur : " + e.message); });
         });
     }
@@ -793,7 +881,7 @@
                 })
                 .then(function () {
                     bootstrap.Modal.getInstance(document.getElementById("userDetailModal")).hide();
-                    loadUsers();
+                    changed("annuaire");
                 })
                 .catch(function (e) { alert("Erreur : " + e.message); });
         });
@@ -868,6 +956,11 @@
                 wireEditForm();
                 wirePhotoLightbox();
                 wireDirectoryFilter();
+                // Resynchronisation : toute modification (ici ou dans l'organigramme) recharge l'annuaire — sauf les
+                // coches du panneau « Rôles » en ligne, qui se rafraîchit seul pour ne pas se refermer.
+                window.addEventListener("rcc:access-changed", function (e) {
+                    if (!e.detail || e.detail.source !== "annuaire-inline") loadUsers();
+                });
                 wireCleanupRolesButton();
                 wireReclassifyTeamsButton();
                 wireUsernameRemapButton();
@@ -925,7 +1018,7 @@
                 .then(function (result) {
                     resultBox.className = "small mt-2 text-success";
                     resultBox.textContent = result.updated + " compte(s) rattaché(s) à leur équipe.";
-                    loadUsers();
+                    changed("annuaire");
                 })
                 .catch(function (e) {
                     resultBox.className = "small mt-2 text-danger";
@@ -986,7 +1079,7 @@
                     }
 
                     fileInput.value = "";
-                    loadUsers();
+                    changed("annuaire");
                 })
                 .catch(function (e) {
                     resultBox.className = "small mt-2 text-danger";
@@ -1056,7 +1149,7 @@
                 alert('Fusion effectuée pour "' + result.username + '" — compte #' + result.keptUserId + ' conservé, ' +
                     result.rowsReassigned + ' ligne(s) réassignée(s), ' + result.rowsDeduplicatedAway + ' doublon(s) internes retiré(s).');
                 loadUsernameDuplicates();
-                loadUsers();
+                changed("annuaire");
             })
             .catch(function (e) { alert("Erreur lors de la fusion : " + e.message); });
     }
@@ -1136,7 +1229,7 @@
                                 alert("Fusion effectuée dans « " + r.mainUsername + " » : " + r.merged.join(", ") + " — " + r.rowsReassigned + " ligne(s) d'historique transférée(s)." +
                                     (r.warnings && r.warnings.length ? "\n\nRemarques :\n- " + r.warnings.slice(0, 5).join("\n- ") : ""));
                                 loadPeopleDuplicates();
-                                loadUsers();
+                                changed("annuaire");
                             })
                             .catch(function (e) { mb.disabled = false; alert("Erreur lors de la fusion : " + e.message); });
                     });

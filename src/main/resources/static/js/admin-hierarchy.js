@@ -53,6 +53,7 @@
                 return '<span class="ah-chip svc">' + esc(s.name || s.code) + '<button type="button" data-del-svc="' + s.id + '" data-label="' + esc(s.name || s.code) + '" title="Retirer ce service">×</button></span>';
             }).join("") || '<span class="ah-none">aucun</span>') +
             '<select class="ah-add" data-add-svc aria-label="Ajouter un service"><option value="">+ service</option>' + svcOpts.map(function (s) { return '<option value="' + s.id + '">' + esc(s.name || s.code) + '</option>'; }).join("") + '</select></div>' +
+            window.RccAccessLevel.controlHtml(p) +
             (p.warnings.length && p.active ? '<ul class="ah-warn">' + p.warnings.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join("") + '</ul>' : '') +
             '</div>';
     }
@@ -134,7 +135,7 @@
         root = el;
         root.innerHTML =
             '<div class="ah-head"><div><h5 class="mb-1"><i class="bi bi-diagram-2-fill"></i> Organigramme — par équipe hiérarchique</h5>' +
-            '<small class="text-muted">Superviseur (Head RCC) → RH → Head QA → Team Leaders → Agents. Rôles et services de chacun : × pour retirer, + pour ajouter — effet immédiat sur les portails.</small></div>' +
+            '<small class="text-muted">Superviseur (Head RCC) → RH → Head QA → Team Leaders → Agents. « Niveau d\'accès » change tout en un geste (ex. Team Leader → Agent) ; rôles et services : × pour retirer, + pour ajouter — effet immédiat sur tout le portail, annuaire synchronisé.</small></div>' +
             '<div class="ah-tools"><div class="ah-search"><i class="bi bi-search"></i><input type="search" placeholder="Nom, identifiant, rôle, service…"></div>' +
             '<div class="ah-seg" data-country><button type="button" class="on" data-v="">Toutes filiales</button><button type="button" data-v="CI">Côte d\'Ivoire</button><button type="button" data-v="TG">Togo</button></div>' +
             '<label class="ah-inactive"><input type="checkbox"> Comptes désactivés</label>' +
@@ -173,16 +174,20 @@
             if (!confirm("Retirer " + (dr ? "le rôle" : "le service") + " « " + label + " » à " + p.name + " ?\n\nSon accès aux portails est mis à jour immédiatement.")) return;
             b.disabled = true;
             call("DELETE", "/api/admin/users/" + p.id + (dr ? "/roles/" + b.getAttribute("data-del-role") : "/services/" + b.getAttribute("data-del-svc")))
-                .then(function () { flash((dr ? "Rôle" : "Service") + " « " + label + " » retiré à " + p.name + ".", true); return load(); })
+                .then(function () { flash((dr ? "Rôle" : "Service") + " « " + label + " » retiré à " + p.name + ".", true); window.RccAccessLevel.notify("organigramme", p.id); })
                 .catch(function (err) { b.disabled = false; flash(err.message, false); });
         });
+        // Niveau d'accès en un geste, et resynchronisation avec l'annuaire : toute modification faite ici ou dans
+        // l'annuaire (rôle, service, statut, niveau, fiche) recharge l'organigramme.
+        window.RccAccessLevel.wire(root, "organigramme", flash);
+        window.addEventListener("rcc:access-changed", function () { load(); });
         root.addEventListener("change", function (e) {
             var sel = e.target.closest("[data-add-role],[data-add-svc]");
             if (!sel || !sel.value) return;
             var p = personOf(sel), isRole = sel.hasAttribute("data-add-role"), label = sel.selectedOptions[0].textContent, id = Number(sel.value);
             sel.disabled = true;
             call("POST", "/api/admin/users/" + p.id + (isRole ? "/roles" : "/services"), isRole ? { roleId: id } : { serviceId: id })
-                .then(function () { flash((isRole ? "Rôle" : "Service") + " « " + label + " » ajouté à " + p.name + ".", true); return load(); })
+                .then(function () { flash((isRole ? "Rôle" : "Service") + " « " + label + " » ajouté à " + p.name + ".", true); window.RccAccessLevel.notify("organigramme", p.id); })
                 .catch(function (err) { sel.disabled = false; sel.value = ""; flash(err.message, false); });
         });
         Promise.all([RccApi.getJson("/api/admin/roles").catch(function () { return []; }), RccApi.getJson("/api/admin/services").catch(function () { return []; })]).then(function (r) {

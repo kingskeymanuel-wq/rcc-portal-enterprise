@@ -68,6 +68,14 @@
 .ah-warn { margin: .4rem 0 0; padding-left: 1.1rem; font-size: .76rem; color: #8A4B06; }
 .ah-empty { color: #8A97AB; font-size: .85rem; padding: .6rem 0; text-align: center; }
 
+/* Niveau d'accès en un geste (access-level.js) — organigramme et annuaire */
+.al-ctl { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; margin-top: .4rem; padding-top: .4rem; border-top: 1px dashed #E2E8F2; }
+.inline-access-panel .al-ctl { border: 1px solid #DCE4F0; border-radius: .7rem; padding: .45rem .6rem; background: #F6F9FF; }
+.al-lbl { font-size: .68rem; font-weight: 800; text-transform: uppercase; color: #0057B8; margin-right: .2rem; }
+.al-ctl select { border: 1px solid #BFD0E6; background: #fff; border-radius: 999px; font-size: .74rem; font-weight: 700; color: #122240; padding: .15rem .55rem; max-width: 190px; }
+.al-apply { border: 0; border-radius: 999px; background: #0057B8; color: #fff; font-size: .74rem; font-weight: 800; padding: .2rem .8rem; }
+.al-apply:disabled { background: #C9D5E6; }
+
 @media (max-width: 700px) {
     .ah-branch { margin-left: .4rem; padding-left: .5rem; }
     .ah-search input { min-width: 0; width: 100%; }
