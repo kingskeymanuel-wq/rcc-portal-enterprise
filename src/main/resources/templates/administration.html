@@ -276,6 +276,9 @@
                 <div class="ah-card" id="adminHierarchy"></div>
 
                 <!-- Correctifs de données et journal des modifications écrites en base (admin-db-log.js) -->
+                <!-- Tables des comptes éditées directement, sans SQL Server (admin-db-editor.js) -->
+                <div class="dbx-card" id="adminDbEditor"></div>
+
                 <div id="adminDbLog"></div>
 
                 <!-- Annuaire complet, organisé par filiale puis niveau hiérarchique / équipe (synchronisé avec l'organigramme) — c'est ici la
@@ -840,6 +843,7 @@
 <script th:src="@{/js/admin-agency.js}"></script>
 <script th:src="@{/js/admin-hierarchy.js}"></script>
 <script th:src="@{/js/admin-db-log.js}"></script>
+<script th:src="@{/js/admin-db-editor.js}"></script>
 
 </body>
 </html>

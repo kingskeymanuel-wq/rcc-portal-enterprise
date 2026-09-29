@@ -46,6 +46,64 @@ public class AdministrationController {
         return hierarchyService.hierarchy();
     }
 
+    // ───────────── Base de données : tables des comptes, éditées sans SQL Server ─────────────
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ecobank.rccportal.service.AdminDataService adminDataService;
+
+    @GetMapping("/data")
+    public List<java.util.Map<String, String>> dataTables(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return adminDataService.tables();
+    }
+
+    @GetMapping("/data/options")
+    public java.util.Map<String, List<java.util.Map<String, Object>>> dataOptions(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return adminDataService.options();
+    }
+
+    @GetMapping("/data/{table}")
+    public com.ecobank.rccportal.service.AdminDataService.Page dataRows(@PathVariable String table,
+                                                                          @RequestParam(required = false) String q,
+                                                                          @RequestParam(defaultValue = "0") int page,
+                                                                          @RequestParam(defaultValue = "100") int size,
+                                                                          @RequestParam(required = false) String sort,
+                                                                          @RequestParam(defaultValue = "false") boolean desc,
+                                                                          @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return adminDataService.rows(table, q, page, size, sort, desc);
+    }
+
+    public record CellUpdate(String column, Object value) {}
+
+    @PatchMapping("/data/{table}/{id}")
+    public java.util.Map<String, Object> dataUpdate(@PathVariable String table, @PathVariable long id, @RequestBody CellUpdate body,
+                                                    @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return adminDataService.update(table, id, body.column(), body.value(), requester.username());
+    }
+
+    @PostMapping("/data/{table}")
+    public java.util.Map<String, Object> dataInsert(@PathVariable String table, @RequestBody java.util.Map<String, Object> values,
+                                                    @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return adminDataService.insert(table, values, requester.username());
+    }
+
+    @DeleteMapping("/data/{table}/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void dataDelete(@PathVariable String table, @PathVariable long id, @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        adminDataService.delete(table, id, requester.username());
+    }
+
+    @PostMapping("/data/links/clean")
+    public java.util.Map<String, Integer> dataCleanLinks(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return java.util.Map.of("removed", adminDataService.removeDuplicateLinks(requester.username()));
+    }
+
     /** Correctifs de données (planning, rôles…) : appliqués une fois au démarrage, résultat enregistré en base. */
     @GetMapping("/data-patches")
     public List<com.ecobank.rccportal.service.DataPatchService.PatchStatus> dataPatches(@AuthenticationPrincipal AuthenticatedUser requester) {

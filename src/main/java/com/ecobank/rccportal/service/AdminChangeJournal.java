@@ -33,6 +33,7 @@ public class AdminChangeJournal {
     public static boolean isAdministrationChange(String method, String path) {
         if (method == null || path == null || "GET".equalsIgnoreCase(method) || "HEAD".equalsIgnoreCase(method)) return false;
         if (path.endsWith("/sessions/me") || path.startsWith("/api/users/me")) return false;
+        if (path.startsWith("/api/admin/data")) return false; // journalisé en détail par AdminDataService (colonne, avant → après)
         return path.startsWith("/api/admin/") || path.startsWith("/api/users") || path.startsWith("/api/tab-permissions")
                 || path.startsWith("/api/teams") || path.startsWith("/api/services") || path.startsWith("/api/site-settings")
                 || path.startsWith("/api/sla-rules") || path.startsWith("/api/login-feature-cards");
