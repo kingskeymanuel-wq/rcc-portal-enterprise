@@ -430,7 +430,7 @@ public class AdministrationService {
         if (n.contains("TEAM LEADER")) {
             if (n.contains("VOICE") || n.contains("VOIX")) return "TEAM_LEADER_INBOUND_VOICE";
             if (n.contains("RAFIKI")) return "TEAM_LEADER_RAFIKI";
-            if (n.contains("TCHAT") || n.contains("CHAT")) return "TEAM_LEADER_TCHAT";
+            if (n.contains("TCHAT") || n.contains("CHAT") || n.contains("RESEAU")) return "TEAM_LEADER_TCHAT";
             if (n.contains("MAIL")) return "TEAM_LEADER_INBOUND_MAIL";
             if (n.contains("OUTBOUND") || n.contains("TELEVENTE") || n.contains("DIGITAL")) return "TEAM_LEADER_OUTBOUND";
             if (n.contains("CIB")) return "TEAM_LEADER_CIB";
@@ -708,6 +708,70 @@ public class AdministrationService {
             }
             default -> throw ApiException.badRequest("Accès attendu : AGENT ou TEAM_LEADER.");
         }
+    }
+
+    /** Activité (équipe) écrite sur un agent aligné sur une équipe — valeurs reconnues par TeamClassifier. */
+    static final java.util.Map<String, String> TEAM_TO_ACTIVITY = java.util.Map.of(
+            "INBOUND_VOICE", "INBOUND VOICE", "INBOUND_MAIL", "INBOUND MAIL", "OUTBOUND", "OUTBOUND",
+            "TCHAT", "INBOUND TCHAT", "RAFIKI", "INBOUND RAFIKI", "CIB", "CIB");
+
+    /** Attribue le rôle de ce nom (créé s'il n'existe pas encore) ; sans effet s'il est déjà attribué. */
+    @Transactional
+    public void grantRoleByName(Long userId, String roleName, String description) {
+        User user = userRepository.findById(userId).orElseThrow(() -> ApiException.notFound("Unknown user."));
+        Role role = roleRepository.findByNameIgnoreCase(roleName)
+                .orElseGet(() -> roleRepository.save(Role.builder().name(roleName).description(description).build()));
+        if (!userRoleRepository.existsByUser_IdAndRole_Id(userId, role.getId())) {
+            userRoleRepository.save(UserRole.builder().user(user).role(role).build());
+        }
+    }
+
+    /**
+     * Agent d'une seule équipe, sans ambiguïté : accès Agent (plus rien de Team Leader, équipe menée effacée),
+     * service agent de l'équipe, autres services agent et autres rôles « Agent … » retirés, rôle agent de
+     * l'équipe attribué, équipe (activité) alignée, filiale renseignée si vide. Renvoie ce qui a changé.
+     */
+    @Transactional
+    public List<String> alignAgent(Long userId, String team, String roleName, String country) {
+        List<String> changes = new java.util.ArrayList<>();
+        User before = userRepository.findById(userId).orElseThrow(() -> ApiException.notFound("Unknown user."));
+        if (before.getLedTeam() != null) changes.add("équipe menée " + before.getLedTeam() + " effacée");
+        List<String> tl = new java.util.ArrayList<>();
+        userRoleRepository.findByUser_Id(userId).stream().filter(ur -> ur.getRole() != null && isTeamLeaderRoleName(ur.getRole().getName()))
+                .forEach(ur -> tl.add(ur.getRole().getName()));
+        userServiceAssignmentRepository.findByUserId(userId).stream()
+                .filter(us -> us.getService() != null && us.getService().getCode() != null && us.getService().getCode().toUpperCase().startsWith("TEAM_LEADER_"))
+                .forEach(us -> tl.add(us.getService().getName()));
+        if (!tl.isEmpty()) changes.add("Team Leader retiré (" + String.join(", ", tl) + ")");
+
+        setAccess(userId, "AGENT", team);
+
+        String keepService = TEAM_TO_AGENT_SERVICE.get(team);
+        userServiceAssignmentRepository.findByUserId(userId).stream()
+                .filter(us -> us.getService() != null && us.getService().getCode() != null)
+                .filter(us -> us.getService().getCode().toUpperCase().startsWith("AGENT_") && !us.getService().getCode().equalsIgnoreCase(keepService))
+                .forEach(us -> { changes.add("service " + us.getService().getName() + " retiré"); userServiceAssignmentRepository.delete(us); });
+        userRoleRepository.findByUser_Id(userId).stream()
+                .filter(ur -> ur.getRole() != null && ur.getRole().getName() != null)
+                .filter(ur -> ur.getRole().getName().toUpperCase().startsWith("AGENT ") && !ur.getRole().getName().equalsIgnoreCase(roleName))
+                .forEach(ur -> { changes.add("rôle " + ur.getRole().getName() + " retiré"); userRoleRepository.delete(ur); });
+        boolean hadRole = userRoleRepository.findByUser_Id(userId).stream()
+                .anyMatch(ur -> ur.getRole() != null && roleName.equalsIgnoreCase(ur.getRole().getName()));
+        grantRoleByName(userId, roleName, "Conseiller clientèle — " + roleName.replaceFirst("(?i)^agent ", ""));
+        if (!hadRole) changes.add("rôle " + roleName + " attribué");
+
+        User user = userRepository.findById(userId).orElseThrow();
+        String activity = TEAM_TO_ACTIVITY.get(team);
+        if (activity != null && !activity.equals(user.getActivity())) {
+            changes.add("équipe " + (user.getActivity() == null ? "—" : user.getActivity()) + " → " + activity);
+            user.setActivity(activity);
+        }
+        if (country != null && (user.getAffiliateBranch() == null || user.getAffiliateBranch().isBlank())) {
+            user.setAffiliateBranch(country);
+            changes.add("filiale " + country);
+        }
+        userRepository.save(user);
+        return changes;
     }
 
     /**

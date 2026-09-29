@@ -21,13 +21,18 @@ public class AdministrationController {
     private final CurrentUserAccessService currentUserAccessService;
     private final com.ecobank.rccportal.service.EffectiveAccessService effectiveAccessService;
     private final com.ecobank.rccportal.service.AdminHierarchyService hierarchyService;
+    private final com.ecobank.rccportal.service.DataPatchService dataPatchService;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ecobank.rccportal.service.AuditLogService auditLogService;
 
     public AdministrationController(AdministrationService administrationService,
                                     UserFeaturePermissionService userFeaturePermissionService,
                                     CurrentUserAccessService currentUserAccessService,
                                     com.ecobank.rccportal.service.EffectiveAccessService effectiveAccessService,
-                                    com.ecobank.rccportal.service.AdminHierarchyService hierarchyService) {
+                                    com.ecobank.rccportal.service.AdminHierarchyService hierarchyService,
+                                    com.ecobank.rccportal.service.DataPatchService dataPatchService) {
         this.hierarchyService = hierarchyService;
+        this.dataPatchService = dataPatchService;
         this.administrationService = administrationService;
         this.userFeaturePermissionService = userFeaturePermissionService;
         this.currentUserAccessService = currentUserAccessService;
@@ -39,6 +44,27 @@ public class AdministrationController {
     public com.ecobank.rccportal.service.AdminHierarchyService.Hierarchy hierarchy(@AuthenticationPrincipal AuthenticatedUser requester) {
         requireAdmin(requester);
         return hierarchyService.hierarchy();
+    }
+
+    /** Correctifs de données (planning, rôles…) : appliqués une fois au démarrage, résultat enregistré en base. */
+    @GetMapping("/data-patches")
+    public List<com.ecobank.rccportal.service.DataPatchService.PatchStatus> dataPatches(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return dataPatchService.list();
+    }
+
+    /** Réapplique un correctif (ex. après avoir créé un compte manquant) — écrit en base et journalisé. */
+    @PostMapping("/data-patches/{code}/run")
+    public java.util.Map<String, String> runDataPatch(@PathVariable String code, @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return java.util.Map.of("result", dataPatchService.run(code, requester.username()));
+    }
+
+    /** Dernières modifications d'administration enregistrées en base (journal d'audit « ADMINISTRATION »). */
+    @GetMapping("/changes")
+    public List<AuditLogResponse> recentChanges(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return auditLogService.recent(com.ecobank.rccportal.service.AdminChangeJournal.ACTION);
     }
 
     public record SetAccessRequest(String level, String team) {}
@@ -168,7 +194,7 @@ public class AdministrationController {
      * démarrage — un bouton dédié côté Administration, déclenché une seule fois à la demande.
      */
     private static final List<String> ROLES_TO_KEEP = List.of(
-            "Agent Inbound", "Agent Outbound", "Team Leader",
+            "Agent Inbound", "Agent Inbound Voice", "Agent Outbound", "Team Leader",
             "Team Leader Inbound Voice", "Team Leader Inbound Mail", "Team Leader Outbound",
             "Formateur", "Quality Assurance", "Superviseur Qualité Assurance",
             "Head RCC (Superviseur)", "Head Outbound", "Head CIB-CMB", "Head Resolution"

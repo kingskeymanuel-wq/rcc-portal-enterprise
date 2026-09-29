@@ -27,7 +27,7 @@
         A_CLASSER: ["À classer", "bi-question-diamond-fill", "todo"]
     };
     var PROFILE = { ADMIN: "Administrateur", SUPERVISOR: "Superviseur", RH: "RH", TEAM_LEADER: "Team Leader", AGENCE: "Agence", AGENT: "Agent", EXCELLIAM: "Excelliam" };
-    var TEAMS = [["INBOUND_VOICE", "Inbound Voix"], ["INBOUND_MAIL", "Inbound Mail"], ["TCHAT", "Tchat"], ["RAFIKI", "Rafiki"], ["CIB", "CIB"], ["OUTBOUND", "Outbound"]];
+    var TEAMS = [["INBOUND_VOICE", "Inbound Voix"], ["INBOUND_MAIL", "Inbound Mail"], ["TCHAT", "Réseaux sociaux"], ["RAFIKI", "Rafiki"], ["CIB", "CIB"], ["OUTBOUND", "Outbound"]];
     var ACTIVITIES = ["INBOUND VOICE", "INBOUND MAIL", "INBOUND TCHAT", "INBOUND RAFIKI", "CIB", "OUTBOUND", "RESOLUTION", "QA"];
     var COUNTRIES = { CI: "Côte d'Ivoire", TG: "Togo", SN: "Sénégal", CM: "Cameroun", BJ: "Bénin", ML: "Mali", BF: "Burkina Faso", NE: "Niger", GH: "Ghana", NG: "Nigeria", KE: "Kenya", GN: "Guinée" };
 

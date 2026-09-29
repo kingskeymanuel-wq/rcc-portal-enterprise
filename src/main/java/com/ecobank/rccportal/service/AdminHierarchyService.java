@@ -35,7 +35,7 @@ public class AdminHierarchyService {
     static {
         TEAM_LABELS.put("INBOUND_VOICE", "Inbound Voix");
         TEAM_LABELS.put("INBOUND_MAIL", "Inbound Mail");
-        TEAM_LABELS.put("TCHAT", "Tchat");
+        TEAM_LABELS.put("TCHAT", "Réseaux sociaux");
         TEAM_LABELS.put("RAFIKI", "Rafiki");
         TEAM_LABELS.put("CIB", "CIB");
         TEAM_LABELS.put("OUTBOUND", "Outbound");
@@ -101,7 +101,7 @@ public class AdminHierarchyService {
         }
         if (!active) w.add("Compte désactivé : aucun accès au portail.");
         if (level.equals("TEAM_LEADER") && team == null) w.add("Team Leader sans équipe : ajoutez un service « Team Leader … » pour lui donner son portail.");
-        if (level.equals("AGENT") && team == null) w.add("Agent sans équipe : ajoutez un service agent (Inbound, Outbound, Tchat, Rafiki, Mail, CIB).");
+        if (level.equals("AGENT") && team == null) w.add("Agent sans équipe : ajoutez un service agent (Inbound, Outbound, Réseaux sociaux, Rafiki, Mail, CIB).");
         if (level.equals("A_CLASSER")) w.add("Aucun rôle reconnu : ajoutez un rôle (agent, Team Leader, RH…) pour lui ouvrir un portail.");
         long tl = serviceCodes.stream().filter(c -> up(c).startsWith("TEAM_LEADER_")).count();
         if (tl > 1) w.add("Plusieurs services Team Leader : une seule équipe est prise en compte, retirez les autres.");

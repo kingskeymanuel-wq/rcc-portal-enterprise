@@ -61,7 +61,7 @@ public class EffectiveAccessService {
         List<String> warnings = new ArrayList<>();
         if (!a.enabled()) warnings.add("Compte désactivé : aucun accès au portail.");
         if ("TEAM_LEADER".equals(role) && (u.getLedTeam() == null || u.getLedTeam().isBlank())) {
-            warnings.add("Team Leader sans équipe : ajoutez un service « Team Leader … » (Inbound Voix, Inbound Mail, Tchat, Rafiki, Outbound, CIB) "
+            warnings.add("Team Leader sans équipe : ajoutez un service « Team Leader … » (Inbound Voix, Inbound Mail, Réseaux sociaux, Rafiki, Outbound, CIB) "
                     + "ou choisissez l'« Équipe dirigée » — sinon son portail reste vide.");
         }
         if ("AGENT".equals(profile) && TeamClassifier.classify(u.getActivity()) == TeamClassifier.Team.OTHER) {

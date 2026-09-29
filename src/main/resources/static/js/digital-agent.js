@@ -12,7 +12,7 @@
 
     var CHANNELS = {
         TCHAT: {
-            label: "Tchat", icon: "bi-chat-text-fill", chip: "Live chat",
+            label: "Réseaux sociaux", icon: "bi-chat-text-fill", chip: "Live chat",
             text: "Vos conversations du live chat, votre production de la semaine face au target et votre planning, au même endroit.",
             platforms: [["bi-chat-dots", "Live chat Ecobank"]],
             rules: [

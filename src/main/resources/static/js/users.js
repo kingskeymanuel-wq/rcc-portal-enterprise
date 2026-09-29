@@ -110,7 +110,7 @@
         ["A_CLASSER", "À classer (aucun rôle reconnu)", "bi-question-diamond-fill"]
     ];
     var TEAM_ORDER = ["INBOUND_VOICE", "INBOUND_MAIL", "TCHAT", "RAFIKI", "CIB", "OUTBOUND"];
-    var TEAM_NAMES = { INBOUND_VOICE: "Inbound Voix", INBOUND_MAIL: "Inbound Mail", TCHAT: "Tchat", RAFIKI: "Rafiki", CIB: "CIB", OUTBOUND: "Outbound", SANS_EQUIPE: "Sans équipe" };
+    var TEAM_NAMES = { INBOUND_VOICE: "Inbound Voix", INBOUND_MAIL: "Inbound Mail", TCHAT: "Réseaux sociaux", RAFIKI: "Rafiki", CIB: "CIB", OUTBOUND: "Outbound", SANS_EQUIPE: "Sans équipe" };
     var LEVEL_BADGES = {
         SUPERVISEUR: "Superviseur", RH: "RH", HEAD_QA: "Head QA", QA: "QA", TEAM_LEADER: "Team Leader",
         AGENT: "Agent", ADMIN: "Admin", AGENCE: "Agence", A_CLASSER: "À classer"

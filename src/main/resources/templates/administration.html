@@ -275,6 +275,9 @@
                 <!-- Organigramme hiérarchique : rôles et services de chacun, modifiables sur place (admin-hierarchy.js) -->
                 <div class="ah-card" id="adminHierarchy"></div>
 
+                <!-- Correctifs de données et journal des modifications écrites en base (admin-db-log.js) -->
+                <div id="adminDbLog"></div>
+
                 <!-- Annuaire complet, organisé par filiale puis niveau hiérarchique / équipe (synchronisé avec l'organigramme) — c'est ici la
                      vraie "gestion des utilisateurs" (featureCode "users") : pas de portail
                      séparé depuis la fusion dans /administration, donc masqué via
@@ -739,7 +742,7 @@
                             <option value="">— Aucune —</option>
                             <option value="INBOUND VOICE">Inbound Voix</option>
                             <option value="INBOUND MAIL">Inbound Mail</option>
-                            <option value="INBOUND TCHAT">Tchat</option>
+                            <option value="INBOUND TCHAT">Réseaux sociaux</option>
                             <option value="INBOUND RAFIKI">Rafiki</option>
                             <option value="CIB">CIB</option>
                             <option value="OUTBOUND">Outbound</option>
@@ -754,7 +757,7 @@
                             <option value="">— Aucune —</option>
                             <option value="INBOUND_VOICE">Inbound Voix</option>
                             <option value="INBOUND_MAIL">Inbound Mail (tout le pôle)</option>
-                            <option value="TCHAT">Tchat</option>
+                            <option value="TCHAT">Réseaux sociaux</option>
                             <option value="RAFIKI">Rafiki</option>
                             <option value="CIB">CIB</option>
                             <option value="OUTBOUND">Outbound</option>
@@ -836,6 +839,7 @@
 <script th:src="@{/js/administration.js}"></script>
 <script th:src="@{/js/admin-agency.js}"></script>
 <script th:src="@{/js/admin-hierarchy.js}"></script>
+<script th:src="@{/js/admin-db-log.js}"></script>
 
 </body>
 </html>

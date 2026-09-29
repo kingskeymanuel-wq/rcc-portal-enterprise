@@ -104,7 +104,7 @@ public class PlanningExportService {
         return switch (c) {
             case "INBOUND_VOICE" -> "Inbound Voix";
             case "INBOUND_MAIL" -> "Inbound Mail";
-            case "TCHAT" -> "Tchat";
+            case "TCHAT" -> "Réseaux sociaux";
             case "RAFIKI" -> "Rafiki";
             case "OUTBOUND" -> "Outbound";
             case "CIB" -> "CIB";

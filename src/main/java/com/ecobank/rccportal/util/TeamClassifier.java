@@ -35,7 +35,8 @@ public final class TeamClassifier {
         if (a.contains("OUTBOUND") || a.contains("TELEVENDEUR") || a.contains("TÉLÉVENDEUR")
                 || a.contains("TELEVENTE") || a.contains("TÉLÉVENTE") || a.contains("DIGITAL")) return Team.OUTBOUND;
         if (a.contains("CIB")) return Team.CIB;
-        if (a.contains("MAIL") || a.contains("TCHAT") || a.contains("CHAT") || a.contains("RESOLUTION") || a.contains("RAFIKI")) return Team.INBOUND_MAIL;
+        if (a.contains("MAIL") || a.contains("TCHAT") || a.contains("CHAT") || a.contains("RESEAU") || a.contains("RÉSEAU")
+                || a.contains("RESOLUTION") || a.contains("RAFIKI")) return Team.INBOUND_MAIL;
         if (a.contains("VOICE") || a.contains("VOIX") || a.contains("CONSEILLER") || a.contains("INBOUND")) return Team.INBOUND_VOICE;
 
         return Team.OTHER;
@@ -66,7 +67,7 @@ public final class TeamClassifier {
     public static String channel(String activity, java.util.Collection<String> serviceCodes) {
         String a = activity == null ? "" : activity.toUpperCase();
         if (a.contains("RAFIKI")) return "RAFIKI";
-        if (a.contains("TCHAT") || a.contains("CHAT")) return "TCHAT";
+        if (a.contains("TCHAT") || a.contains("CHAT") || a.contains("RESEAU") || a.contains("RÉSEAU")) return "TCHAT";
         if (serviceCodes != null) {
             for (String c : serviceCodes) {
                 if (c == null) continue;

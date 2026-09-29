@@ -197,7 +197,7 @@ public class TeamPerformanceService {
         String sheetTeam = channel != null ? channel : team.name();
         src = perfFiles == null ? src : src.withSheet(perfFiles.aggregate(sheetTeam, start, end));
         return channel != null
-                ? build(CHANNEL_PROFILES.get(channel), channel, "TCHAT".equals(channel) ? "Tchat" : "Rafiki", false, label, base, src)
+                ? build(CHANNEL_PROFILES.get(channel), channel, "TCHAT".equals(channel) ? "Réseaux sociaux" : "Rafiki", false, label, base, src)
                 : build(team, label, base, src);
     }
 

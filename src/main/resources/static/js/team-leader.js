@@ -1858,7 +1858,7 @@
     }
 
     function teamLabel(team) {
-        if (myChannel) return myChannel === "RAFIKI" ? "Rafiki" : "Tchat";
+        if (myChannel) return myChannel === "RAFIKI" ? "Rafiki" : "Réseaux sociaux";
         return { INBOUND_VOICE: "Inbound Voix", INBOUND_MAIL: "Inbound Mail", CIB: "CIB", OUTBOUND: "Outbound" }[team] || team;
     }
 

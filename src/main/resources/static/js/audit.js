@@ -18,7 +18,7 @@
         password_reset: { label: "Mot de passe réinitialisé", cls: "info", icon: "bi-key-fill" }
     };
     var TEAMS = {
-        INBOUND_VOICE: "Inbound Voix", INBOUND_MAIL: "Inbound Mail", TCHAT: "Tchat", RAFIKI: "Rafiki", CIB: "CIB",
+        INBOUND_VOICE: "Inbound Voix", INBOUND_MAIL: "Inbound Mail", TCHAT: "Réseaux sociaux", RAFIKI: "Rafiki", CIB: "CIB",
         OUTBOUND: "Outbound", RH: "RH", QA: "Qualité", SUPERVISION: "Supervision", AGENCE: "Agence", FORMATION: "Formation", AUTRE: "Autre"
     };
 

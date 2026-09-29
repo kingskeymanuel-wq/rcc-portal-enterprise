@@ -116,7 +116,7 @@ public class SupervisionService {
     record Sub(Long id, String username, String name, String role, String team) {}
 
     private static final Map<String, String> TEAM_LABELS = Map.of("INBOUND_VOICE", "Inbound Voix", "INBOUND_MAIL", "Inbound Mail",
-            "TCHAT", "Tchat", "RAFIKI", "Rafiki", "CIB", "CIB", "OUTBOUND", "Outbound", "QA", "Quality Assurance");
+            "TCHAT", "Réseaux sociaux", "RAFIKI", "Rafiki", "CIB", "CIB", "OUTBOUND", "Outbound", "QA", "Quality Assurance");
 
     /** Team Leaders (équipe menée, service ou rôle Team Leader) et Head QA — comptes actifs. */
     List<Sub> teamLeadersAndHeadQa() {

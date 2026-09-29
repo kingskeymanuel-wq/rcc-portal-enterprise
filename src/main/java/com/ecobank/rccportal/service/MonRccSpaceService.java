@@ -37,11 +37,11 @@ public class MonRccSpaceService {
         boolean isAgent() { return !isTeamLeader() && !isQa() && !isRh() && !isSupervisor() && !isAgence() && team != null; }
     }
 
-    static final Map<String, String> TEAM_LABELS = Map.of("INBOUND_VOICE", "Inbound Voix", "INBOUND_MAIL", "Inbound Mail", "TCHAT", "Tchat",
+    static final Map<String, String> TEAM_LABELS = Map.of("INBOUND_VOICE", "Inbound Voix", "INBOUND_MAIL", "Inbound Mail", "TCHAT", "Réseaux sociaux",
             "RAFIKI", "Rafiki", "OUTBOUND", "Outbound", "CIB", "CIB");
 
     private static final Map<String, String> PORTAL_LABELS = Map.ofEntries(
-            Map.entry("/dashboard", "Portail agent"), Map.entry("/portail-tchat", "Portail agent Tchat"), Map.entry("/portail-rafiki", "Portail agent Rafiki"),
+            Map.entry("/dashboard", "Portail agent"), Map.entry("/portail-tchat", "Portail agent Réseaux sociaux"), Map.entry("/portail-rafiki", "Portail agent Rafiki"),
             Map.entry("/outbound-dashboard", "Portail Outbound"), Map.entry("/team-leader", "Portail Team Leader"), Map.entry("/qa", "Portail Quality Assurance"),
             Map.entry("/qa-supervisor", "Portail Head QA"), Map.entry("/rh", "Portail RH"), Map.entry("/supervisor", "Portail Superviseur"),
             Map.entry("/agence", "Portail Agence"), Map.entry("/training", "Centre de formation"));

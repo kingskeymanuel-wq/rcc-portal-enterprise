@@ -124,7 +124,7 @@ public class TeamLeaderService {
             "RAFIKI", "AGENT_RAFIKI", "CIB", "AGENT_CIB", "OUTBOUND", "AGENT_OUTBOUND");
 
     static final java.util.Map<String, String> TEAM_LABELS = java.util.Map.of("INBOUND_VOICE", "Inbound Voix", "INBOUND_MAIL", "Inbound Mail",
-            "TCHAT", "Tchat", "RAFIKI", "Rafiki", "CIB", "CIB", "OUTBOUND", "Outbound");
+            "TCHAT", "Réseaux sociaux", "RAFIKI", "Rafiki", "CIB", "CIB", "OUTBOUND", "Outbound");
 
     /** Activité écrite sur un agent ajouté à une équipe de canal (Tchat, Rafiki). */
     private static final java.util.Map<String, String> CHANNEL_TO_ACTIVITY = java.util.Map.of("TCHAT", "INBOUND TCHAT", "RAFIKI", "INBOUND RAFIKI");

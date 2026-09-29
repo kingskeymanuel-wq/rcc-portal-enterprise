@@ -35,12 +35,12 @@ public class HrOrganizationService {
 
     public static final List<PopulationDef> POPULATIONS = List.of(
             new PopulationDef("OUTSOURCE", "Outsource", "bi-building", List.of(
-                    new TeamDef("VOICE", "Inbound Voix", "bi-headset"), new TeamDef("TCHAT", "Tchat", "bi-chat-dots"),
+                    new TeamDef("VOICE", "Inbound Voix", "bi-headset"), new TeamDef("TCHAT", "Réseaux sociaux", "bi-chat-dots"),
                     new TeamDef("MAIL", "Mail", "bi-envelope-at"), new TeamDef("RAFIKI", "Rafiki", "bi-robot"),
                     new TeamDef("CIB", "CIB", "bi-briefcase"))),
             new PopulationDef("STAGIAIRE", "Stagiaires", "bi-mortarboard", List.of(
                     new TeamDef("VOICE", "Inbound Voix", "bi-headset"), new TeamDef("RAFIKI", "Rafiki", "bi-robot"),
-                    new TeamDef("TCHAT", "Tchat", "bi-chat-dots"), new TeamDef("DIGITAL", "Digitalisation (Outbound Digital)", "bi-phone"))),
+                    new TeamDef("TCHAT", "Réseaux sociaux", "bi-chat-dots"), new TeamDef("DIGITAL", "Digitalisation (Outbound Digital)", "bi-phone"))),
             new PopulationDef("STAFF", "Staff Ecobank", "bi-bank", List.of(
                     new TeamDef("QA", "Quality Assurance", "bi-patch-check"), new TeamDef("CARD_OPS", "Service Opérations Cartes", "bi-credit-card-2-front"))));
 

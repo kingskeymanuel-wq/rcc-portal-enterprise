@@ -44,6 +44,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private AccessResolver accessResolver;
 
+    /** Journal en base de chaque modification d'administration réussie (qui, quoi, état relu en base). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.ecobank.rccportal.service.AdminChangeJournal adminChangeJournal;
+
     public JwtAuthenticationFilter(JwtService jwtService) {
         this.jwtService = jwtService;
     }
@@ -180,10 +184,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         }
 
+        Object principal = SecurityContextHolder.getContext().getAuthentication() == null ? null
+                : SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
         filterChain.doFilter(
                 request,
                 response
         );
+
+        if (adminChangeJournal != null && response.getStatus() < 400
+                && com.ecobank.rccportal.service.AdminChangeJournal.isAdministrationChange(request.getMethod(), request.getRequestURI())) {
+            adminChangeJournal.record(principal instanceof AuthenticatedUser au ? au.username() : null,
+                    request.getMethod(), request.getRequestURI());
+        }
 
         // Action d'administration réussie (rôles, services, équipe menée, activation, membres d'équipe, sorties RH) :
         // l'accès des personnes concernées est relu tout de suite, sur tous les portails.

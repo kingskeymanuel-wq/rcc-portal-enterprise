@@ -630,6 +630,26 @@ public class ScheduleService {
                 preview, entriesCreated > preview.size(), skippedRows);
     }
 
+    /**
+     * Compte correspondant à un nom de planning, par la même règle que l'import : nom exact (mots dans
+     * n'importe quel ordre, sans accents), sinon l'unique compte au nom très proche. Mention retirée
+     * (« Premium », « Stage »…). Vide si aucun compte ou plusieurs candidats.
+     */
+    @Transactional(readOnly = true)
+    public Optional<User> findUserByPlanningName(String planningName) {
+        String name = splitNameAnnotation(planningName)[0];
+        List<User> all = userRepository.findAll().stream().filter(u -> u.getName() != null && !u.getName().isBlank()).toList();
+        String key = normalizeName(name);
+        List<User> exact = all.stream().filter(u -> normalizeName(u.getName()).equals(key)).toList();
+        if (exact.size() == 1) return Optional.of(exact.get(0));
+        if (exact.size() > 1) {
+            // Doublons au même nom : le compte actif d'abord.
+            List<User> active = exact.stream().filter(u -> !Boolean.FALSE.equals(u.getAccountEnabled())).toList();
+            return active.size() == 1 ? Optional.of(active.get(0)) : Optional.empty();
+        }
+        return Optional.ofNullable(com.ecobank.rccportal.util.PersonNames.findUnique(name, all, User::getName));
+    }
+
     private void linkTeamIfMissing(User user, com.ecobank.rccportal.model.RccService importService, String countryCode, String team) {
         boolean changed = false;
         if ((user.getAffiliateBranch() == null || user.getAffiliateBranch().isBlank()) && countryCode != null) {

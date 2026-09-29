@@ -948,10 +948,10 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         seedServiceIfMissing("AGENCE_CAISSIER", "Agence — Caissier", "Caissier en agence : opérations de guichet, assistance client", 18);
         seedServiceIfMissing("AGENCE_GESTIONNAIRE", "Agence — Gestionnaire clientèle", "Gestionnaire de clientèle en agence : conseil, comptes, cartes, crédits", 19);
         // Agents des canaux digitaux : chacun atterrit sur son propre portail (/portail-tchat, /portail-rafiki).
-        seedServiceIfMissing("AGENT_TCHAT", "Agent Tchat", "Conseiller clientèle — Live chat", 20);
+        seedServiceIfMissing("AGENT_TCHAT", "Agent Réseaux sociaux", "Conseiller clientèle — Réseaux sociaux", 20);
         seedServiceIfMissing("AGENT_RAFIKI", "Agent Rafiki", "Conseiller clientèle — Rafiki (Facebook, Instagram, X)", 21);
         // Team Leaders des canaux digitaux : même portail Team Leader, restreint aux agents de leur canal.
-        seedServiceIfMissing("TEAM_LEADER_TCHAT", "Team Leader Tchat", "Responsable de l'équipe Tchat (live chat)", 22);
+        seedServiceIfMissing("TEAM_LEADER_TCHAT", "Team Leader Réseaux sociaux", "Responsable de l'équipe Réseaux sociaux", 22);
         seedServiceIfMissing("TEAM_LEADER_RAFIKI", "Team Leader Rafiki", "Responsable de l'équipe Rafiki (réseaux sociaux)", 23);
         seedServiceIfMissing("TEAM_LEADER_CIB", "Team Leader CIB", "Responsable de l'équipe CIB", 24);
 
