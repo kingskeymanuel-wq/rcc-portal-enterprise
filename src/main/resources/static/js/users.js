@@ -657,6 +657,39 @@
         select.value = value;
     }
 
+    // ───────────── Accès (même liste et même synchronisation que l'organigramme) ─────────────
+
+    var ACCESS_TEAMS = [["INBOUND_VOICE", "Inbound Voix"], ["INBOUND_MAIL", "Inbound Mail"], ["TCHAT", "Réseaux sociaux"], ["RAFIKI", "Rafiki"],
+        ["CIB", "CIB"], ["DIGITALISATION", "Outbound — Digitalisation"], ["TELEVENTE", "Télévente"], ["OUTBOUND", "Outbound (pôle, sans sous-équipe)"]];
+    var ACCESS_MGMT = [["QA", "Quality Assurance"], ["HEAD_QA", "Head QA (Superviseur QA)"], ["RH", "Ressources Humaines"], ["SUPERVISEUR", "Superviseur · Head RCC"]];
+    var ACCESS_AGENT_SERVICES = { AGENT_INBOUND: "INBOUND_VOICE", AGENT_INBOUND_MAIL: "INBOUND_MAIL", AGENT_TCHAT: "TCHAT", AGENT_RAFIKI: "RAFIKI",
+        AGENT_CIB: "CIB", AGENT_OUTBOUND: "OUTBOUND", AGENT_TELEVENTE: "TELEVENTE", AGENT_DIGITALISATION: "DIGITALISATION" };
+
+    /** Accès réel d'une personne de l'organigramme : « AGENT:INBOUND_MAIL », « TEAM_LEADER:TCHAT », « RH: »… */
+    function currentAccess(p) {
+        if (!p) return "";
+        if (p.level === "TEAM_LEADER") return "TEAM_LEADER:" + (p.team || "");
+        if (ACCESS_MGMT.some(function (m) { return m[0] === p.level; })) return p.level + ":";
+        if (p.level !== "AGENT") return "";
+        var teams = [];
+        (p.services || []).forEach(function (s) { var t = ACCESS_AGENT_SERVICES[String(s.code || "").toUpperCase()]; if (t && teams.indexOf(t) === -1) teams.push(t); });
+        if (!teams.length && p.team) teams.push(p.team);
+        return teams.length === 1 ? "AGENT:" + teams[0] : "";
+    }
+
+    function fillAccessSelect(select, p, ledTeam) {
+        var cur = currentAccess(p);
+        var locked = p && (p.level === "ADMIN" || p.level === "AGENCE");
+        var opt = function (v, label) { return '<option value="' + v + '"' + (cur === v ? " selected" : "") + '>' + escapeHtml(label) + '</option>'; };
+        select.innerHTML = (cur ? "" : '<option value="" selected>' + (locked ? "Donné par ses rôles / services (inchangé)" : "— inchangé —") + '</option>') +
+            (locked ? "" : '<optgroup label="Agent">' + ACCESS_TEAMS.map(function (t) { return opt("AGENT:" + t[0], "Agent · " + t[1]); }).join("") + '</optgroup>' +
+                '<optgroup label="Team Leader">' + ACCESS_TEAMS.map(function (t) { return opt("TEAM_LEADER:" + t[0], "Team Leader · " + t[1]); }).join("") + '</optgroup>' +
+                '<optgroup label="Encadrement">' + ACCESS_MGMT.map(function (m) { return opt(m[0] + ":", m[1]); }).join("") + '</optgroup>');
+        select.disabled = !!locked;
+        // Agent avec une « équipe menée » restée en base : l'enregistrement réapplique l'accès Agent et la vide.
+        select.setAttribute("data-initial", cur.indexOf("AGENT:") === 0 && ledTeam ? "" : cur);
+    }
+
     function openUserDetail(userId) {
         currentDetailUserId = userId;
         loadEffectiveAccess(userId);
@@ -672,7 +705,7 @@
             document.getElementById("editGender").value = detail.gender || "";
             document.getElementById("editAffiliate").value = detail.affiliateBranch || "";
             setSelectValue(document.getElementById("editActivity"), detail.activity);
-            setSelectValue(document.getElementById("editLedTeam"), detail.ledTeam);
+            fillAccessSelect(document.getElementById("editAccess"), hierarchyIndex && hierarchyIndex[userId], detail.ledTeam);
             document.getElementById("editContractType").value = detail.contractType || "";
             document.getElementById("editContractStatus").value = detail.contractStatus || "";
             document.getElementById("editContractStartDate").value = detail.contractStartDate || "";
@@ -839,7 +872,6 @@
                 affiliateBranch: document.getElementById("editAffiliate").value.trim(),
                 gender: document.getElementById("editGender").value,
                 activity: document.getElementById("editActivity").value.trim(),
-                ledTeam: document.getElementById("editLedTeam").value.trim(),
                 contractType: document.getElementById("editContractType").value,
                 contractStatus: document.getElementById("editContractStatus").value,
                 contractStartDate: document.getElementById("editContractStartDate").value || null
@@ -849,7 +881,16 @@
             var originalLabel = submitBtn ? submitBtn.textContent : null;
             if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Enregistrement…"; }
 
-            sendJson("/api/users/" + currentDetailUserId, "PUT", payload)
+            var userId = currentDetailUserId;
+            var accessSel = document.getElementById("editAccess");
+            var access = accessSel.value, accessChanged = access && access !== accessSel.getAttribute("data-initial");
+            sendJson("/api/users/" + userId, "PUT", payload)
+                .then(function () {
+                    // Accès en dernier : il aligne rôle, service, équipe (activité) et portail — il prime sur le champ Équipe.
+                    if (!accessChanged) return null;
+                    var parts = access.split(":");
+                    return sendJson("/api/admin/users/" + userId + "/access", "PUT", { level: parts[0], team: parts[1] || null });
+                })
                 .then(function () {
                     // L'annuaire et l'organigramme se rechargent à la fermeture de la fiche (voir wireSync).
                     var modalEl = document.getElementById("userDetailModal");
