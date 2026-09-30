@@ -1820,6 +1820,8 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         String[][] roles = {
                 {"Agent Inbound", "Conseiller clientèle — pôle Inbound (Voix ou Mail/Rafiki)"},
                 {"Agent Outbound", "Conseiller clientèle — pôle Outbound (appels sortants, vente)"},
+                {"Agent Réseaux sociaux", "Conseiller clientèle — Réseaux sociaux (portail ex-Tchat)"},
+                {"Team Leader Réseaux sociaux", "Responsable de l'équipe Réseaux sociaux"},
                 {"Team Leader", "Responsable d'équipe — accès générique, toutes équipes"},
                 {"Team Leader Inbound Voice", "Responsable de l'équipe Inbound Voix"},
                 {"Team Leader Inbound Mail", "Responsable de l'équipe Inbound Mail / Rafiki"},

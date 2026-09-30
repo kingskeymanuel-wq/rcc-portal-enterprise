@@ -190,6 +190,11 @@ window.RccSession = (function () {
      * un minuteur en direct — vert en poste, rouge en pause, blanc si le shift n'a pas
      * commencé ou est terminé (rien à chronométrer).
      */
+    /**
+     * Heure de connexion du jour (premier LOGIN), fixe : une pause, une formation, une réunion ou une
+     * déconnexion/reconnexion ne la changent pas. En dessous, le temps écoulé depuis cette connexion,
+     * qui suit son cours normalement (jusqu'à la fin de shift).
+     */
     function updateShiftTimer(status) {
         var el = document.getElementById("shiftTimer");
         if (!el) return;
@@ -197,35 +202,29 @@ window.RccSession = (function () {
         clearInterval(shiftTimerInterval);
 
         var events = status.todayEvents || [];
-        var lastEvent = events.length ? events[events.length - 1] : null;
+        var login = events.filter(function (e) { return e.eventType === "LOGIN"; })[0] || events[0] || null;
+        var end = status.currentState === "SHIFT_ENDED"
+            ? events.filter(function (e) { return e.eventType === "SHIFT_END" || e.eventType === "LOGOUT"; }).slice(-1)[0] || events[events.length - 1]
+            : null;
 
-        if ((status.currentState === "SHIFT_ENDED" || status.currentState === "NOT_STARTED") || !lastEvent) {
+        el.style.color = "#22c55e";
+        if (!login) {
             shiftCurrentStateSince = null;
             updateResumeInfo(null);
-            el.textContent = "--:--:--";
-            el.style.color = "#ffffff";
+            el.innerHTML = '<div style="font-size:.7rem;font-weight:400;color:#cbd5e1">Heure de connexion</div>--:--';
             return;
         }
-
-        // Début de l'état courant calculé par le serveur : après une déconnexion/reconnexion le
-        // même jour, il est conservé — le minuteur reprend en continuité (absence comprise) au
-        // lieu de repartir de zéro. Repli sur le dernier événement pour un ancien serveur.
-        shiftCurrentStateSince = new Date(status.currentStateSince || lastEvent.occurredAt).getTime();
+        shiftCurrentStateSince = new Date(login.occurredAt).getTime();
         updateResumeInfo(status);
-        el.style.color = (status.currentState === "ON_PAUSE" || status.currentState === "ON_LUNCH") ? "#ef4444"
-            : status.currentState === "ON_TRAINING" ? "#0057B8"
-            : status.currentState === "ON_MEETING" ? "#F5A623"
-            : "#22c55e";
 
         function tick() {
-            var elapsed = Math.max(0, Math.floor((Date.now() - shiftCurrentStateSince) / 1000));
-            var h = String(Math.floor(elapsed / 3600)).padStart(2, "0");
-            var m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, "0");
-            var s = String(elapsed % 60).padStart(2, "0");
-            el.textContent = h + ":" + m + ":" + s;
+            var until = end ? new Date(end.occurredAt).getTime() : Date.now();
+            var minutes = Math.max(0, Math.floor((until - shiftCurrentStateSince) / 60000));
+            el.innerHTML = '<div style="font-size:.7rem;font-weight:400;color:#cbd5e1">Connecté à</div>' + hhmm(login.occurredAt) +
+                '<div style="font-size:.72rem;font-weight:400;color:#cbd5e1">' + (end ? "fin à " + hhmm(end.occurredAt) + " · " : "depuis ") + durationLabel(minutes) + '</div>';
         }
         tick();
-        shiftTimerInterval = setInterval(tick, 1000);
+        if (!end) shiftTimerInterval = setInterval(tick, 30000);
     }
 
     function hhmm(iso) {
@@ -251,7 +250,7 @@ window.RccSession = (function () {
         }
         var text = "Reprise à " + hhmm(status.lastReconnectedAt) + " (déconnecté à " + hhmm(status.lastDisconnectedAt) + ")";
         if (status.absenceMinutesInCurrentState > 0) {
-            text += " — minuteur en continuité, dont " + durationLabel(status.absenceMinutesInCurrentState) + " d'absence";
+            text += " — dont " + durationLabel(status.absenceMinutesInCurrentState) + " d'absence";
         }
         if (status.absenceMinutesToday > status.absenceMinutesInCurrentState) {
             text += " · absence totale du jour : " + durationLabel(status.absenceMinutesToday);

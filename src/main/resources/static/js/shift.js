@@ -1243,28 +1243,121 @@
     };
     var TEAM_LABELS_SHIFT = { INBOUND_VOICE: "Inbound Voix", INBOUND_MAIL: "Inbound Mail / Rafiki", CIB: "CIB", OUTBOUND: "Outbound", OTHER: "Non classée" };
 
-    /** "En direct" réutilise la même frise horaire que Suivi réel > Équipe (voir renderDayTeam),
-     *  sur l'équipe active (teamSelect / celle du Team Leader) plutôt qu'un tableau texte
-     *  multi-équipes — voir demande utilisateur et capture de référence. La barre verte
-     *  s'arrête à l'heure actuelle (isToday dans buildSegments), donnant l'effet "en direct". */
+    /**
+     * « En direct » : tous les agents de l'équipe (ou de toutes les équipes pour RH/QA/Superviseur/Admin) qui ont
+     * pointé aujourd'hui, les connectés en tête — état, heure de connexion et frise du shift qui avance jusqu'à
+     * l'heure actuelle. Un clic sur un agent ouvre ses frises des jours précédents. Rafraîchi toutes les 60 s.
+     */
+    var LIVE_CONNECTED = ["WORKING", "ON_PAUSE", "ON_LUNCH", "ON_TRAINING", "ON_MEETING"];
+    var liveFilter = "connected", liveData = [], liveTimer = null, liveHistory = { username: null, name: null, end: null };
+
+    function liveRowsFrom(events) {
+        var byUser = {};
+        events.forEach(function (e) {
+            if (!byUser[e.username]) byUser[e.username] = { username: e.username, fullName: e.userFullName, activity: e.activity, events: [] };
+            byUser[e.username].events.push(e);
+        });
+        return Object.values(byUser).map(function (u) {
+            var a = RccShiftTimeline.analyze(u.events, new Date());
+            var login = u.events.filter(function (e) { return e.eventType === "LOGIN"; })[0] || u.events[0];
+            u.state = a.state;
+            u.since = a.since;
+            u.loginAt = login ? new Date(login.occurredAt) : null;
+            u.connected = LIVE_CONNECTED.indexOf(a.state) !== -1;
+            return u;
+        });
+    }
+
+    function renderLive() {
+        var container = $("shiftLiveTree");
+        var connected = liveData.filter(function (u) { return u.connected; });
+        var paused = liveData.filter(function (u) { return u.state === "ON_PAUSE" || u.state === "ON_LUNCH"; });
+        var off = liveData.filter(function (u) { return u.state === "DISCONNECTED"; });
+        var ended = liveData.filter(function (u) { return u.state === "SHIFT_ENDED"; });
+        var list = liveFilter === "connected" ? connected : liveFilter === "pause" ? paused : liveFilter === "off" ? off.concat(ended) : liveData;
+        list = list.slice().sort(function (x, y) {
+            if (x.connected !== y.connected) return x.connected ? -1 : 1;
+            return (x.fullName || "").localeCompare(y.fullName || "");
+        });
+        function chip(key, label, n) {
+            return '<button type="button" class="btn btn-sm ' + (liveFilter === key ? "btn-primary" : "btn-outline-primary") + '" data-live-filter="' + key + '">' + label + ' <span class="badge text-bg-light">' + n + '</span></button>';
+        }
+        var rows = list.map(function (u) {
+            return '<div class="shift-timeline-row live-row" data-username="' + escapeHtml(u.username) + '" data-live-user="' + escapeHtml(u.username) + '" data-live-name="' + escapeHtml(u.fullName || u.username) + '" title="Voir les shifts précédents" style="cursor:pointer">' +
+                '<div class="shift-agent-label"><b>' + escapeHtml(u.fullName || u.username) + '</b> ' + (SHIFT_STATE_BADGES[u.state] || "") +
+                '<div class="small text-muted">' + (u.loginAt ? "connecté à " + RccShiftTimeline.hhmm(u.loginAt) : "") +
+                (u.since && u.state !== "WORKING" ? " · depuis " + RccShiftTimeline.hhmm(u.since) : "") + ' <i class="bi bi-clock-history ms-1"></i></div>' + disconnectionBadge(u.events) + '</div>' +
+                '<div class="shift-bar-wrap">' + renderBar(u.events, true) + '</div></div>';
+        }).join("");
+        container.innerHTML = '<div class="card dashboard-card shadow-sm"><div class="card-body">' +
+            '<div class="d-flex flex-wrap gap-2 align-items-center mb-2">' +
+            chip("connected", '<i class="bi bi-broadcast"></i> Connectés', connected.length) + chip("pause", "En pause", paused.length) +
+            chip("off", "Déconnectés / fin de shift", off.length + ended.length) + chip("all", "Tous ceux du jour", liveData.length) +
+            '<span class="small text-muted ms-auto">Mis à jour à ' + RccShiftTimeline.hhmm(new Date()) + ' · cliquez un agent pour ses shifts précédents</span></div>' +
+            (rows || '<p class="text-muted text-center my-3">Aucun agent dans cette catégorie pour l\'instant.</p>') +
+            (rows ? '<div class="shift-bar-ruler"><span>06h</span><span>10h</span><span>14h</span><span>18h</span><span>22h</span></div>' : '') +
+            '</div></div>';
+        if (rows) decorateWithPlanning("shiftLiveTree", todayIso(), $("teamSelect").value);
+    }
+
     function loadShiftLive() {
         var container = $("shiftLiveTree");
-        container.innerHTML = '<p class="text-center text-muted">Chargement…</p>';
-
+        if (!liveData.length) container.innerHTML = '<p class="text-center text-muted">Chargement…</p>';
         var today = todayIso();
         var team = $("teamSelect").value;
         var teamParam = team ? "&team=" + encodeURIComponent(team) : "";
-
-        Promise.all([
-            getJson("/api/shift/team?date=" + today + teamParam),
-            getJson("/api/shift/leave-days?date=" + today).catch(function () { return []; })
-        ]).then(function (r) {
-            renderDayTeam(r[0], r[1] || [], today, "shiftLiveTree");
-            fetchCompliance(today, team).then(function () { decorateWithPlanning("shiftLiveTree", today, team); }).catch(function () {});
-        }).catch(function (e) {
+        return getJson("/api/shift/team?date=" + today + teamParam).then(function (events) {
+            liveData = liveRowsFrom(events || []);
+            return fetchCompliance(today, team).catch(function () {});
+        }).then(renderLive).catch(function (e) {
             container.innerHTML = '<p class="text-center text-danger">Erreur : ' + escapeHtml(e.message) + '</p>';
         });
     }
+
+    /** Frises des 14 jours d'un agent (se termine à « end »), du plus récent au plus ancien. */
+    function openLiveHistory(username, name, endIso) {
+        liveHistory = { username: username, name: name, end: endIso || todayIso() };
+        var from = shiftDay(liveHistory.end, -13);
+        var team = $("teamSelect").value;
+        $("shiftDayDetailTitle").textContent = "Shifts de " + name + " — du " + from.split("-").reverse().join("/") + " au " + liveHistory.end.split("-").reverse().join("/");
+        $("shiftDayDetailBody").innerHTML = '<p class="text-center text-muted">Chargement…</p>';
+        shiftDayDetailModal.show();
+        getJson("/api/shift/team/range?from=" + from + "&to=" + liveHistory.end + (team ? "&team=" + encodeURIComponent(team) : "")).then(function (events) {
+            var mine = (events || []).filter(function (e) { return e.username === username; });
+            var byDate = groupByDate(mine);
+            var rows = [];
+            for (var i = 0; i < 14; i++) {
+                var d = shiftDay(liveHistory.end, -i), ev = byDate[d] || [];
+                var label = new Date(d + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "2-digit" });
+                var login = ev.filter(function (e) { return e.eventType === "LOGIN"; })[0];
+                rows.push('<div class="shift-timeline-row"><div class="shift-agent-label"><b>' + escapeHtml(label) + '</b>' +
+                    '<div class="small text-muted">' + (ev.length ? (login ? "connecté à " + RccShiftTimeline.hhmm(new Date(login.occurredAt)) + " · " : "") +
+                        RccShiftTimeline.formatDuration(buildSegments(ev, d === todayIso()).filter(function (x) { return x.type === "work"; })
+                            .reduce(function (n, x) { return n + (x.to - x.from); }, 0)) + " travaillées" : "aucun pointage") + '</div></div>' +
+                    '<div class="shift-bar-wrap">' + (ev.length ? renderBar(ev, d === todayIso()) : "") + '</div></div>');
+            }
+            $("shiftDayDetailBody").innerHTML =
+                '<div class="d-flex justify-content-between mb-2"><button type="button" class="btn btn-sm btn-outline-secondary" data-live-hist="-14"><i class="bi bi-chevron-left"></i> 14 jours précédents</button>' +
+                (liveHistory.end < todayIso() ? '<button type="button" class="btn btn-sm btn-outline-secondary" data-live-hist="14">14 jours suivants <i class="bi bi-chevron-right"></i></button>' : '<span></span>') + '</div>' +
+                rows.join("") + '<div class="shift-bar-ruler"><span>06h</span><span>10h</span><span>14h</span><span>18h</span><span>22h</span></div>';
+        }).catch(function (e) {
+            $("shiftDayDetailBody").innerHTML = '<p class="text-center text-danger">Erreur : ' + escapeHtml(e.message) + '</p>';
+        });
+    }
+
+    $("shiftLiveTree").addEventListener("click", function (e) {
+        var f = e.target.closest("[data-live-filter]");
+        if (f) { liveFilter = f.getAttribute("data-live-filter"); renderLive(); return; }
+        var row = e.target.closest("[data-live-user]");
+        if (row) openLiveHistory(row.getAttribute("data-live-user"), row.getAttribute("data-live-name"), todayIso());
+    });
+    $("shiftDayDetailBody").addEventListener("click", function (e) {
+        var b = e.target.closest("[data-live-hist]");
+        if (!b || !liveHistory.username) return;
+        var end = shiftDay(liveHistory.end, Number(b.getAttribute("data-live-hist")));
+        if (end > todayIso()) end = todayIso();
+        openLiveHistory(liveHistory.username, liveHistory.name, end);
+    });
 
     $("shiftLiveBtn").addEventListener("click", function () {
         var section = $("shiftLiveSection");
@@ -1272,7 +1365,11 @@
         section.style.display = showing ? "none" : "";
         this.classList.toggle("btn-danger", !showing);
         this.classList.toggle("btn-outline-danger", showing);
-        if (!showing) loadShiftLive();
+        clearInterval(liveTimer);
+        if (!showing) {
+            loadShiftLive();
+            liveTimer = setInterval(function () { if (!document.hidden) loadShiftLive(); }, 60000);
+        }
     });
 
     // ═══════════════════════════════════════════════════════════════════

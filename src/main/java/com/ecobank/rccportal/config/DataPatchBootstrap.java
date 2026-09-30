@@ -18,13 +18,20 @@ import org.springframework.stereotype.Component;
 public class DataPatchBootstrap implements CommandLineRunner {
 
     private final DataPatchService patches;
+    private final com.ecobank.rccportal.service.ShiftCatalogService shiftCatalog;
 
-    public DataPatchBootstrap(DataPatchService patches) {
+    public DataPatchBootstrap(DataPatchService patches, com.ecobank.rccportal.service.ShiftCatalogService shiftCatalog) {
         this.patches = patches;
+        this.shiftCatalog = shiftCatalog;
     }
 
     @Override
     public void run(String... args) {
+        try {
+            shiftCatalog.ensure(); // catalogue des shifts (M, M2, M3, M4, A, N) — jamais d'écrasement d'un horaire modifié
+        } catch (RuntimeException e) {
+            log.error("[SHIFTS] Table SHIFT_CODES indisponible : {}", e.getMessage());
+        }
         try {
             patches.ensureTable();
         } catch (RuntimeException e) {

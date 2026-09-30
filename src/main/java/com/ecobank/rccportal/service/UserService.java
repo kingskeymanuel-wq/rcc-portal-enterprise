@@ -142,6 +142,16 @@ public class UserService {
             String channel = digitalChannelPortal(user.getActivity());
             if (channel != null) redirectTo = channel;
         }
+        // Rôle « Réseaux sociaux » (ex-Tchat) ou « Rafiki » attribué : son portail de canal, même s'il garde un service
+        // Agent Inbound ou un autre rôle d'agent — Réseaux sociaux remplace le Tchat.
+        if (!isAdmin && (redirectTo == null || "/dashboard".equals(redirectTo))) {
+            for (UserRole r : roles) {
+                String n = r.getRole() == null ? null : r.getRole().getName();
+                if (n == null || "TEAM_LEADER".equals(com.ecobank.rccportal.security.AccessResolver.roleOfName(n))) continue;
+                String channel = digitalChannelPortal(n);
+                if (channel != null) { redirectTo = channel; break; }
+            }
+        }
 
         // Redirection Outbound réservée aux simples agents (dernier repli, si ni Service ni
         // Rôle métier ci-dessus ne correspond) — un QA/Admin/RH/Superviseur/Team Leader dont
@@ -198,7 +208,8 @@ public class UserService {
         if (activity == null) return null;
         String a = activity.toUpperCase(java.util.Locale.ROOT);
         if (a.contains("RAFIKI")) return "/portail-rafiki";
-        if (a.contains("TCHAT") || a.contains("LIVE CHAT") || a.matches(".*\\bCHAT\\b.*")) return "/portail-tchat";
+        String folded = java.text.Normalizer.normalize(a, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "");
+        if (a.contains("TCHAT") || a.contains("LIVE CHAT") || a.matches(".*\\bCHAT\\b.*") || folded.contains("RESEAU")) return "/portail-tchat";
         return null;
     }
 

@@ -92,6 +92,19 @@ public class ScheduleService {
     private final com.ecobank.rccportal.repository.UserRoleRepository userRoleRepository;
     private final com.ecobank.rccportal.repository.RccNotificationRepository notificationRepository;
 
+    /** Horaires des shifts (M, M2, M3, M4, A, N…) modifiables dans Administration — voir ShiftCatalogService. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ShiftCatalogService shiftCatalog;
+
+    /** Shifts proposés au planning : le catalogue de l'administration, sinon les horaires par défaut. */
+    private Map<String, ShiftDef> fixedShifts() {
+        if (shiftCatalog != null) {
+            Map<String, ShiftDef> m = shiftCatalog.activeDefs();
+            if (!m.isEmpty()) return m;
+        }
+        return FIXED_SHIFTS;
+    }
+
     public ScheduleService(AgentScheduleRepository agentScheduleRepository, ShiftEventRepository shiftEventRepository,
                            UserRepository userRepository, UserServiceAssignmentRepository userServiceAssignmentRepository,
                            com.ecobank.rccportal.repository.RccServiceRepository rccServiceRepository,
@@ -120,8 +133,10 @@ public class ScheduleService {
     private static final Map<String, ShiftDef> FIXED_SHIFTS = Map.of(
             "M", new ShiftDef("Matin 07h-16h", LocalTime.of(7, 0), LocalTime.of(16, 0), false),
             "M2", new ShiftDef("Matin 08h-17h", LocalTime.of(8, 0), LocalTime.of(17, 0), false),
+            "M3", new ShiftDef("Matin 09h-18h", LocalTime.of(9, 0), LocalTime.of(18, 0), false),
+            "M4", new ShiftDef("Matin 10h-19h", LocalTime.of(10, 0), LocalTime.of(19, 0), false),
             "A", new ShiftDef("Après-midi 12h-21h", LocalTime.of(12, 0), LocalTime.of(21, 0), false),
-            "N", new ShiftDef("Nuit 21h-06h", LocalTime.of(21, 0), LocalTime.of(6, 0), true)
+            "N", new ShiftDef("Nuit 21h-07h", LocalTime.of(21, 0), LocalTime.of(7, 0), true)
     );
 
     @Transactional
@@ -306,7 +321,7 @@ public class ScheduleService {
             }
         }
         if (legendRow < 0) {
-            addTotalRowsAndDefaults(grid, legend);
+            addTotalRowsAndDefaults(grid, legend, shiftCatalog != null ? shiftCatalog.activeDefs() : Map.of());
             return legend;
         }
 
@@ -327,12 +342,17 @@ public class ScheduleService {
                 legend.put(codeUpper, new ShiftDef(label.isBlank() ? code : label, null, null, false));
             }
         }
-        addTotalRowsAndDefaults(grid, legend);
+        addTotalRowsAndDefaults(grid, legend, shiftCatalog != null ? shiftCatalog.activeDefs() : Map.of());
         return legend;
     }
 
     /** « TOTAL M (07H - 16H) » → M = 07h-16h ; puis les codes courants encore inconnus (M3, M4, C, RM…). */
     static void addTotalRowsAndDefaults(List<List<String>> grid, Map<String, ShiftDef> legend) {
+        addTotalRowsAndDefaults(grid, legend, Map.of());
+    }
+
+    /** Idem, les horaires du catalogue de l'administration passant avant les horaires codés en dur. */
+    static void addTotalRowsAndDefaults(List<List<String>> grid, Map<String, ShiftDef> legend, Map<String, ShiftDef> catalog) {
         for (List<String> line : grid) {
             for (String cell : line) {
                 if (cell == null) continue;
@@ -348,6 +368,7 @@ public class ScheduleService {
                 legend.put(code, new ShiftDef(label, start, end, !end.isAfter(start)));
             }
         }
+        catalog.forEach(legend::putIfAbsent);
         DEFAULT_CODES.forEach(legend::putIfAbsent);
     }
 
@@ -823,10 +844,11 @@ public class ScheduleService {
             if (a.username() == null || a.username().isBlank()) continue;
             String code = a.shiftCode() == null ? "" : a.shiftCode().trim().toUpperCase();
             boolean isOff = "OFF".equals(code);
-            ShiftDef def = FIXED_SHIFTS.get(code);
+            Map<String, ShiftDef> shifts = fixedShifts();
+            ShiftDef def = shifts.get(code);
             if (!isOff && def == null) {
                 throw ApiException.badRequest("Shift inconnu : \"" + code + "\" — attendu : "
-                        + String.join(", ", FIXED_SHIFTS.keySet()) + " ou OFF.");
+                        + String.join(", ", shifts.keySet()) + " ou OFF.");
             }
 
             User user = userRepository.findFirstByUsernameIgnoreCase(a.username().trim()).orElse(null);

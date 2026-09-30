@@ -436,6 +436,9 @@ public class AdministrationService {
             if (n.contains("CIB")) return "TEAM_LEADER_CIB";
             return null;
         }
+        // Rôle agent d'un canal digital : « Agent Réseaux sociaux » / « Réseaux sociaux » / « Agent Tchat » → portail Tchat.
+        if (n.contains("RESEAU") || n.contains("TCHAT") || n.matches(".*\\bCHAT\\b.*")) return "AGENT_TCHAT";
+        if (n.contains("RAFIKI")) return "AGENT_RAFIKI";
         if (n.contains("QUALIT")) return n.contains("SUPERVISEUR") || n.contains("HEAD") ? "SUPERVISEUR_QA" : "QUALITY_ASSURANCE";
         if (n.equals("RH") || n.contains("RESSOURCES HUMAINES")) return "RH";
         if (n.contains("SUPERVISEUR") || n.contains("HEAD RCC") || n.equals("SUPERVISOR")) return "SUPERVISEUR";

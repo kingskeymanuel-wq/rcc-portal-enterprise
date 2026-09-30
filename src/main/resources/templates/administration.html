@@ -84,7 +84,7 @@
                 <nav class="adm-tabs" id="adminTabs" role="tablist">
                     <button type="button" data-tab="personnes" class="on"><i class="bi bi-people-fill"></i><span>Personnes</span><small>Organigramme, annuaire, comptes</small></button>
                     <button type="button" data-tab="base"><i class="bi bi-database-fill-gear"></i><span>Base de données</span><small>Tables, contrôle, journal</small></button>
-                    <button type="button" data-tab="equipes"><i class="bi bi-diagram-3-fill"></i><span>Équipes &amp; accès</span><small>Équipes, onglets, agences</small></button>
+                    <button type="button" data-tab="equipes"><i class="bi bi-diagram-3-fill"></i><span>Équipes &amp; accès</span><small>Shifts, équipes, onglets, agences</small></button>
                     <button type="button" data-tab="apparence"><i class="bi bi-palette-fill"></i><span>Apparence</span><small>Connexion, bannières</small></button>
                     <button type="button" data-tab="sla"><i class="bi bi-stopwatch-fill"></i><span>Référentiel SLA</span><small>Délais par motif</small></button>
                     <button type="button" data-tab="maintenance"><i class="bi bi-tools"></i><span>Maintenance</span><small>Doublons, rattrapages</small></button>
@@ -205,6 +205,8 @@
 
                 </section>
                 <section class="adm-pane" data-pane="equipes" hidden>
+                <!-- Horaires des shifts M, M2, M3, M4, A, N… (admin-shifts.js) -->
+                <div id="adminShiftCodes"></div>
                 <div class="row g-4 mb-4">
                     <!-- Équipes -->
                     <div class="col-lg-5">
@@ -790,6 +792,7 @@
 <script th:src="@{/js/admin-db-log.js}"></script>
 <script th:src="@{/js/admin-db-editor.js}"></script>
 <script th:src="@{/js/admin-tabs.js}"></script>
+<script th:src="@{/js/admin-shifts.js}"></script>
 
 </body>
 </html>

@@ -433,6 +433,28 @@
 
     var planStatusFromCache = null, planStatusToCache = null;
 
+    /** Shifts proposés : catalogue de l'administration (/api/shift-codes), horaires par défaut sinon. */
+    var planShiftCodes = [
+        { code: "M", start: "07:00", end: "16:00" }, { code: "M2", start: "08:00", end: "17:00" }, { code: "M3", start: "09:00", end: "18:00" },
+        { code: "M4", start: "10:00", end: "19:00" }, { code: "A", start: "12:00", end: "21:00" }, { code: "N", start: "21:00", end: "07:00" }];
+
+    function shiftHours(s) { return s.start.replace(":00", "h").replace(":", "h") + "–" + s.end.replace(":00", "h").replace(":", "h"); }
+
+    function planShiftOptions() {
+        return planShiftCodes.map(function (s) { return '<option value="' + escapeHtml(s.code) + '">' + escapeHtml(shiftHours(s)) + ' (' + escapeHtml(s.code) + ')</option>'; }).join("") +
+            '<option value="OFF">Repos (OFF)</option>';
+    }
+
+    function loadPlanShiftCodes() {
+        return getJson("/api/shift-codes").then(function (list) {
+            if (list && list.length) planShiftCodes = list;
+            var legend = $("tlPlanShiftLegend");
+            if (legend) legend.innerHTML = planShiftCodes.map(function (s) {
+                return '<span class="exc-shift-chip"><span class="dot"' + (s.color ? ' style="background:' + escapeHtml(s.color) + '"' : '') + '></span> ' + escapeHtml(shiftHours(s)) + ' (' + escapeHtml(s.code) + ')</span>';
+            }).join("");
+        }).catch(function () { /* horaires par défaut */ });
+    }
+
     function loadPlanningTab() {
         $("tlPlanFrom").value = todayIso();
         $("tlPlanTo").value = todayIso();
@@ -441,7 +463,8 @@
         $("tlPlanStatusList").innerHTML = '<p class="text-muted small">Choisissez une période puis cliquez "Actualiser".</p>';
         $("tlPlanPublishBtn").classList.add("d-none");
 
-        getJson("/api/team-leader/members/full").then(function (members) {
+        Promise.all([getJson("/api/team-leader/members/full"), loadPlanShiftCodes()]).then(function (res) {
+            var members = res[0];
             var active = members.filter(function (u) { return u.active; })
                 .sort(function (a, b) { return (a.fullName || "").localeCompare(b.fullName || "", "fr"); });
 
@@ -450,11 +473,7 @@
                     '<input type="checkbox" class="form-check-input tl-plan-check">' +
                     '<div class="exc-agent-name">' + escapeHtml(u.fullName || u.username) + '<small>' + escapeHtml(u.username) + '</small></div>' +
                     '<select class="form-select form-select-sm exc-shift-select tl-plan-shift" disabled>' +
-                    '<option value="M">07h–16h (M)</option>' +
-                    '<option value="M2">08h–17h (M2)</option>' +
-                    '<option value="A">12h–21h (A)</option>' +
-                    '<option value="N">21h–06h (N)</option>' +
-                    '<option value="OFF">Repos (OFF)</option>' +
+                    planShiftOptions() +
                     '</select></div>';
             }).join("") : '<p class="text-muted text-center small">Aucun agent actif dans votre équipe.</p>';
 

@@ -278,7 +278,7 @@ public class AdministrationController {
      * démarrage — un bouton dédié côté Administration, déclenché une seule fois à la demande.
      */
     private static final List<String> ROLES_TO_KEEP = List.of(
-            "Agent Inbound", "Agent Inbound Voice", "Agent Outbound", "Team Leader",
+            "Agent Inbound", "Agent Inbound Voice", "Agent Outbound", "Agent Réseaux sociaux", "Team Leader Réseaux sociaux", "Team Leader",
             "Team Leader Inbound Voice", "Team Leader Inbound Mail", "Team Leader Outbound",
             "Formateur", "Quality Assurance", "Superviseur Qualité Assurance",
             "Head RCC (Superviseur)", "Head Outbound", "Head CIB-CMB", "Head Resolution"
