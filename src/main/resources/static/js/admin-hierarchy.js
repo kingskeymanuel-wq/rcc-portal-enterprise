@@ -60,9 +60,26 @@
 
     // ───────────── Carte d'une personne ─────────────
 
+    /** Service agent → équipe (même correspondance que le serveur, AdministrationService.AGENT_TEAMS). */
+    var AGENT_SERVICE_TEAM = { AGENT_INBOUND: "INBOUND_VOICE", AGENT_INBOUND_MAIL: "INBOUND_MAIL", AGENT_TCHAT: "TCHAT", AGENT_RAFIKI: "RAFIKI",
+        AGENT_CIB: "CIB", AGENT_OUTBOUND: "OUTBOUND", AGENT_TELEVENTE: "TELEVENTE" };
+
+    /** Équipes d'agent réelles de la personne : ses services d'agent, sinon son équipe calculée. */
+    function agentTeams(p) {
+        var teams = [];
+        p.services.forEach(function (s) { var t = AGENT_SERVICE_TEAM[String(s.code || "").toUpperCase()]; if (t && teams.indexOf(t) === -1) teams.push(t); });
+        if (!teams.length && /TELEVENTE|TÉLÉVENTE/i.test(p.activity || "")) teams.push("TELEVENTE");
+        if (!teams.length && p.team && TEAMS.some(function (t) { return t[0] === p.team; })) teams.push(p.team);
+        return teams;
+    }
+
+    /** Valeur affichée = accès RÉEL (ex. « Agent · Inbound Mail ») : après un changement, le menu montre la nouvelle équipe. */
     function accessValue(p) {
         if (p.level === "TEAM_LEADER") return "TEAM_LEADER:" + (p.team || "");
-        if (p.level === "AGENT") return "AGENT:";
+        if (p.level === "AGENT") {
+            var teams = agentTeams(p);
+            return teams.length === 1 ? "AGENT:" + teams[0] : "AGENT:";
+        }
         return "";
     }
 
@@ -73,9 +90,16 @@
                 '</span><span class="ah-hint">donné par ses rôles / services</span></div>';
         }
         var cur = accessValue(p);
-        var opts = '<option value="">' + (p.level === "A_CLASSER" ? "— choisir un accès —" : "— inchangé —") + '</option>' +
-            '<optgroup label="Agent">' + (p.level === "AGENT" ? '<option value="AGENT:"' + (cur === "AGENT:" ? " selected" : "") + '>Agent (garder ses services)</option>' : '') +
-            TEAMS.map(function (t) { return '<option value="AGENT:' + t[0] + '">Agent · ' + esc(t[1]) + '</option>'; }).join("") + '</optgroup>' +
+        var several = p.level === "AGENT" && agentTeams(p).length > 1;
+        var opts = (p.level === "A_CLASSER" ? '<option value="" selected>— choisir un accès —</option>' : '') +
+            '<optgroup label="Agent">' +
+            (p.level === "AGENT" && cur === "AGENT:" ? '<option value="" selected>' + (several
+                ? "Agent · " + agentTeams(p).map(function (t) { return (TEAMS.filter(function (x) { return x[0] === t; })[0] || [t, t])[1]; }).join(" + ")
+                : "Agent · équipe à choisir") + '</option>' : '') +
+            TEAMS.map(function (t) {
+                var v = "AGENT:" + t[0];
+                return '<option value="' + v + '"' + (cur === v ? " selected" : "") + '>Agent · ' + esc(t[1]) + '</option>';
+            }).join("") + '</optgroup>' +
             '<optgroup label="Team Leader">' + TEAMS.map(function (t) {
                 var v = "TEAM_LEADER:" + t[0];
                 return '<option value="' + v + '"' + (cur === v ? " selected" : "") + '>Team Leader · ' + esc(t[1]) + '</option>';
@@ -387,8 +411,8 @@
                 var pa = personOf(acc), parts = acc.value.split(":"), lvl = parts[0], team = parts[1] || null;
                 var what = lvl === "TEAM_LEADER" ? "Team Leader · " + teamLabel(team) : "Agent" + (team ? " · " + teamLabel(team) : "");
                 var detail = lvl === "TEAM_LEADER"
-                    ? "Il/elle mène l'équipe " + teamLabel(team) + " (service Team Leader attribué, autres équipes menées retirées)."
-                    : "Rôles et services Team Leader retirés, équipe menée effacée" + (team ? ", service agent " + teamLabel(team) + " ajouté" : "") + ".";
+                    ? "Cette personne mène l'équipe " + teamLabel(team) + " (service Team Leader attribué, autres équipes menées retirées)."
+                    : "Rôle, service et équipe « " + teamLabel(team) + " » attribués, son ancienne équipe d'agent retirée ; plus aucun accès Team Leader.";
                 if (!confirm("Accès de " + pa.name + " : " + what + " ?\n\n" + detail + "\nEffet immédiat sur ses portails.")) { render(); return; }
                 acc.disabled = true;
                 call("PUT", "/api/admin/users/" + pa.id + "/access", { level: lvl, team: team })
