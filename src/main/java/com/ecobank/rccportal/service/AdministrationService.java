@@ -792,6 +792,54 @@ public class AdministrationService {
      *       Team Leader sont retirés (une seule équipe menée).</li>
      * </ul>
      */
+    /** Accès d'encadrement proposés dans l'organigramme : { niveau, rôle, service }. */
+    static final List<String[]> PROFILE_LEVELS = List.of(
+            new String[]{"QA", "Quality Assurance", "QUALITY_ASSURANCE"},
+            new String[]{"HEAD_QA", "Superviseur Qualité Assurance", "SUPERVISEUR_QA"},
+            new String[]{"RH", "RH", "RH"},
+            new String[]{"SUPERVISEUR", "Head RCC (Superviseur)", "SUPERVISEUR"});
+
+    private static final java.util.Set<String> PROFILE_SERVICES = java.util.Set.of("QUALITY_ASSURANCE", "SUPERVISEUR_QA", "RH", "SUPERVISEUR");
+
+    private static boolean isProfileRoleName(String name) {
+        String n = fold(name);
+        String base = com.ecobank.rccportal.security.AccessResolver.roleOfName(name);
+        return "RH".equals(base) || "SUPERVISOR".equals(base) || n.contains("QUALIT");
+    }
+
+    /** Retire les rôles et services d'encadrement (QA, Head QA, RH, Superviseur) — pour changer vraiment d'accès. */
+    private void clearProfiles(Long userId) {
+        userRoleRepository.findByUser_Id(userId).stream()
+                .filter(ur -> ur.getRole() != null && isProfileRoleName(ur.getRole().getName()))
+                .forEach(userRoleRepository::delete);
+        userServiceAssignmentRepository.findByUserId(userId).stream()
+                .filter(us -> us.getService() != null && us.getService().getCode() != null
+                        && PROFILE_SERVICES.contains(us.getService().getCode().toUpperCase(java.util.Locale.ROOT)))
+                .forEach(userServiceAssignmentRepository::delete);
+    }
+
+    /** Retire tout ce qui rend Team Leader (rôles, services, équipe menée). */
+    private void clearTeamLeader(Long userId) {
+        userRoleRepository.findByUser_Id(userId).stream()
+                .filter(ur -> ur.getRole() != null && isTeamLeaderRoleName(ur.getRole().getName()))
+                .forEach(userRoleRepository::delete);
+        userServiceAssignmentRepository.findByUserId(userId).stream()
+                .filter(us -> us.getService() != null && us.getService().getCode() != null
+                        && us.getService().getCode().toUpperCase(java.util.Locale.ROOT).startsWith("TEAM_LEADER_"))
+                .forEach(userServiceAssignmentRepository::delete);
+        userRepository.findById(userId).ifPresent(u -> { u.setLedTeam(null); userRepository.save(u); });
+    }
+
+    /** Retire les rôles et services d'équipe d'agent. */
+    private void clearAgentTeams(Long userId) {
+        userRoleRepository.findByUser_Id(userId).stream()
+                .filter(ur -> ur.getRole() != null && agentTeamOfRole(ur.getRole().getName()) != null)
+                .forEach(userRoleRepository::delete);
+        userServiceAssignmentRepository.findByUserId(userId).stream()
+                .filter(us -> us.getService() != null && agentTeamOfService(us.getService().getCode()) != null)
+                .forEach(userServiceAssignmentRepository::delete);
+    }
+
     @Transactional
     public void setAccess(Long userId, String level, String team) {
         User user = userRepository.findById(userId).orElseThrow(() -> ApiException.notFound("Unknown user."));
@@ -802,21 +850,15 @@ public class AdministrationService {
         }
         switch (lvl) {
             case "AGENT" -> {
-                userRoleRepository.findByUser_Id(userId).stream()
-                        .filter(ur -> ur.getRole() != null && isTeamLeaderRoleName(ur.getRole().getName()))
-                        .forEach(userRoleRepository::delete);
-                userServiceAssignmentRepository.findByUserId(userId).stream()
-                        .filter(us -> us.getService() != null && us.getService().getCode() != null
-                                && us.getService().getCode().toUpperCase(java.util.Locale.ROOT).startsWith("TEAM_LEADER_"))
-                        .forEach(userServiceAssignmentRepository::delete);
-                user.setLedTeam(null);
-                userRepository.save(user);
+                clearTeamLeader(userId);
+                if (t != null) clearProfiles(userId); // un agent d'équipe n'est plus QA / RH / Superviseur
                 if (t != null) syncAgentTeam(userId, t); // rôle, service, équipe et portail de l'équipe choisie
                 log.info("[ADMIN] Accès Agent appliqué (userId={}, équipe={})", userId, t);
             }
             case "TEAM_LEADER" -> {
                 if ("TELEVENTE".equals(t)) t = "OUTBOUND"; // la Télévente est menée par le Team Leader Outbound
                 if (t == null) throw ApiException.badRequest("Choisissez l'équipe menée par ce Team Leader.");
+                clearProfiles(userId);
                 String code = "TEAM_LEADER_" + t;
                 RccService svc = serviceRepository.findByCodeIgnoreCase(code)
                         .orElseThrow(() -> ApiException.badRequest("Service " + code + " introuvable."));
@@ -831,7 +873,17 @@ public class AdministrationService {
                 userRepository.save(user);
                 log.info("[ADMIN] Accès Team Leader appliqué (userId={}, équipe={})", userId, t);
             }
-            default -> throw ApiException.badRequest("Accès attendu : AGENT ou TEAM_LEADER.");
+            default -> {
+                String[] prof = PROFILE_LEVELS.stream().filter(x -> x[0].equals(lvl)).findFirst()
+                        .orElseThrow(() -> ApiException.badRequest("Accès attendu : AGENT, TEAM_LEADER, QA, HEAD_QA, RH ou SUPERVISEUR."));
+                // Encadrement : plus d'équipe d'agent ni d'accès Team Leader, ancien accès d'encadrement remplacé.
+                clearTeamLeader(userId);
+                clearAgentTeams(userId);
+                clearProfiles(userId);
+                grantRoleByName(userId, prof[1], prof[1]);
+                serviceRepository.findByCodeIgnoreCase(prof[2]).ifPresent(svc -> assignService(userId, svc.getId()));
+                log.info("[ADMIN] Accès {} appliqué (userId={})", lvl, userId);
+            }
         }
     }
 
