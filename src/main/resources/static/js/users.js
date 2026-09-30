@@ -597,7 +597,7 @@
      */
     var ROLE_SERVICE_FILTER = [
         { roleMatch: /team leader/i, serviceCodes: ["TEAM_LEADER_INBOUND_VOICE", "TEAM_LEADER_INBOUND_MAIL", "TEAM_LEADER_TCHAT", "TEAM_LEADER_RAFIKI", "TEAM_LEADER_OUTBOUND", "TEAM_LEADER_CIB"] },
-        { roleMatch: /agent/i, serviceCodes: ["AGENT_INBOUND", "AGENT_OUTBOUND", "AGENT_INBOUND_MAIL", "AGENT_TCHAT", "AGENT_RAFIKI", "AGENT_CIB", "AGENT_TELEVENTE"] },
+        { roleMatch: /agent/i, serviceCodes: ["AGENT_INBOUND", "AGENT_OUTBOUND", "AGENT_INBOUND_MAIL", "AGENT_TCHAT", "AGENT_RAFIKI", "AGENT_CIB", "AGENT_TELEVENTE", "AGENT_DIGITALISATION"] },
         { roleMatch: /^quality assurance$/i, serviceCodes: ["QUALITY_ASSURANCE", "FORMATEUR", "COMMUNICATION"] }
     ];
     var ROLE_AUTO_SERVICE = [

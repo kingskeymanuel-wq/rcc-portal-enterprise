@@ -27,7 +27,7 @@
         A_CLASSER: ["À classer", "bi-question-diamond-fill", "todo"]
     };
     var PROFILE = { ADMIN: "Administrateur", SUPERVISOR: "Superviseur", RH: "RH", TEAM_LEADER: "Team Leader", AGENCE: "Agence", AGENT: "Agent", EXCELLIAM: "Excelliam" };
-    var TEAMS = [["INBOUND_VOICE", "Inbound Voix"], ["INBOUND_MAIL", "Inbound Mail"], ["TCHAT", "Réseaux sociaux"], ["RAFIKI", "Rafiki"], ["CIB", "CIB"], ["OUTBOUND", "Outbound"], ["TELEVENTE", "Télévente"]];
+    var TEAMS = [["INBOUND_VOICE", "Inbound Voix"], ["INBOUND_MAIL", "Inbound Mail"], ["TCHAT", "Réseaux sociaux"], ["RAFIKI", "Rafiki"], ["CIB", "CIB"], ["OUTBOUND", "Outbound"], ["TELEVENTE", "Télévente"], ["DIGITALISATION", "Digitalisation"]];
     var ACTIVITIES = ["INBOUND VOICE", "INBOUND MAIL", "INBOUND TCHAT", "INBOUND RAFIKI", "CIB", "OUTBOUND", "RESOLUTION", "QA"];
     var COUNTRIES = { CI: "Côte d'Ivoire", TG: "Togo", SN: "Sénégal", CM: "Cameroun", BJ: "Bénin", ML: "Mali", BF: "Burkina Faso", NE: "Niger", GH: "Ghana", NG: "Nigeria", KE: "Kenya", GN: "Guinée" };
 
@@ -65,13 +65,14 @@
 
     /** Service agent → équipe (même correspondance que le serveur, AdministrationService.AGENT_TEAMS). */
     var AGENT_SERVICE_TEAM = { AGENT_INBOUND: "INBOUND_VOICE", AGENT_INBOUND_MAIL: "INBOUND_MAIL", AGENT_TCHAT: "TCHAT", AGENT_RAFIKI: "RAFIKI",
-        AGENT_CIB: "CIB", AGENT_OUTBOUND: "OUTBOUND", AGENT_TELEVENTE: "TELEVENTE" };
+        AGENT_CIB: "CIB", AGENT_OUTBOUND: "OUTBOUND", AGENT_TELEVENTE: "TELEVENTE", AGENT_DIGITALISATION: "DIGITALISATION" };
 
     /** Équipes d'agent réelles de la personne : ses services d'agent, sinon son équipe calculée. */
     function agentTeams(p) {
         var teams = [];
         p.services.forEach(function (s) { var t = AGENT_SERVICE_TEAM[String(s.code || "").toUpperCase()]; if (t && teams.indexOf(t) === -1) teams.push(t); });
         if (!teams.length && /TELEVENTE|TÉLÉVENTE/i.test(p.activity || "")) teams.push("TELEVENTE");
+        if (!teams.length && /DIGITAL/i.test(p.activity || "")) teams.push("DIGITALISATION");
         if (!teams.length && p.team && TEAMS.some(function (t) { return t[0] === p.team; })) teams.push(p.team);
         return teams;
     }
@@ -181,6 +182,20 @@
             '<div class="ah-people">' + list.map(personHtml).join("") + '</div></section>';
     }
 
+    /** Agents d'une équipe ; l'Outbound est subdivisé en Télévente et Digitalisation. */
+    function agentsHtml(code, agents) {
+        function block(title, list) {
+            return list.length ? '<div class="ah-sub">' + esc(title) + ' <span class="ah-off">(' + list.length + ')</span></div><div class="ah-agents">' + list.map(personHtml).join("") + '</div>' : '';
+        }
+        if (code !== "OUTBOUND") return block("Agents", agents);
+        var tv = [], dg = [], other = [];
+        agents.forEach(function (p) {
+            var at = agentTeams(p);
+            (at.indexOf("TELEVENTE") !== -1 ? tv : at.indexOf("DIGITALISATION") !== -1 ? dg : other).push(p);
+        });
+        return block("Télévente", tv) + block("Digitalisation", dg) + block("Outbound (sous-équipe à préciser)", other);
+    }
+
     /** Hiérarchie complète d'une filiale (ou de toutes quand pfx est vide). */
     function treeHtml(d, pfx) {
         var html = '<div class="ah-tree">';
@@ -199,7 +214,7 @@
                 (leaders.length ? leaders.map(function (l) { return esc(l.name); }).join(", ") : '<span class="ah-off">aucun Team Leader</span>') + '</small></div>' +
                 '<span class="ah-count tl" title="Team Leaders">' + leaders.length + ' TL</span><span class="ah-count">' + agents.length + ' agent(s)</span><i class="bi bi-chevron-down ah-caret"></i></header>' +
                 '<div class="ah-people">' + (leaders.length ? '<div class="ah-sub">Team Leader</div>' + leaders.map(personHtml).join("") : '') +
-                (agents.length ? '<div class="ah-sub">Agents</div><div class="ah-agents">' + agents.map(personHtml).join("") + '</div>' : '<div class="ah-empty">Aucun agent.</div>') + '</div></section>';
+                (agents.length ? agentsHtml(t.code, agents) : '<div class="ah-empty">Aucun agent.</div>') + '</div></section>';
         });
         if (teams) html += '<h5 class="ah-sec"><i class="bi bi-diagram-3-fill"></i> Équipes opérationnelles</h5>' + teams;
         html += '</div>';

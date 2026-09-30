@@ -565,6 +565,7 @@ public class AdministrationService {
             java.util.Map.entry("AGENT_CIB", "CIB"),
             java.util.Map.entry("AGENT_OUTBOUND", "OUTBOUND"),
             java.util.Map.entry("AGENT_TELEVENTE", "OUTBOUND TELEVENTE"),
+            java.util.Map.entry("AGENT_DIGITALISATION", "OUTBOUND DIGITALISATION"),
             java.util.Map.entry("AGENT_TCHAT", "INBOUND TCHAT"),
             java.util.Map.entry("AGENT_RAFIKI", "INBOUND RAFIKI"),
             java.util.Map.entry("TEAM_LEADER_OUTBOUND", "OUTBOUND"),
@@ -671,7 +672,11 @@ public class AdministrationService {
             new String[]{"RAFIKI", "Agent Rafiki", "AGENT_RAFIKI", "INBOUND RAFIKI"},
             new String[]{"CIB", "Agent CIB", "AGENT_CIB", "CIB"},
             new String[]{"OUTBOUND", "Agent Outbound", "AGENT_OUTBOUND", "OUTBOUND"},
-            new String[]{"TELEVENTE", "Agent Télévente", "AGENT_TELEVENTE", "OUTBOUND TELEVENTE"});
+            new String[]{"TELEVENTE", "Agent Télévente", "AGENT_TELEVENTE", "OUTBOUND TELEVENTE"},
+            new String[]{"DIGITALISATION", "Agent Digitalisation", "AGENT_DIGITALISATION", "OUTBOUND DIGITALISATION"});
+
+    /** Sous-équipes du pôle Outbound : menées par le Team Leader Outbound. */
+    static final java.util.Set<String> OUTBOUND_SUBTEAMS = java.util.Set.of("TELEVENTE", "DIGITALISATION");
 
     /**
      * Rattrapage des comptes existants, sans rien retirer : un rôle d'agent sans son service reçoit le service,
@@ -724,6 +729,7 @@ public class AdministrationService {
         if (n.contains("RESEAU") || n.contains("TCHAT") || n.matches(".*\\bCHAT\\b.*")) return "TCHAT";
         if (n.contains("RAFIKI")) return "RAFIKI";
         if (n.contains("TELEVENTE") || n.contains("TELEVENDEUR")) return "TELEVENTE";
+        if (n.contains("DIGITAL")) return "DIGITALISATION";
         if (!n.startsWith("AGENT") && !n.startsWith("CONSEILLER")) return null;
         if (n.contains("MAIL")) return "INBOUND_MAIL";
         if (n.contains("VOICE") || n.contains("VOIX")) return "INBOUND_VOICE";
@@ -856,7 +862,7 @@ public class AdministrationService {
                 log.info("[ADMIN] Accès Agent appliqué (userId={}, équipe={})", userId, t);
             }
             case "TEAM_LEADER" -> {
-                if ("TELEVENTE".equals(t)) t = "OUTBOUND"; // la Télévente est menée par le Team Leader Outbound
+                if (OUTBOUND_SUBTEAMS.contains(t)) t = "OUTBOUND"; // Télévente et Digitalisation : menées par le Team Leader Outbound
                 if (t == null) throw ApiException.badRequest("Choisissez l'équipe menée par ce Team Leader.");
                 clearProfiles(userId);
                 String code = "TEAM_LEADER_" + t;

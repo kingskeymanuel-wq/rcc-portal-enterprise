@@ -13,6 +13,7 @@ class AgentTeamSyncTest {
         assertEquals("INBOUND_VOICE", AdministrationService.agentTeamOfRole("Agent Inbound Voice"));
         assertEquals("TELEVENTE", AdministrationService.agentTeamOfRole("Agent Télévente"));
         assertEquals("TELEVENTE", AdministrationService.agentTeamOfRole("Télévente"));
+        assertEquals("DIGITALISATION", AdministrationService.agentTeamOfRole("Agent Digitalisation"));
         assertEquals("TCHAT", AdministrationService.agentTeamOfRole("Réseaux sociaux"));
         assertEquals("OUTBOUND", AdministrationService.agentTeamOfRole("Agent Outbound"));
         assertNull(AdministrationService.agentTeamOfRole("Team Leader Inbound Mail"));
@@ -26,5 +27,9 @@ class AgentTeamSyncTest {
         assertEquals("TEAM_LEADER_OUTBOUND", AdministrationService.serviceForRoleName("Team Leader Télévente"));
         assertEquals(com.ecobank.rccportal.util.TeamClassifier.Team.OUTBOUND,
                 com.ecobank.rccportal.util.TeamClassifier.classify("OUTBOUND TELEVENTE"));
+        assertEquals("TEAM_LEADER_OUTBOUND", AdministrationService.serviceForRoleName("Team Leader Digitalisation"));
+        assertEquals(com.ecobank.rccportal.util.TeamClassifier.Team.OUTBOUND,
+                com.ecobank.rccportal.util.TeamClassifier.classify("OUTBOUND DIGITALISATION"));
+        assertTrue(AdministrationService.OUTBOUND_SUBTEAMS.containsAll(java.util.List.of("TELEVENTE", "DIGITALISATION")));
     }
 }
