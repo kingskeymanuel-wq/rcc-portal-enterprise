@@ -142,3 +142,26 @@
 .dbx-users label { flex-direction: row; align-items: center; gap: .4rem; font-weight: 500; color: #122240; font-size: .82rem; padding: .15rem 0; }
 .dbx-users small { color: #8A97AB; }
 .dbx-form-actions { grid-column: 1 / -1; display: flex; gap: .5rem; justify-content: flex-end; }
+
+/* ===== Administration : onglets et mise en page ===== */
+.adm-tabs { position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .5rem;
+    background: #F3F5F9; padding: .6rem 0 .8rem; margin-bottom: 1rem; }
+.adm-tabs button { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: .55rem; align-items: center; text-align: left;
+    border: 1px solid #DCE4F0; background: #fff; border-radius: 1rem; padding: .6rem .8rem; color: #33415C; box-shadow: 0 4px 12px rgba(0, 32, 84, .04); }
+.adm-tabs button i { grid-row: 1 / span 2; font-size: 1.25rem; color: #0057B8; }
+.adm-tabs button span { font-weight: 800; font-size: .88rem; }
+.adm-tabs button small { font-size: .7rem; color: #8A97AB; line-height: 1.2; }
+.adm-tabs button:hover { border-color: #9DBBE6; }
+.adm-tabs button.on { background: #0057B8; border-color: #0057B8; color: #fff; }
+.adm-tabs button.on i, .adm-tabs button.on small { color: #D6E6FF; }
+.adm-pane[hidden] { display: none !important; }
+.adm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr)); gap: 1rem; }
+.adm-sub { border: 1px solid #EEF1F5; border-radius: 1rem; padding: .9rem 1rem; background: #FBFCFE; min-width: 0; }
+.adm-sub h6 { font-weight: 800; color: #122240; margin-bottom: .6rem; }
+.adm-sub h6 .bi { color: #0057B8; }
+.adm-scroll { max-height: 520px; overflow: auto; }
+.adm-scroll thead th { position: sticky; top: 0; background: #F3F6FB; z-index: 1; }
+.adm-add { border: 1px dashed #BFD0E6; border-radius: 1rem; padding: .6rem .9rem; margin-top: .8rem; background: #F8FBFF; }
+.adm-add summary { font-weight: 700; color: #0057B8; cursor: pointer; }
+.adm-add[open] summary { margin-bottom: .6rem; }
+@media (max-width: 700px) { .adm-tabs button small { display: none; } }

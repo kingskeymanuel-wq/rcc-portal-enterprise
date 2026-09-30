@@ -28,114 +28,7 @@
 
     var escapeHtml = RccApi.escapeHtml;
 
-    // ===== Rôles =====
-
-    function loadRoles() {
-        getJson("/api/admin/roles").then(function (roles) {
-            var table = $("rolesTable");
-            table.innerHTML = roles.map(function (r) {
-                return "<tr><td>" + escapeHtml(r.name) + "</td><td>" + escapeHtml(r.description) + "</td></tr>";
-            }).join("");
-
-            var select = $("roleToAssign");
-            if (select) select.innerHTML = roles.map(function (r) {
-                return '<option value="' + r.id + '">' + escapeHtml(r.name) + "</option>";
-            }).join("");
-        }).catch(function (e) { console.error(e); });
-    }
-
-    $("createRoleBtn").addEventListener("click", function () {
-        var name = $("newRoleName").value.trim();
-        var description = $("newRoleDescription").value.trim();
-        if (!name) { alert("Le nom du rôle est obligatoire."); return; }
-        postJson("/api/admin/roles", { name: name, description: description })
-            .then(function () {
-                $("newRoleName").value = "";
-                $("newRoleDescription").value = "";
-                loadRoles();
-            })
-            .catch(function (e) { alert("Erreur : " + e.message); });
-    });
-
-    // ===== Services =====
-
-    function loadServices() {
-        getJson("/api/admin/services/usage").then(function (usage) {
-            var table = $("servicesTable");
-            if (!usage.length) {
-                table.innerHTML = '<tr><td colspan="8" class="text-muted text-center">Aucun service.</td></tr>';
-                return;
-            }
-            table.innerHTML = usage.map(function (s) {
-                var deleteBtn = '<button class="btn btn-sm btn-outline-danger delete-service-btn" data-id="' + s.serviceId + '" data-code="' + escapeHtml(s.code) + '" data-count="' + s.userAssignmentCount + '"><i class="bi bi-trash"></i></button>';
-                return "<tr><td>" + escapeHtml(s.code) + "</td><td>" + escapeHtml(s.name) + "</td>" +
-                    "<td>" + s.articleCount + "</td><td>" + s.procedureCount + "</td><td>" + s.courseCount + "</td>" +
-                    "<td>" + s.workflowRequestCount + "</td><td>" + s.userAssignmentCount + "</td><td>" + deleteBtn + "</td></tr>";
-            }).join("");
-
-            Array.prototype.forEach.call(table.querySelectorAll(".delete-service-btn"), function (btn) {
-                btn.addEventListener("click", function () {
-                    var code = btn.getAttribute("data-code");
-                    var count = Number(btn.getAttribute("data-count"));
-                    var msg = "Supprimer le service « " + code + " » ?" +
-                        (count > 0 ? " " + count + " agent(s) actuellement lié(s) perdront cette affectation (à corriger ensuite via Reporting ou un nouvel import roster)." : "") +
-                        " Les articles/procédures/formations liés seront détachés, pas supprimés.";
-                    if (!confirm(msg)) return;
-                    fetch("/api/admin/services/" + btn.getAttribute("data-id"), { method: "DELETE", credentials: "same-origin" })
-                        .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); })
-                        .then(loadServices)
-                        .catch(function (e) { alert("Erreur : " + e.message); });
-                });
-            });
-        }).catch(function (e) { console.error(e); });
-
-        getJson("/api/admin/services").then(function (services) {
-            var select = $("serviceToAssign");
-            if (select) select.innerHTML = services.map(function (s) {
-                return '<option value="' + s.id + '">' + escapeHtml(s.name) + "</option>";
-            }).join("");
-        }).catch(function (e) { console.error(e); });
-    }
-
-    var consolidateBtn = $("consolidateServicesBtn");
-    if (consolidateBtn) {
-        consolidateBtn.addEventListener("click", function () {
-            if (!confirm("Ça va réassigner TOUS les articles, procédures, formations, demandes de workflow et " +
-                "assignations utilisateur vers un service unique « RCC », puis SUPPRIMER tous les autres services. " +
-                "Irréversible. Continuer ?")) return;
-            if (!confirm("Confirme une deuxième fois : es-tu sûr ? Cette action ne peut pas être annulée.")) return;
-
-            postJson("/api/admin/services/consolidate-to-rcc", {})
-                .then(function (result) {
-                    $("consolidateResult").innerHTML =
-                        '<span class="text-success">Terminé — services supprimés : ' +
-                        (result.deletedServiceCodes.length ? escapeHtml(result.deletedServiceCodes.join(", ")) : "aucun") +
-                        '. Réassignés : ' + result.articlesReassigned + ' article(s), ' +
-                        result.proceduresReassigned + ' procédure(s), ' + result.coursesReassigned + ' formation(s), ' +
-                        result.workflowRequestsReassigned + ' demande(s) de workflow, ' +
-                        result.userAssignmentsReassigned + ' assignation(s) utilisateur.</span>';
-                    loadServices();
-                })
-                .catch(function (e) {
-                    $("consolidateResult").innerHTML = '<span class="text-danger">Erreur : ' + escapeHtml(e.message) + '</span>';
-                });
-        });
-    }
-
-    $("createServiceBtn").addEventListener("click", function () {
-        var code = $("newServiceCode").value.trim();
-        var name = $("newServiceName").value.trim();
-        var description = $("newServiceDescription").value.trim();
-        if (!code || !name) { alert("Le code et le nom du service sont obligatoires."); return; }
-        postJson("/api/admin/services", { code: code, name: name, description: description })
-            .then(function () {
-                $("newServiceCode").value = "";
-                $("newServiceName").value = "";
-                $("newServiceDescription").value = "";
-                loadServices();
-            })
-            .catch(function (e) { alert("Erreur : " + e.message); });
-    });
+    // Rôles et services du portail : gérés dans l'onglet « Base de données » (tables ROLES et SERVICES, admin-db-editor.js).
 
     // ===== Équipes =====
 
@@ -477,11 +370,50 @@
 
     var slaRulesCache = [];
 
+    /** Recherche, catégorie et statut : le tableau SLA (très long) n'affiche que ce qui est cherché. */
+    function filteredSlaRules() {
+        var q = ($("slaFilterText") ? $("slaFilterText").value : "").trim().toLowerCase();
+        var cat = $("slaFilterCategory") ? $("slaFilterCategory").value : "";
+        var act = $("slaFilterActive") ? $("slaFilterActive").value : "";
+        return slaRulesCache.filter(function (r) {
+            if (cat && (r.category || "") !== cat) return false;
+            if (act === "1" && !r.isActive) return false;
+            if (act === "0" && r.isActive) return false;
+            if (q && [r.motif, r.category, r.level, r.slaLabel, r.destinationService, r.priority, r.notes].join(" ").toLowerCase().indexOf(q) === -1) return false;
+            return true;
+        });
+    }
+
+    function fillSlaCategories() {
+        var sel = $("slaFilterCategory");
+        if (!sel) return;
+        var cur = sel.value;
+        var cats = slaRulesCache.map(function (r) { return r.category || ""; }).filter(function (c, i, a) { return c && a.indexOf(c) === i; }).sort();
+        sel.innerHTML = '<option value="">Toutes les catégories</option>' + cats.map(function (c) { return '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + '</option>'; }).join("");
+        sel.value = cats.indexOf(cur) !== -1 ? cur : "";
+    }
+
+    ["slaFilterText", "slaFilterCategory", "slaFilterActive"].forEach(function (id) {
+        var el = $(id);
+        if (el) el.addEventListener(id === "slaFilterText" ? "input" : "change", function () { renderSlaRules(); });
+    });
+
     function loadSlaRules() {
         getJson("/api/sla-rules?includeInactive=true").then(function (rules) {
             slaRulesCache = rules;
+            fillSlaCategories();
+            renderSlaRules();
+        }).catch(function () {
+            document.getElementById("slaRulesTable").innerHTML = '<tr><td colspan="9" class="text-center text-danger">Impossible de charger le référentiel SLA.</td></tr>';
+        });
+    }
+
+    function renderSlaRules() {
+        {
+            var rules = filteredSlaRules();
             var body = document.getElementById("slaRulesTable");
-            if (!rules.length) { body.innerHTML = '<tr><td colspan="9" class="text-center text-muted">Aucune règle SLA.</td></tr>'; return; }
+            if ($("slaFilterCount")) $("slaFilterCount").textContent = rules.length + " / " + slaRulesCache.length + " règle(s)";
+            if (!rules.length) { body.innerHTML = '<tr><td colspan="9" class="text-center text-muted">Aucune règle SLA ne correspond.</td></tr>'; return; }
             body.innerHTML = rules.map(function (r) {
                 return "<tr data-sla-id=\"" + r.id + "\">" +
                     "<td>" + escapeHtml(r.motif) + "</td>" +
@@ -516,9 +448,7 @@
                         .then(loadSlaRules).catch(function (e) { alert("Erreur : " + e.message); });
                 });
             });
-        }).catch(function () {
-            document.getElementById("slaRulesTable").innerHTML = '<tr><td colspan="9" class="text-center text-danger">Impossible de charger le référentiel SLA.</td></tr>';
-        });
+        }
     }
 
     var createSlaRuleBtnEl = document.getElementById("createSlaRuleBtn");
@@ -617,8 +547,6 @@
         });
     }
 
-    loadRoles();
-    loadServices();
     loadSiteAppearance();
     loadSlaRules();
     loadPending();
