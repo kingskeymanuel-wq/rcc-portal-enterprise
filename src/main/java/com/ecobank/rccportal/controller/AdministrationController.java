@@ -104,6 +104,32 @@ public class AdministrationController {
         return java.util.Map.of("removed", adminDataService.removeDuplicateLinks(requester.username()));
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ecobank.rccportal.service.DbHealthService dbHealthService;
+
+    /** Contrôle en direct : base utilisée, droits SQL, test d'écriture réel (annulé), données qui faussent les accès. */
+    @GetMapping("/db-health")
+    public com.ecobank.rccportal.service.DbHealthService.Report dbHealth(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return dbHealthService.check(requester.username());
+    }
+
+    /** Correction proposée par le contrôle : liaisons en double / orphelines, équipes menées invalides. */
+    @PostMapping("/db-health/fix/{action}")
+    public java.util.Map<String, Integer> dbHealthFix(@PathVariable String action, @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return switch (action) {
+            case "clean-links" -> java.util.Map.of("fixed", adminDataService.removeDuplicateLinks(requester.username()));
+            case "clear-led-team" -> {
+                int n = dbHealthService.clearInvalidLedTeams();
+                auditLogService.record(requester.username(), com.ecobank.rccportal.service.AdminChangeJournal.ACTION,
+                        "Base — dbo.USERS : équipe menée invalide effacée sur " + n + " compte(s)");
+                yield java.util.Map.of("fixed", n);
+            }
+            default -> throw com.ecobank.rccportal.util.ApiException.badRequest("Correction inconnue : " + action);
+        };
+    }
+
     /** Correctifs de données (planning, rôles…) : appliqués une fois au démarrage, résultat enregistré en base. */
     @GetMapping("/data-patches")
     public List<com.ecobank.rccportal.service.DataPatchService.PatchStatus> dataPatches(@AuthenticationPrincipal AuthenticatedUser requester) {

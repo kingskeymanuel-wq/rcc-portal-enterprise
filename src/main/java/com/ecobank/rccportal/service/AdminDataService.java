@@ -343,8 +343,9 @@ public class AdminDataService {
         if (stampCreated && cols.stream().anyMatch(c -> c.name().equalsIgnoreCase("CREATED_AT"))) names.add("[CREATED_AT]");
         String placeholders = String.join(", ", Collections.nCopies(vals.size(), "?"))
                 + (names.size() > vals.size() ? (vals.isEmpty() ? "" : ", ") + "SYSDATETIMEOFFSET()" : "");
-        Long id = jdbc.queryForObject("INSERT INTO dbo." + t.name() + " (" + String.join(", ", names) + ") OUTPUT INSERTED.ID VALUES (" + placeholders + ")",
-                Long.class, vals.toArray());
+        // SCOPE_IDENTITY plutôt qu'OUTPUT INSERTED : fonctionne aussi si la table porte un déclencheur.
+        Long id = jdbc.queryForObject("SET NOCOUNT ON; INSERT INTO dbo." + t.name() + " (" + String.join(", ", names) + ") VALUES (" + placeholders
+                + "); SELECT CAST(SCOPE_IDENTITY() AS BIGINT)", Long.class, vals.toArray());
         log.info("[ADMIN DATA] dbo.{} : ligne {} créée", t.name(), id);
         trace(by, "Base — dbo." + t.name() + " : nouvelle ligne #" + id + " " + who(t.name(), id == null ? -1 : id));
         return row(t.name(), id == null ? -1 : id);
