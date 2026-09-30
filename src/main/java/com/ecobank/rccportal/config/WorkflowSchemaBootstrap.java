@@ -954,6 +954,7 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         seedServiceIfMissing("TEAM_LEADER_TCHAT", "Team Leader Réseaux sociaux", "Responsable de l'équipe Réseaux sociaux", 22);
         seedServiceIfMissing("TEAM_LEADER_RAFIKI", "Team Leader Rafiki", "Responsable de l'équipe Rafiki (réseaux sociaux)", 23);
         seedServiceIfMissing("TEAM_LEADER_CIB", "Team Leader CIB", "Responsable de l'équipe CIB", 24);
+        seedServiceIfMissing("AGENT_TELEVENTE", "Agent Télévente", "Conseiller clientèle — Télévente (pôle Outbound)", 25);
 
         createIfMissing("USERS", """
                 CREATE TABLE dbo.USERS (
@@ -1821,6 +1822,14 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
                 {"Agent Inbound", "Conseiller clientèle — pôle Inbound (Voix ou Mail/Rafiki)"},
                 {"Agent Outbound", "Conseiller clientèle — pôle Outbound (appels sortants, vente)"},
                 {"Agent Réseaux sociaux", "Conseiller clientèle — Réseaux sociaux (portail ex-Tchat)"},
+                {"Agent Inbound Voice", "Conseiller clientèle — Inbound Voix"},
+                {"Agent Inbound Mail", "Conseiller clientèle — Inbound Mail"},
+                {"Agent Rafiki", "Conseiller clientèle — Rafiki"},
+                {"Agent CIB", "Conseiller clientèle — CIB"},
+                {"Agent Télévente", "Conseiller clientèle — Télévente (pôle Outbound)"},
+                {"Team Leader Télévente", "Responsable de l'équipe Télévente (pôle Outbound)"},
+                {"Team Leader Rafiki", "Responsable de l'équipe Rafiki"},
+                {"Team Leader CIB", "Responsable de l'équipe CIB"},
                 {"Team Leader Réseaux sociaux", "Responsable de l'équipe Réseaux sociaux"},
                 {"Team Leader", "Responsable d'équipe — accès générique, toutes équipes"},
                 {"Team Leader Inbound Voice", "Responsable de l'équipe Inbound Voix"},

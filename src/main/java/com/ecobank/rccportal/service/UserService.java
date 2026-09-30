@@ -193,6 +193,7 @@ public class UserService {
                 put("TEAM_LEADER_RAFIKI", "/team-leader");
                 put("TEAM_LEADER_CIB", "/team-leader");
                 put("AGENT_OUTBOUND", "/outbound-dashboard");
+                put("AGENT_TELEVENTE", "/outbound-dashboard");
                 put("AGENT_TCHAT", "/portail-tchat");
                 put("AGENT_RAFIKI", "/portail-rafiki");
                 put("AGENT_INBOUND", "/dashboard");

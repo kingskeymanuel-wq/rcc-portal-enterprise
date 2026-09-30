@@ -14,7 +14,7 @@ class SocialNetworksAndShiftsTest {
         assertEquals("AGENT_TCHAT", AdministrationService.serviceForRoleName("Agent Tchat"));
         assertEquals("AGENT_RAFIKI", AdministrationService.serviceForRoleName("Agent Rafiki"));
         assertEquals("TEAM_LEADER_TCHAT", AdministrationService.serviceForRoleName("Team Leader Réseaux sociaux"));
-        assertNull(AdministrationService.serviceForRoleName("Agent Inbound Voice"));
+        assertEquals("AGENT_INBOUND", AdministrationService.serviceForRoleName("Agent Inbound Voice"));
         assertEquals("/portail-tchat", UserService.digitalChannelPortal("Réseaux sociaux"));
         assertEquals("/portail-tchat", UserService.digitalChannelPortal("INBOUND TCHAT"));
         assertEquals("/portail-rafiki", UserService.digitalChannelPortal("Agent Rafiki"));

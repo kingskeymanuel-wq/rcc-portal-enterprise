@@ -40,6 +40,9 @@ public class DataPatchService {
     /** Rôle « Réseaux sociaux » / « Tchat » déjà attribué : service Agent Réseaux sociaux (portail ex-Tchat). */
     public static final String RESEAUX_SOCIAUX_ROLES = "RESEAUX_SOCIAUX_ROLES";
 
+    /** Rôles et services d'agent alignés (Inbound Voix, Inbound Mail, Réseaux sociaux, Rafiki, CIB, Outbound, Télévente). */
+    public static final String AGENT_ROLES_SERVICES_SYNC = "AGENT_ROLES_SERVICES_SYNC";
+
     public static final List<Patch> PATCHES = List.of(new Patch(INBOUND_VOIX_2026_10,
             "Team Inbound Voix — planning d'octobre 2026 et rôles",
             "Planning d'octobre 2026 des 32 agents Inbound Voix (fichier Exceliam) ; chacun reçoit le rôle « Agent Inbound Voice », "
@@ -50,7 +53,10 @@ public class DataPatchService {
                             + "à True : tout nouveau compte (portail, import, connexion AD, ou ajout direct en SQL) est créé à True."),
             new Patch(RESEAUX_SOCIAUX_ROLES, "Rôle Réseaux sociaux → portail Réseaux sociaux (ex-Tchat)",
                     "Toute personne ayant un rôle « Réseaux sociaux » ou « Tchat » (hors Team Leader) reçoit le service Agent Réseaux sociaux : "
-                            + "elle arrive sur le portail Réseaux sociaux (l'ancien portail Tchat) à sa prochaine connexion."));
+                            + "elle arrive sur le portail Réseaux sociaux (l'ancien portail Tchat) à sa prochaine connexion."),
+            new Patch(AGENT_ROLES_SERVICES_SYNC, "Rôles et services d'agent synchronisés",
+                    "Chaque rôle d'agent (Inbound Voix, Inbound Mail, Réseaux sociaux, Rafiki, CIB, Outbound, Télévente) reçoit son service "
+                            + "et chaque service d'agent son rôle, sans rien retirer — ensuite, choisir l'un applique l'autre automatiquement."));
 
     static final String PLANNING_FILE = "data/planning/inbound-voix-2026-10.csv";
     static final String AGENT_ROLE = "Agent Inbound Voice";
@@ -112,6 +118,7 @@ public class DataPatchService {
             case INBOUND_VOIX_2026_10 -> inboundVoix(by);
             case TEAM_ASSIGNMENT_LOCKED_TRUE -> teamAssignmentLockedTrue();
             case RESEAUX_SOCIAUX_ROLES -> socialNetworkRoles();
+            case AGENT_ROLES_SERVICES_SYNC -> administrationService.addMissingAgentPairs() + " rôle(s) ou service(s) d'agent ajouté(s) pour aligner rôles et services.";
             default -> throw com.ecobank.rccportal.util.ApiException.notFound("Correctif inconnu : " + code);
         };
         jdbc.update("""

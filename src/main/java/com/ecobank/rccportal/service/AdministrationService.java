@@ -410,6 +410,13 @@ public class AdministrationService {
         userRoleRepository.save(UserRole.builder().user(user).role(role).build());
         log.info("Role assigned (userId={}, role={})", userId, role.getName());
 
+        // Rôle d'agent d'une équipe : service, équipe et portail suivent aussitôt (et l'ancienne équipe est quittée).
+        String agentTeam = agentTeamOfRole(role.getName());
+        if (agentTeam != null) {
+            syncAgentTeam(userId, agentTeam);
+            return;
+        }
+
         // Le rôle choisi prend effet partout : son service métier (et donc l'équipe menée d'un Team Leader, le
         // profil QA, RH, Superviseur…) est attribué d'office, quelle que soit la voie utilisée dans l'écran admin.
         String serviceCode = serviceForRoleName(role.getName());
@@ -432,13 +439,13 @@ public class AdministrationService {
             if (n.contains("RAFIKI")) return "TEAM_LEADER_RAFIKI";
             if (n.contains("TCHAT") || n.contains("CHAT") || n.contains("RESEAU")) return "TEAM_LEADER_TCHAT";
             if (n.contains("MAIL")) return "TEAM_LEADER_INBOUND_MAIL";
-            if (n.contains("OUTBOUND") || n.contains("TELEVENTE") || n.contains("DIGITAL")) return "TEAM_LEADER_OUTBOUND";
+            if (n.contains("OUTBOUND") || n.contains("TELEVENTE") || n.contains("TELEVENDEUR") || n.contains("DIGITAL")) return "TEAM_LEADER_OUTBOUND";
             if (n.contains("CIB")) return "TEAM_LEADER_CIB";
             return null;
         }
-        // Rôle agent d'un canal digital : « Agent Réseaux sociaux » / « Réseaux sociaux » / « Agent Tchat » → portail Tchat.
-        if (n.contains("RESEAU") || n.contains("TCHAT") || n.matches(".*\\bCHAT\\b.*")) return "AGENT_TCHAT";
-        if (n.contains("RAFIKI")) return "AGENT_RAFIKI";
+        // Rôle d'agent d'une équipe (Inbound Voix, Inbound Mail, Réseaux sociaux, Rafiki, CIB, Outbound, Télévente).
+        String agentTeam = agentTeamOfRole(roleName);
+        if (agentTeam != null) return agentTeam(agentTeam)[2];
         if (n.contains("QUALIT")) return n.contains("SUPERVISEUR") || n.contains("HEAD") ? "SUPERVISEUR_QA" : "QUALITY_ASSURANCE";
         if (n.equals("RH") || n.contains("RESSOURCES HUMAINES")) return "RH";
         if (n.contains("SUPERVISEUR") || n.contains("HEAD RCC") || n.equals("SUPERVISOR")) return "SUPERVISEUR";
@@ -557,6 +564,7 @@ public class AdministrationService {
             java.util.Map.entry("TEAM_LEADER_INBOUND_MAIL", "INBOUND MAIL"),
             java.util.Map.entry("AGENT_CIB", "CIB"),
             java.util.Map.entry("AGENT_OUTBOUND", "OUTBOUND"),
+            java.util.Map.entry("AGENT_TELEVENTE", "OUTBOUND TELEVENTE"),
             java.util.Map.entry("AGENT_TCHAT", "INBOUND TCHAT"),
             java.util.Map.entry("AGENT_RAFIKI", "INBOUND RAFIKI"),
             java.util.Map.entry("TEAM_LEADER_OUTBOUND", "OUTBOUND"),
@@ -577,6 +585,13 @@ public class AdministrationService {
         userServiceAssignmentRepository.save(
                 UserServiceAssignment.builder().user(user).service(service).build());
         log.info("Service assigned (userId={}, service={})", userId, service.getCode());
+
+        // Service agent d'une équipe : le rôle correspondant et l'équipe suivent (synchronisation dans les deux sens).
+        String agentTeam = agentTeamOfService(service.getCode());
+        if (agentTeam != null) {
+            syncAgentTeam(userId, agentTeam);
+            return;
+        }
 
         String ledTeam = service.getCode() != null
                 ? SERVICE_CODE_TO_LED_TEAM.get(service.getCode().toUpperCase()) : null;
@@ -644,15 +659,124 @@ public class AdministrationService {
                 });
     }
 
+    /**
+     * Équipes d'agents — UNE seule correspondance, utilisée dans les deux sens : rôle agent ↔ service agent ↔ équipe
+     * (activité) ↔ portail. Attribuer le rôle « Agent Inbound Mail » donne le service, l'équipe et le portail
+     * Inbound Mail ; attribuer le service donne le rôle. { équipe, rôle, service, activité }.
+     */
+    static final List<String[]> AGENT_TEAMS = List.of(
+            new String[]{"INBOUND_VOICE", "Agent Inbound Voice", "AGENT_INBOUND", "INBOUND VOICE"},
+            new String[]{"INBOUND_MAIL", "Agent Inbound Mail", "AGENT_INBOUND_MAIL", "INBOUND MAIL"},
+            new String[]{"TCHAT", "Agent Réseaux sociaux", "AGENT_TCHAT", "INBOUND TCHAT"},
+            new String[]{"RAFIKI", "Agent Rafiki", "AGENT_RAFIKI", "INBOUND RAFIKI"},
+            new String[]{"CIB", "Agent CIB", "AGENT_CIB", "CIB"},
+            new String[]{"OUTBOUND", "Agent Outbound", "AGENT_OUTBOUND", "OUTBOUND"},
+            new String[]{"TELEVENTE", "Agent Télévente", "AGENT_TELEVENTE", "OUTBOUND TELEVENTE"});
+
+    /**
+     * Rattrapage des comptes existants, sans rien retirer : un rôle d'agent sans son service reçoit le service,
+     * un service d'agent sans son rôle reçoit le rôle. Renvoie le nombre d'ajouts.
+     */
+    @Transactional
+    public int addMissingAgentPairs() {
+        int added = 0;
+        for (User user : userRepository.findAll()) {
+            java.util.Set<String> teams = new java.util.LinkedHashSet<>();
+            userRoleRepository.findByUser_Id(user.getId()).forEach(ur -> {
+                String t = ur.getRole() == null ? null : agentTeamOfRole(ur.getRole().getName());
+                if (t != null) teams.add(t);
+            });
+            userServiceAssignmentRepository.findByUserId(user.getId()).forEach(us -> {
+                String t = us.getService() == null ? null : agentTeamOfService(us.getService().getCode());
+                if (t != null) teams.add(t);
+            });
+            for (String team : teams) {
+                String[] t = agentTeam(team);
+                Role role = roleRepository.findByNameIgnoreCase(t[1])
+                        .orElseGet(() -> roleRepository.save(Role.builder().name(t[1]).description("Conseiller clientèle — " + t[1].substring(6)).build()));
+                if (!userRoleRepository.existsByUser_IdAndRole_Id(user.getId(), role.getId())) {
+                    userRoleRepository.save(UserRole.builder().user(user).role(role).build());
+                    added++;
+                }
+                var svc = serviceRepository.findByCodeIgnoreCase(t[2]).orElse(null);
+                if (svc != null && !userServiceAssignmentRepository.existsByUserIdAndServiceId(user.getId(), svc.getId())) {
+                    userServiceAssignmentRepository.save(UserServiceAssignment.builder().user(user).service(svc).build());
+                    added++;
+                }
+            }
+        }
+        return added;
+    }
+
     /** Service agent de chaque équipe — voir SERVICE_CODE_TO_LED_TEAM pour les services Team Leader. */
-    static final java.util.Map<String, String> TEAM_TO_AGENT_SERVICE = java.util.Map.of(
-            "INBOUND_VOICE", "AGENT_INBOUND",
-            "INBOUND_MAIL", "AGENT_INBOUND_MAIL",
-            "OUTBOUND", "AGENT_OUTBOUND",
-            "TCHAT", "AGENT_TCHAT",
-            "RAFIKI", "AGENT_RAFIKI",
-            "CIB", "AGENT_CIB"
-    );
+    static final java.util.Map<String, String> TEAM_TO_AGENT_SERVICE = AGENT_TEAMS.stream()
+            .collect(java.util.stream.Collectors.toUnmodifiableMap(t -> t[0], t -> t[2]));
+
+    private static String fold(String s) {
+        return s == null ? "" : java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "")
+                .toUpperCase(java.util.Locale.ROOT).replace('_', ' ').trim();
+    }
+
+    /** Équipe d'un rôle d'agent (« Agent Inbound Mail » → INBOUND_MAIL, « Télévente » → TELEVENTE), null sinon. */
+    static String agentTeamOfRole(String roleName) {
+        String n = fold(roleName);
+        if (n.isEmpty() || n.contains("TEAM LEADER") || n.contains("HEAD") || n.contains("SUPERVIS")) return null;
+        if (n.contains("RESEAU") || n.contains("TCHAT") || n.matches(".*\\bCHAT\\b.*")) return "TCHAT";
+        if (n.contains("RAFIKI")) return "RAFIKI";
+        if (n.contains("TELEVENTE") || n.contains("TELEVENDEUR")) return "TELEVENTE";
+        if (!n.startsWith("AGENT") && !n.startsWith("CONSEILLER")) return null;
+        if (n.contains("MAIL")) return "INBOUND_MAIL";
+        if (n.contains("VOICE") || n.contains("VOIX")) return "INBOUND_VOICE";
+        if (n.contains("CIB")) return "CIB";
+        if (n.contains("OUTBOUND")) return "OUTBOUND";
+        return null;
+    }
+
+    /** Équipe d'un service agent (AGENT_INBOUND_MAIL → INBOUND_MAIL), null sinon. */
+    static String agentTeamOfService(String code) {
+        if (code == null) return null;
+        for (String[] t : AGENT_TEAMS) if (t[2].equalsIgnoreCase(code.trim())) return t[0];
+        return null;
+    }
+
+    static String[] agentTeam(String team) {
+        for (String[] t : AGENT_TEAMS) if (t[0].equals(team)) return t;
+        return null;
+    }
+
+    /**
+     * Synchronisation d'une équipe d'agent, quel que soit le point d'entrée (rôle ou service) : rôle et service de
+     * l'équipe attribués, équipe (activité) alignée, rôles et services d'une AUTRE équipe d'agent retirés — l'agent
+     * change vraiment d'équipe et de portail. Les rôles de Team Leader, QA, RH… ne sont pas touchés.
+     */
+    private void syncAgentTeam(Long userId, String team) {
+        String[] t = agentTeam(team);
+        if (t == null) return;
+        User user = userRepository.findById(userId).orElseThrow(() -> ApiException.notFound("Unknown user."));
+        Role role = roleRepository.findByNameIgnoreCase(t[1])
+                .orElseGet(() -> roleRepository.save(Role.builder().name(t[1]).description("Conseiller clientèle — " + t[1].substring(6)).build()));
+        if (!userRoleRepository.existsByUser_IdAndRole_Id(userId, role.getId())) {
+            userRoleRepository.save(UserRole.builder().user(user).role(role).build());
+        }
+        serviceRepository.findByCodeIgnoreCase(t[2]).ifPresent(svc -> {
+            if (!userServiceAssignmentRepository.existsByUserIdAndServiceId(userId, svc.getId())) {
+                userServiceAssignmentRepository.save(UserServiceAssignment.builder().user(user).service(svc).build());
+            }
+        });
+        userRoleRepository.findByUser_Id(userId).stream()
+                .filter(ur -> ur.getRole() != null && !ur.getRole().getId().equals(role.getId()))
+                .filter(ur -> { String other = agentTeamOfRole(ur.getRole().getName()); return other != null && !other.equals(team); })
+                .forEach(userRoleRepository::delete);
+        userServiceAssignmentRepository.findByUserId(userId).stream()
+                .filter(us -> us.getService() != null)
+                .filter(us -> { String other = agentTeamOfService(us.getService().getCode()); return other != null && !other.equals(team); })
+                .forEach(userServiceAssignmentRepository::delete);
+        if (!t[3].equals(user.getActivity())) {
+            user.setActivity(t[3]);
+            userRepository.save(user);
+        }
+        log.info("[ADMIN] Équipe d'agent synchronisée : {} (userId={})", team, userId);
+    }
 
     private static boolean isTeamLeaderRoleName(String name) {
         return "TEAM_LEADER".equals(com.ecobank.rccportal.security.AccessResolver.roleOfName(name));
@@ -687,13 +811,11 @@ public class AdministrationService {
                         .forEach(userServiceAssignmentRepository::delete);
                 user.setLedTeam(null);
                 userRepository.save(user);
-                if (t != null) {
-                    serviceRepository.findByCodeIgnoreCase(TEAM_TO_AGENT_SERVICE.get(t))
-                            .ifPresent(s -> assignService(userId, s.getId()));
-                }
+                if (t != null) syncAgentTeam(userId, t); // rôle, service, équipe et portail de l'équipe choisie
                 log.info("[ADMIN] Accès Agent appliqué (userId={}, équipe={})", userId, t);
             }
             case "TEAM_LEADER" -> {
+                if ("TELEVENTE".equals(t)) t = "OUTBOUND"; // la Télévente est menée par le Team Leader Outbound
                 if (t == null) throw ApiException.badRequest("Choisissez l'équipe menée par ce Team Leader.");
                 String code = "TEAM_LEADER_" + t;
                 RccService svc = serviceRepository.findByCodeIgnoreCase(code)
@@ -714,9 +836,8 @@ public class AdministrationService {
     }
 
     /** Activité (équipe) écrite sur un agent aligné sur une équipe — valeurs reconnues par TeamClassifier. */
-    static final java.util.Map<String, String> TEAM_TO_ACTIVITY = java.util.Map.of(
-            "INBOUND_VOICE", "INBOUND VOICE", "INBOUND_MAIL", "INBOUND MAIL", "OUTBOUND", "OUTBOUND",
-            "TCHAT", "INBOUND TCHAT", "RAFIKI", "INBOUND RAFIKI", "CIB", "CIB");
+    static final java.util.Map<String, String> TEAM_TO_ACTIVITY = AGENT_TEAMS.stream()
+            .collect(java.util.stream.Collectors.toUnmodifiableMap(t -> t[0], t -> t[3]));
 
     /** Attribue le rôle de ce nom (créé s'il n'existe pas encore) ; sans effet s'il est déjà attribué. */
     @Transactional
