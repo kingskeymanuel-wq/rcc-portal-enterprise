@@ -695,9 +695,13 @@ window.RccSession = (function () {
      * 15 s (et au retour sur l'onglet). Si le profil change → bascule vers le bon portail ; si seuls les onglets,
      * fonctionnalités ou l'équipe changent → la page se recharge pour appliquer les nouveaux droits.
      */
+    /** Portails d'accueil des agents : un agent n'ouvre que celui de son équipe. */
+    var AGENT_HOME_PORTALS = ["/dashboard", "/outbound-dashboard", "/portail-tchat", "/portail-rafiki", "/portail-televente"];
+
     function watchAccessChanges(user, profile) {
         var roleSig = String(user.role || "") + "|" + String(user.service || "");
         var baseline = null;
+        var baselinePortal = null;
         var shown = false;
 
         function banner(text, target) {
@@ -722,9 +726,13 @@ window.RccSession = (function () {
             }).then(function (a) {
                 if (!a) return;
                 if (a.active === false) { window.location.href = "/login"; return; }
-                if (baseline === null) { baseline = a.signature; return; }
+                if (baseline === null) { baseline = a.signature; baselinePortal = a.redirectTo || null; return; }
                 if (a.signature === baseline) return;
-                if (String(a.role || "") + "|" + String(a.service || "") !== roleSig) {
+                // Nouveau portail (ex. Agent Inbound Mail → Agent Réseaux sociaux : même profil Agent, autre portail).
+                var portalChanged = (a.redirectTo || null) !== baselinePortal && a.redirectTo && a.redirectTo !== window.location.pathname;
+                if (portalChanged) {
+                    banner("Vos accès ont été mis à jour par l'administrateur : votre portail change.", a.redirectTo);
+                } else if (String(a.role || "") + "|" + String(a.service || "") !== roleSig) {
                     var newProfile = computeProfile(a);
                     banner("Vos accès ont été mis à jour par l'administrateur : " + (PROFILE_LABELS[newProfile] || newProfile) + ".", a.redirectTo || "/dashboard");
                 } else {
@@ -775,6 +783,14 @@ window.RccSession = (function () {
 
                     var isOutboundAgent = profile === "AGENT" && /^\/(outbound-dashboard|portail-televente)$/.test(teamStatus.redirectTo || "");
                     var channelPortal = profile === "AGENT" && /^\/portail-(tchat|rafiki|televente)$/.test(teamStatus.redirectTo || "") ? teamStatus.redirectTo : null;
+                    // Un agent est toujours ramené sur SON portail d'équipe : accueil générique, favori ou ancien
+                    // portail après un changement d'accès dans l'Administration (Réseaux sociaux, Rafiki, Télévente…).
+                    var here = window.location.pathname;
+                    if (profile === "AGENT" && teamStatus.redirectTo && AGENT_HOME_PORTALS.indexOf(teamStatus.redirectTo) !== -1
+                        && AGENT_HOME_PORTALS.indexOf(here) !== -1 && here !== teamStatus.redirectTo) {
+                        window.location.replace(teamStatus.redirectTo);
+                        return null;
+                    }
                     applySidebarVisibility(profile, permissionOverrides, deniedTabCodes, isOutboundAgent, channelPortal);
                     applyHeader(user, profile);
 
