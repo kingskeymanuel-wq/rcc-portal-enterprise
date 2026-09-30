@@ -121,13 +121,16 @@ public class TeamLeaderService {
     /** Service agent de chaque équipe : aligné automatiquement quand un agent change d'équipe. */
     static final java.util.Map<String, String> TEAM_TO_AGENT_SERVICE = java.util.Map.of(
             "INBOUND_VOICE", "AGENT_INBOUND", "INBOUND_MAIL", "AGENT_INBOUND_MAIL", "TCHAT", "AGENT_TCHAT",
-            "RAFIKI", "AGENT_RAFIKI", "CIB", "AGENT_CIB", "OUTBOUND", "AGENT_OUTBOUND");
+            "RAFIKI", "AGENT_RAFIKI", "CIB", "AGENT_CIB", "OUTBOUND", "AGENT_OUTBOUND",
+            "TELEVENTE", "AGENT_TELEVENTE", "DIGITALISATION", "AGENT_DIGITALISATION");
 
     static final java.util.Map<String, String> TEAM_LABELS = java.util.Map.of("INBOUND_VOICE", "Inbound Voix", "INBOUND_MAIL", "Inbound Mail",
-            "TCHAT", "Réseaux sociaux", "RAFIKI", "Rafiki", "CIB", "CIB", "OUTBOUND", "Outbound");
+            "TCHAT", "Réseaux sociaux", "RAFIKI", "Rafiki", "CIB", "CIB", "OUTBOUND", "Outbound",
+            "TELEVENTE", "Télévente", "DIGITALISATION", "Digitalisation");
 
-    /** Activité écrite sur un agent ajouté à une équipe de canal (Tchat, Rafiki). */
-    private static final java.util.Map<String, String> CHANNEL_TO_ACTIVITY = java.util.Map.of("TCHAT", "INBOUND TCHAT", "RAFIKI", "INBOUND RAFIKI");
+    /** Activité écrite sur un agent ajouté à une sous-équipe (Tchat, Rafiki, Télévente, Digitalisation). */
+    private static final java.util.Map<String, String> CHANNEL_TO_ACTIVITY = java.util.Map.of("TCHAT", "INBOUND TCHAT", "RAFIKI", "INBOUND RAFIKI",
+            "TELEVENTE", "OUTBOUND TELEVENTE", "DIGITALISATION", "OUTBOUND DIGITALISATION");
 
     /** Code de l'équipe menée tel qu'affecté (INBOUND_VOICE, INBOUND_MAIL, TCHAT, RAFIKI, CIB, OUTBOUND). */
     @Transactional(readOnly = true)

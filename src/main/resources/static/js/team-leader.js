@@ -7,7 +7,11 @@
     var escapeHtml = RccApi.escapeHtml;
 
     var myTeam = null; // "INBOUND_VOICE" | "INBOUND_MAIL" | "CIB" | "OUTBOUND"
-    var myChannel = ""; // "TCHAT" | "RAFIKI" pour un Team Leader de canal (pôle Inbound Mail), sinon vide
+    var myChannel = ""; // "TCHAT" | "RAFIKI" (pôle Inbound Mail), "TELEVENTE" | "DIGITALISATION" (pôle Outbound) pour un Team Leader de sous-équipe, sinon vide
+    var CHANNEL_NAMES = { TCHAT: "Réseaux sociaux", RAFIKI: "Rafiki", TELEVENTE: "Télévente", DIGITALISATION: "Digitalisation" };
+    var CHANNEL_ICONS = { TCHAT: "bi-chat-text-fill", RAFIKI: "bi-chat-heart-fill", TELEVENTE: "bi-headset", DIGITALISATION: "bi-phone-fill" };
+    /** Cible de campagne propre à la sous-équipe Outbound du Team Leader (Campaign.targetService). */
+    var CHANNEL_CAMPAIGN_TARGET = { TELEVENTE: "TELEVENTE", DIGITALISATION: "DIGITAL" };
     var reportingCache = [];
     var salesByAgentCache = {}; // agentName -> count (mois du reporting en cours), Outbound uniquement
     var agentModal;
@@ -1093,7 +1097,7 @@
     $("tlNewCampaignBtn").addEventListener("click", function () {
         $("tlCampaignName").value = ""; $("tlCampaignDescription").value = "";
         $("tlCampaignStart").value = ""; $("tlCampaignEnd").value = "";
-        $("tlCampaignTargetService").value = "";
+        $("tlCampaignTargetService").value = CHANNEL_CAMPAIGN_TARGET[myChannel] || "";
         $("tlCampaignIcon").value = "bi-megaphone-fill";
         $("tlCampaignColorFrom").value = "#0057B8";
         $("tlCampaignColorTo").value = "#00A651";
@@ -1940,7 +1944,7 @@
                 var hero = document.querySelector(".tl-hero");
                 if (hero) hero.setAttribute("data-channel", myChannel);
                 var kicker = document.querySelector(".tl-hero-kicker");
-                if (kicker) kicker.innerHTML = '<i class="bi ' + (myChannel === "RAFIKI" ? "bi-chat-heart-fill" : "bi-chat-text-fill") + '"></i> Espace Team Leader ' + teamLabel(myTeam);
+                if (kicker) kicker.innerHTML = '<i class="bi ' + (CHANNEL_ICONS[myChannel] || "bi-people-fill") + '"></i> Espace Team Leader ' + teamLabel(myTeam);
                 document.title = "RCC Portal — Portail Team Leader " + teamLabel(myTeam);
             }
             $("tlContent").style.display = "";
@@ -1962,7 +1966,7 @@
     }
 
     function teamLabel(team) {
-        if (myChannel) return myChannel === "RAFIKI" ? "Rafiki" : "Réseaux sociaux";
+        if (myChannel) return CHANNEL_NAMES[myChannel] || myChannel;
         return { INBOUND_VOICE: "Inbound Voix", INBOUND_MAIL: "Inbound Mail", CIB: "CIB", OUTBOUND: "Outbound" }[team] || team;
     }
 

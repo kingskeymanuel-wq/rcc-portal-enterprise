@@ -956,6 +956,9 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         seedServiceIfMissing("TEAM_LEADER_CIB", "Team Leader CIB", "Responsable de l'équipe CIB", 24);
         seedServiceIfMissing("AGENT_TELEVENTE", "Agent Télévente", "Conseiller clientèle — Télévente (pôle Outbound)", 25);
         seedServiceIfMissing("AGENT_DIGITALISATION", "Agent Digitalisation", "Conseiller clientèle — Digitalisation (pôle Outbound)", 26);
+        // Télévente et Digitalisation : chacune son Team Leader (portail Team Leader restreint à la sous-équipe).
+        seedServiceIfMissing("TEAM_LEADER_TELEVENTE", "Team Leader Télévente", "Responsable de l'équipe Télévente (pôle Outbound)", 27);
+        seedServiceIfMissing("TEAM_LEADER_DIGITALISATION", "Team Leader Digitalisation", "Responsable de l'équipe Digitalisation (pôle Outbound)", 28);
 
         createIfMissing("USERS", """
                 CREATE TABLE dbo.USERS (

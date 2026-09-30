@@ -129,9 +129,10 @@ window.RccSession = (function () {
             // Inbound Voix/Mail) ne le concernent pas — remplacées par l'onglet "Parcours de
             // vente" de son propre tableau de bord Outbound.
             if ((featureCode === "procedures" || featureCode === "knowledge" || featureCode === "training" || featureCode === "performance") && outboundAgent) isAllowed = false;
-            if (featureCode === "outbound-dashboard" && !outboundAgent) isAllowed = false;
-            // Portails Tchat / Rafiki : chaque agent ne voit que celui de son canal (l'administrateur voit les deux).
-            if ((featureCode === "portail-tchat" || featureCode === "portail-rafiki") && profile !== "ADMIN"
+            // Portail Outbound = Digitalisation ; un agent Télévente a son propre portail.
+            if (featureCode === "outbound-dashboard" && (!outboundAgent || channelPortal === "/portail-televente")) isAllowed = false;
+            // Portails Tchat / Rafiki / Télévente : chaque agent ne voit que le sien (l'administrateur voit tout).
+            if ((featureCode === "portail-tchat" || featureCode === "portail-rafiki" || featureCode === "portail-televente") && profile !== "ADMIN"
                 && channelPortal !== "/" + featureCode) isAllowed = false;
 
             isAllowed = computeFeatureAllowed(featureCode, isAllowed, overridesByCode, denied);
@@ -772,8 +773,8 @@ window.RccSession = (function () {
                     var deniedTabCodes = results[1].deniedTabCodes || [];
                     var teamStatus = results[2];
 
-                    var isOutboundAgent = profile === "AGENT" && teamStatus.redirectTo === "/outbound-dashboard";
-                    var channelPortal = profile === "AGENT" && /^\/portail-(tchat|rafiki)$/.test(teamStatus.redirectTo || "") ? teamStatus.redirectTo : null;
+                    var isOutboundAgent = profile === "AGENT" && /^\/(outbound-dashboard|portail-televente)$/.test(teamStatus.redirectTo || "");
+                    var channelPortal = profile === "AGENT" && /^\/portail-(tchat|rafiki|televente)$/.test(teamStatus.redirectTo || "") ? teamStatus.redirectTo : null;
                     applySidebarVisibility(profile, permissionOverrides, deniedTabCodes, isOutboundAgent, channelPortal);
                     applyHeader(user, profile);
 

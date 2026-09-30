@@ -38,7 +38,9 @@ public class AdminHierarchyService {
         TEAM_LABELS.put("TCHAT", "Réseaux sociaux");
         TEAM_LABELS.put("RAFIKI", "Rafiki");
         TEAM_LABELS.put("CIB", "CIB");
-        TEAM_LABELS.put("OUTBOUND", "Outbound — Télévente et Digitalisation");
+        TEAM_LABELS.put("DIGITALISATION", "Outbound — Digitalisation");
+        TEAM_LABELS.put("TELEVENTE", "Télévente");
+        TEAM_LABELS.put("OUTBOUND", "Outbound (pôle, sans sous-équipe)");
     }
 
     private final JdbcTemplate jdbc;

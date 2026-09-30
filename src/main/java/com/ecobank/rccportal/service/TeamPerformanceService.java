@@ -110,7 +110,10 @@ public class TeamPerformanceService {
                 computed("presence", "Présence", "PCT", true, "Taux de présence (pointage)", "PRESENCE")));
     }
 
-    /** Canaux de l'Inbound Mail menés par leur propre Team Leader : indicateurs de leur rapport hebdo. */
+    static final Map<String, String> CHANNEL_LABELS = Map.of("TCHAT", "Réseaux sociaux", "RAFIKI", "Rafiki",
+            "TELEVENTE", "Télévente", "DIGITALISATION", "Digitalisation");
+
+    /** Canaux de l'Inbound Mail menés par leur propre Team Leader : indicateurs de leur rapport hebdo (Télévente et Digitalisation : ceux de l'Outbound). */
     static final Map<String, List<Def>> CHANNEL_PROFILES = Map.of(
             "TCHAT", List.of(
                     kpi("liveChat", "Live Chat", "COUNT", true, "Conversations live chat traitées", "@liveChat", "LIVE_CHAT", "~LIVE+CHAT"),
@@ -163,15 +166,15 @@ public class TeamPerformanceService {
         String channel = null;
         if (isManager(requester)) {
             String code = teamCode == null ? "" : teamCode.trim().toUpperCase(Locale.ROOT);
-            if (TeamClassifier.isChannel(code)) { channel = code; team = TeamClassifier.Team.INBOUND_MAIL; }
+            if (TeamClassifier.isChannel(code)) { channel = code; team = TeamClassifier.teamOf(code); }
             else try {
                 team = TeamClassifier.Team.valueOf(code);
             } catch (IllegalArgumentException e) {
-                throw ApiException.badRequest("Équipe inconnue : INBOUND_VOICE, INBOUND_MAIL, TCHAT, RAFIKI, CIB ou OUTBOUND.");
+                throw ApiException.badRequest("Équipe inconnue : INBOUND_VOICE, INBOUND_MAIL, TCHAT, RAFIKI, CIB, OUTBOUND, TELEVENTE ou DIGITALISATION.");
             }
         } else if ("TEAM_LEADER".equalsIgnoreCase(requester.role())) {
             team = teamLeaders.requireLedTeam(requester); // un Team Leader ne voit que son équipe
-            channel = teamLeaders.ledChannel(requester);  // … ou son canal (Tchat, Rafiki)
+            channel = teamLeaders.ledChannel(requester);  // … ou sa sous-équipe (Tchat, Rafiki, Télévente, Digitalisation)
         } else {
             throw ApiException.forbidden("Réservé aux Team Leaders, au Superviseur, à la QA et à l'administrateur.");
         }
@@ -194,10 +197,11 @@ public class TeamPerformanceService {
                 .filter(r -> ch == null || ch.equals(TeamClassifier.channel(r.activity(), services.getOrDefault(r.userId(), List.of()))))
                 .toList();
         Sources src = sources(start, end);
-        String sheetTeam = channel != null ? channel : team.name();
+        String sheetTeam = channel != null && CHANNEL_PROFILES.containsKey(channel) ? channel : team.name();
         src = perfFiles == null ? src : src.withSheet(perfFiles.aggregate(sheetTeam, start, end));
         return channel != null
-                ? build(CHANNEL_PROFILES.get(channel), channel, "TCHAT".equals(channel) ? "Réseaux sociaux" : "Rafiki", false, label, base, src)
+                ? build(CHANNEL_PROFILES.getOrDefault(channel, PROFILES.get(team)), channel, CHANNEL_LABELS.get(channel),
+                        team == TeamClassifier.Team.OUTBOUND, label, base, src)
                 : build(team, label, base, src);
     }
 

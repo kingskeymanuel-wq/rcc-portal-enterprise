@@ -19,7 +19,7 @@
     };
     var TEAMS = {
         INBOUND_VOICE: "Inbound Voix", INBOUND_MAIL: "Inbound Mail", TCHAT: "Réseaux sociaux", RAFIKI: "Rafiki", CIB: "CIB",
-        OUTBOUND: "Outbound", RH: "RH", QA: "Qualité", SUPERVISION: "Supervision", AGENCE: "Agence", FORMATION: "Formation", AUTRE: "Autre"
+        OUTBOUND: "Outbound", TELEVENTE: "Télévente", DIGITALISATION: "Digitalisation", RH: "RH", QA: "Qualité", SUPERVISION: "Supervision", AGENCE: "Agence", FORMATION: "Formation", AUTRE: "Autre"
     };
 
     function $(id) { return document.getElementById(id); }

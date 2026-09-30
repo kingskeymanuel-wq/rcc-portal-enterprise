@@ -54,36 +54,54 @@ public final class TeamClassifier {
         return team;
     }
 
-    // ───────────── Canaux digitaux de l'Inbound Mail : Tchat et Rafiki ─────────────
+    // ───────────── Sous-équipes : Tchat et Rafiki (Inbound Mail), Télévente et Digitalisation (Outbound) ─────────────
 
-    /** Codes d'équipe menée (User.ledTeam) propres à un canal : un Team Leader Tchat ou Rafiki. */
-    public static final java.util.Set<String> CHANNELS = java.util.Set.of("TCHAT", "RAFIKI");
+    /** Codes d'équipe menée (User.ledTeam) propres à une sous-équipe, chacune avec son Team Leader et son portail. */
+    public static final java.util.Set<String> CHANNELS = java.util.Set.of("TCHAT", "RAFIKI", "TELEVENTE", "DIGITALISATION");
+
+    /** Pôle de chaque sous-équipe (reporting, droits du Team Leader de tout le pôle). */
+    public static final java.util.Map<String, Team> CHANNEL_TEAM = java.util.Map.of(
+            "TCHAT", Team.INBOUND_MAIL, "RAFIKI", Team.INBOUND_MAIL,
+            "TELEVENTE", Team.OUTBOUND, "DIGITALISATION", Team.OUTBOUND);
+
+    /** Sous-équipe d'après un libellé (activité ou code de service), null si aucune. */
+    static String channelOf(String text) {
+        if (text == null) return null;
+        String a = text.toUpperCase();
+        if (a.contains("RAFIKI")) return "RAFIKI";
+        if (a.contains("TELEVENTE") || a.contains("TÉLÉVENTE") || a.contains("TELEVENDEUR") || a.contains("TÉLÉVENDEUR")) return "TELEVENTE";
+        if (a.contains("DIGITAL")) return "DIGITALISATION";
+        if (a.contains("TCHAT") || a.contains("CHAT") || a.contains("RESEAU") || a.contains("RÉSEAU")) return "TCHAT";
+        return null;
+    }
 
     public static boolean isChannel(String code) {
         return code != null && CHANNELS.contains(code.trim().toUpperCase());
     }
 
-    /** Canal d'un agent : « RAFIKI » ou « TCHAT » (activité ou service AGENT_TCHAT / AGENT_RAFIKI), sinon null. */
+    /**
+     * Sous-équipe d'un agent : « RAFIKI », « TCHAT », « TELEVENTE » ou « DIGITALISATION » (activité, sinon service
+     * AGENT_TCHAT / AGENT_RAFIKI / AGENT_TELEVENTE / AGENT_DIGITALISATION), null sinon.
+     */
     public static String channel(String activity, java.util.Collection<String> serviceCodes) {
-        String a = activity == null ? "" : activity.toUpperCase();
-        if (a.contains("RAFIKI")) return "RAFIKI";
-        if (a.contains("TCHAT") || a.contains("CHAT") || a.contains("RESEAU") || a.contains("RÉSEAU")) return "TCHAT";
+        String ch = channelOf(activity);
+        if (ch != null) return ch;
         if (serviceCodes != null) {
             for (String c : serviceCodes) {
-                if (c == null) continue;
-                String u = c.toUpperCase();
-                if (u.contains("RAFIKI")) return "RAFIKI";
-                if (u.contains("TCHAT")) return "TCHAT";
+                String u = c == null ? "" : c.toUpperCase();
+                if (!u.startsWith("AGENT_") && !u.contains("RAFIKI") && !u.contains("TCHAT")) continue;
+                ch = channelOf(u.replace('_', ' '));
+                if (ch != null) return ch;
             }
         }
         return null;
     }
 
-    /** Équipe du reporting d'un code d'équipe menée : TCHAT / RAFIKI relèvent de l'Inbound Mail. */
+    /** Équipe du reporting d'un code d'équipe menée : TCHAT / RAFIKI relèvent de l'Inbound Mail, TELEVENTE / DIGITALISATION de l'Outbound. */
     public static Team teamOf(String ledTeam) {
         if (ledTeam == null || ledTeam.isBlank()) return Team.OTHER;
         String code = ledTeam.trim().toUpperCase().replace(' ', '_');
-        if (CHANNELS.contains(code)) return Team.INBOUND_MAIL;
+        if (CHANNELS.contains(code)) return CHANNEL_TEAM.get(code);
         try {
             return Team.valueOf(code);
         } catch (IllegalArgumentException e) {
@@ -91,7 +109,7 @@ public final class TeamClassifier {
         }
     }
 
-    /** L'agent fait-il partie de l'équipe menée ? Un Team Leader Tchat ne voit que le Tchat ; celui de l'Inbound Mail voit tout le pôle. */
+    /** L'agent fait-il partie de l'équipe menée ? Un Team Leader Tchat (ou Télévente) ne voit que sa sous-équipe ; celui du pôle voit tout le pôle. */
     public static boolean belongsTo(String ledTeam, String activity, java.util.Collection<String> serviceCodes) {
         Team team = teamOf(ledTeam);
         if (team == Team.OTHER || classify(activity, serviceCodes) != team) return false;
@@ -102,8 +120,8 @@ public final class TeamClassifier {
     public static java.util.List<String> leaderCodesFor(String activity, java.util.Collection<String> serviceCodes) {
         java.util.List<String> out = new java.util.ArrayList<>();
         Team team = classify(activity, serviceCodes);
-        String ch = team == Team.INBOUND_MAIL ? channel(activity, serviceCodes) : null;
-        if (ch != null) out.add(ch);
+        String ch = channel(activity, serviceCodes);
+        if (ch != null && CHANNEL_TEAM.get(ch) == team) out.add(ch);
         if (team != Team.OTHER) out.add(team.name());
         return out;
     }

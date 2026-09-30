@@ -439,7 +439,9 @@ public class AdministrationService {
             if (n.contains("RAFIKI")) return "TEAM_LEADER_RAFIKI";
             if (n.contains("TCHAT") || n.contains("CHAT") || n.contains("RESEAU")) return "TEAM_LEADER_TCHAT";
             if (n.contains("MAIL")) return "TEAM_LEADER_INBOUND_MAIL";
-            if (n.contains("OUTBOUND") || n.contains("TELEVENTE") || n.contains("TELEVENDEUR") || n.contains("DIGITAL")) return "TEAM_LEADER_OUTBOUND";
+            if (n.contains("TELEVENTE") || n.contains("TELEVENDEUR")) return "TEAM_LEADER_TELEVENTE";
+            if (n.contains("DIGITAL")) return "TEAM_LEADER_DIGITALISATION";
+            if (n.contains("OUTBOUND")) return "TEAM_LEADER_OUTBOUND";
             if (n.contains("CIB")) return "TEAM_LEADER_CIB";
             return null;
         }
@@ -544,7 +546,9 @@ public class AdministrationService {
             "TEAM_LEADER_OUTBOUND", "OUTBOUND",
             "TEAM_LEADER_TCHAT", "TCHAT",
             "TEAM_LEADER_RAFIKI", "RAFIKI",
-            "TEAM_LEADER_CIB", "CIB"
+            "TEAM_LEADER_CIB", "CIB",
+            "TEAM_LEADER_TELEVENTE", "TELEVENTE",
+            "TEAM_LEADER_DIGITALISATION", "DIGITALISATION"
     );
 
     /**
@@ -571,7 +575,9 @@ public class AdministrationService {
             java.util.Map.entry("TEAM_LEADER_OUTBOUND", "OUTBOUND"),
             java.util.Map.entry("TEAM_LEADER_TCHAT", "INBOUND TCHAT"),
             java.util.Map.entry("TEAM_LEADER_RAFIKI", "INBOUND RAFIKI"),
-            java.util.Map.entry("TEAM_LEADER_CIB", "CIB")
+            java.util.Map.entry("TEAM_LEADER_CIB", "CIB"),
+            java.util.Map.entry("TEAM_LEADER_TELEVENTE", "OUTBOUND TELEVENTE"),
+            java.util.Map.entry("TEAM_LEADER_DIGITALISATION", "OUTBOUND DIGITALISATION")
     );
 
     @Transactional
@@ -675,7 +681,7 @@ public class AdministrationService {
             new String[]{"TELEVENTE", "Agent Télévente", "AGENT_TELEVENTE", "OUTBOUND TELEVENTE"},
             new String[]{"DIGITALISATION", "Agent Digitalisation", "AGENT_DIGITALISATION", "OUTBOUND DIGITALISATION"});
 
-    /** Sous-équipes du pôle Outbound : menées par le Team Leader Outbound. */
+    /** Sous-équipes du pôle Outbound, chacune avec son Team Leader et son portail (le Team Leader Outbound voit tout le pôle). */
     static final java.util.Set<String> OUTBOUND_SUBTEAMS = java.util.Set.of("TELEVENTE", "DIGITALISATION");
 
     /**
@@ -862,7 +868,6 @@ public class AdministrationService {
                 log.info("[ADMIN] Accès Agent appliqué (userId={}, équipe={})", userId, t);
             }
             case "TEAM_LEADER" -> {
-                if (OUTBOUND_SUBTEAMS.contains(t)) t = "OUTBOUND"; // Télévente et Digitalisation : menées par le Team Leader Outbound
                 if (t == null) throw ApiException.badRequest("Choisissez l'équipe menée par ce Team Leader.");
                 clearProfiles(userId);
                 String code = "TEAM_LEADER_" + t;

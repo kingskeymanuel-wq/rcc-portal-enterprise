@@ -131,8 +131,16 @@ public class ViewController {
         return "team-leader";
     }
 
+    /** Portail Outbound = équipe Digitalisation ; la Télévente a son propre portail (même socle, contenu Télévente). */
     @GetMapping("/outbound-dashboard")
-    public String outboundDashboard() {
+    public String outboundDashboard(org.springframework.ui.Model model) {
+        model.addAttribute("outboundTeam", "DIGITALISATION");
+        return "outbound-dashboard";
+    }
+
+    @GetMapping("/portail-televente")
+    public String televentePortal(org.springframework.ui.Model model) {
+        model.addAttribute("outboundTeam", "TELEVENTE");
         return "outbound-dashboard";
     }
 

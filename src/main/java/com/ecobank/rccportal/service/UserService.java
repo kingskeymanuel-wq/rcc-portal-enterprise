@@ -192,8 +192,10 @@ public class UserService {
                 put("TEAM_LEADER_TCHAT", "/team-leader");
                 put("TEAM_LEADER_RAFIKI", "/team-leader");
                 put("TEAM_LEADER_CIB", "/team-leader");
+                put("TEAM_LEADER_TELEVENTE", "/team-leader");
+                put("TEAM_LEADER_DIGITALISATION", "/team-leader");
                 put("AGENT_OUTBOUND", "/outbound-dashboard");
-                put("AGENT_TELEVENTE", "/outbound-dashboard");
+                put("AGENT_TELEVENTE", "/portail-televente");
                 put("AGENT_DIGITALISATION", "/outbound-dashboard");
                 put("AGENT_TCHAT", "/portail-tchat");
                 put("AGENT_RAFIKI", "/portail-rafiki");
@@ -205,12 +207,16 @@ public class UserService {
                 put("AGENCE", "/agence");
             }};
 
-    /** Portail du canal digital d'après l'activité : « RAFIKI » → /portail-rafiki, « TCHAT » / « LIVE CHAT » → /portail-tchat. */
+    /**
+     * Portail propre d'après l'activité (ou le nom du rôle) : « RAFIKI » → /portail-rafiki, « TCHAT » / « LIVE CHAT » →
+     * /portail-tchat, « TÉLÉVENTE » → /portail-televente (la Digitalisation garde le portail Outbound).
+     */
     static String digitalChannelPortal(String activity) {
         if (activity == null) return null;
         String a = activity.toUpperCase(java.util.Locale.ROOT);
         if (a.contains("RAFIKI")) return "/portail-rafiki";
         String folded = java.text.Normalizer.normalize(a, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "");
+        if (folded.contains("TELEVENTE") || folded.contains("TELEVENDEUR")) return "/portail-televente";
         if (a.contains("TCHAT") || a.contains("LIVE CHAT") || a.matches(".*\\bCHAT\\b.*") || folded.contains("RESEAU")) return "/portail-tchat";
         return null;
     }
@@ -291,7 +297,7 @@ public class UserService {
         if (request.residencePlace() != null) user.setResidencePlace(request.residencePlace().isBlank() ? null : request.residencePlace().trim());
         if (request.ledTeam() != null) {
             String lt = request.ledTeam().isBlank() ? null : request.ledTeam().trim().toUpperCase();
-            if (lt != null && !java.util.Set.of("INBOUND_VOICE", "INBOUND_MAIL", "TCHAT", "RAFIKI", "CIB", "OUTBOUND").contains(lt)) {
+            if (lt != null && !java.util.Set.of("INBOUND_VOICE", "INBOUND_MAIL", "TCHAT", "RAFIKI", "CIB", "OUTBOUND", "TELEVENTE", "DIGITALISATION").contains(lt)) {
                 throw ApiException.badRequest("ledTeam must be one of INBOUND_VOICE, INBOUND_MAIL, TCHAT, RAFIKI, CIB, OUTBOUND.");
             }
             user.setLedTeam(lt);
@@ -695,6 +701,8 @@ public class UserService {
                 put("TEAM_LEADER_OUTBOUND", "TEAM_LEADER");
                 put("TEAM_LEADER_TCHAT", "TEAM_LEADER");
                 put("TEAM_LEADER_RAFIKI", "TEAM_LEADER");
+                put("TEAM_LEADER_TELEVENTE", "TEAM_LEADER");
+                put("TEAM_LEADER_DIGITALISATION", "TEAM_LEADER");
                 put("AGENT_INBOUND", "AGENT");
                 put("AGENT_OUTBOUND", "AGENT");
                 put("AGENT_TCHAT", "AGENT");

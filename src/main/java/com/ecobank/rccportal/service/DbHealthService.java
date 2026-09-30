@@ -26,7 +26,7 @@ public class DbHealthService {
     static final List<String> TABLES = List.of("USERS", "USER_ROLES", "USER_SERVICES", "ROLES", "SERVICES",
             "ActionAuditLogs", "AgentSchedules", "DATA_PATCHES");
 
-    static final Set<String> VALID_LED_TEAMS = Set.of("INBOUND_VOICE", "INBOUND_MAIL", "TCHAT", "RAFIKI", "CIB", "OUTBOUND");
+    static final Set<String> VALID_LED_TEAMS = Set.of("INBOUND_VOICE", "INBOUND_MAIL", "TCHAT", "RAFIKI", "CIB", "OUTBOUND", "TELEVENTE", "DIGITALISATION");
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
@@ -89,7 +89,7 @@ public class DbHealthService {
                 + " liaison(s) orpheline(s). Bouton « Corriger » ou « Nettoyer doublons » dans l'éditeur de tables.", "clean-links"));
 
         List<Map<String, Object>> badLed = jdbc.queryForList(
-                "SELECT NAME, USERNAME, LED_TEAM FROM dbo.USERS WHERE LED_TEAM IS NOT NULL AND LTRIM(RTRIM(LED_TEAM)) <> '' AND UPPER(LTRIM(RTRIM(LED_TEAM))) NOT IN ('INBOUND_VOICE','INBOUND_MAIL','TCHAT','RAFIKI','CIB','OUTBOUND')");
+                "SELECT NAME, USERNAME, LED_TEAM FROM dbo.USERS WHERE LED_TEAM IS NOT NULL AND LTRIM(RTRIM(LED_TEAM)) <> '' AND UPPER(LTRIM(RTRIM(LED_TEAM))) NOT IN ('INBOUND_VOICE','INBOUND_MAIL','TCHAT','RAFIKI','CIB','OUTBOUND','TELEVENTE','DIGITALISATION')");
         checks.add(badLed.isEmpty()
                 ? new Check("Équipe menée (LED_TEAM)", "OK", "Toutes les valeurs sont des équipes valides.")
                 : new Check("Équipe menée (LED_TEAM)", "A_CORRIGER", badLed.size() + " compte(s) avec une équipe menée invalide, qui les rend Team Leader sans équipe : "
@@ -135,6 +135,6 @@ public class DbHealthService {
 
     /** Vide les « équipes menées » invalides (ex. « QA ») : ces comptes cessent d'être Team Leader par erreur. */
     public int clearInvalidLedTeams() {
-        return jdbc.update("UPDATE dbo.USERS SET LED_TEAM = NULL WHERE LED_TEAM IS NOT NULL AND (LTRIM(RTRIM(LED_TEAM)) = '' OR UPPER(LTRIM(RTRIM(LED_TEAM))) NOT IN ('INBOUND_VOICE','INBOUND_MAIL','TCHAT','RAFIKI','CIB','OUTBOUND'))");
+        return jdbc.update("UPDATE dbo.USERS SET LED_TEAM = NULL WHERE LED_TEAM IS NOT NULL AND (LTRIM(RTRIM(LED_TEAM)) = '' OR UPPER(LTRIM(RTRIM(LED_TEAM))) NOT IN ('INBOUND_VOICE','INBOUND_MAIL','TCHAT','RAFIKI','CIB','OUTBOUND','TELEVENTE','DIGITALISATION'))");
     }
 }

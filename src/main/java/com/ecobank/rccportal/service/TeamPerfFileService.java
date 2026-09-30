@@ -202,9 +202,11 @@ public class TeamPerfFileService {
         }
     }
 
-    /** Fichiers gérés selon le code d'équipe menée : un Team Leader Tchat ou Rafiki n'importe que son canal. */
+    /** Fichiers gérés selon le code d'équipe menée : un Team Leader Tchat ou Rafiki n'importe que son canal (Télévente, Digitalisation : fichier Outbound). */
     static Set<String> fileTeamsFor(String ledTeamCode) {
-        if (TeamClassifier.isChannel(ledTeamCode)) return Set.of(ledTeamCode.trim().toUpperCase(Locale.ROOT));
+        if (TeamClassifier.isChannel(ledTeamCode) && CATALOG.containsKey(ledTeamCode.trim().toUpperCase(Locale.ROOT))) {
+            return Set.of(ledTeamCode.trim().toUpperCase(Locale.ROOT));
+        }
         return fileTeamsFor(TeamClassifier.teamOf(ledTeamCode));
     }
 

@@ -110,8 +110,8 @@
         ["AGENCE", "Agences", "bi-shop-window"],
         ["A_CLASSER", "À classer (aucun rôle reconnu)", "bi-question-diamond-fill"]
     ];
-    var TEAM_ORDER = ["INBOUND_VOICE", "INBOUND_MAIL", "TCHAT", "RAFIKI", "CIB", "OUTBOUND"];
-    var TEAM_NAMES = { INBOUND_VOICE: "Inbound Voix", INBOUND_MAIL: "Inbound Mail", TCHAT: "Réseaux sociaux", RAFIKI: "Rafiki", CIB: "CIB", OUTBOUND: "Outbound", SANS_EQUIPE: "Sans équipe" };
+    var TEAM_ORDER = ["INBOUND_VOICE", "INBOUND_MAIL", "TCHAT", "RAFIKI", "CIB", "DIGITALISATION", "TELEVENTE", "OUTBOUND"];
+    var TEAM_NAMES = { INBOUND_VOICE: "Inbound Voix", INBOUND_MAIL: "Inbound Mail", TCHAT: "Réseaux sociaux", RAFIKI: "Rafiki", CIB: "CIB", OUTBOUND: "Outbound", DIGITALISATION: "Outbound — Digitalisation", TELEVENTE: "Télévente", SANS_EQUIPE: "Sans équipe" };
     var LEVEL_BADGES = {
         SUPERVISEUR: "Superviseur", RH: "RH", HEAD_QA: "Head QA", QA: "QA", TEAM_LEADER: "Team Leader",
         AGENT: "Agent", ADMIN: "Admin", AGENCE: "Agence", A_CLASSER: "À classer"
@@ -596,7 +596,7 @@
      * Comparaison insensible à la casse sur le NOM du rôle réel (voir WorkflowSchemaBootstrap).
      */
     var ROLE_SERVICE_FILTER = [
-        { roleMatch: /team leader/i, serviceCodes: ["TEAM_LEADER_INBOUND_VOICE", "TEAM_LEADER_INBOUND_MAIL", "TEAM_LEADER_TCHAT", "TEAM_LEADER_RAFIKI", "TEAM_LEADER_OUTBOUND", "TEAM_LEADER_CIB"] },
+        { roleMatch: /team leader/i, serviceCodes: ["TEAM_LEADER_INBOUND_VOICE", "TEAM_LEADER_INBOUND_MAIL", "TEAM_LEADER_TCHAT", "TEAM_LEADER_RAFIKI", "TEAM_LEADER_OUTBOUND", "TEAM_LEADER_CIB", "TEAM_LEADER_TELEVENTE", "TEAM_LEADER_DIGITALISATION"] },
         { roleMatch: /agent/i, serviceCodes: ["AGENT_INBOUND", "AGENT_OUTBOUND", "AGENT_INBOUND_MAIL", "AGENT_TCHAT", "AGENT_RAFIKI", "AGENT_CIB", "AGENT_TELEVENTE", "AGENT_DIGITALISATION"] },
         { roleMatch: /^quality assurance$/i, serviceCodes: ["QUALITY_ASSURANCE", "FORMATEUR", "COMMUNICATION"] }
     ];
