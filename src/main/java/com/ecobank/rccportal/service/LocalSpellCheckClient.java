@@ -180,7 +180,7 @@ public class LocalSpellCheckClient {
                     m.getShortMessage(),
                     from,
                     to - from,
-                    m.getSuggestedReplacements().stream().limit(8).toList(),
+                    rankSuggestions(text.substring(Math.max(0, from), Math.min(text.length(), to)), m.getSuggestedReplacements()),
                     rule.getId(),
                     rule.getCategory() != null ? rule.getCategory().getName() : null,
                     spelling ? "misspelling" : issueType(rule.getLocQualityIssueType() != null
@@ -310,7 +310,7 @@ public class LocalSpellCheckClient {
                 issues.add(new Issue(
                         m.path("message").asText(""),
                         m.path("shortMessage").asText(""),
-                        offset, length, suggestions,
+                        offset, length, rankSuggestions(offset >= 0 && offset + length <= text.length() ? text.substring(offset, offset + length) : "", suggestions),
                         m.path("rule").path("id").asText(null),
                         m.path("rule").path("category").path("name").asText(null),
                         type));
@@ -328,6 +328,42 @@ public class LocalSpellCheckClient {
     }
 
     // ══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Suggestions classées de la plus proche du texte saisi à la plus éloignée (distance d'édition), l'ordre du
+     * moteur départageant les ex æquo : « éfectué » propose « effectué » avant « effectue », « recu » « reçu »
+     * avant « reçut ». « Tout corriger » applique la première : elle doit être la plus plausible.
+     */
+    static List<String> rankSuggestions(String original, List<String> suggestions) {
+        if (suggestions == null || suggestions.isEmpty()) return List.of();
+        List<String> list = new ArrayList<>(suggestions.subList(0, Math.min(12, suggestions.size())));
+        if (original == null || original.isBlank() || original.length() > 40) return list.subList(0, Math.min(8, list.size()));
+        String o = original.toLowerCase(Locale.ROOT);
+        List<String> sorted = new ArrayList<>(list);
+        sorted.sort(Comparator.comparingInt(s -> distance(o, s.toLowerCase(Locale.ROOT))));
+        return sorted.subList(0, Math.min(8, sorted.size()));
+    }
+
+    static int distance(String a, String b) {
+        int[] prev = new int[b.length() + 1], cur = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++) prev[j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            cur[0] = i;
+            for (int j = 1; j <= b.length(); j++) {
+                char x = a.charAt(i - 1), y = b.charAt(j - 1);
+                // Une lettre accentuée à la place de sa lettre de base compte moitié moins (é/e, ç/c).
+                int cost = x == y ? 0 : fold(x) == fold(y) ? 1 : 2;
+                cur[j] = Math.min(Math.min(cur[j - 1] + 2, prev[j] + 2), prev[j - 1] + cost);
+            }
+            int[] t = prev; prev = cur; cur = t;
+        }
+        return prev[b.length()];
+    }
+
+    private static char fold(char c) {
+        String s = java.text.Normalizer.normalize(String.valueOf(c), java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "");
+        return s.isEmpty() ? c : s.charAt(0);
+    }
 
     /** Trie par position et retire les chevauchements (garde la première erreur). */
     private static List<Issue> clean(List<Issue> issues) {

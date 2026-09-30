@@ -77,12 +77,7 @@ public class AnthropicClient {
                         "Anthropic a répondu HTTP " + response.statusCode() + " : " + response.body());
             }
 
-            JsonNode json = objectMapper.readTree(response.body());
-            JsonNode content = json.path("content");
-            if (content.isArray() && !content.isEmpty()) {
-                return content.get(0).path("text").asText("");
-            }
-            throw ApiException.serviceUnavailable("Réponse inattendue d'Anthropic.");
+            return textOf(objectMapper.readTree(response.body()));
 
         } catch (ApiException e) {
             throw e;
@@ -133,12 +128,7 @@ public class AnthropicClient {
                         "Anthropic a répondu HTTP " + response.statusCode() + " : " + response.body());
             }
 
-            JsonNode json = objectMapper.readTree(response.body());
-            JsonNode responseContent = json.path("content");
-            if (responseContent.isArray() && !responseContent.isEmpty()) {
-                return responseContent.get(0).path("text").asText("");
-            }
-            throw ApiException.serviceUnavailable("Réponse inattendue d'Anthropic.");
+            return textOf(objectMapper.readTree(response.body()));
 
         } catch (ApiException e) {
             throw e;
@@ -148,5 +138,21 @@ public class AnthropicClient {
             Thread.currentThread().interrupt();
             throw ApiException.serviceUnavailable("Appel à Anthropic interrompu.");
         }
+    }
+
+    /**
+     * Texte de la réponse : tous les blocs « text », dans l'ordre. Les modèles récents peuvent renvoyer
+     * d'abord un bloc « thinking » : lire seulement le premier bloc donnait une réponse vide.
+     */
+    static String textOf(JsonNode json) {
+        if ("refusal".equals(json.path("stop_reason").asText())) {
+            throw ApiException.serviceUnavailable("Anthropic a décliné cette demande.");
+        }
+        StringBuilder out = new StringBuilder();
+        for (JsonNode block : json.path("content")) {
+            if ("text".equals(block.path("type").asText("text"))) out.append(block.path("text").asText(""));
+        }
+        if (out.length() == 0) throw ApiException.serviceUnavailable("Réponse inattendue d'Anthropic (aucun texte).");
+        return out.toString();
     }
 }

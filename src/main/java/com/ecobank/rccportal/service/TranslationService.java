@@ -207,8 +207,9 @@ public class TranslationService {
             } else if (detected != null) {
                 sourceForCall = detected;
             } else {
-                failures.add(provider.label() + " : langue source non détectable automatiquement pour ce texte");
-                continue;
+                // Texte trop court pour détecter la langue (« ok », un sigle…) : au centre de relation client, un texte
+                // à traduire vers une autre langue que le français est presque toujours en français, et inversement.
+                sourceForCall = "fr".equals(baseCode(target)) ? "en" : "fr";
             }
             candidates.add(provider);
             sources.add(sourceForCall);

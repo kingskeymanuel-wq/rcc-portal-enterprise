@@ -448,52 +448,115 @@
     function loadPlanShiftCodes() {
         return getJson("/api/shift-codes").then(function (list) {
             if (list && list.length) planShiftCodes = list;
-            var legend = $("tlPlanShiftLegend");
-            if (legend) legend.innerHTML = planShiftCodes.map(function (s) {
-                return '<span class="exc-shift-chip"><span class="dot"' + (s.color ? ' style="background:' + escapeHtml(s.color) + '"' : '') + '></span> ' + escapeHtml(shiftHours(s)) + ' (' + escapeHtml(s.code) + ')</span>';
-            }).join("");
         }).catch(function () { /* horaires par défaut */ });
+    }
+
+    /**
+     * Planning par agent : chaque agent a son brouillon { jour: code } (M, M2… ou OFF). On clique un agent, on choisit
+     * l'horaire (pinceau) puis ses jours ; ce qui est déjà en ligne est affiché en gris. « Publier » envoie tous les
+     * brouillons, regroupés par horaire et par jours identiques (un envoi pour les agents qui ont le même planning).
+     */
+    var planAgents = [], planDrafts = {}, planCurrent = null, planBrush = "M", planPicker = null, planExisting = {};
+
+    function planCodesMap() {
+        var m = { OFF: { color: "#94A3B8", label: "Repos (OFF)" } };
+        planShiftCodes.forEach(function (s) { m[s.code] = { color: s.color || "#0057B8", label: s.code + " · " + shiftHours(s) }; });
+        return m;
+    }
+
+    function renderBrushes() {
+        var codes = planCodesMap();
+        $("tlPlanShiftLegend").innerHTML = planShiftCodes.map(function (s) { return s.code; }).concat(["OFF"]).map(function (c) {
+            var info = codes[c], light = isLightColor(info.color);
+            return '<button type="button" class="pa-brush' + (c === planBrush ? " on" : "") + '" data-brush="' + escapeHtml(c) + '" style="background:' + escapeHtml(info.color) +
+                ';color:' + (light ? "#122240" : "#fff") + '">' + escapeHtml(c === "OFF" ? "Repos" : c) + '<small>' + escapeHtml(c === "OFF" ? "OFF" : info.label.split(" · ")[1]) + '</small></button>';
+        }).join("");
+    }
+
+    function isLightColor(hex) {
+        var h = String(hex || "").replace("#", "");
+        if (h.length !== 6) return false;
+        return (parseInt(h.substr(0, 2), 16) * 299 + parseInt(h.substr(2, 2), 16) * 587 + parseInt(h.substr(4, 2), 16) * 114) / 1000 > 150;
+    }
+
+    function draftCount(u) { return Object.keys(planDrafts[u] || {}).length; }
+
+    function renderPlanAgents() {
+        var q = ($("paAgentSearch").value || "").trim().toLowerCase();
+        var list = planAgents.filter(function (u) { return !q || ((u.fullName || "") + " " + u.username).toLowerCase().indexOf(q) !== -1; });
+        $("tlPlanAgentList").innerHTML = list.length ? list.map(function (u) {
+            var n = draftCount(u.username);
+            return '<button type="button" class="pa-agent' + (planCurrent === u.username ? " on" : "") + '" data-agent="' + escapeHtml(u.username) + '">' +
+                '<div><b>' + escapeHtml(u.fullName || u.username) + '</b><small>' + escapeHtml(u.username) + '</small></div>' +
+                (n ? '<span class="pa-badge draft">' + n + ' j à publier</span>' : '') + '</button>';
+        }).join("") : '<p class="text-muted text-center small p-3">Aucun agent.</p>';
+        var agents = Object.keys(planDrafts).filter(function (k) { return draftCount(k); });
+        $("paDraftCount").textContent = agents.length;
+        $("tlPlanCheckedCount").textContent = agents.length;
+        $("paDayCount").textContent = agents.reduce(function (n, k) { return n + draftCount(k); }, 0);
+    }
+
+    function updatePlanCheckedCount() { renderPlanAgents(); }
+
+    /** Planning déjà en ligne de l'agent sur ~4 mois (affiché en gris dans le calendrier). */
+    function loadAgentExisting(username) {
+        var from = todayIso(), d = new Date(); d.setMonth(d.getMonth() + 4);
+        var to = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+        return getJson("/api/schedule/team?from=" + from + "&to=" + to).then(function (entries) {
+            planExisting = {};
+            (entries || []).forEach(function (e) {
+                if (!e.username || !e.shiftCode) return;
+                var k = e.username.toLowerCase();
+                (planExisting[k] = planExisting[k] || {})[e.workDate] = e.shiftCode;
+            });
+            if (planPicker && planCurrent) planPicker.setExisting(planExisting[planCurrent.toLowerCase()] || {});
+        }).catch(function () { /* affichage seulement */ });
+    }
+
+    function openPlanAgent(username) {
+        var u = planAgents.filter(function (x) { return x.username === username; })[0];
+        if (!u) return;
+        planCurrent = username;
+        $("paEmpty").hidden = true;
+        $("paEditor").hidden = false;
+        $("paAgentName").textContent = u.fullName || u.username;
+        $("paAgentInfo").textContent = u.username;
+        if (!planPicker) {
+            planPicker = RccDayPicker.mount($("tlPlanDayPicker"), {
+                brush: function () { return planBrush; },
+                codes: planCodesMap(),
+                onChange: function () {
+                    if (!planCurrent || !planPicker) return;
+                    planDrafts[planCurrent] = planPicker.entries();
+                    renderPlanAgents();
+                }
+            });
+        }
+        planPicker.setExisting(planExisting[username.toLowerCase()] || {});
+        planPicker.load(planDrafts[username] || {});
+        $("paCopyList").innerHTML = planAgents.filter(function (x) { return x.username !== username; }).map(function (x) {
+            return '<label><input type="checkbox" class="form-check-input me-1" value="' + escapeHtml(x.username) + '">' + escapeHtml(x.fullName || x.username) + '</label>';
+        }).join("");
+        renderPlanAgents();
     }
 
     function loadPlanningTab() {
         $("tlPlanFrom").value = todayIso();
         $("tlPlanTo").value = todayIso();
         $("tlPlanResult").textContent = "";
-        $("tlPlanCheckAll").checked = false;
         $("tlPlanStatusList").innerHTML = '<p class="text-muted small">Choisissez une période puis cliquez "Actualiser".</p>';
         $("tlPlanPublishBtn").classList.add("d-none");
 
         Promise.all([getJson("/api/team-leader/members/full"), loadPlanShiftCodes()]).then(function (res) {
-            var members = res[0];
-            var active = members.filter(function (u) { return u.active; })
+            planAgents = res[0].filter(function (u) { return u.active; })
                 .sort(function (a, b) { return (a.fullName || "").localeCompare(b.fullName || "", "fr"); });
-
-            $("tlPlanAgentList").innerHTML = active.length ? active.map(function (u) {
-                return '<div class="exc-agent-row" data-username="' + escapeHtml(u.username) + '">' +
-                    '<input type="checkbox" class="form-check-input tl-plan-check">' +
-                    '<div class="exc-agent-name">' + escapeHtml(u.fullName || u.username) + '<small>' + escapeHtml(u.username) + '</small></div>' +
-                    '<select class="form-select form-select-sm exc-shift-select tl-plan-shift" disabled>' +
-                    planShiftOptions() +
-                    '</select></div>';
-            }).join("") : '<p class="text-muted text-center small">Aucun agent actif dans votre équipe.</p>';
-
-            Array.prototype.forEach.call($("tlPlanAgentList").querySelectorAll(".exc-agent-row"), function (row) {
-                var checkbox = row.querySelector(".tl-plan-check");
-                var select = row.querySelector(".tl-plan-shift");
-                checkbox.addEventListener("change", function () {
-                    select.disabled = !checkbox.checked;
-                    row.classList.toggle("checked", checkbox.checked);
-                    updatePlanCheckedCount();
-                });
-            });
-            updatePlanCheckedCount();
+            if (!planShiftCodes.some(function (s) { return s.code === planBrush; })) planBrush = planShiftCodes.length ? planShiftCodes[0].code : "OFF";
+            renderBrushes();
+            renderPlanAgents();
+            loadAgentExisting(planCurrent || "");
         }).catch(function (e) {
-            $("tlPlanAgentList").innerHTML = '<p class="text-danger text-center small">Erreur : ' + escapeHtml(e.message) + '</p>';
+            $("tlPlanAgentList").innerHTML = '<p class="text-danger text-center small p-3">Erreur : ' + escapeHtml(e.message) + '</p>';
         });
-    }
-
-    function updatePlanCheckedCount() {
-        $("tlPlanCheckedCount").textContent = $("tlPlanAgentList").querySelectorAll(".tl-plan-check:checked").length;
     }
 
     // PENDING / VALIDATED : plannings envoyés à l'ancien portail Excelliam (supprimé), à publier par le Team Leader.
@@ -535,65 +598,87 @@
     }
 
     function wirePlanningTab() {
-        $("tlPlanCheckAll").addEventListener("change", function () {
-            var checkAll = $("tlPlanCheckAll").checked;
-            Array.prototype.forEach.call($("tlPlanAgentList").querySelectorAll(".tl-plan-check"), function (cb) {
-                if (cb.checked !== checkAll) { cb.checked = checkAll; cb.dispatchEvent(new Event("change")); }
-            });
+        $("paAgentSearch").addEventListener("input", renderPlanAgents);
+        $("tlPlanAgentList").addEventListener("click", function (e) {
+            var b = e.target.closest("[data-agent]");
+            if (b) openPlanAgent(b.getAttribute("data-agent"));
         });
-
-        // Deux façons de choisir les jours : une période continue (du … au …) ou des jours précis dans le
-        // calendrier, sur plusieurs semaines et plusieurs mois (plan-day-picker.js).
-        var planMode = "range";
-        var dayPicker = window.RccDayPicker ? RccDayPicker.mount($("tlPlanDayPicker"), {}) : null;
-        $("tlPlanMode").addEventListener("click", function (e) {
-            var b = e.target.closest("[data-mode]");
+        $("tlPlanShiftLegend").addEventListener("click", function (e) {
+            var b = e.target.closest("[data-brush]");
             if (!b) return;
-            planMode = b.getAttribute("data-mode");
-            Array.prototype.forEach.call(this.querySelectorAll("[data-mode]"), function (x) { x.classList.toggle("on", x === b); });
-            $("tlPlanDaysBox").hidden = planMode !== "days";
-            $("tlPlanFrom").closest(".exc-period-bar").querySelectorAll("input[type=date], #tlPlanPeriodLabel, .exc-period-bar > span").forEach(function (el) {
-                el.style.display = planMode === "days" ? "none" : "";
-            });
+            planBrush = b.getAttribute("data-brush");
+            renderBrushes();
+        });
+        $("paClearBtn").addEventListener("click", function () {
+            if (!planCurrent || !planPicker) return;
+            planPicker.clear();
+        });
+        $("paReloadBtn").addEventListener("click", function () { loadAgentExisting(planCurrent); });
+        $("paCopyBtn").addEventListener("click", function () {
+            if (!planCurrent) return;
+            var src = planDrafts[planCurrent] || {};
+            if (!Object.keys(src).length) { alert("Le planning de cet agent est vide : choisissez d'abord ses jours."); return; }
+            var targets = Array.prototype.map.call($("paCopyList").querySelectorAll("input:checked"), function (i) { return i.value; });
+            if (!targets.length) { alert("Cochez au moins un agent."); return; }
+            targets.forEach(function (t) { planDrafts[t] = Object.assign({}, src); });
+            $("paCopyList").querySelectorAll("input:checked").forEach(function (i) { i.checked = false; });
+            renderPlanAgents();
+            $("tlPlanResult").className = "text-success small";
+            $("tlPlanResult").textContent = "Planning copié vers " + targets.length + " agent(s) — à publier.";
+        });
+        $("paDiscardBtn").addEventListener("click", function () {
+            if (!Object.keys(planDrafts).some(function (k) { return draftCount(k); })) return;
+            if (!confirm("Annuler tous les jours choisis et non publiés ?")) return;
+            planDrafts = {};
+            if (planPicker) planPicker.clear();
+            renderPlanAgents();
         });
 
-        // Publication directe : en ligne tout de suite, chaque agent est prévenu.
+        // Publication : brouillons regroupés par (horaire, jours identiques) — un envoi par groupe.
         function submitPlanning() {
-            var from = $("tlPlanFrom").value, to = $("tlPlanTo").value;
             var resultBox = $("tlPlanResult");
-            var days = planMode === "days" && dayPicker ? dayPicker.days() : null;
-            if (days) {
-                if (!days.length) { resultBox.className = "text-danger"; resultBox.textContent = "Choisissez au moins un jour dans le calendrier."; return; }
-                from = days[0]; to = days[days.length - 1];
-            }
-            if (!from || !to) { resultBox.className = "text-danger"; resultBox.textContent = "Choisissez une période."; return; }
-
-            var assignments = [];
-            Array.prototype.forEach.call($("tlPlanAgentList").querySelectorAll(".exc-agent-row"), function (row) {
-                var checkbox = row.querySelector(".tl-plan-check");
-                if (!checkbox.checked) return;
-                assignments.push({ username: row.getAttribute("data-username"), shiftCode: row.querySelector(".tl-plan-shift").value });
-            });
-            if (!assignments.length) { resultBox.className = "text-danger"; resultBox.textContent = "Cochez au moins un agent."; return; }
-            if (!confirm("Publier ce planning maintenant" + (days ? " (" + days.length + " jour(s) choisi(s))" : "") + " ? Il sera immédiatement visible par les " + assignments.length + " agent(s) concerné(s).")) return;
-
-            resultBox.className = "text-muted";
-            resultBox.textContent = "Publication…";
-            fetch("/api/schedule/team/submit", {
-                method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ periodFrom: from, periodTo: to, assignments: assignments,
-                    days: days, restOnOtherDays: days ? $("tlPlanRestOthers").checked : null })
-            })
-                .then(readImportResponse)
-                .then(function (result) {
-                    resultBox.className = "text-success";
-                    resultBox.textContent = "Planning publié : " + result.agentsPlanified + " agent(s), " + result.entriesCreated + " jour(s) — en ligne et agents prévenus.";
-                    loadPlanningStatus();
-                })
-                .catch(function (e) {
-                    resultBox.className = "text-danger";
-                    resultBox.textContent = "Erreur : " + e.message;
+            var byDayCode = {};
+            Object.keys(planDrafts).forEach(function (u) {
+                var perCode = {};
+                Object.keys(planDrafts[u] || {}).forEach(function (day) { (perCode[planDrafts[u][day]] = perCode[planDrafts[u][day]] || []).push(day); });
+                Object.keys(perCode).forEach(function (code) {
+                    var days = perCode[code].sort(), key = code + "|" + days.join(",");
+                    (byDayCode[key] = byDayCode[key] || { code: code, days: days, users: [] }).users.push(u);
                 });
+            });
+            var groups = Object.keys(byDayCode).map(function (k) { return byDayCode[k]; });
+            var agents = Object.keys(planDrafts).filter(function (k) { return draftCount(k); });
+            if (!groups.length) { resultBox.className = "text-danger small"; resultBox.textContent = "Choisissez d'abord un agent et ses jours."; return; }
+            var total = agents.reduce(function (n, k) { return n + draftCount(k); }, 0);
+            if (!confirm("Publier " + total + " jour(s) de planning pour " + agents.length + " agent(s) ? Ce sera immédiatement visible par les agents concernés (ils sont prévenus).")) return;
+
+            resultBox.className = "text-muted small";
+            resultBox.textContent = "Publication…";
+            $("tlPlanPublishDirectBtn").disabled = true;
+            var done = 0, entries = 0, errors = [];
+            groups.reduce(function (chain, g) {
+                return chain.then(function () {
+                    return fetch("/api/schedule/team/submit", {
+                        method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ periodFrom: g.days[0], periodTo: g.days[g.days.length - 1], days: g.days, restOnOtherDays: false,
+                            assignments: g.users.map(function (u) { return { username: u, shiftCode: g.code }; }) })
+                    }).then(readImportResponse).then(function (r) {
+                        done++;
+                        entries += r.entriesCreated || 0;
+                        g.users.forEach(function (u) { g.days.forEach(function (d) { if (planDrafts[u]) delete planDrafts[u][d]; }); });
+                    }).catch(function (e) { errors.push(g.code + " : " + e.message); });
+                });
+            }, Promise.resolve()).then(function () {
+                $("tlPlanPublishDirectBtn").disabled = false;
+                if (planPicker && planCurrent) planPicker.load(planDrafts[planCurrent] || {});
+                renderPlanAgents();
+                loadAgentExisting(planCurrent || "");
+                resultBox.className = errors.length ? "text-danger small" : "text-success small";
+                resultBox.textContent = errors.length
+                    ? "Publié en partie (" + entries + " jour(s)). Erreurs : " + errors.join(" ; ")
+                    : "Planning publié : " + agents.length + " agent(s), " + entries + " jour(s) — en ligne et agents prévenus.";
+                loadPlanningStatus();
+            });
         }
         $("tlPlanPublishDirectBtn").addEventListener("click", submitPlanning);
 

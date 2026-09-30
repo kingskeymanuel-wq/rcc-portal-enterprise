@@ -256,51 +256,55 @@
                                     <button type="button" class="btn btn-sm btn-success" id="tlPlanExportBtn"><i class="bi bi-download"></i> Exporter (Excel)</button>
                                 </div>
                             </div>
-                            <p class="text-muted small mb-2"><i class="bi bi-info-circle"></i> Construisez le planning de votre équipe puis <b>publiez-le</b> : il est en ligne tout de suite et chaque agent le voit dans son portail (il est prévenu).</p>
+                            <p class="text-muted small mb-2"><i class="bi bi-info-circle"></i> <b>1.</b> Cliquez un agent · <b>2.</b> choisissez un horaire · <b>3.</b> cliquez ses jours dans le calendrier (ou semaine, mois, Lun–Ven…). Chaque agent a ses propres jours et horaires ; ce qui est déjà en ligne apparaît en gris. <b>4.</b> Publiez : c'est en ligne tout de suite et chaque agent est prévenu.</p>
 
-                            <!-- Horaires du catalogue des shifts (Administration → Équipes & accès → Horaires des shifts) -->
-                            <div class="exc-shift-legend mb-2" id="tlPlanShiftLegend">
-                                <span class="exc-shift-chip"><span class="dot"></span> 07h–16h (M)</span>
-                                <span class="exc-shift-chip"><span class="dot"></span> 08h–17h (M2)</span>
-                                <span class="exc-shift-chip"><span class="dot"></span> 09h–18h (M3)</span>
-                                <span class="exc-shift-chip"><span class="dot"></span> 10h–19h (M4)</span>
-                                <span class="exc-shift-chip"><span class="dot"></span> 12h–21h (A)</span>
-                                <span class="exc-shift-chip"><span class="dot"></span> 21h–07h (N)</span>
+                            <div class="pa-wrap">
+                                <!-- Agents de l'équipe : un clic ouvre son planning -->
+                                <aside class="pa-agents">
+                                    <div class="pa-agents-head">
+                                        <input type="search" class="form-control form-control-sm" id="paAgentSearch" placeholder="Rechercher un agent…">
+                                        <div class="small text-muted"><b id="paDraftCount">0</b> agent(s) avec des jours à publier</div>
+                                    </div>
+                                    <div class="pa-agents-list" id="tlPlanAgentList"><p class="text-muted text-center small p-3">Chargement des agents…</p></div>
+                                </aside>
+
+                                <!-- Planning de l'agent choisi -->
+                                <section class="pa-main" id="paMain">
+                                    <div class="pa-empty" id="paEmpty"><i class="bi bi-hand-index-thumb" style="font-size:1.6rem"></i><br>Cliquez un agent à gauche pour choisir ses jours et ses horaires.</div>
+                                    <div id="paEditor" hidden>
+                                        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                            <div><h6 class="mb-0" id="paAgentName">—</h6><small class="text-muted" id="paAgentInfo"></small></div>
+                                            <div class="d-flex gap-1">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary" id="paReloadBtn" title="Recharger ce qui est déjà en ligne"><i class="bi bi-arrow-clockwise"></i></button>
+                                                <button type="button" class="btn btn-sm btn-outline-danger" id="paClearBtn"><i class="bi bi-eraser"></i> Vider</button>
+                                            </div>
+                                        </div>
+                                        <div class="small fw-semibold mt-2">Horaire à appliquer :</div>
+                                        <!-- Horaires du catalogue des shifts (Administration → Équipes & accès → Horaires des shifts) -->
+                                        <div class="pa-brushes" id="tlPlanShiftLegend"></div>
+                                        <div id="tlPlanDayPicker"></div>
+                                        <details class="pa-copy">
+                                            <summary class="small fw-semibold"><i class="bi bi-files"></i> Copier ce planning vers d'autres agents</summary>
+                                            <div class="pa-copy-list" id="paCopyList"></div>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" id="paCopyBtn"><i class="bi bi-clipboard-check"></i> Copier vers les agents cochés</button>
+                                        </details>
+                                    </div>
+                                </section>
                             </div>
 
-                            <div class="tl-plan-mode" id="tlPlanMode" role="group" aria-label="Mode de sélection des jours">
-                                <button type="button" class="on" data-mode="range"><i class="bi bi-arrow-left-right"></i> Période continue</button>
-                                <button type="button" data-mode="days"><i class="bi bi-calendar3"></i> Jours choisis (semaines / mois)</button>
+                            <div class="pa-bottom">
+                                <span class="small"><b id="tlPlanCheckedCount">0</b> agent(s) · <b id="paDayCount">0</b> jour(s) à publier</span>
+                                <span id="tlPlanResult" class="text-muted small"></span>
+                                <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" id="paDiscardBtn">Tout annuler</button>
+                                <button type="button" class="btn btn-primary" id="tlPlanPublishDirectBtn"><i class="bi bi-lightning-charge-fill"></i> Publier le planning</button>
                             </div>
-                            <div id="tlPlanDaysBox" hidden>
-                                <div id="tlPlanDayPicker"></div>
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" id="tlPlanRestOthers">
-                                    <label class="form-check-label small" for="tlPlanRestOthers">Mettre en repos (OFF) les jours non choisis entre le premier et le dernier jour</label>
-                                </div>
-                            </div>
-                            <div class="exc-period-bar mb-3">
-                                <label class="small fw-semibold mb-0" id="tlPlanPeriodLabel">Période :</label>
+
+                            <!-- Période de l'état ci-dessous -->
+                            <div class="exc-period-bar mb-2 mt-3">
+                                <label class="small fw-semibold mb-0" id="tlPlanPeriodLabel">État du planning du</label>
                                 <input type="date" class="form-control form-control-sm" id="tlPlanFrom">
                                 <span class="small text-muted">au</span>
                                 <input type="date" class="form-control form-control-sm" id="tlPlanTo">
-                                <div class="form-check ms-auto">
-                                    <input class="form-check-input" type="checkbox" id="tlPlanCheckAll">
-                                    <label class="form-check-label small" for="tlPlanCheckAll">Tout cocher</label>
-                                </div>
-                            </div>
-
-                            <div id="tlPlanAgentList" class="exc-shift-picker">
-                                <p class="text-muted text-center small">Chargement des agents…</p>
-                            </div>
-
-                            <div class="exc-summary-bar">
-                                <span><b id="tlPlanCheckedCount">0</b> agent(s) sélectionné(s)</span>
-                                <span id="tlPlanResult" class="text-muted"></span>
-                            </div>
-
-                            <div class="d-flex justify-content-end align-items-center gap-2 mt-2 flex-wrap">
-                                <button type="button" class="btn btn-primary" id="tlPlanPublishDirectBtn"><i class="bi bi-lightning-charge-fill"></i> Publier le planning</button>
                             </div>
 
                             <hr>

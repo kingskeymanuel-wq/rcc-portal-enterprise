@@ -40,6 +40,10 @@
         html[data-theme="dark"] .tr-swap-btn { background:#1a2233; border-color:#2a3448; color:#edf3fb; }
         @media (max-width: 700px) { .tr-panes { flex-direction:column; } .tr-pane-right { border-left:none; border-top:1px solid rgba(0,0,0,.06); } }
         #scEditor:empty:before { content: attr(data-placeholder); color:#9aa0a6; }
+        .rw-styles { display:flex; flex-wrap:wrap; gap:.35rem; }
+        .rw-style { border:1px solid #DCE4F0; background:#fff; border-radius:999px; padding:.3rem .8rem; font-size:.82rem; font-weight:700; color:#33415C; }
+        .rw-style.on { background:#0057B8; border-color:#0057B8; color:#fff; }
+        html[data-theme="dark"] .rw-style:not(.on) { background:transparent; color:#cbd5e1; }
         #scEditor { white-space: pre-wrap; word-wrap: break-word; min-height: 220px; }
         #scEditor mark.sc-issue { background: rgba(220,53,69,.12); color: inherit; padding: 0; border-bottom: 2px solid #dc3545; cursor: pointer; }
         .sc-issue-card-active { box-shadow: 0 0 0 2px rgba(0,87,184,.35); }
@@ -109,6 +113,7 @@
                         <ul class="nav tr-tabs" id="trTopTabs">
                             <li class="nav-item"><button type="button" class="nav-link active" id="trTabTranslateBtn"><i class="bi bi-translate"></i> Traduction</button></li>
                             <li class="nav-item"><button type="button" class="nav-link" id="trTabSpellcheckBtn"><i class="bi bi-spellcheck"></i> Correcteur</button></li>
+                            <li class="nav-item"><button type="button" class="nav-link" id="trTabRewriteBtn"><i class="bi bi-magic"></i> Réécriture</button></li>
                         </ul>
                         <div class="ms-auto d-flex align-items-center gap-2">
                             <span class="tr-expand-hint" id="trExpandHint">Échap pour réduire</span>
@@ -200,6 +205,51 @@
                         </div>
                         <div class="tr-status" id="scStatus"></div>
                     </div>
+
+                    <!-- ===================== Onglet Réécriture (rewrite.js) ===================== -->
+                    <div id="trPaneRewrite" style="display:none;">
+                        <div class="tr-card">
+                            <div class="tr-langbar flex-wrap gap-2">
+                                <div class="rw-styles" id="rwStyles" role="group" aria-label="Style de réécriture">
+                                    <button type="button" class="rw-style on" data-style="professionnel"><i class="bi bi-briefcase"></i> Professionnel</button>
+                                    <button type="button" class="rw-style" data-style="courtois"><i class="bi bi-emoji-smile"></i> Courtois</button>
+                                    <button type="button" class="rw-style" data-style="concis"><i class="bi bi-scissors"></i> Concis</button>
+                                    <button type="button" class="rw-style" data-style="simple"><i class="bi bi-lightbulb"></i> Plus simple</button>
+                                </div>
+                                <div style="flex:1"></div>
+                                <select class="tr-lang-select" id="rwLangSelect" style="font-size:.85rem">
+                                    <option value="fr">Français</option>
+                                    <option value="en-US">Anglais</option>
+                                </select>
+                                <label class="small text-muted d-flex align-items-center gap-1" id="rwAiWrap" style="display:none !important">
+                                    <input type="checkbox" class="form-check-input" id="rwAi" checked> IA
+                                </label>
+                            </div>
+                            <div class="tr-panes">
+                                <div class="tr-pane">
+                                    <textarea class="tr-textarea" id="rwSource" style="font-size:1.05rem;font-weight:400" maxlength="5000" placeholder="Collez le message à réécrire… (Ctrl+Entrée pour réécrire)"></textarea>
+                                    <div class="tr-toolbar">
+                                        <span class="tr-charcount" id="rwCharCount">0 / 5000</span>
+                                        <button type="button" class="btn btn-sm btn-primary" id="rwBtn"><i class="bi bi-magic"></i> Réécrire</button>
+                                    </div>
+                                </div>
+                                <div class="tr-pane tr-pane-right">
+                                    <div class="tr-output" id="rwOutput" style="font-size:1.05rem;font-weight:400;color:inherit"></div>
+                                    <ul class="small text-muted mb-2 ps-3" id="rwChanges"></ul>
+                                    <div class="tr-toolbar">
+                                        <span class="text-muted small" id="rwEngine"></span>
+                                        <div class="d-flex gap-1 flex-wrap">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" id="rwCopyBtn" disabled title="Copier"><i class="bi bi-copy"></i></button>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" id="rwUseBtn" disabled title="Remplacer mon texte par la proposition"><i class="bi bi-arrow-left"></i> Utiliser</button>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" id="rwToCheckBtn" disabled><i class="bi bi-spellcheck"></i> Vérifier</button>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" id="rwToTranslateBtn" disabled><i class="bi bi-translate"></i> Traduire</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tr-status" id="rwStatus"></div>
+                    </div>
                 </div>
             </div>
         </main>
@@ -212,6 +262,7 @@
 <script th:src="@{/js/session.js}"></script>
 <script th:src="@{/js/translator.js}"></script>
 <script th:src="@{/js/spellcheck.js}"></script>
+<script th:src="@{/js/rewrite.js}"></script>
 <script th:src="@{/js/translator-ui.js}"></script>
 </body>
 </html>
