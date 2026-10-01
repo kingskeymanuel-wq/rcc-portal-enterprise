@@ -100,6 +100,14 @@ window.RccFormBuilder = (function () {
 
         function field(label, html, cls) { return '<div class="mb-2 ' + (cls || "") + '"><label class="form-label">' + label + '</label>' + html + '</div>'; }
         function input(path, value, ph, type) { return '<input class="form-control form-control-sm" data-f="' + path + '" value="' + esc(value == null ? "" : value) + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : '') + (type ? ' type="' + type + '"' : '') + '>'; }
+        /** Liste des pas à pas (base de connaissance) à lier. */
+        function guideSelect(attr, value, label) {
+            var guides = window.RccGuide ? window.RccGuide.list() : [];
+            if (!guides.length) return "";
+            return '<select class="form-select form-select-sm" ' + attr + ' title="' + esc(label || "Pas à pas") + '"><option value="">' + esc(label || "— pas à pas —") + '</option>' +
+                guides.map(function (g) { return '<option value="' + esc(g.ref) + '"' + (g.ref === value ? " selected" : "") + '>' + esc(g.platform + " · " + g.title) + '</option>'; }).join("") + '</select>';
+        }
+
         function varsHtml(target) { return '<div class="fb-vars">' + VARS.map(function (v) { return '<button type="button" data-var="' + esc(v[0]) + '" data-target="' + target + '">' + esc(v[1]) + '</button>'; }).join("") + '</div>'; }
 
         function condHtml(cond, candidates, path, title) {
@@ -140,6 +148,7 @@ window.RccFormBuilder = (function () {
                 field("Titre", input("s.title", s.title)) +
                 field("Description (vue par l'agent)", '<textarea class="form-control form-control-sm" rows="2" data-f="s.description">' + esc(s.description || "") + '</textarea>') +
                 field("Script d'appel — ce que l'agent dit au client", '<textarea class="form-control form-control-sm" rows="3" id="fbScript" data-f="s.script">' + esc(s.script || "") + '</textarea>' + varsHtml("fbScript")) +
+                (window.RccGuide ? field("Pas à pas proposé à l'agent dans cette section", guideSelect('data-guide-sel="s"', s.guide, "Aucun")) : '') +
                 condHtml(s.visibleIf, earlier(sel.s, null), "s", "Afficher cette section seulement si…") +
                 '<div class="d-flex gap-2 mt-3 flex-wrap"><button type="button" class="btn btn-sm btn-light" data-act="s-up"' + (sel.s === 0 ? " disabled" : "") + '><i class="bi bi-arrow-up"></i> Monter</button>' +
                 '<button type="button" class="btn btn-sm btn-light" data-act="s-down"' + (sel.s === form.sections.length - 1 ? " disabled" : "") + '><i class="bi bi-arrow-down"></i> Descendre</button>' +
@@ -162,7 +171,9 @@ window.RccFormBuilder = (function () {
                         '<select class="form-select form-select-sm" data-opt="' + key + '" data-i="' + i + '" data-k="outcome" title="Issue d\'appel suggérée si cette réponse est choisie"><option value="">— issue —</option>' +
                         Object.keys(STATUSES).map(function (k) { return '<option value="' + k + '"' + (o.outcome === k ? " selected" : "") + '>' + STATUSES[k] + '</option>'; }).join("") + '</select>' : '<span></span><span></span>') +
                     '<span class="d-flex gap-1"><button type="button" class="btn btn-sm btn-light" data-opt-move="' + key + '" data-i="' + i + '" data-dir="-1"' + (i === 0 ? " disabled" : "") + '><i class="bi bi-arrow-up"></i></button>' +
-                    '<button type="button" class="btn btn-sm btn-light" data-opt-del="' + key + '" data-i="' + i + '"><i class="bi bi-x-lg"></i></button></span></div>';
+                    '<button type="button" class="btn btn-sm btn-light" data-opt-del="' + key + '" data-i="' + i + '"><i class="bi bi-x-lg"></i></button></span></div>' +
+                    (withScore ? '<div class="fb-opt-x"><input class="form-control form-control-sm" data-opt="' + key + '" data-i="' + i + '" data-k="reply" value="' + esc(o.reply || "") + '" placeholder="Réponse conseillée / argument affiché à l\'agent si ce choix est sélectionné (facultatif)">' +
+                        guideSelect('data-opt="' + key + '" data-i="' + i + '" data-k="guide"', o.guide, "Pas à pas : aucun") + '</div>' : '');
             }).join("") +
                 '<div class="d-flex gap-2 mt-1 flex-wrap"><button type="button" class="btn btn-sm btn-outline-secondary" data-opt-add="' + key + '"><i class="bi bi-plus-lg"></i> Ajouter</button>' +
                 '<button type="button" class="btn btn-sm btn-outline-secondary" data-opt-paste="' + key + '"><i class="bi bi-clipboard"></i> Coller une liste</button></div></div>';
@@ -201,6 +212,8 @@ window.RccFormBuilder = (function () {
                     (t === "SINGLE" || t === "MULTIPLE" ? '<div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="fbOther" data-qbool="allowOther"' + (q.allowOther ? " checked" : "") + '><label class="form-check-label small" for="fbOther">Réponse « Autre » libre</label></div>' : '') + '</div>';
             }
             if (t === "SHORT_TEXT" || t === "LONG_TEXT" || t === "NUMBER" || t === "PHONE" || t === "EMAIL") html += field("Texte indicatif dans le champ", input("q.placeholder", q.placeholder));
+            if (t === "STATEMENT") html += field("Points forts / argumentaire (un par ligne)", '<textarea class="form-control form-control-sm" rows="4" data-bullets placeholder="Ex. Activation en 3 minutes pendant l\'appel">' + esc((q.bullets || []).join("\n")) + '</textarea>');
+            if (window.RccGuide) html += field("Pas à pas lié à cette question", guideSelect('data-guide-sel="q"', q.guide, "Aucun"));
             if (t === "SINGLE" || t === "MULTIPLE" || t === "DROPDOWN" || t === "YES_NO") html += optionsHtml(q, "options", "Choix proposés · points pour le score du lead · issue d'appel suggérée", true);
             if (t === "RANKING") html += optionsHtml(q, "options", "Éléments à classer", false);
             if (t === "MATRIX") html += optionsHtml(q, "rows", "Lignes (critères)", false) + optionsHtml(q, "options", "Colonnes (réponses)", false);
@@ -378,9 +391,16 @@ window.RccFormBuilder = (function () {
                 if (v === undefined || v === "") delete target[key]; else target[key] = v;
                 soft(); return;
             }
-            if (d.opt && (d.k === "label" || d.k === "score")) {
+            if (el.hasAttribute("data-bullets")) {
+                var bl = el.value.split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean);
+                if (bl.length) cur().bullets = bl; else delete cur().bullets;
+                soft(); return;
+            }
+            if (d.opt && (d.k === "label" || d.k === "score" || d.k === "reply")) {
                 var o = cur()[d.opt][Number(d.i)];
-                if (d.k === "score") { if (el.value === "") delete o.score; else o.score = Number(el.value); } else o.label = el.value;
+                if (d.k === "score") { if (el.value === "") delete o.score; else o.score = Number(el.value); }
+                else if (d.k === "reply") { if (el.value.trim()) o.reply = el.value; else delete o.reply; }
+                else o.label = el.value;
                 soft(); return;
             }
             if (d.val) {
@@ -417,6 +437,8 @@ window.RccFormBuilder = (function () {
                 sel = { s: to, q: form.sections[to].questions.length - 1 }; hard(); return;
             }
             if (d.qbool) { cur()[d.qbool] = el.checked; hard(); return; }
+            if (d.guideSel) { var tg = d.guideSel === "s" ? sec() : cur(); if (el.value) tg.guide = el.value; else delete tg.guide; soft(); return; }
+            if ((d.opt === "options" || d.opt === "rows") && d.k === "guide") { var og = cur()[d.opt][Number(d.i)]; if (el.value) og.guide = el.value; else delete og.guide; soft(); return; }
             if (d.opt === "options" || d.opt === "rows") { if (d.k === "outcome") { var o = cur()[d.opt][Number(d.i)]; if (el.value) o.outcome = el.value; else delete o.outcome; soft(); } return; }
             if (d.scale === "min" || d.scale === "max") { (cur().scale = cur().scale || {})[d.scale] = Number(el.value); hard(); return; }
             if (el.hasAttribute("data-val-preset")) { var v = cur().validation || (cur().validation = {}); if (el.value) v.pattern = el.value; else delete v.pattern; soft(); return; }

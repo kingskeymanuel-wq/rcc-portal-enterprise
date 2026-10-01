@@ -338,16 +338,38 @@ window.RccForm = (function () {
             return "";
         }
 
+        /** Bouton « Accompagner pas à pas » (base de connaissance Pas à pas, voir rcc-guides.js). */
+        function guideBtn(ref, label) {
+            if (!ref) return "";
+            var g = window.RccGuide ? window.RccGuide.find(ref) : null;
+            return '<button type="button" class="rf-guide" data-guide="' + esc(ref) + '"><i class="bi bi-play-circle-fill"></i> ' +
+                esc(label || "Accompagner pas à pas") + (g ? " : " + esc(g.guide.title) : "") + '</button>';
+        }
+
+        /** Réponse conseillée et pas à pas attachés aux choix sélectionnés (anticipation des objections, démonstration). */
+        function selectionExtras(q) {
+            var v = answers[q.id];
+            if (v == null || !q.options) return "";
+            var picked = q.type === "MULTIPLE" ? (list(v) || []).map(function (x) { return findOption(q, x); }).filter(Boolean) : [findOption(q, v)].filter(Boolean);
+            return picked.map(function (o) {
+                return (o.reply ? '<div class="rf-reply"><small>' + esc(q.type === "MULTIPLE" ? o.label + " — à dire" : "Réponse conseillée") + '</small>' + esc(pipe(o.reply, ctx, answers, form)) + '</div>' : '') +
+                    (o.guide ? guideBtn(o.guide, "Montrer au client") : '');
+            }).join("");
+        }
+
         function questionHtml(q) {
             var err = ev.errors[q.id], showErr = err && (touched[q.id] || showAllErrors) && !(err === "Obligatoire." && !showAllErrors);
             if (q.type === "STATEMENT") {
-                return '<div class="rf-q rf-statement"><i class="bi bi-info-circle-fill"></i><div><b>' + esc(pipe(q.label, ctx, answers, form)) + '</b>' +
-                    (q.help ? '<div>' + esc(pipe(q.help, ctx, answers, form)) + '</div>' : '') + '</div></div>';
+                return '<div class="rf-q rf-statement"><i class="bi ' + esc(q.icon || "bi-info-circle-fill") + '"></i><div><b>' + esc(pipe(q.label, ctx, answers, form)) + '</b>' +
+                    (q.help ? '<div>' + esc(pipe(q.help, ctx, answers, form)) + '</div>' : '') +
+                    ((q.bullets || []).length ? '<ul class="rf-bullets">' + q.bullets.map(function (b) { return '<li>' + esc(pipe(b, ctx, answers, form)) + '</li>'; }).join("") + '</ul>' : '') +
+                    (q.guide ? guideBtn(q.guide) : '') + '</div></div>';
             }
             return '<div class="rf-q' + (showErr ? " err" : "") + '" data-q="' + esc(q.id) + '">' +
                 (q.type === "CONSENT" ? "" : '<label class="rf-label">' + esc(pipe(q.label, ctx, answers, form)) + (q.required ? ' <span class="rf-req">*</span>' : '') + '</label>') +
                 (q.help ? '<div class="rf-help">' + esc(pipe(q.help, ctx, answers, form)) + '</div>' : '') +
-                inputHtml(q) + '<div class="rf-err" data-err="' + esc(q.id) + '">' + (showErr ? '<i class="bi bi-exclamation-circle"></i> ' + esc(err === "Obligatoire." ? "Réponse obligatoire." : err) : "") + '</div></div>';
+                inputHtml(q) + selectionExtras(q) + (q.guide ? guideBtn(q.guide) : '') +
+                '<div class="rf-err" data-err="' + esc(q.id) + '">' + (showErr ? '<i class="bi bi-exclamation-circle"></i> ' + esc(err === "Obligatoire." ? "Réponse obligatoire." : err) : "") + '</div></div>';
         }
 
         function sectionHtml(s) {
@@ -355,6 +377,7 @@ window.RccForm = (function () {
             return '<section class="rf-section">' +
                 '<header><h6>' + esc(pipe(s.title, ctx, answers, form)) + '</h6>' + (s.description ? '<p>' + esc(pipe(s.description, ctx, answers, form)) + '</p>' : '') + '</header>' +
                 (s.script ? '<div class="rf-script"><i class="bi bi-chat-quote-fill"></i><div><small>À dire au client</small>' + esc(pipe(s.script, ctx, answers, form)) + '</div></div>' : '') +
+                (s.guide ? '<div class="mb-2">' + guideBtn(s.guide) + '</div>' : '') +
                 (qs.length ? qs.map(questionHtml).join("") : '<div class="rf-empty">Aucune question dans cette section pour ces réponses.</div>') + '</section>';
         }
 
@@ -427,6 +450,7 @@ window.RccForm = (function () {
             var b = e.target.closest("button");
             if (!b || !root.contains(b)) return;
             var d = b.dataset;
+            if (d.guide) { if (window.RccGuide) window.RccGuide.open(d.guide); return; }
             if (d.step != null) { step = Number(d.step); draw(); return; }
             if (d.nav) {
                 var secs = sections();

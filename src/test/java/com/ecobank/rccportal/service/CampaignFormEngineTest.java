@@ -108,4 +108,38 @@ class CampaignFormEngineTest {
         ObjectNode c = CampaignFormTemplates.closest("relance carte VISA gold");
         assertTrue(CampaignFormEngine.questions(c).stream().anyMatch(q -> q.get("label").asText().contains("carte")));
     }
+
+    @Test
+    void televenteJourneyShowsOnlyTheChosenProduct() {
+        ObjectNode form = CampaignFormEngine.normalize(CampaignFormTemplates.byCode("TELEVENTE").orElseThrow().form());
+        Map<String, String> a = new HashMap<>(Map.of("joignable", "Oui, disponible", "profil", "Fonctionnaire", "deja_client", "Oui",
+                "besoins", "[\"Financer un projet\"]", "produit", "Prêt", "type_pret", "Prêt scolaire", "revenus", "Oui",
+                "decision", "RDV en agence"));
+        CampaignFormEngine.Evaluation e = CampaignFormEngine.evaluate(form, a);
+        assertTrue(e.valid(), e.errors().toString());
+        assertTrue(e.visible().contains("piste_pret"), "la piste prêt est anticipée d'après le besoin");
+        assertFalse(e.visible().contains("piste_compte"));
+        assertTrue(e.visible().contains("type_pret"));
+        assertFalse(e.visible().contains("type_compte"), "section compte masquée pour un prêt");
+        assertEquals("YELLOW", e.suggestedStatus());
+        // Réponses conseillées et pas à pas conservés par le moteur.
+        JsonNode typeCompte = CampaignFormEngine.questions(form).stream().filter(q -> "type_compte".equals(q.get("id").asText())).findFirst().orElseThrow();
+        assertTrue(typeCompte.get("options").get(0).has("reply"));
+        assertEquals("ecobank-mobile/enrolement", typeCompte.get("options").get(0).get("guide").asText());
+    }
+
+    @Test
+    void digitalJourneyLinksStepByStepGuides() {
+        ObjectNode form = CampaignFormEngine.normalize(CampaignFormTemplates.byCode("DIGITAL").orElseThrow().form());
+        JsonNode demo = CampaignFormEngine.questions(form).stream().filter(q -> "demo".equals(q.get("id").asText())).findFirst().orElseThrow();
+        demo.get("options").forEach(o -> assertTrue(o.get("guide").asText().startsWith("ecobank-mobile/"), o.toString()));
+        Map<String, String> a = Map.of("joignable", "Oui, disponible", "smartphone", "Oui", "app", "Pas installée",
+                "profil", "Nouveau client — ouverture d'un compte Xpress", "etape", "Application activée (code PIN créé)", "issue", "Client autonome sur l'application");
+        CampaignFormEngine.Evaluation e = CampaignFormEngine.evaluate(form, a);
+        assertTrue(e.valid(), e.errors().toString());
+        assertEquals("GREEN", e.suggestedStatus());
+        // Sans smartphone : pas d'activation proposée.
+        CampaignFormEngine.Evaluation noPhone = CampaignFormEngine.evaluate(form, Map.of("joignable", "Oui, disponible", "smartphone", "Non", "issue", "Refus"));
+        assertFalse(noPhone.visible().contains("profil"));
+    }
 }

@@ -90,6 +90,8 @@
 .fb-block > b { display: block; font-size: .82rem; color: #122240; margin-bottom: .4rem; }
 .fb-opt { display: grid; grid-template-columns: 1.4rem minmax(0, 1fr) 72px 130px auto; gap: .3rem; align-items: center; margin-bottom: .3rem; }
 .fb-opt .fb-grip { color: #A8B4C6; text-align: center; }
+.fb-opt-x { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: .3rem; margin: -.1rem 0 .55rem 1.7rem; }
+.fb-opt-x input { font-size: .78rem; background: #FAFCFF; }
 .fb-rule { display: grid; grid-template-columns: minmax(0, 1.4fr) 150px minmax(0, 1fr) auto; gap: .3rem; align-items: center; margin-bottom: .3rem; }
 .fb-types { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .35rem; }
 .fb-types button { display: flex; align-items: center; gap: .45rem; border: 1px solid #E2E8F2; background: #fff; border-radius: .6rem; padding: .4rem .55rem; font-size: .8rem; text-align: left; }

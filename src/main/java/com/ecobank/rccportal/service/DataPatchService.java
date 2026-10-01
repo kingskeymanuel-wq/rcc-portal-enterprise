@@ -46,6 +46,12 @@ public class DataPatchService {
     /** Pôle Inbound Mail : LOUM Olivia Team Leader, comptes de test (bypass) Team Leader et agent Inbound Mail alignés. */
     public static final String INBOUND_MAIL_LEADERSHIP = "INBOUND_MAIL_LEADERSHIP";
 
+    /** Campagnes Outbound prêtes : Digital (Ecobank Mobile) et Télévente (prêts, comptes, cartes, digital). */
+    public static final String CAMPAGNES_OUTBOUND = "CAMPAGNES_OUTBOUND_DIGITAL_TELEVENTE";
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.ecobank.rccportal.repository.CampaignRepository campaignRepository;
+
     /** Filiale RCC ETG (Togo, Lomé) : agents rattachés à leur filiale, équipe et accès — sans doublon de compte. */
     public static final String TOGO_RCC_ETG = "TOGO_RCC_ETG";
 
@@ -81,7 +87,11 @@ public class DataPatchService {
             new Patch(TOGO_RCC_ETG, "Filiale RCC ETG (Togo) — équipe de Lomé",
                     "Les 9 collaborateurs de Lomé sont rattachés à la filiale RCC ETG (Togo), contrat Ecobank : 7 agents Inbound Voix, "
                             + "1 agent Réseaux sociaux (LASSEY), 1 QA (AGBOKOU) et FAHE Talitha Team Leader Inbound Voix de RCC ETG. "
-                            + "Un compte déjà en base (même identifiant ou même nom) est réorganisé, jamais dupliqué ; seuls les absents sont créés."));
+                            + "Un compte déjà en base (même identifiant ou même nom) est réorganisé, jamais dupliqué ; seuls les absents sont créés."),
+            new Patch(CAMPAGNES_OUTBOUND, "Campagnes Outbound Digital et Télévente",
+                    "Crée deux campagnes actives avec leur parcours interactif : « Ecobank Mobile — Digitalisation » pour l'équipe Digitalisation "
+                            + "(activation accompagnée et pas à pas de chaque fonctionnalité) et « Télévente — Prêts, comptes et produits digitaux » pour la Télévente "
+                            + "(besoin, produit recommandé, avantages, objections anticipées). Une campagne du même nom n'est jamais recréée."));
 
     static final String PLANNING_FILE = "data/planning/inbound-voix-2026-10.csv";
     static final String AGENT_ROLE = "Agent Inbound Voice";
@@ -146,6 +156,7 @@ public class DataPatchService {
             case AGENT_ROLES_SERVICES_SYNC -> administrationService.addMissingAgentPairs() + " rôle(s) ou service(s) d'agent ajouté(s) pour aligner rôles et services.";
             case INBOUND_MAIL_LEADERSHIP -> inboundMailLeadership();
             case TOGO_RCC_ETG -> togoTeam();
+            case CAMPAGNES_OUTBOUND -> outboundCampaigns();
             default -> throw com.ecobank.rccportal.util.ApiException.notFound("Correctif inconnu : " + code);
         };
         jdbc.update("""
@@ -157,6 +168,41 @@ public class DataPatchService {
         auditLogService.record(by, "DATA_PATCH", code + " — " + summary);
         log.warn("[DATA PATCH] {} appliqué :\n{}", code, result);
         return result;
+    }
+
+    // ───────────── Campagnes Outbound prêtes à l'emploi ─────────────
+
+    String outboundCampaigns() {
+        if (campaignRepository == null) return "Campagnes indisponibles.";
+        Long owner = jdbc.queryForList("""
+                SELECT TOP 1 u.ID FROM dbo.USERS u JOIN dbo.USER_ROLES ur ON ur.USERS_ID = u.ID JOIN dbo.ROLES r ON r.ID = ur.ROLES_ID
+                WHERE UPPER(r.NAME) = 'ADMIN' ORDER BY u.ID""", Long.class).stream().findFirst()
+                .orElseGet(() -> jdbc.queryForObject("SELECT MIN(ID) FROM dbo.USERS", Long.class));
+        StringBuilder out = new StringBuilder();
+        Object[][] defs = {
+                {"Ecobank Mobile — Digitalisation", "DIGITAL", "DIGITAL", "bi-phone-fill", "#0B5ED7", "#00A651",
+                        "Équiper et rendre autonome sur Ecobank Mobile : activation accompagnée pas à pas et première opération pendant l'appel."},
+                {"Télévente — Prêts, comptes et produits digitaux", "TELEVENTE", "TELEVENTE", "bi-headset", "#6A1B9A", "#0B5ED7",
+                        "Parcours de proposition : besoin du client, produit recommandé, avantages, objections anticipées et closing."}};
+        for (Object[] d : defs) {
+            String name = (String) d[0];
+            boolean exists = campaignRepository.findAll().stream().anyMatch(c -> name.equalsIgnoreCase(c.getName()));
+            if (exists) { out.append("• Déjà présente : ").append(name).append("\n"); continue; }
+            var form = CampaignFormEngine.normalize(CampaignFormTemplates.byCode((String) d[1]).orElseThrow().form());
+            String formJson, fieldsJson;
+            try {
+                var mapper = CampaignFormEngine.JSON;
+                formJson = mapper.writeValueAsString(form);
+                fieldsJson = mapper.writeValueAsString(CampaignFormEngine.toLegacyFields(form));
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            campaignRepository.save(com.ecobank.rccportal.model.Campaign.builder().name(name).description((String) d[6]).createdByUserId(owner)
+                    .status("ACTIVE").targetService((String) d[2]).iconClass((String) d[3]).colorFrom((String) d[4]).colorTo((String) d[5])
+                    .formJson(formJson).fieldsJson(fieldsJson).build());
+            out.append("• Créée : ").append(name).append(" (équipe ").append("DIGITAL".equals(d[2]) ? "Digitalisation" : "Télévente").append(")\n");
+        }
+        return out.toString().trim();
     }
 
     // ───────────── Filiale RCC ETG (Togo) ─────────────

@@ -6,6 +6,7 @@
     <title>RCC Portal Enterprise — Knowledge Base</title>
     <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}" rel="stylesheet">
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/rcc-guides.css}">
     <!-- Onglet « Agences / Carte » — Leaflet (copie locale /vendor/leaflet, pas de CDN) + OpenStreetMap :
          carte réelle, interactive, sans dépendance à Google Maps (aucune clé API requise). -->
     <link rel="stylesheet" th:href="@{/vendor/leaflet/leaflet.min.css}">
@@ -219,9 +220,17 @@
                             <i class="bi bi-credit-card-2-front"></i> Disponibilité des cartes
                         </button>
                     </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="kbGuidesTabBtn" data-bs-toggle="tab" data-bs-target="#kbGuidesTab" type="button" role="tab">
+                            <i class="bi bi-collection-play-fill"></i> Pas à pas
+                        </button>
+                    </li>
                 </ul>
 
                 <div class="tab-content">
+                    <!-- Pas à pas animés par plateforme (guides-data.js, rcc-guides.js) — mêmes pas à pas que dans les campagnes Outbound. -->
+                    <div class="tab-pane fade" id="kbGuidesTab" role="tabpanel"><div id="kbGuides"></div></div>
+
                     <div class="tab-pane fade show active" id="kbCategoriesTab" role="tabpanel">
                         <div class="row g-4 mb-4" id="categoryGrid"></div>
                         <p class="text-muted small">Cliquez sur une rubrique ci-dessus pour ouvrir son contenu.</p>
@@ -479,6 +488,20 @@
 <script th:src="@{/js/branch-viewer.js}"></script>
 <script th:src="@{/js/card-agency.js}"></script>
 <script th:src="@{/js/card-availability.js}"></script>
+<script th:src="@{/js/guides-data.js}"></script>
+<script th:src="@{/js/rcc-guides.js}"></script>
+<script>
+    // Bibliothèque « Pas à pas », chargée à la première ouverture de l'onglet (ou via #pas-a-pas dans l'adresse).
+    (function () {
+        var mounted = false;
+        function mount() { if (!mounted && window.RccGuide) { mounted = true; RccGuide.mountLibrary(document.getElementById("kbGuides")); } }
+        document.addEventListener("DOMContentLoaded", function () {
+            var btn = document.getElementById("kbGuidesTabBtn");
+            btn.addEventListener("shown.bs.tab", mount);
+            if (location.hash === "#pas-a-pas") bootstrap.Tab.getOrCreateInstance(btn).show();
+        });
+    })();
+</script>
 <script th:src="@{/js/knowledge.js}"></script>
 </body>
 </html>
