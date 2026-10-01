@@ -34,10 +34,19 @@ window.RccGuide = (function () {
 
     // ───────────── Écran reconstitué (aspect de l'application) ─────────────
 
-    function mockHtml(m) {
+    function mockHtml(m, device) {
         var rows = (m.rows || []).map(function (r, i) {
             var hot = r.hot ? " hot" : "";
             switch (r.t) {
+                case "link": return '<div class="gm-link' + hot + '" data-row="' + i + '">' + esc(r.label) + '</div>';
+                case "captcha": return '<div class="gm-captcha' + hot + '" data-row="' + i + '"><span>' + esc(r.value || "GZPOQ") + '</span><i class="bi bi-arrow-repeat"></i><small>' + esc(r.label || "Recopiez le code") + '</small></div>';
+                case "otp": return '<div class="gm-otp' + hot + '" data-row="' + i + '"><small>' + esc(r.label || "Code reçu par SMS") + '</small><div>' + "••••••".split("").map(function () { return "<b></b>"; }).join("") + '</div></div>';
+                case "sms": return '<div class="gm-sms"><small><i class="bi bi-chat-dots-fill"></i> ' + esc(r.from || "ECOBANK") + '</small>' + esc(r.text) + '</div>';
+                case "nav": return '<div class="gm-nav">' + r.items.map(function (x, k) { return '<span class="' + (k === r.active ? "on" : "") + '">' + esc(x) + '</span>'; }).join("") + '</div>';
+                case "table": return '<div class="gm-table"><div class="h">' + r.head.map(function (x) { return '<span>' + esc(x) + '</span>'; }).join("") + '</div>' +
+                    r.rows.map(function (row) { return '<div>' + row.map(function (x) { return '<span>' + esc(x) + '</span>'; }).join("") + '</div>'; }).join("") + '</div>';
+                case "tiles": return '<div class="gm-tiles">' + r.items.map(function (x) { return '<span class="' + (x[2] ? "hot" : "") + '"' + (x[2] ? ' data-row="' + i + '"' : '') + '><i class="bi ' + esc(x[0]) + '"></i>' + esc(x[1]) + '</span>'; }).join("") + '</div>';
+                case "scene": return '<div class="gm-scene"><i class="bi ' + esc(r.icon || "bi-people") + '"></i><b>' + esc(r.text) + '</b>' + (r.sub ? '<small>' + esc(r.sub) + '</small>' : '') + '</div>';
                 case "balance": return '<div class="gm-balance"><small>' + esc(r.label) + '</small><b>' + esc(r.value) + '</b></div>';
                 case "option": return '<div class="gm-option' + hot + '" data-row="' + i + '"><i class="bi ' + esc(r.icon || "bi-chevron-right") + '"></i><span>' + esc(r.label) + (r.sub ? '<small>' + esc(r.sub) + '</small>' : '') + '</span><i class="bi bi-chevron-right gm-chev"></i></div>';
                 case "select": return '<div class="gm-field' + hot + '" data-row="' + i + '"><small>' + esc(r.label) + '</small><span>' + esc(r.value || " ") + '<i class="bi bi-chevron-down"></i></span></div>';
@@ -51,7 +60,32 @@ window.RccGuide = (function () {
                 default: return "";
             }
         }).join("");
+        if (device === "browser") {
+            return '<div class="gm web"><div class="gw-head"><b>Ecobank</b><span>' + esc(m.app || "Ecobank Online") + '</span><i class="bi bi-person-circle"></i></div>' +
+                (m.title ? '<div class="gw-title">' + esc(m.title) + '</div>' : '') + '<div class="gm-body">' + rows + '</div></div>';
+        }
+        if (device === "atm") {
+            return '<div class="gm atm"><div class="ga-head"><b>Ecobank</b>' + (m.title ? '<span>' + esc(m.title) + '</span>' : '') + '</div><div class="gm-body">' + rows + '</div></div>';
+        }
         return '<div class="gm"><div class="gm-top"><i class="bi bi-arrow-left"></i><span>' + esc(m.title || "") + '</span></div><div class="gm-body">' + rows + '</div></div>';
+    }
+
+    /** Appareil affiché selon la plateforme : téléphone (défaut), navigateur web, guichet automatique. */
+    function deviceHtml(device) {
+        var touch = '<div class="gp-finger"><i class="bi bi-hand-index-thumb-fill"></i></div><div class="gp-ring"></div>';
+        if (device === "browser") {
+            return '<div class="gp-browser"><div class="gp-bchrome"><span></span><span></span><span></span><div class="gp-url"><i class="bi bi-lock-fill"></i> <b>https://</b>ecobank.com/ci</div></div>' +
+                '<div class="gp-screen">' + touch + '</div></div>';
+        }
+        if (device === "atm") {
+            return '<div class="gp-atm"><div class="gp-atm-top"><b>Ecobank</b><small>GAB · 24h/24</small></div>' +
+                '<div class="gp-atm-face"><div class="gp-atm-keys l"><i></i><i></i><i></i><i></i></div><div class="gp-screen">' + touch + '</div><div class="gp-atm-keys r"><i></i><i></i><i></i><i></i></div></div>' +
+                '<div class="gp-atm-hw"><div class="gp-hw" data-hw="card"><i class="bi bi-credit-card-2-front"></i><span>Carte</span></div>' +
+                '<div class="gp-hw" data-hw="receipt"><i class="bi bi-receipt"></i><span>Reçu</span></div>' +
+                '<div class="gp-hw keypad" data-hw="keypad">' + "123456789*0#".split("").map(function (k) { return "<i>" + k + "</i>"; }).join("") + '</div>' +
+                '<div class="gp-hw cash" data-hw="cash"><i class="bi bi-cash-stack"></i><span>Billets</span></div></div></div>';
+        }
+        return '<div class="gp-phone"><div class="gp-notch"></div><div class="gp-screen">' + touch + '</div></div>';
     }
 
     /** Ligne d'un écran reconstitué qui correspond le mieux à un choix (mots en commun). */
@@ -71,7 +105,7 @@ window.RccGuide = (function () {
 
     function player(root, found, opts) {
         opts = opts || {};
-        var g = found.guide, p = found.platform;
+        var g = found.guide, p = found.platform, device = p.device || "phone";
         var path = [g.start], dir = 1, auto = false, timer = null;
         function cur() { return g.steps[path[path.length - 1]]; }
         function countLinear() {
@@ -81,8 +115,8 @@ window.RccGuide = (function () {
             return path.length - 1 + n;
         }
 
-        root.innerHTML = '<div class="gp">' +
-            '<div class="gp-stage"><div class="gp-phone"><div class="gp-notch"></div><div class="gp-screen"><div class="gp-finger"><i class="bi bi-hand-index-thumb-fill"></i></div><div class="gp-ring"></div></div></div></div>' +
+        root.innerHTML = '<div class="gp dev-' + esc(device) + '">' +
+            '<div class="gp-stage"><div class="gp-who" style="display:none"></div>' + deviceHtml(device) + '</div>' +
             '<div class="gp-side">' +
             '<div class="gp-head"><span class="gp-plat" style="background:' + esc(p.color) + '"><i class="bi ' + esc(p.icon) + '"></i> ' + esc(p.name) + '</span>' +
             (g.source === "guide" ? '<span class="gp-src ok"><i class="bi bi-patch-check-fill"></i> Guide officiel</span>' : '<span class="gp-src" title="Reconstitué d\'après l\'application — à valider par l\'équipe Digital"><i class="bi bi-magic"></i> Pas à pas indicatif</span>') +
@@ -125,7 +159,12 @@ window.RccGuide = (function () {
             var s = cur(), n = path.length, total = Math.max(n, countLinear());
             var layer = document.createElement("div");
             layer.className = "gp-layer in-" + (dir > 0 ? "right" : "left");
-            layer.innerHTML = s.img ? '<img src="' + esc(s.img) + '" alt="' + esc(s.title) + '">' : mockHtml(s.mock || {});
+            layer.innerHTML = s.img ? '<img src="' + esc(s.img) + '" alt="' + esc(s.title) + '">' : mockHtml(s.mock || {}, s.device || device);
+            // Qui tient l'écran (Point Xpress : téléphone de l'agent / du client) et matériel du GAB à utiliser.
+            var who = root.querySelector(".gp-who");
+            who.style.display = s.who ? "" : "none";
+            who.innerHTML = s.who ? '<i class="bi ' + (/client/i.test(s.who) ? "bi-person-fill" : "bi-shop") + '"></i> ' + esc(s.who) : "";
+            Array.prototype.forEach.call(root.querySelectorAll(".gp-hw"), function (h) { h.classList.toggle("glow", h.getAttribute("data-hw") === s.hw); });
             Array.prototype.forEach.call(screen.querySelectorAll(".gp-layer"), function (old) { old.classList.add("out"); setTimeout(function () { old.remove(); }, 450); });
             screen.appendChild(layer);
             var img = layer.querySelector("img");
@@ -233,7 +272,12 @@ window.RccGuide = (function () {
             modalEl.addEventListener("hidden.bs.modal", function () { if (current) current.stop(); });
         }
         if (current) current.stop();
-        current = player(modalEl.querySelector(".modal-body"), found, { onOpen: open });
+        // Conteneur neuf à chaque ouverture : les écouteurs du pas à pas précédent disparaissent avec lui
+        // (sinon ils s'accumulaient et réagissaient aux clics du nouveau pas à pas).
+        var body = modalEl.querySelector(".modal-body"), host = document.createElement("div");
+        body.innerHTML = "";
+        body.appendChild(host);
+        current = player(host, found, { onOpen: open });
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
