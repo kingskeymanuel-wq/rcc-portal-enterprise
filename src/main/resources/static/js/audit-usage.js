@@ -29,6 +29,7 @@
         "/team-leader": ["Portail Team Leader", "bi-people", "#EF6C00"],
         "/outbound-dashboard": ["Portail Outbound — Digitalisation", "bi-graph-up-arrow", "#AD1457"],
         "/portail-televente": ["Portail Télévente", "bi-headset", "#6A1B9A"],
+        "/portail-mail": ["Portail Inbound Mail", "bi-envelope-paper-fill", "#0B3D91"],
         "/shift": ["Suivi de shift", "bi-clock-history", "#5D4037"],
         "/audit": ["Audit", "bi-shield-lock", "#37474F"],
         "/administration": ["Administration", "bi-gear", "#546E7A"],

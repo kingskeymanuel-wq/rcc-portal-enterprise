@@ -151,6 +151,13 @@ public class ViewController {
         return "digital-agent";
     }
 
+    /** Portail des agents Inbound Mail (mails, CIS, rappels) : même socle que Réseaux sociaux / Rafiki. */
+    @GetMapping("/portail-mail")
+    public String mailPortal(org.springframework.ui.Model model) {
+        model.addAttribute("channel", "MAIL");
+        return "digital-agent";
+    }
+
     @GetMapping("/portail-rafiki")
     public String rafikiPortal(org.springframework.ui.Model model) {
         model.addAttribute("channel", "RAFIKI");

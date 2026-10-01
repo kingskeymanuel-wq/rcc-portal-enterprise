@@ -2,6 +2,7 @@
 .mrcc-hero[data-theme-space] .mrcc-hero-overlay { background: linear-gradient(95deg, var(--sp-a) 0%, var(--sp-b) 55%, rgba(0, 0, 0, .05) 100%); }
 .mrcc-hero[data-theme-space="agent"] { --sp-a: rgba(0, 30, 70, .92); --sp-b: rgba(0, 87, 184, .72); }
 .mrcc-hero[data-theme-space="tchat"] { --sp-a: rgba(6, 78, 80, .94); --sp-b: rgba(91, 60, 196, .7); }
+.mrcc-hero[data-theme-space="mail"] { --sp-a: rgba(11, 61, 145, .94); --sp-b: rgba(2, 136, 209, .7); }
 .mrcc-hero[data-theme-space="rafiki"] { --sp-a: rgba(12, 60, 150, .94); --sp-b: rgba(214, 36, 159, .66); }
 .mrcc-hero[data-theme-space="outbound"] { --sp-a: rgba(90, 40, 0, .92); --sp-b: rgba(230, 120, 20, .7); }
 .mrcc-hero[data-theme-space="tl"] { --sp-a: rgba(20, 24, 90, .94); --sp-b: rgba(76, 70, 220, .7); }

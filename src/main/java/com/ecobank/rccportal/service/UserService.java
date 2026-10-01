@@ -147,7 +147,8 @@ public class UserService {
         if (!isAdmin && (redirectTo == null || "/dashboard".equals(redirectTo))) {
             for (UserRole r : roles) {
                 String n = r.getRole() == null ? null : r.getRole().getName();
-                if (n == null || "TEAM_LEADER".equals(com.ecobank.rccportal.security.AccessResolver.roleOfName(n))) continue;
+                String base = n == null ? null : com.ecobank.rccportal.security.AccessResolver.roleOfName(n);
+                if (n == null || (base != null && !"AGENT".equals(base)) || n.toUpperCase(java.util.Locale.ROOT).contains("QUALIT")) continue;
                 String channel = digitalChannelPortal(n);
                 if (channel != null) { redirectTo = channel; break; }
             }
@@ -168,8 +169,27 @@ public class UserService {
             }
         }
 
+        // Portail aligné sur le profil réel (le même calcul que les droits, AccessResolver) : un Team Leader par
+        // son seul rôle (« Team Leader Rafiki »…) ou par son équipe menée, un Superviseur, un RH ou un compte
+        // Agence n'atterrit jamais sur l'accueil ou un portail d'agent.
+        if (!isAdmin) {
+            List<String> roleNames = roles.stream().map(r -> r.getRole() == null ? null : r.getRole().getName()).filter(java.util.Objects::nonNull).toList();
+            List<String> codes = userServiceAssignmentRepository.findServicesByUserId(user.getId()).stream()
+                    .filter(s -> s.getService() != null && s.getService().getCode() != null).map(s -> s.getService().getCode().trim()).toList();
+            String home = PROFILE_HOMES.get(com.ecobank.rccportal.security.AccessResolver.primaryRole(roleNames, codes, user.getLedTeam()));
+            if (home != null && (redirectTo == null || AGENT_PORTALS.contains(redirectTo))) redirectTo = home;
+        }
+
         return new com.ecobank.rccportal.dto.TeamStatusResponse(false, redirectTo);
     }
+
+    /** Portails d'agent (accueil compris). */
+    static final java.util.Set<String> AGENT_PORTALS = java.util.Set.of("/dashboard", "/portail-mail", "/portail-tchat", "/portail-rafiki",
+            "/portail-televente", "/outbound-dashboard");
+
+    /** Portail de chaque profil d'encadrement. */
+    static final java.util.Map<String, String> PROFILE_HOMES = java.util.Map.of("TEAM_LEADER", "/team-leader", "SUPERVISOR", "/supervisor",
+            "RH", "/rh", "AGENCE", "/agence");
 
     /**
      * Portail métier vers lequel rediriger automatiquement l'utilisateur juste après sa
@@ -200,7 +220,7 @@ public class UserService {
                 put("AGENT_TCHAT", "/portail-tchat");
                 put("AGENT_RAFIKI", "/portail-rafiki");
                 put("AGENT_INBOUND", "/dashboard");
-                put("AGENT_INBOUND_MAIL", "/dashboard");
+                put("AGENT_INBOUND_MAIL", "/portail-mail");
                 put("AGENT_CIB", "/dashboard");
                 put("AGENCE_CAISSIER", "/agence");
                 put("AGENCE_GESTIONNAIRE", "/agence");
@@ -209,7 +229,7 @@ public class UserService {
 
     /**
      * Portail propre d'après l'activité (ou le nom du rôle) : « RAFIKI » → /portail-rafiki, « TCHAT » / « LIVE CHAT » →
-     * /portail-tchat, « TÉLÉVENTE » → /portail-televente (la Digitalisation garde le portail Outbound).
+     * /portail-tchat, « MAIL » → /portail-mail, « TÉLÉVENTE » → /portail-televente (la Digitalisation garde le portail Outbound).
      */
     static String digitalChannelPortal(String activity) {
         if (activity == null) return null;
@@ -218,6 +238,7 @@ public class UserService {
         String folded = java.text.Normalizer.normalize(a, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "");
         if (folded.contains("TELEVENTE") || folded.contains("TELEVENDEUR")) return "/portail-televente";
         if (a.contains("TCHAT") || a.contains("LIVE CHAT") || a.matches(".*\\bCHAT\\b.*") || folded.contains("RESEAU")) return "/portail-tchat";
+        if (a.contains("MAIL")) return "/portail-mail";
         return null;
     }
 
