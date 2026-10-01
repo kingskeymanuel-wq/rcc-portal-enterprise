@@ -61,6 +61,8 @@
     // ───────────── Carte d'une personne ─────────────
 
     /** Accès d'encadrement (même liste que le serveur, AdministrationService.PROFILE_LEVELS). */
+    /** Accès appliqués par PUT /api/admin/users/{id}/access-level (AccessLevelService : garde-fous administrateur). */
+    var OTHER_ACCESS = [["FORMATEUR:", "Formateur"], ["AGENCE:CAISSIER", "Agence · Caissier"], ["AGENCE:GESTIONNAIRE", "Agence · Gestionnaire clientèle"], ["ADMIN:", "Administrateur"]];
     var MGMT = [["QA", "Quality Assurance"], ["HEAD_QA", "Head QA (Superviseur QA)"], ["RH", "Ressources Humaines"], ["SUPERVISEUR", "Superviseur · Head RCC"]];
 
     /** Service agent → équipe (même correspondance que le serveur, AdministrationService.AGENT_TEAMS). */
@@ -81,6 +83,7 @@
     function accessValue(p) {
         if (p.level === "TEAM_LEADER") return "TEAM_LEADER:" + (p.team || "");
         if (MGMT.some(function (m) { return m[0] === p.level; })) return p.level + ":";
+        if (p.level === "ADMIN") return "ADMIN:";
         if (p.level === "AGENT") {
             var teams = agentTeams(p);
             return teams.length === 1 ? "AGENT:" + teams[0] : "AGENT:";
@@ -89,14 +92,10 @@
     }
 
     function accessHtml(p) {
-        var editable = p.level !== "ADMIN" && p.level !== "AGENCE";
-        if (!editable) {
-            return '<div class="ah-tags"><span class="ah-lbl">Accès</span><span class="ah-chip lvl">' + esc(LEVELS[p.level] ? LEVELS[p.level][0] : p.level) +
-                '</span><span class="ah-hint">donné par ses rôles / services</span></div>';
-        }
         var cur = accessValue(p);
         var several = p.level === "AGENT" && agentTeams(p).length > 1;
         var opts = (p.level === "A_CLASSER" ? '<option value="" selected>— choisir un accès —</option>' : '') +
+            (p.level === "AGENCE" ? '<option value="" selected>Agence (poste actuel)</option>' : '') +
             '<optgroup label="Agent">' +
             (p.level === "AGENT" && cur === "AGENT:" ? '<option value="" selected>' + (several
                 ? "Agent · " + agentTeams(p).map(function (t) { return (TEAMS.filter(function (x) { return x[0] === t; })[0] || [t, t])[1]; }).join(" + ")
@@ -112,6 +111,9 @@
             '<optgroup label="Encadrement">' + MGMT.map(function (m) {
                 var v = m[0] + ":";
                 return '<option value="' + v + '"' + (cur === v ? " selected" : "") + '>' + esc(m[1]) + '</option>';
+            }).join("") + '</optgroup>' +
+            '<optgroup label="Autres accès">' + OTHER_ACCESS.map(function (o) {
+                return '<option value="' + o[0] + '"' + (cur === o[0] ? " selected" : "") + '>' + esc(o[1]) + '</option>';
             }).join("") + '</optgroup>';
         return '<div class="ah-tags"><span class="ah-lbl">Accès</span><select class="ah-access" data-access aria-label="Accès">' + opts + '</select>' +
             (p.leaderSource === "LED_TEAM" ? '<span class="ah-ghost" title="Ni rôle ni service Team Leader : seul le champ « équipe menée » lui donne cet accès"><i class="bi bi-exclamation-triangle-fill"></i> via « équipe menée » seule</span>' : '') +
@@ -462,6 +464,15 @@
                 if (!acc.value) return;
                 var pa = personOf(acc), parts = acc.value.split(":"), lvl = parts[0], team = parts[1] || null;
                 var mg = MGMT.filter(function (m) { return m[0] === lvl; })[0];
+                var other = OTHER_ACCESS.filter(function (o) { return o[0] === acc.value; })[0];
+                if (other) {
+                    if (!confirm("Accès de " + pa.name + " : " + other[1] + " ?\n\nSes anciens rôles et services de portail sont remplacés d'un bloc.\nEffet immédiat sur ses portails.")) { render(); return; }
+                    acc.disabled = true;
+                    call("PUT", "/api/admin/users/" + pa.id + "/access-level", { level: lvl, team: team })
+                        .then(function () { return done("Accès de " + pa.name + " : " + other[1] + "."); })
+                        .catch(function (err) { acc.disabled = false; flash(err.message, false); render(); });
+                    return;
+                }
                 var what = mg ? mg[1] : lvl === "TEAM_LEADER" ? "Team Leader · " + teamLabel(team) : "Agent" + (team ? " · " + teamLabel(team) : "");
                 var detail = mg ? "Rôle et service « " + mg[1] + " » attribués ; son équipe d'agent, son accès Team Leader et son ancien accès d'encadrement sont retirés."
                     : lvl === "TEAM_LEADER"

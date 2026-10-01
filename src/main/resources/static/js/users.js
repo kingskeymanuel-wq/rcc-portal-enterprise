@@ -661,6 +661,8 @@
 
     var ACCESS_TEAMS = [["INBOUND_VOICE", "Inbound Voix"], ["INBOUND_MAIL", "Inbound Mail"], ["TCHAT", "Réseaux sociaux"], ["RAFIKI", "Rafiki"],
         ["CIB", "CIB"], ["DIGITALISATION", "Outbound — Digitalisation"], ["TELEVENTE", "Télévente"], ["OUTBOUND", "Outbound (pôle, sans sous-équipe)"]];
+    /** Appliqués par /api/admin/users/{id}/access-level (garde-fous : pas de retrait de ses propres droits admin ni du dernier admin). */
+    var ACCESS_OTHER = [["FORMATEUR:", "Formateur"], ["AGENCE:CAISSIER", "Agence · Caissier"], ["AGENCE:GESTIONNAIRE", "Agence · Gestionnaire clientèle"], ["ADMIN:", "Administrateur"]];
     var ACCESS_MGMT = [["QA", "Quality Assurance"], ["HEAD_QA", "Head QA (Superviseur QA)"], ["RH", "Ressources Humaines"], ["SUPERVISEUR", "Superviseur · Head RCC"]];
     var ACCESS_AGENT_SERVICES = { AGENT_INBOUND: "INBOUND_VOICE", AGENT_INBOUND_MAIL: "INBOUND_MAIL", AGENT_TCHAT: "TCHAT", AGENT_RAFIKI: "RAFIKI",
         AGENT_CIB: "CIB", AGENT_OUTBOUND: "OUTBOUND", AGENT_TELEVENTE: "TELEVENTE", AGENT_DIGITALISATION: "DIGITALISATION" };
@@ -670,6 +672,7 @@
         if (!p) return "";
         if (p.level === "TEAM_LEADER") return "TEAM_LEADER:" + (p.team || "");
         if (ACCESS_MGMT.some(function (m) { return m[0] === p.level; })) return p.level + ":";
+        if (p.level === "ADMIN") return "ADMIN:";
         if (p.level !== "AGENT") return "";
         var teams = [];
         (p.services || []).forEach(function (s) { var t = ACCESS_AGENT_SERVICES[String(s.code || "").toUpperCase()]; if (t && teams.indexOf(t) === -1) teams.push(t); });
@@ -679,13 +682,13 @@
 
     function fillAccessSelect(select, p, ledTeam) {
         var cur = currentAccess(p);
-        var locked = p && (p.level === "ADMIN" || p.level === "AGENCE");
         var opt = function (v, label) { return '<option value="' + v + '"' + (cur === v ? " selected" : "") + '>' + escapeHtml(label) + '</option>'; };
-        select.innerHTML = (cur ? "" : '<option value="" selected>' + (locked ? "Donné par ses rôles / services (inchangé)" : "— inchangé —") + '</option>') +
-            (locked ? "" : '<optgroup label="Agent">' + ACCESS_TEAMS.map(function (t) { return opt("AGENT:" + t[0], "Agent · " + t[1]); }).join("") + '</optgroup>' +
-                '<optgroup label="Team Leader">' + ACCESS_TEAMS.map(function (t) { return opt("TEAM_LEADER:" + t[0], "Team Leader · " + t[1]); }).join("") + '</optgroup>' +
-                '<optgroup label="Encadrement">' + ACCESS_MGMT.map(function (m) { return opt(m[0] + ":", m[1]); }).join("") + '</optgroup>');
-        select.disabled = !!locked;
+        select.innerHTML = (cur ? "" : '<option value="" selected>— inchangé —</option>') +
+            '<optgroup label="Agent">' + ACCESS_TEAMS.map(function (t) { return opt("AGENT:" + t[0], "Agent · " + t[1]); }).join("") + '</optgroup>' +
+            '<optgroup label="Team Leader">' + ACCESS_TEAMS.map(function (t) { return opt("TEAM_LEADER:" + t[0], "Team Leader · " + t[1]); }).join("") + '</optgroup>' +
+            '<optgroup label="Encadrement">' + ACCESS_MGMT.map(function (m) { return opt(m[0] + ":", m[1]); }).join("") + '</optgroup>' +
+            '<optgroup label="Autres accès">' + ACCESS_OTHER.map(function (o) { return opt(o[0], o[1]); }).join("") + '</optgroup>';
+        select.disabled = false;
         // Agent avec une « équipe menée » restée en base : l'enregistrement réapplique l'accès Agent et la vide.
         select.setAttribute("data-initial", cur.indexOf("AGENT:") === 0 && ledTeam ? "" : cur);
     }
@@ -889,7 +892,8 @@
                     // Accès en dernier : il aligne rôle, service, équipe (activité) et portail — il prime sur le champ Équipe.
                     if (!accessChanged) return null;
                     var parts = access.split(":");
-                    return sendJson("/api/admin/users/" + userId + "/access", "PUT", { level: parts[0], team: parts[1] || null });
+                    var other = ACCESS_OTHER.some(function (o) { return o[0] === access; });
+                    return sendJson("/api/admin/users/" + userId + (other ? "/access-level" : "/access"), "PUT", { level: parts[0], team: parts[1] || null });
                 })
                 .then(function () {
                     // L'annuaire et l'organigramme se rechargent à la fermeture de la fiche (voir wireSync).

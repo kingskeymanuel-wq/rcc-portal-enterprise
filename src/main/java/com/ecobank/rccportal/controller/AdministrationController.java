@@ -24,15 +24,18 @@ public class AdministrationController {
     private final com.ecobank.rccportal.service.DataPatchService dataPatchService;
     @org.springframework.beans.factory.annotation.Autowired
     private com.ecobank.rccportal.service.AuditLogService auditLogService;
+    private final com.ecobank.rccportal.service.AccessLevelService accessLevelService;
 
     public AdministrationController(AdministrationService administrationService,
                                     UserFeaturePermissionService userFeaturePermissionService,
                                     CurrentUserAccessService currentUserAccessService,
                                     com.ecobank.rccportal.service.EffectiveAccessService effectiveAccessService,
                                     com.ecobank.rccportal.service.AdminHierarchyService hierarchyService,
-                                    com.ecobank.rccportal.service.DataPatchService dataPatchService) {
+                                    com.ecobank.rccportal.service.DataPatchService dataPatchService,
+                                    com.ecobank.rccportal.service.AccessLevelService accessLevelService) {
         this.hierarchyService = hierarchyService;
         this.dataPatchService = dataPatchService;
+        this.accessLevelService = accessLevelService;
         this.administrationService = administrationService;
         this.userFeaturePermissionService = userFeaturePermissionService;
         this.currentUserAccessService = currentUserAccessService;
@@ -170,6 +173,17 @@ public class AdministrationController {
                                                        @AuthenticationPrincipal AuthenticatedUser requester) {
         requireAdmin(requester);
         return java.util.Map.of("fixed", administrationService.clearLedTeamOnly(request.userIds()));
+    }
+
+    public record ChangeAccessLevelRequest(String level, String team) {}
+
+    /** Change le niveau d'accès en un geste (Team Leader → Agent, changement d'équipe…) — appliqué à tout le portail. */
+    @PutMapping("/users/{userId}/access-level")
+    public com.ecobank.rccportal.service.AccessLevelService.Result changeAccessLevel(@PathVariable Long userId,
+                                                                                    @RequestBody ChangeAccessLevelRequest request,
+                                                                                    @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return accessLevelService.change(userId, request.level(), request.team(), requester == null ? null : requester.username());
     }
 
     /** Accès effectif d'un utilisateur (profil, équipe menée, portail) et ce qui manque — fiche utilisateur de l'admin. */
