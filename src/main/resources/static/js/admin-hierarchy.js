@@ -12,7 +12,7 @@
  */
 (function () {
     var esc = RccApi.escapeHtml;
-    var st = { data: null, roles: [], services: [], q: "", country: "", showInactive: false, open: {}, edit: {}, ghostOpen: false };
+    var st = { data: null, roles: [], services: [], q: "", country: window.RccFiliale ? window.RccFiliale.get() : "", showInactive: false, open: {}, edit: {}, ghostOpen: false };
     var root;
 
     var LEVELS = {
@@ -29,7 +29,7 @@
     var PROFILE = { ADMIN: "Administrateur", SUPERVISOR: "Superviseur", RH: "RH", TEAM_LEADER: "Team Leader", AGENCE: "Agence", AGENT: "Agent", EXCELLIAM: "Excelliam" };
     var TEAMS = [["INBOUND_VOICE", "Inbound Voix"], ["INBOUND_MAIL", "Inbound Mail"], ["TCHAT", "Réseaux sociaux"], ["RAFIKI", "Rafiki"], ["CIB", "CIB"], ["DIGITALISATION", "Outbound — Digitalisation"], ["TELEVENTE", "Télévente"], ["OUTBOUND", "Outbound (pôle, sans sous-équipe)"]];
     var ACTIVITIES = ["INBOUND VOICE", "INBOUND MAIL", "INBOUND TCHAT", "INBOUND RAFIKI", "CIB", "OUTBOUND", "RESOLUTION", "QA"];
-    var COUNTRIES = { CI: "Côte d'Ivoire", TG: "Togo", SN: "Sénégal", CM: "Cameroun", BJ: "Bénin", ML: "Mali", BF: "Burkina Faso", NE: "Niger", GH: "Ghana", NG: "Nigeria", KE: "Kenya", GN: "Guinée" };
+    var COUNTRIES = { CI: "RCC ECI — Côte d'Ivoire", TG: "RCC ETG — Togo", SN: "Sénégal", CM: "Cameroun", BJ: "Bénin", ML: "Mali", BF: "Burkina Faso", NE: "Niger", GH: "Ghana", NG: "Nigeria", KE: "Kenya", GN: "Guinée" };
 
     function $(s) { return root.querySelector(s); }
     function initials(n) { return String(n || "?").trim().split(/\s+/).slice(0, 2).map(function (x) { return x[0]; }).join("").toUpperCase(); }

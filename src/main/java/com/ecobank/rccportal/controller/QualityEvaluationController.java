@@ -18,6 +18,18 @@ import java.util.Map;
 @RequestMapping("/api/quality")
 public class QualityEvaluationController {
     private final QualityEvaluationService qualityEvaluationService;
+
+    /** Filiale active (RCC ECI / RCC ETG) — voir util.Filiale. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.ecobank.rccportal.service.FilialeScope filialeScope;
+
+    private <T> java.util.List<T> scopeById(java.util.List<T> list, java.util.function.Function<T, Long> id) {
+        return filialeScope == null ? list : filialeScope.byUserId(list, id);
+    }
+
+    private <T> java.util.List<T> scopeByName(java.util.List<T> list, java.util.function.Function<T, String> name) {
+        return filialeScope == null ? list : filialeScope.byUsername(list, name);
+    }
     private final AudioStorageService audioStorageService;
 
     public QualityEvaluationController(QualityEvaluationService qualityEvaluationService,
@@ -40,7 +52,7 @@ public class QualityEvaluationController {
     public List<QualityEvaluationResponse> listAll(@RequestParam(required = false) String agentMatricule) {
         return agentMatricule != null
                 ? qualityEvaluationService.listForAgent(agentMatricule)
-                : qualityEvaluationService.listAll();
+                : scopeByName(qualityEvaluationService.listAll(), QualityEvaluationResponse::agentMatricule);
     }
 
     @GetMapping("/evaluations/{id}")

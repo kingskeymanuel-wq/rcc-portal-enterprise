@@ -23,6 +23,18 @@ import java.util.List;
 public class ShiftController {
 
     private final ShiftService shiftService;
+
+    /** Filiale active (RCC ECI / RCC ETG) — voir util.Filiale. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.ecobank.rccportal.service.FilialeScope filialeScope;
+
+    private <T> java.util.List<T> scopeById(java.util.List<T> list, java.util.function.Function<T, Long> id) {
+        return filialeScope == null ? list : filialeScope.byUserId(list, id);
+    }
+
+    private <T> java.util.List<T> scopeByName(java.util.List<T> list, java.util.function.Function<T, String> name) {
+        return filialeScope == null ? list : filialeScope.byUsername(list, name);
+    }
     private final com.ecobank.rccportal.repository.UserRepository userRepository;
 
     public ShiftController(ShiftService shiftService, com.ecobank.rccportal.repository.UserRepository userRepository) {
@@ -98,7 +110,7 @@ public class ShiftController {
             @RequestParam(required = false) String team,
             @AuthenticationPrincipal AuthenticatedUser requester) {
         requireOwnTeamOrSupervisor(requester, team);
-        return shiftService.forTeam(requester.username(), date, team);
+        return scopeByName(shiftService.forTeam(requester.username(), date, team), ShiftEventResponse::username);
     }
 
     /** Même principe, sur une plage — vues semaine/mois de l'onglet Équipe. */
@@ -109,7 +121,7 @@ public class ShiftController {
             @RequestParam(required = false) String team,
             @AuthenticationPrincipal AuthenticatedUser requester) {
         requireOwnTeamOrSupervisor(requester, team);
-        return shiftService.forTeamRange(requester.username(), from, to, team);
+        return scopeByName(shiftService.forTeamRange(requester.username(), from, to, team), ShiftEventResponse::username);
     }
 
     /**

@@ -940,6 +940,7 @@ public class ScheduleService {
         String wanted = team == null ? "" : team.trim().toUpperCase().replace(' ', '_');
         return u -> {
             if (u == null || wanted.isEmpty()) return false;
+            if (!com.ecobank.rccportal.util.Filiale.matches(u.getAffiliateBranch())) return false; // filiale du Team Leader
             if (team.equalsIgnoreCase(u.getActivity())) return true;
             return cache.computeIfAbsent(u.getId(), id -> {
                 List<String> codes = userServiceAssignmentRepository.findServicesByUserId(id).stream()

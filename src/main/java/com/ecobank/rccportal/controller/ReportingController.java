@@ -45,12 +45,12 @@ public class ReportingController {
                 java.time.LocalDate periodStart = java.time.LocalDate.parse(from);
                 java.time.LocalDate periodEnd = java.time.LocalDate.parse(to);
                 String label = from.equals(to) ? from : (from + " → " + to);
-                return reportingService.teamSummary(periodStart, periodEnd, label, countryCode);
+                return reportingService.teamSummary(periodStart, periodEnd, label, com.ecobank.rccportal.util.Filiale.orCurrent(countryCode));
             } catch (DateTimeParseException e) {
                 throw ApiException.badRequest("from/to must be ISO dates (YYYY-MM-DD).");
             }
         }
-        return reportingService.teamSummary(parseMonth(month), countryCode);
+        return reportingService.teamSummary(parseMonth(month), com.ecobank.rccportal.util.Filiale.orCurrent(countryCode));
     }
 
     @GetMapping("/team/export")
@@ -81,7 +81,7 @@ public class ReportingController {
             @RequestParam(required = false) String countryCode) {
         requireReviewer(requester);
         YearMonth targetMonth = parseMonth(month) != null ? parseMonth(month) : YearMonth.now();
-        byte[] body = reportExportService.exportExcel(targetMonth, countryCode);
+        byte[] body = reportExportService.exportExcel(targetMonth, com.ecobank.rccportal.util.Filiale.orCurrent(countryCode));
 
         String filename = "analyse-donnees-" + targetMonth + ".xlsx";
         return ResponseEntity.ok()
@@ -101,7 +101,7 @@ public class ReportingController {
             @RequestParam(required = false) String countryCode) {
         requireReviewer(requester);
         YearMonth targetMonth = parseMonth(month) != null ? parseMonth(month) : YearMonth.now();
-        byte[] body = reportExportService.exportWordTeam(targetMonth, countryCode);
+        byte[] body = reportExportService.exportWordTeam(targetMonth, com.ecobank.rccportal.util.Filiale.orCurrent(countryCode));
         return wordResponse(body, "analyse-donnees-" + targetMonth + ".docx");
     }
 
@@ -135,7 +135,7 @@ public class ReportingController {
             @RequestParam(required = false) String countryCode) {
         requireReviewer(requester);
         YearMonth targetMonth = parseMonth(month) != null ? parseMonth(month) : YearMonth.now();
-        byte[] body = reportExportService.exportPowerPointTeam(targetMonth, countryCode);
+        byte[] body = reportExportService.exportPowerPointTeam(targetMonth, com.ecobank.rccportal.util.Filiale.orCurrent(countryCode));
         return pptResponse(body, "analyse-donnees-" + targetMonth + ".pptx");
     }
 

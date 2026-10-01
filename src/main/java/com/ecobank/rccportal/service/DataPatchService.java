@@ -46,6 +46,21 @@ public class DataPatchService {
     /** Pôle Inbound Mail : LOUM Olivia Team Leader, comptes de test (bypass) Team Leader et agent Inbound Mail alignés. */
     public static final String INBOUND_MAIL_LEADERSHIP = "INBOUND_MAIL_LEADERSHIP";
 
+    /** Filiale RCC ETG (Togo, Lomé) : agents rattachés à leur filiale, équipe et accès — sans doublon de compte. */
+    public static final String TOGO_RCC_ETG = "TOGO_RCC_ETG";
+
+    /** Équipe RCC ETG (Lomé) : { nom, identifiant, statut du contrat, accès, équipe }. */
+    static final List<String[]> TOGO_TEAM = List.of(
+            new String[]{"AGBOKOU Nutekpo Yao", "NAGBOKOU", "STAFF", "QA", null},
+            new String[]{"AMOUZOU KOSSI BERNARD AMENUVEVE", "KOAMOUZOU", "CDD", "AGENT", "INBOUND_VOICE"},
+            new String[]{"DJABIGUE Yendoubouan Viviane", "YDJABIGUE", "CDD", "AGENT", "INBOUND_VOICE"},
+            new String[]{"FAHE Talitha Sylvia", "TFAHE", null, "TEAM_LEADER", "INBOUND_VOICE"},
+            new String[]{"FIA ESSI DEBORAH", "EFIA", "CDD", "AGENT", "INBOUND_VOICE"},
+            new String[]{"KAGBARA Bénéré Cindy", "BKAGBARA", "CDD", "AGENT", "INBOUND_VOICE"},
+            new String[]{"LASSEY TELE JOANELLE CARMEN", "JLASSEY", "CDD", "AGENT", "TCHAT"},
+            new String[]{"M'BANABIKEDI Ereza Eudoxie", "EMBANABIKEDI", "CDD", "AGENT", "INBOUND_VOICE"},
+            new String[]{"YEHADJI Abla Mawougbé Charlotte", "AYEHADJI", "CDD", "AGENT", "INBOUND_VOICE"});
+
     public static final List<Patch> PATCHES = List.of(new Patch(INBOUND_VOIX_2026_10,
             "Team Inbound Voix — planning d'octobre 2026 et rôles",
             "Planning d'octobre 2026 des 32 agents Inbound Voix (fichier Exceliam) ; chacun reçoit le rôle « Agent Inbound Voice », "
@@ -62,7 +77,11 @@ public class DataPatchService {
                             + "et chaque service d'agent son rôle, sans rien retirer — ensuite, choisir l'un applique l'autre automatiquement."),
             new Patch(INBOUND_MAIL_LEADERSHIP, "Inbound Mail — Team Leader LOUM Olivia et accès bypass",
                     "LOUM Olivia devient Team Leader Inbound Mail (service, rôle, équipe menée). Les comptes de test (bypass) "
-                            + "teamleader.inboundmail et agent.mail sont alignés : portail Team Leader Inbound Mail et portail agent Inbound Mail."));
+                            + "teamleader.inboundmail et agent.mail sont alignés : portail Team Leader Inbound Mail et portail agent Inbound Mail."),
+            new Patch(TOGO_RCC_ETG, "Filiale RCC ETG (Togo) — équipe de Lomé",
+                    "Les 9 collaborateurs de Lomé sont rattachés à la filiale RCC ETG (Togo), contrat Ecobank : 7 agents Inbound Voix, "
+                            + "1 agent Réseaux sociaux (LASSEY), 1 QA (AGBOKOU) et FAHE Talitha Team Leader Inbound Voix de RCC ETG. "
+                            + "Un compte déjà en base (même identifiant ou même nom) est réorganisé, jamais dupliqué ; seuls les absents sont créés."));
 
     static final String PLANNING_FILE = "data/planning/inbound-voix-2026-10.csv";
     static final String AGENT_ROLE = "Agent Inbound Voice";
@@ -126,6 +145,7 @@ public class DataPatchService {
             case RESEAUX_SOCIAUX_ROLES -> socialNetworkRoles();
             case AGENT_ROLES_SERVICES_SYNC -> administrationService.addMissingAgentPairs() + " rôle(s) ou service(s) d'agent ajouté(s) pour aligner rôles et services.";
             case INBOUND_MAIL_LEADERSHIP -> inboundMailLeadership();
+            case TOGO_RCC_ETG -> togoTeam();
             default -> throw com.ecobank.rccportal.util.ApiException.notFound("Correctif inconnu : " + code);
         };
         jdbc.update("""
@@ -137,6 +157,40 @@ public class DataPatchService {
         auditLogService.record(by, "DATA_PATCH", code + " — " + summary);
         log.warn("[DATA PATCH] {} appliqué :\n{}", code, result);
         return result;
+    }
+
+    // ───────────── Filiale RCC ETG (Togo) ─────────────
+
+    String togoTeam() {
+        StringBuilder out = new StringBuilder();
+        int created = 0, updated = 0;
+        List<User> all = userRepository.findAll().stream().filter(u -> u.getName() != null || u.getUsername() != null).toList();
+        for (String[] t : TOGO_TEAM) {
+            User u = userRepository.findFirstByUsernameIgnoreCase(t[1]).orElse(null);
+            if (u == null) u = com.ecobank.rccportal.util.PersonNames.findUnique(t[0], all.stream().filter(x -> x.getName() != null).toList(), User::getName);
+            boolean isNew = u == null;
+            if (isNew) {
+                u = userRepository.save(User.builder().username(t[1]).name(t[0]).status("APPROVED").accountEnabled(true).accountLocked(false)
+                        .accountExpired(false).credentialsExpired(false).failedAttempts(0).affiliateBranch("TG").contractType("Ecobank")
+                        .contractStatus(t[2]).build());
+                created++;
+            } else {
+                u.setAffiliateBranch("TG");
+                u.setContractType("Ecobank");
+                if (t[2] != null) u.setContractStatus(t[2]);
+                if (u.getName() == null || u.getName().isBlank()) u.setName(t[0]);
+                u = userRepository.save(u);
+                updated++;
+            }
+            administrationService.setAccess(u.getId(), t[3], t[4]);
+            String what = switch (t[3]) {
+                case "QA" -> "Quality Assurance";
+                case "TEAM_LEADER" -> "Team Leader Inbound Voix";
+                default -> "TCHAT".equals(t[4]) ? "Agent Réseaux sociaux" : "Agent Inbound Voix";
+            };
+            out.append(isNew ? "• Créé : " : "• Réorganisé : ").append(u.getName()).append(" (").append(u.getUsername()).append(") — ").append(what).append("\n");
+        }
+        return ("RCC ETG (Togo) : " + updated + " compte(s) existant(s) réorganisé(s), " + created + " créé(s).\n" + out).trim();
     }
 
     // ───────────── Inbound Mail : Team Leader et comptes de test ─────────────

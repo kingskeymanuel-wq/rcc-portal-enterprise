@@ -33,6 +33,9 @@ import java.util.List;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    private static final String LIVE_COUNTRY = "rcc.liveCountry";
+
+
     private static final String ACCESS_COOKIE = SessionCookies.ACCESS;
     /** Au-delà, le jeton est ré-émis à la prochaine requête (session glissante). */
     private static final long RENEW_AFTER_MS = 5 * 60 * 1000L;
@@ -116,6 +119,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             }
                             role = live.role() != null ? live.role() : role;
                             service = live.service();
+                            request.setAttribute(LIVE_COUNTRY, live.country());
                         }
                     } catch (RuntimeException dbUnavailable) {
                         // base indisponible : on garde le rôle du jeton
@@ -187,10 +191,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         Object principal = SecurityContextHolder.getContext().getAuthentication() == null ? null
                 : SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        filterChain.doFilter(
-                request,
-                response
-        );
+        // Filiale choisie dans l'en-tête du portail (RCC ECI / RCC ETG) — Superviseur, RH, administrateur, Head QA.
+        com.ecobank.rccportal.util.Filiale.set(principal instanceof AuthenticatedUser au0 ? au0 : null,
+                request.getHeader(com.ecobank.rccportal.util.Filiale.HEADER));
+        // Un Team Leader ne pilote que les agents de SA filiale (RCC ECI ou RCC ETG).
+        if (principal instanceof AuthenticatedUser au1 && "TEAM_LEADER".equalsIgnoreCase(au1.role()) && request.getAttribute(LIVE_COUNTRY) instanceof String own) {
+            com.ecobank.rccportal.util.Filiale.setOwn(own);
+        }
+        try {
+            filterChain.doFilter(
+                    request,
+                    response
+            );
+        } finally {
+            com.ecobank.rccportal.util.Filiale.clear();
+        }
 
         if (adminChangeJournal != null && response.getStatus() < 400
                 && com.ecobank.rccportal.service.AdminChangeJournal.isAdministrationChange(request.getMethod(), request.getRequestURI())) {

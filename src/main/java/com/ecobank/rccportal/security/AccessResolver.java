@@ -26,7 +26,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class AccessResolver {
 
-    public record Access(String role, String service, boolean enabled) {}
+    public record Access(String role, String service, boolean enabled, String country) {
+        public Access(String role, String service, boolean enabled) { this(role, service, enabled, null); }
+    }
 
     /** Du plus élevé au plus bas. */
     static final List<String> PRIORITY = List.of("ADMIN", "RH", "EXCELLIAM", "SUPERVISOR", "TEAM_LEADER", "AGENCE", "AGENT");
@@ -109,7 +111,8 @@ public class AccessResolver {
         // Seule la désactivation par l'admin/le RH coupe l'accès ; un verrouillage temporaire (mots de passe erronés)
         // n'éjecte pas une session déjà ouverte.
         boolean enabled = !Boolean.FALSE.equals(u.getAccountEnabled());
-        return new Access(primaryRole(roles, services, u.getLedTeam()), primaryService(services), enabled);
+        return new Access(primaryRole(roles, services, u.getLedTeam()), primaryService(services), enabled,
+                com.ecobank.rccportal.util.Affiliates.countryOf(u.getAffiliateBranch()));
     }
 
     /** Accès actuel (cache court) — null si l'utilisateur n'existe pas en base. */

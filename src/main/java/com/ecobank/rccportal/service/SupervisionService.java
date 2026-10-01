@@ -130,6 +130,7 @@ public class SupervisionService {
                 LEFT JOIN dbo.USER_SERVICES us ON us.USER_ID = u.ID LEFT JOIN dbo.SERVICES s ON s.ID = us.SERVICE_ID
                 LEFT JOIN dbo.USER_ROLES ur ON ur.USERS_ID = u.ID LEFT JOIN dbo.ROLES r ON r.ID = ur.ROLES_ID
                 WHERE (u.ACCOUNT_ENABLED IS NULL OR u.ACCOUNT_ENABLED = 1)
+                """ + com.ecobank.rccportal.util.Filiale.sql("u") + """
                 GROUP BY u.ID, u.USERNAME, u.NAME, u.LED_TEAM
                 """);
         List<Sub> out = new ArrayList<>();
@@ -205,6 +206,7 @@ public class SupervisionService {
             subs.forEach(s -> leaderIds.add(String.valueOf(s.id())));
             for (User u : users.findAll()) {
                 if (Boolean.FALSE.equals(u.getAccountEnabled()) || leaderIds.contains(String.valueOf(u.getId()))) continue;
+                if (!com.ecobank.rccportal.util.Filiale.matches(u.getAffiliateBranch())) continue;
                 List<String> c = codes.getOrDefault(u.getId(), List.of());
                 for (Sub s : subs) {
                     if (s.team() == null || "QA".equals(s.team())) continue;

@@ -6,6 +6,50 @@
  * et gère le suivi de shift (pause/pause déjeuner/fin de shift). À inclure sur
  * toutes les pages protégées, AVANT les scripts propres à chaque page.
  */
+/**
+ * Filiale active — RCC ECI (Côte d'Ivoire) ou RCC ETG (Togo). Le Superviseur, le RH, l'administrateur et le Head QA
+ * basculent d'une filiale à l'autre depuis l'en-tête ; chaque appel au serveur porte la filiale choisie (en-tête
+ * X-RCC-Filiale) et tous les écrans de pilotage n'affichent que ses données. Ignoré par le serveur pour les autres profils.
+ */
+window.RccFiliale = (function () {
+    var KEY = "rcc.filiale", LABELS = { CI: "RCC ECI", TG: "RCC ETG" }, NAMES = { CI: "Côte d'Ivoire", TG: "Togo — Lomé" };
+    function get() { try { var v = localStorage.getItem(KEY); return LABELS[v] ? v : "CI"; } catch (e) { return "CI"; } }
+    function set(c) {
+        if (!LABELS[c]) return;
+        try { localStorage.setItem(KEY, c); localStorage.setItem("rccHrCountry", c); } catch (e) { /* stockage indisponible */ }
+        document.dispatchEvent(new CustomEvent("rcc:filiale-changed", { detail: { country: c } }));
+    }
+    var nativeFetch = window.fetch.bind(window);
+    window.fetch = function (input, init) {
+        try {
+            var url = typeof input === "string" ? input : (input && input.url) || "";
+            if (/^\/api\//.test(url) || url.indexOf(location.origin + "/api/") === 0) {
+                init = init || {};
+                var h = new Headers(init.headers || (typeof input !== "string" && input.headers) || {});
+                if (!h.has("X-RCC-Filiale")) h.set("X-RCC-Filiale", get());
+                init.headers = h;
+            }
+        } catch (e) { /* en-tête non ajouté : comportement d'origine */ }
+        return nativeFetch(input, init);
+    };
+    // Listes « Filiale » propres à certaines pages (Superviseur, Reporting) : alignées sur la filiale active, et un
+    // changement dans la liste bascule tout le portail.
+    document.addEventListener("DOMContentLoaded", function () {
+        ["svCountryFilter", "countryFilterInput"].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.value = get();
+            el.addEventListener("change", function () { if (LABELS[el.value]) { set(el.value); location.reload(); } });
+        });
+    });
+    document.addEventListener("rcc:filiale-changed", function (e) {
+        Array.prototype.forEach.call(document.querySelectorAll("#rccFilialeSwitch [data-filiale]"), function (b) {
+            b.classList.toggle("on", b.getAttribute("data-filiale") === e.detail.country);
+        });
+    });
+    return { get: get, set: set, label: function (c) { return LABELS[c || get()] || c; }, name: function (c) { return NAMES[c || get()] || c; }, LABELS: LABELS };
+})();
+
 // Visionneuse commune (articles, procédures, fichiers en fenêtre) — chargée sur toutes les pages.
 (function () {
     if (window.RccViewer || document.querySelector('script[data-rcc-viewer]')) return;
@@ -147,7 +191,39 @@ window.RccSession = (function () {
         applyFeatureElementVisibility(overridesByCode, deniedTabCodes);
     }
 
+    /** Sélecteur de filiale dans l'en-tête : Superviseur, RH, administrateur, Head QA. */
+    var FILIALE_PROFILES = ["ADMIN", "SUPERVISOR", "RH", "QA_SUPERVISOR"];
+    function mountFilialeSwitch(profile) {
+        var right = document.querySelector(".topbar .right");
+        if (!right || FILIALE_PROFILES.indexOf(profile) === -1 || document.getElementById("rccFilialeSwitch")) return;
+        var cur = window.RccFiliale.get();
+        var box = document.createElement("div");
+        box.id = "rccFilialeSwitch";
+        box.className = "rcc-filiale";
+        box.title = "Filiale affichée dans tout le portail";
+        box.innerHTML = '<i class="bi bi-building"></i>' + Object.keys(window.RccFiliale.LABELS).map(function (c) {
+            return '<button type="button" data-filiale="' + c + '" class="' + (c === cur ? "on" : "") + '" title="' + RccApi.escapeHtml(window.RccFiliale.name(c)) + '">' + window.RccFiliale.label(c) + '</button>';
+        }).join("");
+        right.insertBefore(box, right.firstChild);
+        if (!document.getElementById("rccFilialeCss")) {
+            var st = document.createElement("style");
+            st.id = "rccFilialeCss";
+            st.textContent = ".rcc-filiale{display:inline-flex;align-items:center;gap:.2rem;background:#EEF3FB;border:1px solid #D5E0F2;border-radius:999px;padding:.15rem;margin-right:.6rem}" +
+                ".rcc-filiale>i{color:#0B3D91;margin:0 .3rem 0 .4rem}.rcc-filiale button{border:0;background:transparent;border-radius:999px;padding:.2rem .7rem;font-weight:700;font-size:.78rem;color:#4B5A70}" +
+                ".rcc-filiale button.on{background:#0B3D91;color:#fff}";
+            document.head.appendChild(st);
+        }
+        box.addEventListener("click", function (e) {
+            var b = e.target.closest("[data-filiale]");
+            if (!b || b.classList.contains("on")) return;
+            window.RccFiliale.set(b.getAttribute("data-filiale"));
+            // Tous les écrans de la page se rechargent sur la nouvelle filiale.
+            window.location.reload();
+        });
+    }
+
     function applyHeader(user, profile) {
+        mountFilialeSwitch(profile);
         var nameEl = document.getElementById("headerUserName");
         var roleEl = document.getElementById("headerUserRole");
         if (nameEl) nameEl.textContent = user.name || user.username || "—";

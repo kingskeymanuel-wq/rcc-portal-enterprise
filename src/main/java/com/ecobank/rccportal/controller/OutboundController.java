@@ -17,6 +17,18 @@ public class OutboundController {
 
     private final SalesAppointmentService service;
 
+    /** Filiale active (RCC ECI / RCC ETG) — voir util.Filiale. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.ecobank.rccportal.service.FilialeScope filialeScope;
+
+    private <T> java.util.List<T> scopeById(java.util.List<T> list, java.util.function.Function<T, Long> id) {
+        return filialeScope == null ? list : filialeScope.byUserId(list, id);
+    }
+
+    private <T> java.util.List<T> scopeByName(java.util.List<T> list, java.util.function.Function<T, String> name) {
+        return filialeScope == null ? list : filialeScope.byUsername(list, name);
+    }
+
     public OutboundController(SalesAppointmentService service) {
         this.service = service;
     }
@@ -40,7 +52,7 @@ public class OutboundController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @AuthenticationPrincipal AuthenticatedUser requester) {
-        return service.teamSales(requester, from, to);
+        return scopeById(service.teamSales(requester, from, to), com.ecobank.rccportal.dto.SalesRecordResponse::agentUserId);
     }
 
     @DeleteMapping("/sales/{id}")
@@ -67,7 +79,7 @@ public class OutboundController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
             @AuthenticationPrincipal AuthenticatedUser requester) {
-        return service.teamAppointments(requester, from, to);
+        return scopeById(service.teamAppointments(requester, from, to), com.ecobank.rccportal.dto.AppointmentResponse::agentUserId);
     }
 
     @PutMapping("/appointments/{id}/status")

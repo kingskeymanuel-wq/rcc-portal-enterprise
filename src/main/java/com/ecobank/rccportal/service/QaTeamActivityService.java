@@ -65,6 +65,7 @@ public class QaTeamActivityService {
                 LEFT JOIN dbo.USER_ROLES ur ON ur.USERS_ID = u.ID LEFT JOIN dbo.ROLES r ON r.ID = ur.ROLES_ID
                 WHERE (u.ACCOUNT_ENABLED IS NULL OR u.ACCOUNT_ENABLED = 1)
                   AND (UPPER(s.CODE) IN ('QUALITY_ASSURANCE', 'SUPERVISEUR_QA', 'FORMATEUR') OR UPPER(r.NAME) IN ('QA', 'QA_SUPERVISOR'))
+                """ + com.ecobank.rccportal.util.Filiale.sql("u") + """
                 GROUP BY u.ID, u.USERNAME, u.NAME
                 """);
         List<Person> out = new ArrayList<>();

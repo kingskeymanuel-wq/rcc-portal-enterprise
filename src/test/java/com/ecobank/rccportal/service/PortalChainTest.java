@@ -42,7 +42,7 @@ class PortalChainTest {
         when(userRepo.findById(anyLong())).thenAnswer(i -> Optional.ofNullable(users.get((Long) i.getArgument(0))));
         when(userRepo.findFirstByUsernameIgnoreCase(anyString())).thenAnswer(i -> users.values().stream()
                 .filter(u -> u.getUsername().equalsIgnoreCase(i.getArgument(0))).findFirst());
-        when(userRepo.save(any(User.class))).thenAnswer(i -> { User u = i.getArgument(0); users.put(u.getId(), u); return u; });
+        when(userRepo.save(any(User.class))).thenAnswer(i -> { User u = i.getArgument(0); if (u.getId() == null) u.setId(ids.incrementAndGet()); users.put(u.getId(), u); return u; });
         when(userRepo.findAll()).thenAnswer(i -> new ArrayList<>(users.values()));
 
         when(roleRepo.findByNameIgnoreCase(anyString())).thenAnswer(i -> roles.stream().filter(r -> r.getName().equalsIgnoreCase(i.getArgument(0))).findFirst());
@@ -71,7 +71,7 @@ class PortalChainTest {
         for (String[] s : new String[][]{{"AGENT_INBOUND", "Agent Inbound"}, {"AGENT_INBOUND_MAIL", "Agent Inbound Mail"}, {"AGENT_TCHAT", "Agent Réseaux sociaux"},
                 {"AGENT_RAFIKI", "Agent Rafiki"}, {"AGENT_CIB", "Agent CIB"}, {"AGENT_OUTBOUND", "Agent Outbound"}, {"AGENT_TELEVENTE", "Agent Télévente"},
                 {"AGENT_DIGITALISATION", "Agent Digitalisation"}, {"TEAM_LEADER_INBOUND_MAIL", "Team Leader Inbound Mail"}, {"TEAM_LEADER_TCHAT", "Team Leader Réseaux sociaux"},
-                {"TEAM_LEADER_RAFIKI", "Team Leader Rafiki"}, {"QUALITY_ASSURANCE", "Quality Assurance"}}) {
+                {"TEAM_LEADER_RAFIKI", "Team Leader Rafiki"}, {"QUALITY_ASSURANCE", "Quality Assurance"}, {"TEAM_LEADER_INBOUND_VOICE", "Team Leader Inbound Voice"}}) {
             services.add(RccService.builder().id(ids.incrementAndGet()).code(s[0]).name(s[1]).enabled(true).build());
         }
         for (String r : List.of("AGENT", "Agent Inbound Voice", "Team Leader Inbound Mail")) roles.add(Role.builder().id(ids.incrementAndGet()).name(r).build());
@@ -157,5 +157,49 @@ class PortalChainTest {
         assertEquals("INBOUND_MAIL", users.get(loum.getId()).getLedTeam());
         assertEquals("/team-leader", portal(tlTest));
         assertEquals("/portail-mail", portal(agentTest));
+    }
+
+    @Test
+    void togoTeamIsReorganisedWithoutDuplicates() {
+        // Déjà en base, rattaché par erreur à la Côte d'Ivoire : réorganisé, pas dupliqué.
+        User existing = legacyAgent("koamouzou", null);
+        existing.setName("AMOUZOU Kossi Bernard");
+        existing.setAffiliateBranch("K01");
+        int before = users.size();
+        DataPatchService patch = new DataPatchService(null, null, admin, userRepo, null);
+        String out = patch.togoTeam();
+        assertTrue(out.contains("1 compte(s) existant(s) réorganisé(s), 8 créé(s)"), out);
+        assertEquals(before + 8, users.size());
+        assertEquals("TG", users.get(existing.getId()).getAffiliateBranch());
+        User tl = users.values().stream().filter(u -> "TFAHE".equals(u.getUsername())).findFirst().orElseThrow();
+        assertEquals("INBOUND_VOICE", tl.getLedTeam());
+        assertEquals("/team-leader", portal(tl));
+        User chat = users.values().stream().filter(u -> "JLASSEY".equals(u.getUsername())).findFirst().orElseThrow();
+        assertEquals("/portail-tchat", portal(chat));
+        // Rejouer le correctif ne crée rien de plus.
+        patch.togoTeam();
+        assertEquals(before + 8, users.size());
+    }
+
+    @Test
+    void filialeRules() {
+        assertEquals("RCC ECI", com.ecobank.rccportal.util.Filiale.label("K01"));
+        assertEquals("RCC ETG", com.ecobank.rccportal.util.Filiale.label("TG"));
+        var rh = new com.ecobank.rccportal.security.AuthenticatedUser("rh", "RH", "RH", "RH");
+        var agent = new com.ecobank.rccportal.security.AuthenticatedUser("a", "AGENT", "AGENT_INBOUND", "A");
+        try {
+            com.ecobank.rccportal.util.Filiale.set(agent, "TG");
+            assertNull(com.ecobank.rccportal.util.Filiale.current(), "un agent ne bascule pas de filiale");
+            com.ecobank.rccportal.util.Filiale.set(rh, "TG");
+            assertEquals("TG", com.ecobank.rccportal.util.Filiale.current());
+            assertTrue(com.ecobank.rccportal.util.Filiale.matches("TG"));
+            assertFalse(com.ecobank.rccportal.util.Filiale.matches("K01"));
+            assertTrue(com.ecobank.rccportal.util.Filiale.sql("u").contains("'TG'"));
+            com.ecobank.rccportal.util.Filiale.set(rh, "CI");
+            assertTrue(com.ecobank.rccportal.util.Filiale.matches(null), "sans filiale = Côte d'Ivoire (siège)");
+            assertTrue(com.ecobank.rccportal.util.Filiale.matches("K01"));
+        } finally {
+            com.ecobank.rccportal.util.Filiale.clear();
+        }
     }
 }

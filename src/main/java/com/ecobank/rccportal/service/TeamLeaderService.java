@@ -151,7 +151,7 @@ public class TeamLeaderService {
     }
 
     private boolean inTeam(String ledCode, User u) {
-        return TeamClassifier.belongsTo(ledCode, u.getActivity(), null);
+        return TeamClassifier.belongsTo(ledCode, u.getActivity(), null) && com.ecobank.rccportal.util.Filiale.matches(u.getAffiliateBranch());
     }
 
     /** Personne trouvée par la recherche élargie de l'onglet Membres. */
@@ -200,7 +200,7 @@ public class TeamLeaderService {
                 if (!all) continue;
             }
             boolean active = !Boolean.FALSE.equals(u.getAccountEnabled());
-            boolean mine = TeamClassifier.belongsTo(code, u.getActivity(), c);
+            boolean mine = TeamClassifier.belongsTo(code, u.getActivity(), c) && com.ecobank.rccportal.util.Filiale.matches(u.getAffiliateBranch());
             String management = managementLabel(roles.getOrDefault(u.getId(), List.of()), c);
             String reason = mine ? "Déjà dans votre équipe" : management != null ? "Compte de management (" + management + ")"
                     : !active ? "Compte désactivé — réintégration par le RH" : null;
@@ -402,7 +402,7 @@ public class TeamLeaderService {
     @Transactional(readOnly = true)
     public List<PerformanceResponse> teamReporting(AuthenticatedUser requester, YearMonth month) {
         String code = ledTeamCode(requester);
-        return reportingService.teamSummary(month != null ? month : YearMonth.now()).stream()
+        return reportingService.teamSummary(month != null ? month : YearMonth.now(), com.ecobank.rccportal.util.Filiale.current()).stream()
                 .filter(r -> TeamClassifier.belongsTo(code, r.activity(), null))
                 .toList();
     }

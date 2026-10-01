@@ -53,7 +53,7 @@
     var directoryUsers = [];
 
     var FILIALE_LABELS = {
-        CI: "Côte d'Ivoire", SN: "Sénégal", CM: "Cameroun", TG: "Togo",
+        CI: "RCC ECI — Côte d'Ivoire", SN: "Sénégal", CM: "Cameroun", TG: "RCC ETG — Togo",
         BJ: "Bénin", ML: "Mali", BF: "Burkina Faso", NE: "Niger",
         GH: "Ghana", NG: "Nigeria", KE: "Kenya", GN: "Guinée"
     };
