@@ -185,7 +185,77 @@ public class TranslationService {
             TranslationResult cached = cache.get(key);
             if (cached != null) return cached;
         }
+        TranslationResult byLine = translateChangedLines(text, source, target, detected);
+        if (byLine != null) {
+            synchronized (cache) {
+                cache.put(key, byLine);
+            }
+            return byLine;
+        }
+        TranslationResult whole = translateUncached(text, source, target, detected);
+        rememberLines(text, whole, source, target);
+        return whole;
+    }
 
+    /**
+     * Texte de plusieurs lignes dont une partie est déjà traduite (l'agent complète ou corrige son
+     * message) : seules les lignes nouvelles ou modifiées partent à la traduction, en un seul appel.
+     * Avant, chaque frappe renvoyait tout le texte au moteur — de plus en plus lent à mesure qu'il
+     * s'allongeait. {@code null} si rien n'est réutilisable ou si le découpage ne tombe pas juste.
+     */
+    private TranslationResult translateChangedLines(String text, String source, String target, String detected) {
+        String[] lines = text.split("\n", -1);
+        if (lines.length < 2) return null;
+        String[] out = new String[lines.length];
+        List<Integer> missing = new ArrayList<>();
+        int reused = 0;
+        TranslationResult sample = null;
+        synchronized (cache) {
+            for (int i = 0; i < lines.length; i++) {
+                if (lines[i].isBlank()) { out[i] = lines[i]; continue; }
+                TranslationResult hit = cache.get(new CacheKey(source, target, lines[i]));
+                if (hit != null) { out[i] = hit.translatedText(); reused++; sample = hit; }
+                else missing.add(i);
+            }
+        }
+        if (reused == 0) return null;
+        if (!missing.isEmpty()) {
+            StringBuilder chunk = new StringBuilder();
+            for (int i : missing) chunk.append(chunk.length() > 0 ? "\n" : "").append(lines[i]);
+            TranslationResult part = translateUncached(chunk.toString(), source, target, detected);
+            String[] got = part.translatedText().split("\n", -1);
+            if (got.length != missing.size()) return null;
+            for (int k = 0; k < got.length; k++) {
+                out[missing.get(k)] = got[k];
+                synchronized (cache) {
+                    cache.put(new CacheKey(source, target, lines[missing.get(k)]), new TranslationResult(got[k], part.detectedSourceLang(), part.provider()));
+                }
+            }
+            sample = part;
+        }
+        return new TranslationResult(String.join("\n", out), sample.detectedSourceLang(), sample.provider());
+    }
+
+    /** Traduction ligne à ligne mémorisée quand le moteur a conservé le découpage du texte. */
+    private void rememberLines(String text, TranslationResult result, String source, String target) {
+        String[] lines = text.split("\n", -1);
+        if (lines.length < 2 || result == null || result.translatedText() == null) return;
+        String[] got = result.translatedText().split("\n", -1);
+        if (got.length != lines.length) return;
+        synchronized (cache) {
+            for (int i = 0; i < lines.length; i++) {
+                if (!lines[i].isBlank() && !got[i].isBlank()) {
+                    cache.put(new CacheKey(source, target, lines[i]), new TranslationResult(got[i], result.detectedSourceLang(), result.provider()));
+                }
+            }
+        }
+    }
+
+    /** Dernière source qui a répondu : essayée en premier la fois suivante. */
+    private volatile String lastWinner;
+
+    private TranslationResult translateUncached(String text, String source, String target, String detected) {
+        CacheKey key = new CacheKey(source, target, text);
         // Sources utilisables pour ce texte, dans l'ordre de préférence.
         List<String> failures = java.util.Collections.synchronizedList(new ArrayList<>());
         List<Provider> candidates = new ArrayList<>();
@@ -211,8 +281,13 @@ public class TranslationService {
                 // à traduire vers une autre langue que le français est presque toujours en français, et inversement.
                 sourceForCall = "fr".equals(baseCode(target)) ? "en" : "fr";
             }
-            candidates.add(provider);
-            sources.add(sourceForCall);
+            if (provider.id().equals(lastWinner)) {
+                candidates.add(0, provider);
+                sources.add(0, sourceForCall);
+            } else {
+                candidates.add(provider);
+                sources.add(sourceForCall);
+            }
         }
 
         // Course « relais » : la source préférée part seule ; si elle n'a pas répondu en
@@ -245,7 +320,7 @@ public class TranslationService {
     }
 
     /** Délai avant de lancer la source suivante en parallèle quand la précédente tarde. */
-    static final long HEDGE_DELAY_MS = 2500;
+    static final long HEDGE_DELAY_MS = 1500;
     /** Source trop lente (délai dépassé) : écartée un moment pour ne pas ralentir les agents. */
     private static final long SLOW_RETRY_MS = 60 * 1000L;
 
@@ -285,6 +360,7 @@ public class TranslationService {
                 Attempt a = done.get();
                 if (a.error() == null) {
                     unreachableUntil.remove(a.provider().id());
+                    lastWinner = a.provider().id();
                     TranslationResult r = a.result();
                     String detectedLang = r.detectedSourceLang() != null && !r.detectedSourceLang().isBlank()
                             ? canonical(r.detectedSourceLang())

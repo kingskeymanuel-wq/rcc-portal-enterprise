@@ -26,6 +26,7 @@
     var lastRequestKey = "";
     var requestSeq = 0;
     var debounceTimer = null;
+    var inflight = null;
     var recognition = null;
     var recognizing = false;
 
@@ -105,8 +106,12 @@
         var seq = ++requestSeq;
         setStatus("Traduction…");
         $("targetText").classList.add("opacity-50");
+        // La requête précédente (frappe antérieure) est abandonnée : le navigateur ne fait plus la queue.
+        if (inflight && inflight.abort) inflight.abort();
+        inflight = window.AbortController ? new AbortController() : null;
         fetch("/api/ralph/translate", {
             method: "POST",
+            signal: inflight ? inflight.signal : undefined,
             credentials: "same-origin",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ text: text, sourceLang: sourceLang, targetLang: targetLang })
@@ -125,7 +130,7 @@
             $("detectedLangLabel").textContent = parts.join(" · ");
             setStatus("");
         }).catch(function (e) {
-            if (seq !== requestSeq) return;
+            if (seq !== requestSeq || (e && e.name === "AbortError")) return;
             $("targetText").classList.remove("opacity-50");
             $("targetText").textContent = "";
             $("retryBtn").style.display = "";

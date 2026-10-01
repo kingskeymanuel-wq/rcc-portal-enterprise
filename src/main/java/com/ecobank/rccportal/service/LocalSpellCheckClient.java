@@ -103,6 +103,29 @@ public class LocalSpellCheckClient {
         this.wordTermRepository = wordTermRepository;
     }
 
+    /**
+     * Chargement anticipé des dictionnaires (français puis anglais) juste après le démarrage, en
+     * arrière-plan. Sans cela, la première vérification de chaque langue prenait près de 20 secondes
+     * (ensuite ~50 ms) : c'était la lenteur ressentie du Correcteur et de la Réécriture.
+     */
+    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    public void warmUp() {
+        Thread t = new Thread(() -> {
+            for (String lang : List.of("fr", "en-US")) {
+                long start = System.currentTimeMillis();
+                try {
+                    check("Bonjour, ceci est un texte de préchauffage du correcteur.", lang);
+                    log.info("Correcteur {} prêt en {} ms.", lang, System.currentTimeMillis() - start);
+                } catch (RuntimeException e) {
+                    log.warn("Correcteur {} : préchargement en échec ({}).", lang, e.getMessage());
+                }
+            }
+        }, "spellcheck-warmup");
+        t.setDaemon(true);
+        t.setPriority(Thread.MIN_PRIORITY);
+        t.start();
+    }
+
     public boolean isSupported(String lang) {
         String normalized = normalizeLang(lang);
         return normalized != null && (LOCAL_LANGUAGES.contains(normalized) || "auto".equals(normalized) || remoteConfigured());

@@ -41,4 +41,20 @@ class RewriteAndCorrectionTest {
                 {"stop_reason":"end_turn","content":[{"type":"thinking","thinking":""},{"type":"text","text":"Bonjour, "},{"type":"text","text":"Madame."}]}""");
         assertEquals("Bonjour, Madame.", AnthropicClient.textOf(json));
     }
+
+    @Test
+    void exhaustedCreditGivesShortMessageAndPausesTheAi() {
+        AnthropicClient ai = new AnthropicClient();
+        org.springframework.test.util.ReflectionTestUtils.setField(ai, "apiKey", "sk-test");
+        assertTrue(ai.isAvailable());
+        var e = ai.failure(400, "{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Your credit balance is too low to access the Anthropic API.\"}}");
+        assertFalse(e.getMessage().contains("{"), "pas de JSON brut affiché à l'agent : " + e.getMessage());
+        assertTrue(e.getMessage().contains("crédit"), e.getMessage());
+        assertFalse(ai.isAvailable(), "plus d'appel (ni d'attente) tant que le crédit n'est pas rechargé");
+
+        LocalSpellCheckClient sc = new LocalSpellCheckClient(Mockito.mock(WordTermRepository.class));
+        var r = new TextRewriteService(sc, ai).rewrite("merci de traiter ce dossier", "fr", "professionnel", true);
+        assertEquals("Règles locales (sans IA)", r.engine());
+        assertTrue(r.changes().get(0).startsWith("IA indisponible (crédit"), r.changes().get(0));
+    }
 }

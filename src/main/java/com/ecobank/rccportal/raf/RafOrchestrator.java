@@ -261,17 +261,9 @@ public class RafOrchestrator {
                 if (combined(a, routerScores) >= Math.max(0.35, 0.6 * primaryScore)) secondary.add(a);
             }
             String synthesis = synthesize(request, primary, secondary);
-            if (synthesis != null) {
-                explanation.append(synthesis);
-            } else {
-                explanation.append(primary.markdown());
-                // Les autres sources qui confirment ou complètent la réponse sont intégrées (2-3
-                // lignes utiles chacune), pas seulement listées : RAF croise ses sources.
-                for (AgentAnswer a : secondary) {
-                    explanation.append("\n\n---\n🔎 **").append(RafText.get(request.lang(), "complement")).append(" — ")
-                            .append(labelOf(a.agentId())).append("**\n").append(excerpt(a.markdown(), 3));
-                }
-            }
+            // Réponse courte : la source principale seulement. Les sources complémentaires restent à un clic
+            // (boutons procédure / SLA / modèle et « Plus de détails ») au lieu d'être empilées dans la bulle.
+            explanation.append(synthesis != null ? synthesis : primary.markdown());
         }
         if (!"fr".equals(request.lang()) && primary.intent() != RafIntent.SMALL_TALK) {
             explanation.append("\n\n_").append(RafText.get(request.lang(), "dataFrench")).append("_");
@@ -458,8 +450,8 @@ public class RafOrchestrator {
             said.add(answer);
             sources.add(labelOf("verifiedqa"));
         }
-        if (article != null) {
-            String extract = SearchText.bestSentences(article.plainText(), request.terms(), 2, 320);
+        if (article != null && term == null && qa == null) {
+            String extract = SearchText.bestSentences(article.plainText(), request.terms(), 1, 220);
             if (!extract.isBlank() && said.stream().noneMatch(x -> x.contains(SearchText.normalize(extract)))) {
                 if (md.length() > 0) md.append("\n");
                 md.append(RafText.get(lang, "synth.from", article.title())).append(" ").append(extract);
@@ -468,7 +460,7 @@ public class RafOrchestrator {
         }
         if (procedure != null && !procedure.steps().isEmpty()) {
             md.append("\n\n👉 ").append(RafText.get(lang, "synth.proc", procedure.title(), procedure.steps().size(),
-                    trim(procedure.steps().get(0).content(), 110)));
+                    trim(procedure.steps().get(0).content(), 90)));
             sources.add("« " + procedure.title() + " »");
         }
         if (sla != null) {
@@ -533,21 +525,6 @@ public class RafOrchestrator {
 
     private static String trim(String s, int max) {
         return s == null ? "" : s.length() <= max ? s : s.substring(0, max).trim() + "…";
-    }
-
-    /** Premières lignes utiles d'une réponse (sans son titre), pour l'intégrer en complément. */
-    private static String excerpt(String markdown, int lines) {
-        if (markdown == null) return "";
-        List<String> kept = new ArrayList<>();
-        for (String line : markdown.split("\n")) {
-            if (line.isBlank()) continue;
-            kept.add(line.trim());
-            if (kept.size() >= lines + 1) break;
-        }
-        if (kept.size() > 1 && kept.get(0).startsWith("**")) {
-            kept.set(0, kept.get(0));
-        }
-        return String.join("\n", kept);
     }
 
     private RalphSearchResponse nothingFound(RafRequest request, List<IntentScore> ranked, List<RafAgentTrace> traces) {

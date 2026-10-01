@@ -71,7 +71,7 @@ public class TextRewriteService {
     }
 
     public boolean aiAvailable() {
-        return anthropic.isConfigured();
+        return anthropic.isAvailable();
     }
 
     public RewriteResult rewrite(String text, String lang, String style, boolean allowAi) {
@@ -80,15 +80,19 @@ public class TextRewriteService {
         String st = style == null || !STYLES.containsKey(style.trim().toLowerCase(Locale.ROOT)) ? "professionnel" : style.trim().toLowerCase(Locale.ROOT);
         String lg = lang == null || lang.isBlank() ? "fr" : lang.trim();
         if (allowAi && anthropic.isConfigured()) {
-            try {
-                return aiRewrite(text, lg, st);
-            } catch (ApiException e) {
-                // IA indisponible (réseau, quota) : la réécriture locale prend le relais plutôt qu'une erreur.
-                RewriteResult local = localRewrite(text, lg, st);
-                List<String> changes = new ArrayList<>(local.changes());
-                changes.add(0, "IA indisponible (" + e.getMessage() + ") — réécriture locale utilisée.");
-                return new RewriteResult(local.text(), st, local.engine(), changes);
+            String reason = anthropic.unavailableReason();
+            if (reason == null) {
+                try {
+                    return aiRewrite(text, lg, st);
+                } catch (ApiException e) {
+                    reason = e.getMessage();
+                }
             }
+            // IA indisponible (crédit, réseau) : la réécriture locale prend le relais aussitôt, avec une note courte.
+            RewriteResult local = localRewrite(text, lg, st);
+            List<String> changes = new ArrayList<>(local.changes());
+            changes.add(0, "IA indisponible (" + reason + ") : réécriture locale.");
+            return new RewriteResult(local.text(), st, local.engine(), changes);
         }
         return localRewrite(text, lg, st);
     }
@@ -104,7 +108,7 @@ public class TextRewriteService {
                 engagements ; n'invente aucune information, aucune promesse et aucun délai ; corrige l'orthographe et la
                 grammaire ; garde le vouvoiement avec le client. Réponds uniquement par le texte réécrit, sans commentaire,
                 sans guillemets ni titre.""".formatted(STYLES.get(style), language);
-        String out = anthropic.chat(system, text, 2000, 30).trim();
+        String out = anthropic.chat(system, text, Math.min(2000, 200 + text.length()), 20).trim();
         if (out.isEmpty()) throw ApiException.serviceUnavailable("réponse vide");
         return new RewriteResult(out, style, "IA (Anthropic)", List.of("Texte reformulé en style « " + style + " »."));
     }

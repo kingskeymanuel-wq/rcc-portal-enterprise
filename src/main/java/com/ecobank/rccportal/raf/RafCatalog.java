@@ -90,14 +90,60 @@ public class RafCatalog {
         return catalog;
     }
 
+    /** Reconstruction en arrière-plan en cours (une seule à la fois). */
+    private final java.util.concurrent.atomic.AtomicBoolean rebuilding = new java.util.concurrent.atomic.AtomicBoolean();
+
+    /**
+     * Instantané courant. Périmé : il reste servi tel quel pendant que le nouveau se construit en
+     * arrière-plan — avant, l'agent qui tombait sur l'expiration (toutes les 5 min) attendait la relecture
+     * complète de la base et des documents joints.
+     */
     public RafDocs.Snapshot snapshot() {
         RafDocs.Snapshot current = snapshot;
-        if (current != null && System.currentTimeMillis() - builtAt < TTL_MS) return current;
+        if (current != null) {
+            if (System.currentTimeMillis() - builtAt >= TTL_MS) refreshInBackground();
+            return current;
+        }
         synchronized (this) {
-            if (snapshot != null && System.currentTimeMillis() - builtAt < TTL_MS) return snapshot;
-            snapshot = build();
-            builtAt = System.currentTimeMillis();
+            if (snapshot == null) rebuild();
             return snapshot;
+        }
+    }
+
+    private void rebuild() {
+        RafDocs.Snapshot fresh = build();
+        warmSearchIndex(fresh);
+        snapshot = fresh;
+        builtAt = System.currentTimeMillis();
+    }
+
+    private void refreshInBackground() {
+        if (!rebuilding.compareAndSet(false, true)) return;
+        Thread t = new Thread(() -> {
+            try {
+                rebuild();
+            } catch (RuntimeException e) {
+                log.warn("RAF : rechargement du catalogue en échec ({}).", e.getMessage());
+            } finally {
+                rebuilding.set(false);
+            }
+        }, "raf-catalog-refresh");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    /** Catalogue prêt dès le démarrage : la première question n'attend pas la lecture des documents. */
+    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    public void warmUp() {
+        builtAt = 0;
+        refreshInBackground();
+    }
+
+    /** Textes des articles indexés d'avance (voir SearchText) : la recherche n'a plus qu'à comparer. */
+    private static void warmSearchIndex(RafDocs.Snapshot s) {
+        for (ArticleDoc a : s.articles()) {
+            SearchText.index(a.plainText());
+            SearchText.normalize(a.plainText());
         }
     }
 
@@ -130,6 +176,7 @@ public class RafCatalog {
 
     public void invalidate() {
         builtAt = 0;
+        if (snapshot != null) refreshInBackground();
     }
 
     RafDocs.Snapshot build() {

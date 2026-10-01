@@ -49,7 +49,7 @@ public class CampaignFormAiService {
         if (p.isEmpty()) throw com.ecobank.rccportal.util.ApiException.badRequest("Décrivez la campagne (produit, cible, objectif).");
         if (p.length() > 2000) p = p.substring(0, 2000);
         Map<String, Object> out = new LinkedHashMap<>();
-        if (anthropic.isConfigured()) {
+        if (anthropic.isAvailable()) {
             try {
                 String raw = anthropic.chat(SYSTEM, "Campagne à concevoir : " + p, 6000, 90);
                 ObjectNode form = CampaignFormEngine.normalize(parseJson(raw));

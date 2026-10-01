@@ -163,7 +163,8 @@
         wrap.style.display = "flex";
         wrap.style.flexDirection = "column";
         wrap.style.gap = "6px";
-        results.forEach(function (r) {
+        // Réponse épurée : 2 sources à ouvrir au plus, titre seul (l'extrait répétait la réponse).
+        results.slice(0, 2).forEach(function (r) {
             var badge = SOURCE_BADGES[r.sourceType] || "📋 Étape de procédure";
             var card = document.createElement("button");
             card.type = "button";
@@ -174,9 +175,9 @@
             card.style.background = "#fff";
             card.style.borderRadius = "10px";
             card.style.transition = "background .15s ease, border-color .15s ease";
-            card.innerHTML = "<strong>" + escapeHtml(r.title) + "</strong>" +
-                '<div class="text-muted" style="font-size:.75rem;">' + badge + "</div>" +
-                "<div>" + escapeHtml(r.snippet) + "</div>";
+            card.style.padding = "4px 8px";
+            card.style.fontSize = ".8rem";
+            card.innerHTML = '<span class="text-muted" style="font-size:.72rem;">' + badge + "</span> · <strong>" + escapeHtml(r.title) + "</strong>";
             card.addEventListener("mouseenter", function () { card.style.background = "#f0f6ff"; card.style.borderColor = "#0057B8"; });
             card.addEventListener("mouseleave", function () { card.style.background = "#fff"; card.style.borderColor = "#dbe4ee"; });
             // Cliquer une bulle = reformuler avec son titre exact, exactement ce que RAF
@@ -199,21 +200,6 @@
         badge.textContent = source === "WEB"
             ? "🌐 Réponse tirée d'une recherche web (hors portail) — source externe à vérifier."
             : "🌐 Réponse complétée par des sources web en plus des procédures internes.";
-        thread.appendChild(badge);
-    }
-
-    /** Confiance + sources consultées, dans l'ordre de priorité Ecobank (procédures > KB > Copilot > web). */
-    function appendConfidence(thread, confidencePercent, sourcesConsulted) {
-        if (confidencePercent == null && (!sourcesConsulted || !sourcesConsulted.length)) return;
-        var badge = document.createElement("div");
-        badge.className = "text-muted";
-        badge.style.fontSize = ".72rem";
-        badge.style.maxWidth = "85%";
-        badge.style.margin = "0 0 6px";
-        var parts = [];
-        if (confidencePercent != null) parts.push(t("confidence") + " : " + confidencePercent + "%");
-        if (sourcesConsulted && sourcesConsulted.length) parts.push(t("sources") + " : " + sourcesConsulted.join(", "));
-        badge.textContent = parts.join(" · ");
         thread.appendChild(badge);
     }
 
@@ -292,18 +278,6 @@
         return true;
     }
 
-    /** « Agents consultés » — transparence sur qui a répondu (grisé = consulté sans résultat retenu). */
-    function appendAgents(thread, traces) {
-        if (!traces || !traces.length) return;
-        var div = document.createElement("div");
-        div.style.cssText = "font-size:.7rem;margin:0 0 6px;max-width:92%;color:#6b7280;";
-        div.innerHTML = "🧭 " + escapeHtml(t("agentsConsulted")) + " : " + traces.map(function (tr) {
-            return '<span title="' + escapeHtml("routeur " + tr.routerScore + "% · correspondance " + tr.matchScore + "%") + '" style="' +
-                (tr.used ? "color:#0057B8;font-weight:600;" : "opacity:.55;") + '">' + escapeHtml(tr.label) + (tr.used ? " ✓" : "") + "</span>";
-        }).join(" · ");
-        thread.appendChild(div);
-    }
-
     /** Élément interactif : étape guidée, échéance SLA, brouillon de mail. */
     function renderAction(thread, action) {
         if (!action || !action.payload) return;
@@ -337,12 +311,19 @@
     }
 
     /** « Pourquoi cette réponse ? » — trace lisible du routage et des sources. */
-    function appendWhy(thread, reasoning) {
-        if (!reasoning || !reasoning.length) return;
+    function appendWhy(thread, reasoning, result) {
+        result = result || {};
+        var lines = (reasoning || []).slice();
+        // Confiance, sources et agents : repliés ici au lieu de trois lignes sous chaque réponse.
+        if (result.confidencePercent != null) lines.unshift(t("confidence") + " : " + result.confidencePercent + "%");
+        if (result.sourcesConsulted && result.sourcesConsulted.length) lines.push(t("sources") + " : " + result.sourcesConsulted.join(", "));
+        var used = (result.agentsConsulted || []).filter(function (tr) { return tr.used; }).map(function (tr) { return tr.label; });
+        if (used.length) lines.push(t("agentsConsulted") + " : " + used.join(", "));
+        if (!lines.length) return;
         var d = document.createElement("details");
         d.style.cssText = "font-size:.72rem;color:#6b7280;margin:0 0 8px;max-width:92%;";
         d.innerHTML = "<summary style=\"cursor:pointer;\">" + escapeHtml(t("why")) + "</summary><ul class=\"mb-0 ps-3\">" +
-            reasoning.map(function (r) { return "<li>" + escapeHtml(r) + "</li>"; }).join("") + "</ul>";
+            lines.map(function (r) { return "<li>" + escapeHtml(r) + "</li>"; }).join("") + "</ul>";
         thread.appendChild(d);
     }
 
@@ -408,9 +389,7 @@
                 appendResults(thread, result.results);
                 appendSourceBadge(thread, result.source);
                 appendWebResults(thread, result.webResults);
-                appendConfidence(thread, result.confidencePercent, result.sourcesConsulted);
-                appendAgents(thread, result.agentsConsulted);
-                appendWhy(thread, result.reasoning);
+                appendWhy(thread, result.reasoning, result);
                 scrollDown(thread);
                 if (wasVoice) speak(result.explanation.replace(/\*\*/g, ""));
             })

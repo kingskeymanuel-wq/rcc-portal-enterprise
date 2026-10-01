@@ -132,8 +132,10 @@ class RafOrchestratorTest {
         assertTrue(e.contains("5 jours ouvrés"), e);                     // ce que je dis (SLA officiel)
         assertTrue(e.contains("Back-office monétique"), e);              // où transmettre
         assertTrue(e.contains("Réclamation retrait GAB"), e);            // modèle
-        assertTrue(e.contains("GAB") && e.contains("Guichet automatique"), e); // termes utiles
+        assertFalse(e.contains("Guichet automatique"), "fiche courte : les termes utiles sont dans les détails");
         assertTrue(r.suggestions().stream().anyMatch(s -> "raf:proc:2:step:1".equals(s.command())));
+        var details = raf.handle(null, "agent.conseiller", null, "raf:details").explanation();
+        assertTrue(details.contains("Guichet automatique"), details);   // termes utiles
     }
 
     @Test

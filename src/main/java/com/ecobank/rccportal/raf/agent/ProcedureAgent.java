@@ -97,7 +97,7 @@ public class ProcedureAgent implements RafAgent {
         if (!meta.isEmpty()) md.append(" — ").append(String.join(" · ", meta));
         md.append("\n");
         List<StepDoc> steps = p.steps();
-        steps.stream().limit(3).forEach(s -> md.append("\n").append(s.number()).append(". ").append(Scoring.truncate(s.content(), 220)));
+        steps.stream().limit(3).forEach(s -> md.append("\n").append(s.number()).append(". ").append(Scoring.truncate(s.content(), 140)));
         if (steps.size() > 3) md.append("\n… (").append(steps.size() - 3).append(" étape(s) de plus)");
         if (steps.isEmpty()) md.append("\nÉtapes pas encore rédigées par la QA.");
 

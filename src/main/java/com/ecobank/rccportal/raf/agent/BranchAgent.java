@@ -98,7 +98,7 @@ public class BranchAgent implements RafAgent {
         StringBuilder md = new StringBuilder("**🏦 ").append(matches.size()).append(" agence(s)")
                 .append(where != null ? " — " + where : "").append("**\n");
         java.util.Map<String, java.util.Map<String, com.ecobank.rccportal.dto.CardAgencyDtos.AgencyRow>> cardCache = new java.util.HashMap<>();
-        for (BranchDoc b : matches.stream().limit(5).toList()) {
+        for (BranchDoc b : matches.stream().limit(3).toList()) {
             md.append("\n• **").append(b.name()).append("**").append(b.city() != null ? " (" + b.city() + ")" : "");
             if (b.address() != null && !b.address().isBlank()) md.append("\n  ").append(b.address());
             if (b.openingHours() != null && !b.openingHours().isBlank()) md.append("\n  🕘 ").append(b.openingHours());
@@ -116,7 +116,7 @@ public class BranchAgent implements RafAgent {
                         .append("#map=17/").append(b.latitude()).append("/").append(b.longitude());
             }
         }
-        if (matches.size() > 5) md.append("\n\n… et ").append(matches.size() - 5).append(" autre(s) : voir l'onglet Agences de la Base de connaissances.");
+        if (matches.size() > 3) md.append("\n\n… et ").append(matches.size() - 3).append(" autre(s) : voir l'onglet Agences de la Base de connaissances.");
         List<RalphResultItem> citations = matches.stream().limit(5)
                 .map(b -> new RalphResultItem("BRANCH", (int) b.id(), b.name(), b.address())).toList();
         return new AgentAnswer(id(), RafIntent.BRANCH, city != null || country != null ? 0.9 : 0.6, true, md.toString(), null,
