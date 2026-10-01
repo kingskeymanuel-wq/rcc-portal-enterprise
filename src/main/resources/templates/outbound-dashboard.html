@@ -11,6 +11,7 @@
     <link rel="stylesheet" th:href="@{/css/agent-trainings.css}">
     <link rel="stylesheet" th:href="@{/css/campaign-forms.css}">
     <link rel="stylesheet" th:href="@{/css/rcc-guides.css}">
+    <link rel="stylesheet" th:href="@{/css/kb-embed.css}">
     <style>
         .ob-chat-scroll { max-height: 60vh; overflow-y: auto; padding: 4px; }
         .ob-chat-msg { max-width: 82%; margin-bottom: .6rem; display: flex; }
@@ -151,6 +152,7 @@
                             <button class="btn nav-link" id="obTabSalesBtn"><i class="bi bi-graph-up-arrow"></i> Mes ventes</button>
                             <button class="btn nav-link" id="obTabRdvBtn"><i class="bi bi-calendar-check"></i> Mes rendez-vous</button>
                             <button class="btn nav-link" id="obTabJourneysBtn"><i class="bi bi-signpost-split-fill"></i> Parcours de vente</button>
+                            <button class="btn nav-link" id="obTabKbBtn"><i class="bi bi-journal-bookmark-fill"></i> Base de connaissance</button>
                         </nav>
                     </div>
 
@@ -237,6 +239,9 @@
                         </div>
                         <div class="row g-3" id="obJourneysGrid"></div>
                     </div>
+
+                    <!-- ===================== BASE DE CONNAISSANCE (kb-embed.js) ===================== -->
+                    <div id="obPaneKb" class="card-body" style="display:none;"><div id="obKbRoot"></div></div>
                 </div>
 
             </div>
@@ -572,6 +577,7 @@
 <script th:src="@{/js/agent-trainings.js}"></script>
 <script th:src="@{/js/guides-data.js}"></script>
 <script th:src="@{/js/rcc-guides.js}"></script>
+<script th:src="@{/js/kb-embed.js}"></script>
 <script th:src="@{/js/campaign-forms.js}"></script>
 <script th:src="@{/js/outbound-dashboard.js}"></script>
 </body>

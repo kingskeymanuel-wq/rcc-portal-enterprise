@@ -16,7 +16,7 @@
     var salesByAgentCache = {}; // agentName -> count (mois du reporting en cours), Outbound uniquement
     var agentModal;
 
-    var TABS = ["Reporting", "Members", "Planning", "Qa", "PerfFiles", "Sales", "Rdv", "Campaigns", "Alerts", "Competitions", "Meetings"];
+    var TABS = ["Reporting", "Members", "Planning", "Qa", "PerfFiles", "Sales", "Rdv", "Campaigns", "Kb", "Alerts", "Competitions", "Meetings"];
 
     var perfFilesMounted = false;
 
@@ -29,6 +29,7 @@
             pane.style.display = t.toLowerCase() === tab ? "" : "none";
         });
         if (tab === "reporting") loadReporting();
+        if (tab === "kb" && window.RccKbEmbed) RccKbEmbed.mount($("tlKbRoot"));
         if (tab === "members") loadMembers();
         if (tab === "planning") loadPlanningTab();
         if (tab === "qa") loadQa();
@@ -1944,6 +1945,7 @@
         $("tlTabSalesBtn").addEventListener("click", function () { switchTab("sales"); });
         $("tlTabRdvBtn").addEventListener("click", function () { switchTab("rdv"); });
         $("tlTabCampaignsBtn").addEventListener("click", function () { switchTab("campaigns"); });
+        $("tlTabKbBtn").addEventListener("click", function () { switchTab("kb"); });
         $("tlTabAlertsBtn").addEventListener("click", function () { switchTab("alerts"); });
         $("tlTabCompetitionsBtn").addEventListener("click", function () { switchTab("competitions"); });
         $("tlTabMeetingsBtn").addEventListener("click", function () { switchTab("meetings"); });
@@ -1980,6 +1982,7 @@
                 $("tlTabSalesBtn").style.display = "";
                 $("tlTabRdvBtn").style.display = "";
                 $("tlTabCampaignsBtn").style.display = "";
+                $("tlTabKbBtn").style.display = "";
             }
             loadReporting();
             refreshMeetingCounts();

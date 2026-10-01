@@ -167,12 +167,10 @@ window.RccSession = (function () {
             var allowed = link.getAttribute("data-roles").split(",");
             var isAllowed = allowed.indexOf(profile) !== -1;
 
-            // Un conseiller Outbound a ses propres masques de mail (Digitalisation/Prêt/
-            // Assurance — voir seedOutboundMailTemplatesIfMissing()) donc GARDE ce lien ; en
-            // revanche les procédures/Knowledge Base/Formation génériques (pensées pour
-            // Inbound Voix/Mail) ne le concernent pas — remplacées par l'onglet "Parcours de
-            // vente" de son propre tableau de bord Outbound.
-            if ((featureCode === "procedures" || featureCode === "knowledge" || featureCode === "training" || featureCode === "performance") && outboundAgent) isAllowed = false;
+            // Un conseiller Outbound (Digitalisation, Télévente) garde ses masques de mail et la Base de
+            // connaissance (aussi intégrée à son portail, onglet « Base de connaissance ») ; les procédures et la
+            // formation génériques (pensées pour Inbound Voix/Mail) restent remplacées par ses « Parcours de vente ».
+            if ((featureCode === "procedures" || featureCode === "training" || featureCode === "performance") && outboundAgent) isAllowed = false;
             // Portail Outbound = Digitalisation ; un agent Télévente a son propre portail.
             if (featureCode === "outbound-dashboard" && (!outboundAgent || channelPortal === "/portail-televente")) isAllowed = false;
             // Portails Tchat / Rafiki / Télévente : chaque agent ne voit que le sien (l'administrateur voit tout).

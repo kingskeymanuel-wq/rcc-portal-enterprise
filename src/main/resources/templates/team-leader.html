@@ -15,6 +15,7 @@
     <link rel="stylesheet" th:href="@{/css/team-perf-files.css}">
     <link rel="stylesheet" th:href="@{/css/campaign-forms.css}">
     <link rel="stylesheet" th:href="@{/css/rcc-guides.css}">
+    <link rel="stylesheet" th:href="@{/css/kb-embed.css}">
     <style>
         .tl-tab-nav { gap: .35rem; padding: .7rem .8rem; background: #F5F8FC; border-radius: 1rem 1rem 0 0; }
         .tl-tab-nav .btn.nav-link { border: 0; border-radius: 999px; color: #4B5A70; font-weight: 700; font-size: .86rem; padding: .45rem .95rem; transition: background .2s ease, color .2s ease, box-shadow .2s ease; }
@@ -193,6 +194,7 @@
                                 <button class="btn nav-link" id="tlTabSalesBtn" style="display:none;"><i class="bi bi-graph-up-arrow"></i> Ventes équipe</button>
                                 <button class="btn nav-link" id="tlTabRdvBtn" style="display:none;"><i class="bi bi-calendar-check"></i> RDV équipe</button>
                                 <button class="btn nav-link" id="tlTabCampaignsBtn" style="display:none;"><i class="bi bi-megaphone-fill"></i> Campagnes</button>
+                                <button class="btn nav-link" id="tlTabKbBtn" style="display:none;"><i class="bi bi-journal-bookmark-fill"></i> Base de connaissance</button>
                                 <button class="btn nav-link" id="tlTabAlertsBtn"><i class="bi bi-exclamation-triangle"></i> Alertes</button>
                                 <button class="btn nav-link" id="tlTabCompetitionsBtn"><i class="bi bi-trophy-fill"></i> Compétitions</button>
                                 <button class="btn nav-link" id="tlTabMeetingsBtn"><i class="bi bi-chat-square-heart"></i> Meetings <span class="tl-tab-count" id="tlMeetingsTabCount" style="display:none;">0</span></button>
@@ -401,6 +403,9 @@
                         </div>
 
                         <!-- ===================== CAMPAGNES (OUTBOUND) ===================== -->
+                        <!-- Base de connaissance (Team Leader Outbound — kb-embed.js) -->
+                        <div id="tlPaneKb" class="card-body" style="display:none;"><div id="tlKbRoot"></div></div>
+
                         <div id="tlPaneCampaigns" class="card-body" style="display:none;">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h6 class="mb-0">Mes campagnes</h6>
@@ -791,6 +796,7 @@
 <script th:src="@{/js/plan-day-picker.js}"></script>
 <script th:src="@{/js/guides-data.js}"></script>
 <script th:src="@{/js/rcc-guides.js}"></script>
+<script th:src="@{/js/kb-embed.js}"></script>
 <script th:src="@{/js/campaign-forms.js}"></script>
 <script th:src="@{/js/campaign-form-builder.js}"></script>
 <script th:src="@{/js/team-leader.js}"></script>

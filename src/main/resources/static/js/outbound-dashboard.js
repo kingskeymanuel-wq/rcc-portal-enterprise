@@ -33,11 +33,12 @@
     // ===================== ONGLETS =====================
 
     function switchTab(tab) {
-        ["Campaign", "Calls", "Sales", "Rdv", "Journeys"].forEach(function (t) {
+        ["Campaign", "Calls", "Sales", "Rdv", "Journeys", "Kb"].forEach(function (t) {
             $("obTab" + t + "Btn").classList.toggle("active", t.toLowerCase() === tab);
             $("obPane" + t).style.display = t.toLowerCase() === tab ? "" : "none";
         });
         if (tab === "journeys") renderJourneysGrid();
+        if (tab === "kb" && window.RccKbEmbed) RccKbEmbed.mount($("obKbRoot"));
         if (tab === "calls") loadMyCalls();
         if (tab === "campaign") loadCampaignGrid();
     }
@@ -1345,6 +1346,7 @@
         $("obTabSalesBtn").addEventListener("click", function () { switchTab("sales"); });
         $("obTabRdvBtn").addEventListener("click", function () { switchTab("rdv"); });
         $("obTabJourneysBtn").addEventListener("click", function () { switchTab("journeys"); });
+        $("obTabKbBtn").addEventListener("click", function () { switchTab("kb"); });
 
         wireCampaignTab();
         wireCampaignManage();
