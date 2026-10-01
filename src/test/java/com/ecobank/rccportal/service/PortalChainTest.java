@@ -143,4 +143,19 @@ class PortalChainTest {
         assertEquals("AGENT", profile(tl));
         assertEquals("/portail-tchat", portal(tl));
     }
+
+    @Test
+    void inboundMailLeadershipPatch() {
+        User loum = legacyAgent("oloum", null);
+        loum.setName("LOUM Olivia");
+        User tlTest = legacyAgent("teamleader.inboundmail", "INBOUND_MAIL");
+        User agentTest = legacyAgent("agent.mail", null);
+        DataPatchService patch = new DataPatchService(null, null, admin, userRepo, null);
+        String out = patch.inboundMailLeadership();
+        assertTrue(out.contains("LOUM Olivia"), out);
+        assertEquals("/team-leader", portal(loum));
+        assertEquals("INBOUND_MAIL", users.get(loum.getId()).getLedTeam());
+        assertEquals("/team-leader", portal(tlTest));
+        assertEquals("/portail-mail", portal(agentTest));
+    }
 }

@@ -83,7 +83,8 @@ window.RccDayPicker = (function () {
         function setMany(days, on) { var v = value(); days.forEach(function (d) { if (on) sel[iso(d)] = v; else delete sel[iso(d)]; }); }
         function allSelected(days) { var v = value(); return days.length && days.every(function (d) { return sel[iso(d)] === v; }); }
 
-        function render() {
+        /** silent : affichage seul (agent chargé, planning en ligne), sans signaler de changement de sélection. */
+        function render(silent) {
             root.querySelector(".dp-months").innerHTML = monthsShown().map(function (m) {
                 var days = daysOfMonth(m);
                 var html = '<div class="dp-month"><button type="button" class="dp-mtitle" data-month="' + iso(m) + '">' + MONTHS[m.getMonth()] + ' ' + m.getFullYear() +
@@ -133,7 +134,7 @@ window.RccDayPicker = (function () {
                     }).join(" ");
                 }
             }
-            if (opts.onChange) opts.onChange(keys);
+            if (opts.onChange && silent !== true) opts.onChange(keys);
         }
 
         root.addEventListener("click", function (e) {
@@ -186,8 +187,8 @@ window.RccDayPicker = (function () {
             count: function () { return Object.keys(sel).length; },
             clear: function () { sel = {}; render(); },
             entries: function () { var o = {}; Object.keys(sel).forEach(function (k) { o[k] = sel[k]; }); return o; },
-            load: function (entries) { sel = {}; Object.keys(entries || {}).forEach(function (k) { sel[k] = entries[k]; }); last = null; render(); },
-            setExisting: function (map) { existing = map || {}; render(); },
+            load: function (entries) { sel = {}; Object.keys(entries || {}).forEach(function (k) { sel[k] = entries[k]; }); last = null; render(true); },
+            setExisting: function (map) { existing = map || {}; render(true); },
             render: render
         };
     }

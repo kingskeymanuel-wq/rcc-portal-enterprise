@@ -43,6 +43,9 @@ public class DataPatchService {
     /** Rôles et services d'agent alignés (Inbound Voix, Inbound Mail, Réseaux sociaux, Rafiki, CIB, Outbound, Télévente). */
     public static final String AGENT_ROLES_SERVICES_SYNC = "AGENT_ROLES_SERVICES_SYNC";
 
+    /** Pôle Inbound Mail : LOUM Olivia Team Leader, comptes de test (bypass) Team Leader et agent Inbound Mail alignés. */
+    public static final String INBOUND_MAIL_LEADERSHIP = "INBOUND_MAIL_LEADERSHIP";
+
     public static final List<Patch> PATCHES = List.of(new Patch(INBOUND_VOIX_2026_10,
             "Team Inbound Voix — planning d'octobre 2026 et rôles",
             "Planning d'octobre 2026 des 32 agents Inbound Voix (fichier Exceliam) ; chacun reçoit le rôle « Agent Inbound Voice », "
@@ -56,7 +59,10 @@ public class DataPatchService {
                             + "elle arrive sur le portail Réseaux sociaux (l'ancien portail Tchat) à sa prochaine connexion."),
             new Patch(AGENT_ROLES_SERVICES_SYNC, "Rôles et services d'agent synchronisés",
                     "Chaque rôle d'agent (Inbound Voix, Inbound Mail, Réseaux sociaux, Rafiki, CIB, Outbound, Télévente) reçoit son service "
-                            + "et chaque service d'agent son rôle, sans rien retirer — ensuite, choisir l'un applique l'autre automatiquement."));
+                            + "et chaque service d'agent son rôle, sans rien retirer — ensuite, choisir l'un applique l'autre automatiquement."),
+            new Patch(INBOUND_MAIL_LEADERSHIP, "Inbound Mail — Team Leader LOUM Olivia et accès bypass",
+                    "LOUM Olivia devient Team Leader Inbound Mail (service, rôle, équipe menée). Les comptes de test (bypass) "
+                            + "teamleader.inboundmail et agent.mail sont alignés : portail Team Leader Inbound Mail et portail agent Inbound Mail."));
 
     static final String PLANNING_FILE = "data/planning/inbound-voix-2026-10.csv";
     static final String AGENT_ROLE = "Agent Inbound Voice";
@@ -119,6 +125,7 @@ public class DataPatchService {
             case TEAM_ASSIGNMENT_LOCKED_TRUE -> teamAssignmentLockedTrue();
             case RESEAUX_SOCIAUX_ROLES -> socialNetworkRoles();
             case AGENT_ROLES_SERVICES_SYNC -> administrationService.addMissingAgentPairs() + " rôle(s) ou service(s) d'agent ajouté(s) pour aligner rôles et services.";
+            case INBOUND_MAIL_LEADERSHIP -> inboundMailLeadership();
             default -> throw com.ecobank.rccportal.util.ApiException.notFound("Correctif inconnu : " + code);
         };
         jdbc.update("""
@@ -130,6 +137,28 @@ public class DataPatchService {
         auditLogService.record(by, "DATA_PATCH", code + " — " + summary);
         log.warn("[DATA PATCH] {} appliqué :\n{}", code, result);
         return result;
+    }
+
+    // ───────────── Inbound Mail : Team Leader et comptes de test ─────────────
+
+    String inboundMailLeadership() {
+        StringBuilder out = new StringBuilder();
+        List<User> all = userRepository.findAll().stream().filter(u -> u.getName() != null).toList();
+        User loum = com.ecobank.rccportal.util.PersonNames.findUnique("LOUM OLIVIA", all, User::getName);
+        if (loum == null) {
+            out.append("⚠ LOUM Olivia : aucun compte unique à ce nom — à nommer dans Administration → Organigramme → Team Leaders par équipe.\n");
+        } else {
+            administrationService.setAccess(loum.getId(), "TEAM_LEADER", "INBOUND_MAIL");
+            administrationService.grantRoleByName(loum.getId(), "Team Leader Inbound Mail", "Responsable d'équipe");
+            out.append("• Team Leader Inbound Mail : ").append(loum.getName()).append(" (").append(loum.getUsername()).append(")\n");
+        }
+        for (String[] acc : new String[][]{{"teamleader.inboundmail", "TEAM_LEADER"}, {"agent.mail", "AGENT"}}) {
+            userRepository.findFirstByUsernameIgnoreCase(acc[0]).ifPresentOrElse(u -> {
+                administrationService.setAccess(u.getId(), acc[1], "INBOUND_MAIL");
+                out.append("• Compte de test ").append(acc[0]).append(" : ").append(acc[1].equals("AGENT") ? "agent" : "Team Leader").append(" Inbound Mail\n");
+            }, () -> out.append("• Compte de test ").append(acc[0]).append(" absent (mode bypass désactivé ?)\n"));
+        }
+        return out.toString().trim();
     }
 
     // ───────────── Rôle Réseaux sociaux → service Agent Réseaux sociaux ─────────────

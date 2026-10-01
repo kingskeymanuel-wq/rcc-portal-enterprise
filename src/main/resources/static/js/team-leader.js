@@ -532,12 +532,14 @@
                 onChange: function () {
                     if (!planCurrent || !planPicker) return;
                     planDrafts[planCurrent] = planPicker.entries();
+                    if (!Object.keys(planDrafts[planCurrent]).length) delete planDrafts[planCurrent];
                     renderPlanAgents();
                 }
             });
         }
+        // Chaque agent a SON brouillon : on charge le sien (copie), jamais la sélection de l'agent précédent.
+        planPicker.load(Object.assign({}, planDrafts[username] || {}));
         planPicker.setExisting(planExisting[username.toLowerCase()] || {});
-        planPicker.load(planDrafts[username] || {});
         $("paCopyList").innerHTML = planAgents.filter(function (x) { return x.username !== username; }).map(function (x) {
             return '<label><input type="checkbox" class="form-check-input me-1" value="' + escapeHtml(x.username) + '">' + escapeHtml(x.fullName || x.username) + '</label>';
         }).join("");
@@ -638,19 +640,16 @@
             renderPlanAgents();
         });
 
-        // Publication : brouillons regroupés par (horaire, jours identiques) — un envoi par groupe.
+        // Publication agent par agent (un envoi par agent et par horaire) : chaque planning est indépendant — l'erreur
+        // sur un agent n'empêche ni ne modifie celui des autres.
         function submitPlanning() {
             var resultBox = $("tlPlanResult");
-            var byDayCode = {};
+            var groups = [];
             Object.keys(planDrafts).forEach(function (u) {
                 var perCode = {};
                 Object.keys(planDrafts[u] || {}).forEach(function (day) { (perCode[planDrafts[u][day]] = perCode[planDrafts[u][day]] || []).push(day); });
-                Object.keys(perCode).forEach(function (code) {
-                    var days = perCode[code].sort(), key = code + "|" + days.join(",");
-                    (byDayCode[key] = byDayCode[key] || { code: code, days: days, users: [] }).users.push(u);
-                });
+                Object.keys(perCode).forEach(function (code) { groups.push({ code: code, days: perCode[code].sort(), users: [u] }); });
             });
-            var groups = Object.keys(byDayCode).map(function (k) { return byDayCode[k]; });
             var agents = Object.keys(planDrafts).filter(function (k) { return draftCount(k); });
             if (!groups.length) { resultBox.className = "text-danger small"; resultBox.textContent = "Choisissez d'abord un agent et ses jours."; return; }
             var total = agents.reduce(function (n, k) { return n + draftCount(k); }, 0);
@@ -670,7 +669,7 @@
                         done++;
                         entries += r.entriesCreated || 0;
                         g.users.forEach(function (u) { g.days.forEach(function (d) { if (planDrafts[u]) delete planDrafts[u][d]; }); });
-                    }).catch(function (e) { errors.push(g.code + " : " + e.message); });
+                    }).catch(function (e) { errors.push(g.users[0] + " (" + g.code + ") : " + e.message); });
                 });
             }, Promise.resolve()).then(function () {
                 $("tlPlanPublishDirectBtn").disabled = false;

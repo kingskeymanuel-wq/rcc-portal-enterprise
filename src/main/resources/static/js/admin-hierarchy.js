@@ -264,12 +264,38 @@
             }).join("") + '<div class="ah-edit-actions"><button type="button" class="ah-btn primary" data-ghost-fix><i class="bi bi-person-down"></i> Repasser la sélection en agent</button></div></div>' : '');
     }
 
+    /**
+     * Team Leaders par équipe : l'administrateur voit qui mène chaque équipe et en nomme un en deux clics (toutes les
+     * équipes, même vides). Nommer = accès « Team Leader · équipe » (service, rôle, équipe menée) ; retirer = la
+     * personne redevient agent de cette équipe.
+     */
+    function renderTlPanel() {
+        var box = $(".ah-tlpanel"), open = st.tlOpen !== false;
+        var people = allPeople().filter(function (p) { return p.active && p.level !== "ADMIN" && p.level !== "AGENCE" && (!st.country || p.country === st.country); })
+            .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), "fr"); });
+        var rows = TEAMS.map(function (t) {
+            var tls = people.filter(function (p) { return p.level === "TEAM_LEADER" && p.team === t[0]; });
+            return '<div class="ah-tlrow"><div class="ah-tlteam"><i class="bi bi-people-fill"></i> ' + esc(t[1]) + '</div>' +
+                '<div class="ah-tlnames">' + (tls.length ? tls.map(function (p) {
+                    return '<span class="ah-tlchip">' + esc(p.name) + ' <small>' + esc(p.username) + '</small><button type="button" title="Retirer : redevient agent de cette équipe" data-tl-remove="' + p.id + '" data-team="' + t[0] + '">×</button></span>';
+                }).join("") : '<span class="ah-off">aucun Team Leader</span>') + '</div>' +
+                '<div class="ah-tlpick"><select class="ah-access" data-tl-pick="' + t[0] + '"><option value="">Choisir une personne…</option>' +
+                people.filter(function (p) { return tls.indexOf(p) === -1; }).map(function (p) {
+                    return '<option value="' + p.id + '">' + esc(p.name) + ' · ' + esc(p.username) + (p.level === "TEAM_LEADER" ? " (TL " + esc(teamLabel(p.team)) + ")" : "") + '</option>';
+                }).join("") + '</select><button type="button" class="ah-btn primary" data-tl-name="' + t[0] + '"><i class="bi bi-person-check"></i> Nommer</button></div></div>';
+        }).join("");
+        box.innerHTML = '<section class="ah-tlbox' + (open ? " open" : "") + '"><header data-tl-toggle><i class="bi bi-person-badge-fill"></i><div><b>Team Leaders par équipe</b>' +
+            '<small>Choisissez qui mène chaque équipe — enregistré directement en base, portail Team Leader ouvert aussitôt.</small></div><i class="bi bi-chevron-down ah-caret"></i></header>' +
+            (open ? '<div class="ah-tlrows">' + rows + '</div>' : '') + '</section>';
+    }
+
     function render() {
         var d = st.data;
         if (!d) return;
         renderCountrySeg();
         renderCounts();
         renderGhosts();
+        renderTlPanel();
         var html;
         var list = countries();
         if (!st.country && list.length > 1) {
@@ -358,7 +384,7 @@
             '<label class="ah-inactive"><input type="checkbox"> Comptes désactivés</label>' +
             '<button type="button" class="ah-expand">Tout déplier</button></div></div>' +
             '<datalist id="ahCountries"></datalist>' +
-            '<div class="ah-counts"></div><div class="ah-flash"></div><div class="ah-ghosts"></div><div class="ah-body"><div class="ah-empty">Chargement de l\'organigramme…</div></div>';
+            '<div class="ah-counts"></div><div class="ah-flash"></div><div class="ah-ghosts"></div><div class="ah-tlpanel"></div><div class="ah-body"><div class="ah-empty">Chargement de l\'organigramme…</div></div>';
         $(".ah-search input").addEventListener("input", function () { st.q = this.value.trim().toLowerCase(); render(); });
         $(".ah-inactive input").addEventListener("change", function () { st.showInactive = this.checked; render(); });
         $("[data-country]").addEventListener("click", function (e) {
@@ -396,6 +422,23 @@
             if (op) {
                 if (window.RccDirectory && window.RccDirectory.openUserDetail) window.RccDirectory.openUserDetail(op.getAttribute("data-open"));
                 else flash("Fiche disponible dans l'annuaire ci-dessous.", false);
+                return;
+            }
+            if (e.target.closest("[data-tl-toggle]")) { st.tlOpen = st.tlOpen === false; renderTlPanel(); return; }
+            var nm = e.target.closest("[data-tl-name]"), rm = e.target.closest("[data-tl-remove]");
+            if (nm || rm) {
+                var team = (nm || rm).getAttribute(nm ? "data-tl-name" : "data-team");
+                var pid = nm ? Number($('[data-tl-pick="' + team + '"]').value) : Number(rm.getAttribute("data-tl-remove"));
+                if (!pid) { flash("Choisissez d'abord la personne à nommer Team Leader " + teamLabel(team) + ".", false); return; }
+                var who = allPeople().filter(function (x) { return x.id === pid; })[0];
+                var name = who ? who.name : "cette personne";
+                var q = nm ? "Nommer " + name + " Team Leader · " + teamLabel(team) + " ?\n\nService et rôle Team Leader attribués, équipe menée « " + teamLabel(team) + " » ; elle arrive sur le portail Team Leader."
+                    : "Retirer " + name + " des Team Leaders " + teamLabel(team) + " ?\n\nElle redevient agent de cette équipe (plus d'accès Team Leader).";
+                if (!confirm(q)) return;
+                (nm || rm).disabled = true;
+                call("PUT", "/api/admin/users/" + pid + "/access", { level: nm ? "TEAM_LEADER" : "AGENT", team: team })
+                    .then(function () { return done(nm ? name + " est Team Leader · " + teamLabel(team) + "." : name + " n'est plus Team Leader " + teamLabel(team) + "."); })
+                    .catch(function (err) { (nm || rm).disabled = false; flash(err.message, false); });
                 return;
             }
             var dr = e.target.closest("[data-del-role]"), ds = e.target.closest("[data-del-svc]");
