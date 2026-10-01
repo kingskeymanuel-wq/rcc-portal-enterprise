@@ -70,7 +70,8 @@ public class ViewController {
     }
 
     @GetMapping("/rh")
-    public String rhPortal() {
+    public String rhPortal(Model model) {
+        model.addAttribute("viewer", false);
         return "hr-parcours";
     }
 
@@ -121,9 +122,11 @@ public class ViewController {
         return "reports";
     }
 
+    /** Portail Superviseur : les vues du portail RH en lecture seule, plus Supervision, Qualité et CRM Outbound. */
     @GetMapping("/supervisor")
-    public String supervisor() {
-        return "supervisor";
+    public String supervisor(Model model) {
+        model.addAttribute("viewer", true);
+        return "hr-parcours";
     }
 
     @GetMapping("/team-leader")

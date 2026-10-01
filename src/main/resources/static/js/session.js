@@ -294,11 +294,22 @@ window.RccSession = (function () {
         shiftCurrentStateSince = new Date(login.occurredAt).getTime();
         updateResumeInfo(status);
 
+        // Débordement : shift encore ouvert après sa fin prévue — temps de dépassement en jaune, clôture
+        // automatique 1 h 30 après la fin prévue (ShiftOverflowJob côté serveur).
+        var plannedEnd = !end && status.plannedEnd ? new Date(status.plannedEnd).getTime() : null;
+        var autoClose = status.autoCloseAt ? new Date(status.autoCloseAt).getTime() : null;
         function tick() {
             var until = end ? new Date(end.occurredAt).getTime() : Date.now();
             var minutes = Math.max(0, Math.floor((until - shiftCurrentStateSince) / 60000));
+            var over = plannedEnd && Date.now() > plannedEnd ? Math.floor((Date.now() - plannedEnd) / 60000) : -1;
+            el.style.color = over >= 0 ? "#facc15" : "#22c55e";
             el.innerHTML = '<div style="font-size:.7rem;font-weight:400;color:#cbd5e1">Connecté à</div>' + hhmm(login.occurredAt) +
-                '<div style="font-size:.72rem;font-weight:400;color:#cbd5e1">' + (end ? "fin à " + hhmm(end.occurredAt) + " · " : "depuis ") + durationLabel(minutes) + '</div>';
+                '<div style="font-size:.72rem;font-weight:400;color:#cbd5e1">' + (end ? "fin à " + hhmm(end.occurredAt) + " · " : "depuis ") + durationLabel(minutes) + '</div>' +
+                (over >= 0 ? '<div class="shift-overflow" title="Votre shift est terminé : pensez à « Fin de shift ». Sinon il sera clôturé automatiquement.">' +
+                    '<i class="bi bi-hourglass-bottom"></i> Débordement +' + durationLabel(over) +
+                    (autoClose ? '<small>clôture auto à ' + hhmm(status.autoCloseAt) + '</small>' : '') + '</div>' : '');
+            // Heure de clôture automatique passée : le serveur a clôturé le shift, on recharge le statut.
+            if (autoClose && Date.now() >= autoClose + 60000 && !tick.reloaded) { tick.reloaded = true; refreshShiftStatus(); }
         }
         tick();
         if (!end) shiftTimerInterval = setInterval(tick, 30000);

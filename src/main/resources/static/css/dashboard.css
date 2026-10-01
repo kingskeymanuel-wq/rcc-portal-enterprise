@@ -397,3 +397,12 @@ body{
     padding: .75rem;
 }
 .rcc-richtext-editable:focus { outline: none; box-shadow: none; }
+
+/* Minuteur de shift (barre latérale) : débordement après la fin prévue du shift. */
+#shiftTimer .shift-overflow{margin-top:.35rem;padding:.25rem .5rem;border-radius:8px;background:rgba(250,204,21,.16);
+  border:1px solid rgba(250,204,21,.55);color:#facc15;font-size:.74rem;font-weight:800;letter-spacing:0;animation:shiftOverPulse 2.4s ease-in-out infinite}
+#shiftTimer .shift-overflow small{display:block;font-weight:500;color:#fde68a;font-size:.68rem}
+@keyframes shiftOverPulse{0%,100%{box-shadow:0 0 0 0 rgba(250,204,21,.0)}50%{box-shadow:0 0 0 4px rgba(250,204,21,.18)}}
+@media (prefers-reduced-motion: reduce){#shiftTimer .shift-overflow{animation:none}}
+/* Suivi de shift « En direct » : débordement (shift non terminé après l'heure prévue). */
+.shift-overflow-badge{background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;font-weight:700}

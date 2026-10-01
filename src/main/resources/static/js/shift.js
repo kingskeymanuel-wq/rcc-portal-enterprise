@@ -637,6 +637,21 @@
     }
 
     /** Ajoute sur chaque frise la plage planifiée de l'agent et sa pastille retard/absence. */
+    /**
+     * Débordement : agent encore en poste (ou en pause, formation, réunion) après la fin prévue de son shift
+     * (planning, sinon connexion + 9 h) — badge jaune avec le temps écoulé ; clôture automatique à +1 h 30.
+     */
+    function overflowBadge(u, dateIso, r) {
+        if (LIVE_CONNECTED.indexOf(u.state) === -1) return "";
+        var end = null;
+        if (r && r.plannedEnd && !r.overnight && (!r.plannedStart || r.plannedEnd > r.plannedStart)) end = new Date(dateIso + "T" + String(r.plannedEnd).slice(0, 5) + ":00");
+        else if (!(r && r.plannedEnd) && u.loginAt) end = new Date(u.loginAt.getTime() + 9 * 3600000);
+        if (!end || Date.now() <= end.getTime()) return "";
+        var min = Math.floor((Date.now() - end.getTime()) / 60000), close = new Date(end.getTime() + 90 * 60000);
+        return ' <span class="badge shift-overflow-badge" title="Shift terminé à ' + RccShiftTimeline.hhmm(end) + ' sans « Fin de shift » — clôture automatique à ' +
+            RccShiftTimeline.hhmm(close) + '"><i class="bi bi-hourglass-bottom"></i> Débordement +' + (min < 60 ? min + " min" : Math.floor(min / 60) + "h" + String(min % 60).padStart(2, "0")) + '</span>';
+    }
+
     function decorateWithPlanning(containerId, dateIso, team) {
         var cached = complianceCache[complianceKey(dateIso, team)];
         var container = $(containerId);
@@ -648,6 +663,11 @@
             if (label && !label.querySelector(".shift-compliance-badge")) {
                 label.insertAdjacentHTML("beforeend", complianceBadge(r) +
                     (r.shiftCode ? ' <span class="small text-muted">' + escapeHtml(r.shiftCode) + '</span>' : ''));
+            }
+            if (containerId === "shiftLiveTree" && label && !label.querySelector(".shift-overflow-badge")) {
+                var u = liveData.filter(function (x) { return x.username === row.getAttribute("data-username"); })[0];
+                var ob = u ? overflowBadge(u, dateIso, r) : "";
+                if (ob) label.insertAdjacentHTML("beforeend", ob);
             }
             var wrap = row.querySelector(".shift-bar-wrap");
             var startMin = timeToMinutes(r.plannedStart), endMin = timeToMinutes(r.plannedEnd);

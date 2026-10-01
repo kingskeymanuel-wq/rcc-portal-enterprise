@@ -7,6 +7,7 @@
 window.RccHrLive = (function () {
     var esc = RccApi.escapeHtml;
     var STATUS = {
+        DEBORDEMENT: ["Débordement", "bi-hourglass-bottom", "over"],
         EN_POSTE: ["En poste", "bi-broadcast", "ok"],
         EN_PAUSE: ["En pause", "bi-cup-hot", "pause"],
         DECONNECTE: ["Déconnecté", "bi-wifi-off", "off"],
@@ -29,6 +30,15 @@ window.RccHrLive = (function () {
     function hhmm(t) { return t ? String(t).slice(0, 5) : ""; }
     function country() { return (window.RccHr && window.RccHr.country) || "CI"; }
     function initials(n) { return String(n || "?").trim().split(/\s+/).slice(0, 2).map(function (x) { return x[0]; }).join("").toUpperCase(); }
+
+    /** Débordement : temps écoulé depuis la fin prévue du shift, et heure de clôture automatique (+1 h 30). */
+    function overflowText(endIso) {
+        var end = new Date(endIso), min = Math.max(0, Math.floor((Date.now() - end.getTime()) / 60000));
+        var close = new Date(end.getTime() + 90 * 60000);
+        var t = function (x) { return x.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); };
+        return '<small class="hl-over-time">+' + (min < 60 ? min + " min" : Math.floor(min / 60) + "h" + String(min % 60).padStart(2, "0")) +
+            ' après ' + t(end) + ' · clôture auto ' + t(close) + '</small>';
+    }
 
     function codeClass(code) {
         if (!code) return "empty";
@@ -134,16 +144,19 @@ window.RccHrLive = (function () {
         var html = teams.filter(function (t) { return !state.team || state.team === (t.population || "") + "|" + (t.team || ""); }).map(function (t) {
             var people = t.people.filter(personMatches);
             if (!people.length) return "";
+            var over = (t.counts.DEBORDEMENT || 0);
             var on = (t.counts.EN_POSTE || 0), pause = (t.counts.EN_PAUSE || 0), late = (t.counts.EN_RETARD || 0) + (t.counts.NON_POINTE || 0);
             return '<section class="hl-team"><header><div><h6>' + esc(t.label) + '</h6><small>' + t.people.length + ' collaborateur(s)</small></div>' +
                 '<div class="hl-team-stats">' + (d.today ? '<span class="ok"><i class="bi bi-broadcast"></i> ' + on + '</span><span class="pause"><i class="bi bi-cup-hot"></i> ' + pause + '</span>' +
-                '<span class="late"><i class="bi bi-alarm"></i> ' + late + '</span>' : '') + '<span class="leave"><i class="bi bi-airplane"></i> ' + (t.counts.CONGE || 0) + '</span></div></header>' +
+                '<span class="late"><i class="bi bi-alarm"></i> ' + late + '</span>' +
+                (over ? '<span class="over" title="Encore en poste après la fin du shift"><i class="bi bi-hourglass-bottom"></i> ' + over + '</span>' : '') : '') + '<span class="leave"><i class="bi bi-airplane"></i> ' + (t.counts.CONGE || 0) + '</span></div></header>' +
                 '<div class="hl-table"><div class="hl-row hl-head"><span>Collaborateur</span><span>Shift</span><span>Statut</span><span class="hl-week">' +
                 d.weekDays.map(function (w, i) { return '<i' + (i === todayIdx ? ' class="today"' : '') + '>' + DAYS[i] + ' ' + Number(w.slice(8)) + '</i>'; }).join("") + '</span></div>' +
                 people.map(function (p) {
                     var s = STATUS[p.status] || [p.status, "bi-dot", "rest"];
                     var since = p.statusSince && d.today && ["EN_POSTE", "EN_PAUSE", "DECONNECTE", "TERMINE"].indexOf(p.status) !== -1
                         ? '<small>depuis ' + new Date(p.statusSince).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) + '</small>' : "";
+                    if (p.status === "DEBORDEMENT" && p.statusSince) since = overflowText(p.statusSince);
                     return '<div class="hl-row"><span class="hl-who"><span class="hl-av">' + esc(initials(p.name)) + '</span><span><b>' + esc(p.name) + '</b><small>' + esc(p.username || "") + '</small></span></span>' +
                         '<span class="hl-shiftcell">' + (p.shiftCode ? '<span class="hl-code ' + codeClass(p.shiftCode) + '">' + esc(p.shiftCode) + '</span>' +
                         (p.start ? '<small>' + hhmm(p.start) + ' – ' + hhmm(p.end) + '</small>' : '') : '<small class="text-muted">—</small>') + '</span>' +

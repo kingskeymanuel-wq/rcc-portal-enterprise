@@ -6,207 +6,23 @@
     var getJson = RccApi.getJson;
     var escapeHtml = RccApi.escapeHtml;
 
-    var reportingCache = [];
     var qaCache = [];
 
-    function fmtPct(v) { return v != null ? Math.round(v) + " %" : "—"; }
-    function fmtScore(v) { return v != null ? v : "—"; }
-
-    function currentMonthValue() {
-        var now = new Date();
-        return now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
-    }
-
-    function todayIso() {
-        var d = new Date();
-        return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-    }
-
-    function toIsoDate(d) {
-        return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-    }
-
-    /** Format natif de <input type="week"> : "2026-W32" -> [lundi, dimanche] de cette semaine ISO. */
-    function isoWeekToRange(weekStr) {
-        var parts = weekStr.split("-W");
-        var year = Number(parts[0]);
-        var week = Number(parts[1]);
-        var simple = new Date(year, 0, 1 + (week - 1) * 7);
-        var dayOfWeek = simple.getDay();
-        var monday = new Date(simple);
-        var diff = dayOfWeek <= 4 ? dayOfWeek - 1 : dayOfWeek - 8;
-        monday.setDate(simple.getDate() - diff);
-        var sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        return [toIsoDate(monday), toIsoDate(sunday)];
-    }
-
-    /** Bascule le champ de saisie visible (jour/semaine/mois) selon la granularité choisie. */
-    function updatePeriodInputs() {
-        var type = $("svPeriodType").value;
-        $("svDayInput").style.display = type === "DAY" ? "" : "none";
-        $("svWeekInput").style.display = type === "WEEK" ? "" : "none";
-        $("svMonthInput").style.display = type === "MONTH" ? "" : "none";
-        $("svPeriodLabel").textContent = type === "DAY" ? "Jour" : (type === "WEEK" ? "Semaine" : "Mois");
-    }
-
-    /** @return {from, to, month} — month est renseigné uniquement en granularité Mois (compat endpoint existant). */
-    function computeSelectedPeriod() {
-        var type = $("svPeriodType").value;
-        if (type === "DAY") {
-            var day = $("svDayInput").value || todayIso();
-            return { from: day, to: day, month: null };
-        }
-        if (type === "WEEK") {
-            var weekValue = $("svWeekInput").value;
-            if (!weekValue) { var now = new Date(); weekValue = now.getFullYear() + "-W01"; }
-            var range = isoWeekToRange(weekValue);
-            return { from: range[0], to: range[1], month: null };
-        }
-        return { from: null, to: null, month: $("svMonthInput").value || currentMonthValue() };
-    }
-
     // ===================== ONGLETS =====================
+    // Le portail Superviseur reprend le portail RH en lecture (hr-parcours.js gère les onglets) : ses
+    // onglets propres (Supervision, Qualité, CRM) se chargent à leur première ouverture (événement « hr:tab »).
 
-    var workflowMounted = false;
-    var TAB_DEFS = [
-        { btn: "svTabWorkflowBtn", pane: "svPaneWorkflow", onShow: function () {
-            if (!workflowMounted && window.RccSupervision) { workflowMounted = true; RccSupervision.mountManager($("spManager"), { scope: "RCC" }); }
-        } },
-        { btn: "svTabReportingBtn", pane: "svPaneReporting", onShow: loadReporting },
-        { btn: "svTabQaBtn", pane: "svPaneQa", onShow: loadQa },
-        { btn: "svTabCrmBtn", pane: "svPaneCrm", onShow: function () { loadCrmCampaigns(); } },
-        { btn: "svTabQaTeamBtn", pane: "svPaneQaTeam", onShow: function () {
-            if (!qaTeamMounted && window.RccQaTeam) { qaTeamMounted = true; RccQaTeam.mount($("svQaTeamMount")); }
-        } }
-    ];
-    var qaTeamMounted = false;
-
-    // ===================== INDICATEURS MÉTIER PAR ÉQUIPE =====================
-    // Inbound Voix, Inbound Mail / Rafiki, CIB et Outbound n'ont pas les mêmes indicateurs :
-    // chaque équipe a son tableau (voir TeamPerformanceService).
-    var svPerfTeam = "";
-    function loadTeamPerf() {
-        var generic = !svPerfTeam;
-        $("svGenericReporting").style.display = generic ? "" : "none";
-        $("svTeamPerf").style.display = generic ? "none" : "";
-        if (generic || !window.RccTeamPerf) return;
-        var period = computeSelectedPeriod();
-        RccTeamPerf.render($("svTeamPerf"), { team: svPerfTeam, month: period.month, from: period.from, to: period.to,
-            countryCode: $("svCountryFilter").value });
-    }
-    Array.prototype.forEach.call(document.querySelectorAll("#svPerfTeams [data-sv-perf]"), function (b) {
-        b.addEventListener("click", function () {
-            svPerfTeam = b.getAttribute("data-sv-perf");
-            Array.prototype.forEach.call(document.querySelectorAll("#svPerfTeams [data-sv-perf]"), function (x) { x.classList.toggle("on", x === b); });
-            loadTeamPerf();
-        });
-    });
-
-    function wireTabs() {
-        TAB_DEFS.forEach(function (def) {
-            $(def.btn).addEventListener("click", function () { activateTab(def); });
-        });
-    }
-
-    function activateTab(activeDef) {
-        TAB_DEFS.forEach(function (def) {
-            var isActive = def === activeDef;
-            $(def.btn).classList.toggle("active", isActive);
-            $(def.pane).style.display = isActive ? "" : "none";
-        });
-        if (activeDef.onShow) activeDef.onShow();
-    }
-
-    // ===================== REPORTING D'ÉQUIPE =====================
-
-    var selectedTeam = null;
-
-    function loadReporting() {
-        var period = computeSelectedPeriod();
-        var country = $("svCountryFilter").value;
-        var url = period.month
-            ? "/api/reporting/team?month=" + encodeURIComponent(period.month)
-            : "/api/reporting/team?from=" + encodeURIComponent(period.from) + "&to=" + encodeURIComponent(period.to);
-        if (country) url += "&countryCode=" + encodeURIComponent(country);
-        getJson(url).then(function (rows) {
-            reportingCache = rows || [];
-            renderTeamPicker();
-            renderReporting();
-            updateHeaderStats();
-        }).catch(function (e) {
-            $("svReportingBody").innerHTML = '<tr><td colspan="9" class="text-center text-danger">Erreur : ' + escapeHtml(e.message) + '</td></tr>';
-        });
-    }
-
-    /** Pastilles cliquables par équipe (r.activity) — cliquer filtre le tableau aux agents de cette équipe. */
-    function renderTeamPicker() {
-        var picker = $("svTeamPicker");
-        var counts = {};
-        var order = [];
-        reportingCache.forEach(function (r) {
-            var team = r.activity || "—";
-            if (!counts[team]) { counts[team] = 0; order.push(team); }
-            counts[team]++;
-        });
-        order.sort(function (a, b) { return a.localeCompare(b, "fr"); });
-
-        if (selectedTeam && !counts[selectedTeam]) selectedTeam = null;
-
-        if (!order.length) { picker.innerHTML = '<span class="text-muted small">Aucune équipe pour ces filtres.</span>'; return; }
-
-        picker.innerHTML = order.map(function (team) {
-            var active = team === selectedTeam;
-            return '<button type="button" class="btn btn-sm ' + (active ? "btn-primary" : "btn-outline-secondary") + '" data-team-pick="' + escapeHtml(team) + '">' +
-                escapeHtml(team) + ' <span class="badge ' + (active ? "bg-light text-primary" : "bg-secondary") + ' ms-1">' + counts[team] + '</span></button>';
-        }).join("");
-
-        Array.prototype.forEach.call(picker.querySelectorAll("[data-team-pick]"), function (btn) {
-            btn.addEventListener("click", function () {
-                var team = btn.getAttribute("data-team-pick");
-                selectedTeam = team === selectedTeam ? null : team;
-                renderTeamPicker();
-                renderReporting();
-            });
-        });
-    }
-
-    function renderReporting() {
-        var search = ($("svReportingSearch").value || "").trim().toLowerCase();
-        var body = $("svReportingBody");
-        var filtered = reportingCache.filter(function (r) {
-            if (selectedTeam && (r.activity || "—") !== selectedTeam) return false;
-            if (!search) return true;
-            var haystack = (r.userFullName || r.username || "").toLowerCase();
-            return haystack.indexOf(search) !== -1;
-        });
-        if (!filtered.length) {
-            body.innerHTML = '<tr><td colspan="9" class="text-center text-muted">Aucun agent pour ces filtres.</td></tr>';
-            return;
-        }
-        filtered.sort(function (a, b) { return (a.userFullName || a.username || "").localeCompare(b.userFullName || b.username || "", "fr"); });
-        body.innerHTML = filtered.map(function (r) {
-            var m = r.kpiMetrics || {};
-            return "<tr><td>" + escapeHtml(r.userFullName || r.username) + "</td>" +
-                "<td>" + escapeHtml(r.affiliateBranch || "—") + "</td>" +
-                "<td>" + escapeHtml(r.serviceName || "—") + "</td>" +
-                "<td>" + escapeHtml(r.activity || "—") + "</td>" +
-                "<td>" + fmtScore(m.SCORE_QA) + "</td>" +
-                "<td>" + (m.SCORE_EVALUATION != null ? m.SCORE_EVALUATION + " %" : "—") + "</td>" +
-                "<td>" + fmtScore(m.INTERACTIONS) + "</td>" +
-                "<td>" + fmtPct(r.presenceRate) + "</td>" +
-                "<td>" + fmtPct(r.performanceGlobale) + "</td></tr>";
-        }).join("");
-    }
-
-    function wireReporting() {
-        $("svReportingApplyBtn").addEventListener("click", function () { loadReporting(); loadTeamPerf(); });
-        $("svReportingSearch").addEventListener("input", renderReporting);
-        $("svPeriodType").addEventListener("change", updatePeriodInputs);
-        $("svMonthInput").value = currentMonthValue();
-        $("svDayInput").value = todayIso();
-        updatePeriodInputs();
-    }
+    var mounted = {};
+    var ON_SHOW = {
+        "sv-supervision": function () {
+            if (!mounted.workflow && window.RccSupervision) { mounted.workflow = true; RccSupervision.mountManager($("spManager"), { scope: "RCC" }); }
+        },
+        "sv-quality": function () {
+            loadQa();
+            if (!mounted.qaTeam && window.RccQaTeam) { mounted.qaTeam = true; RccQaTeam.mount($("svQaTeamMount")); }
+        },
+        "sv-crm": function () { if (!mounted.crm) { mounted.crm = true; loadCrmCampaigns(); } }
+    };
 
     // ===================== ÉVALUATIONS QA =====================
 
@@ -214,7 +30,6 @@
         getJson("/api/quality/evaluations").then(function (list) {
             qaCache = list || [];
             renderQa();
-            updateHeaderStats();
         }).catch(function (e) {
             $("svQaBody").innerHTML = '<tr><td colspan="7" class="text-center text-danger">Erreur : ' + escapeHtml(e.message) + '</td></tr>';
         });
@@ -248,15 +63,6 @@
 
     function wireQa() {
         $("svQaSearch").addEventListener("input", renderQa);
-    }
-
-    // ===================== STATS D'EN-TÊTE =====================
-
-    function updateHeaderStats() {
-        $("svStatAgents").textContent = reportingCache.length || "—";
-        var scores = reportingCache.map(function (r) { return r.kpiMetrics && r.kpiMetrics.SCORE_QA; }).filter(function (v) { return v != null; });
-        $("svStatAvgQa").textContent = scores.length ? (scores.reduce(function (a, b) { return a + b; }, 0) / scores.length).toFixed(1) : "—";
-        $("svStatEvaluations").textContent = qaCache.length || "—";
     }
 
     // ===================== INIT =====================
@@ -391,14 +197,21 @@
     }
 
     function init() {
+        if (!$("svCampaignDetailModal")) return;
         svCampaignDetailModal = new bootstrap.Modal($("svCampaignDetailModal"));
-        wireTabs();
-        wireReporting();
         wireQa();
         wireCrmSubTabs();
         initCrmDefaults();
-        activateTab(TAB_DEFS[0]);
-        loadReporting(); // chiffres du haut (agents suivis, score QA) dès l'ouverture
+        window.addEventListener("hr:tab", function (e) { var f = ON_SHOW[e.detail]; if (f) f(); });
+        // Nombre de demandes escaladées (support-requests.js) reporté sur l'onglet « Supervision ».
+        var src = document.querySelector("[data-sr-mount='supervisor'] [data-sr-count]"), dst = $("svEscalatedCount");
+        if (src && dst && window.MutationObserver) {
+            var sync = function () { dst.textContent = src.style.display === "none" ? "" : src.textContent; };
+            new MutationObserver(sync).observe(src, { childList: true, attributes: true, characterData: true, subtree: true });
+            sync();
+        }
+        var current = (location.hash || "").replace("#", "");
+        if (ON_SHOW[current]) ON_SHOW[current]();
     }
 
     document.addEventListener("DOMContentLoaded", init);

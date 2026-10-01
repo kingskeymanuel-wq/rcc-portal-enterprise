@@ -49,7 +49,7 @@ public class HrLiveService {
                                List<ShiftSlot> shifts, List<LocalDate> weekDays, List<LiveTeam> teams) {}
 
     /** Statuts affichés, dans l'ordre des compteurs. */
-    public static final List<String> STATUSES = List.of("EN_POSTE", "EN_PAUSE", "DECONNECTE", "EN_RETARD", "A_VENIR", "TERMINE",
+    public static final List<String> STATUSES = List.of("DEBORDEMENT", "EN_POSTE", "EN_PAUSE", "DECONNECTE", "EN_RETARD", "A_VENIR", "TERMINE",
             "NON_POINTE", "PLANIFIE", "CONGE", "ABSENT", "REPOS", "NON_PLANIFIE");
 
     static final Set<String> ABSENT_CODES = Set.of("ABS", "AB", "ABSENT", "MAL", "MALADIE", "AM");
@@ -256,7 +256,9 @@ public class HrLiveService {
             LivePerson lp = new LivePerson(p.userId(), p.name(), p.username(), p.role(),
                     s == null ? null : norm(s.getShiftCode()), s == null ? null : s.getShiftLabel(),
                     s == null ? null : s.getPlannedStartTime(), s == null ? null : s.getPlannedEndTime(),
-                    status, st == null ? null : st.since(), st == null ? 0 : st.absenceMinutesToday(), weekCodes);
+                    // Débordement : « depuis » = fin prévue du shift (temps de dépassement affiché en jaune).
+                    status, st == null ? null : "DEBORDEMENT".equals(status) ? st.plannedEnd() : st.since(),
+                    st == null ? 0 : st.absenceMinutesToday(), weekCodes);
             LiveTeam team = p.team() == null ? unassigned : teams.getOrDefault(p.population() + "|" + p.team(), unassigned);
             team.people().add(lp);
             team.counts().merge(status, 1, Integer::sum);
@@ -264,7 +266,7 @@ public class HrLiveService {
             if (s != null && s.getPlannedStartTime() != null && isWorkingCode(lp.shiftCode()) && !onLeave.contains(p.userId())) {
                 int[] c = slotCounts.computeIfAbsent(lp.shiftCode(), k -> new int[2]);
                 c[0]++;
-                if (Set.of("EN_POSTE", "EN_PAUSE", "DECONNECTE", "TERMINE").contains(status)) c[1]++;
+                if (Set.of("DEBORDEMENT", "EN_POSTE", "EN_PAUSE", "DECONNECTE", "TERMINE").contains(status)) c[1]++;
                 slotSample.putIfAbsent(lp.shiftCode(), s);
             }
         }
@@ -300,6 +302,8 @@ public class HrLiveService {
         if (ABSENT_CODES.contains(code)) return "ABSENT";
         String state = live == null ? null : live.currentState();
         if (isToday && state != null && !"NOT_STARTED".equals(state)) {
+            // Encore en poste (ou en pause) après la fin prévue : oubli de « Fin de shift » — clôture auto à +1 h 30.
+            if (com.ecobank.rccportal.util.ShiftOverflow.overflowing(state, live.plannedEnd(), now)) return "DEBORDEMENT";
             switch (state) {
                 case "WORKING": return "EN_POSTE";
                 case "ON_PAUSE": case "ON_LUNCH": case "ON_TRAINING": case "ON_MEETING": return "EN_PAUSE";
