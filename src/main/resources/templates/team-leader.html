@@ -13,6 +13,7 @@
     <link rel="stylesheet" th:href="@{/css/meetings.css}">
     <link rel="stylesheet" th:href="@{/css/qa-team.css}">
     <link rel="stylesheet" th:href="@{/css/team-perf-files.css}">
+    <link rel="stylesheet" th:href="@{/css/campaign-forms.css}">
     <style>
         .tl-tab-nav { gap: .35rem; padding: .7rem .8rem; background: #F5F8FC; border-radius: 1rem 1rem 0 0; }
         .tl-tab-nav .btn.nav-link { border: 0; border-radius: 999px; color: #4B5A70; font-weight: 700; font-size: .86rem; padding: .45rem .95rem; transition: background .2s ease, color .2s ease, box-shadow .2s ease; }
@@ -430,50 +431,42 @@
                 </div>
                 </div>
 
-                <!-- ===================== MODALE — NOUVELLE CAMPAGNE ===================== -->
-                <div class="modal fade" id="tlNewCampaignModal" tabindex="-1">
-                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <!-- ===================== MODALE — CAMPAGNE ET SON FORMULAIRE (création / modification) ===================== -->
+                <div class="modal fade" id="tlNewCampaignModal" tabindex="-1" data-bs-backdrop="static">
+                    <div class="modal-dialog modal-fullscreen">
                         <div class="modal-content">
-                            <div class="modal-header"><h5 class="modal-title"><i class="bi bi-megaphone-fill"></i> Nouvelle campagne</h5>
+                            <div class="modal-header py-2">
+                                <h5 class="modal-title"><i class="bi bi-megaphone-fill"></i> <span id="tlCampaignModalTitle">Nouvelle campagne</span></h5>
+                                <span class="small text-muted ms-3" id="tlBuilderNotice"></span>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                            <div class="modal-body">
-                                <div class="mb-2"><label class="form-label small">Nom de la campagne</label>
-                                    <input type="text" class="form-control" id="tlCampaignName" placeholder="Ex. Relance clients CASHXPRESS — Août"></div>
-                                <div class="mb-2"><label class="form-label small">Description (optionnel)</label>
-                                    <textarea class="form-control" id="tlCampaignDescription" rows="2"></textarea></div>
-                                <div class="row g-2 mb-2">
-                                    <div class="col-6"><label class="form-label small">Début (optionnel)</label>
-                                        <input type="date" class="form-control" id="tlCampaignStart"></div>
-                                    <div class="col-6"><label class="form-label small">Fin (optionnel)</label>
-                                        <input type="date" class="form-control" id="tlCampaignEnd"></div>
-                                </div>
-                                <div class="mb-2">
-                                    <label class="form-label small">Équipe ciblée (onglet "Campagne" agent)</label>
-                                    <select class="form-select" id="tlCampaignTargetService">
-                                        <option value="">Toute l'équipe Outbound</option>
-                                        <option value="DIGITAL">Service Digital</option>
-                                        <option value="TELEVENTE">Télévente</option>
-                                    </select>
-                                </div>
-                                <div class="row g-2 mb-2">
-                                    <div class="col-4"><label class="form-label small">Icône (Bootstrap Icons)</label>
-                                        <input type="text" class="form-control" id="tlCampaignIcon" placeholder="bi-credit-card-2-front-fill"></div>
-                                    <div class="col-4"><label class="form-label small">Couleur début</label>
-                                        <input type="color" class="form-control form-control-color w-100" id="tlCampaignColorFrom" value="#0057B8"></div>
-                                    <div class="col-4"><label class="form-label small">Couleur fin</label>
-                                        <input type="color" class="form-control form-control-color w-100" id="tlCampaignColorTo" value="#00A651"></div>
-                                </div>
-
-                                <hr>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h6 class="mb-0">Questions de la campagne <span class="text-muted small">(affichées à l'agent pendant l'appel)</span></h6>
-                                    <button class="btn btn-sm btn-outline-primary" id="tlCampaignAddFieldBtn"><i class="bi bi-plus-lg"></i> Ajouter une question</button>
-                                </div>
-                                <div id="tlCampaignFieldsEditor"></div>
+                            <div class="modal-body pt-2">
+                                <details class="mb-2" id="tlCampaignMeta" open>
+                                    <summary class="fw-semibold small mb-2">Campagne : nom, période, équipe ciblée, visuel</summary>
+                                    <div class="row g-2">
+                                        <div class="col-lg-4"><label class="form-label small mb-0">Nom de la campagne</label>
+                                            <input type="text" class="form-control form-control-sm" id="tlCampaignName" placeholder="Ex. Relance carte Visa — octobre"></div>
+                                        <div class="col-lg-4"><label class="form-label small mb-0">Description</label>
+                                            <input type="text" class="form-control form-control-sm" id="tlCampaignDescription" placeholder="Objectif de la campagne"></div>
+                                        <div class="col-6 col-lg-2"><label class="form-label small mb-0">Début</label><input type="date" class="form-control form-control-sm" id="tlCampaignStart"></div>
+                                        <div class="col-6 col-lg-2"><label class="form-label small mb-0">Fin</label><input type="date" class="form-control form-control-sm" id="tlCampaignEnd"></div>
+                                        <div class="col-lg-3"><label class="form-label small mb-0">Équipe ciblée (onglet « Campagne » agent)</label>
+                                            <select class="form-select form-select-sm" id="tlCampaignTargetService">
+                                                <option value="">Toute l'équipe Outbound</option>
+                                                <option value="DIGITAL">Digitalisation</option>
+                                                <option value="TELEVENTE">Télévente</option>
+                                            </select></div>
+                                        <div class="col-lg-3"><label class="form-label small mb-0">Icône (Bootstrap Icons)</label>
+                                            <input type="text" class="form-control form-control-sm" id="tlCampaignIcon" placeholder="bi-credit-card-2-front-fill"></div>
+                                        <div class="col-6 col-lg-1"><label class="form-label small mb-0">Couleur 1</label><input type="color" class="form-control form-control-sm form-control-color w-100" id="tlCampaignColorFrom" value="#0057B8"></div>
+                                        <div class="col-6 col-lg-1"><label class="form-label small mb-0">Couleur 2</label><input type="color" class="form-control form-control-sm form-control-color w-100" id="tlCampaignColorTo" value="#00A651"></div>
+                                    </div>
+                                </details>
+                                <div id="tlFormBuilder"></div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer py-2">
+                                <span class="small text-muted me-auto" id="tlBuilderStatus"></span>
                                 <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
-                                <button class="btn btn-primary" id="tlSaveCampaignBtn">Créer</button>
+                                <button class="btn btn-primary" id="tlSaveCampaignBtn"><i class="bi bi-check2-circle"></i> <span id="tlSaveCampaignLbl">Créer la campagne</span></button>
                             </div>
                         </div>
                     </div>
@@ -486,10 +479,17 @@
                             <div class="modal-header"><h5 class="modal-title" id="tlCampaignDetailTitle"><i class="bi bi-megaphone-fill"></i></h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                             <div class="modal-body">
+                                <div class="d-flex gap-2 flex-wrap justify-content-end mb-2">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="tlCampaignEditBtn"><i class="bi bi-pencil-square"></i> Modifier la campagne et son formulaire</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="tlCampaignDupBtn"><i class="bi bi-copy"></i> Dupliquer</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="tlCampaignStateBtn"></button>
+                                </div>
                                 <nav class="cp-tabs" id="tlCampaignTabs">
                                     <button type="button" class="on" data-cp-pane="tlCpContacts"><i class="bi bi-people"></i> Contacts &amp; import</button>
+                                    <button type="button" data-cp-pane="tlCpResults"><i class="bi bi-bar-chart-line"></i> Résultats du formulaire</button>
                                     <button type="button" data-cp-pane="tlCpPerformance"><i class="bi bi-graph-up-arrow"></i> Performance</button>
                                 </nav>
+                                <div id="tlCpResults" style="display:none;"></div>
                                 <div id="tlCpPerformance" style="display:none;"></div>
                                 <div id="tlCpContacts">
                                 <div class="d-flex gap-2 align-items-end mb-3 flex-wrap">
@@ -788,6 +788,8 @@
 <script th:src="@{/js/team-perf-files.js}"></script>
 <script th:src="@{/js/supervision.js}"></script>
 <script th:src="@{/js/plan-day-picker.js}"></script>
+<script th:src="@{/js/campaign-forms.js}"></script>
+<script th:src="@{/js/campaign-form-builder.js}"></script>
 <script th:src="@{/js/team-leader.js}"></script>
 <script>document.addEventListener("DOMContentLoaded", function () { RccSession.init().then(function (s) { if (s) RccSupervision.mountAssignee(document.getElementById("spMine")); }); });</script>
 </body>

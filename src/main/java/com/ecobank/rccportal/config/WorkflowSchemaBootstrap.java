@@ -1658,6 +1658,12 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         addColumnIfMissing("Campaigns", "CoverImageUrl", "ALTER TABLE dbo.Campaigns ADD CoverImageUrl NVARCHAR(500) NULL");
         addColumnIfMissing("CampaignContacts", "AnswersJson", "ALTER TABLE dbo.CampaignContacts ADD AnswersJson NVARCHAR(4000) NULL");
         addColumnIfMissing("CampaignContacts", "AccountKey", "ALTER TABLE dbo.CampaignContacts ADD AccountKey NVARCHAR(64) NULL");
+        // Formulaires de campagne v2 (sections, logique, score — CampaignFormEngine) et score du lead par contact.
+        addColumnIfMissing("Campaigns", "FormJson", "ALTER TABLE dbo.Campaigns ADD FormJson NVARCHAR(MAX) NULL");
+        addColumnIfMissing("CampaignContacts", "LeadScore", "ALTER TABLE dbo.CampaignContacts ADD LeadScore INT NULL");
+        if (tableExists("CampaignContacts") && columnExists("CampaignContacts", "AnswersJson")) {
+            jdbcTemplate.execute("IF COL_LENGTH('dbo.CampaignContacts', 'AnswersJson') <> -1 ALTER TABLE dbo.CampaignContacts ALTER COLUMN AnswersJson NVARCHAR(MAX) NULL");
+        }
         // Questionnaire construit depuis un fichier : listes de choix longues → au-delà de 4000 caractères.
         if (tableExists("Campaigns") && columnExists("Campaigns", "FieldsJson")) {
             jdbcTemplate.execute("IF COL_LENGTH('dbo.Campaigns', 'FieldsJson') <> -1 ALTER TABLE dbo.Campaigns ALTER COLUMN FieldsJson NVARCHAR(MAX) NULL");

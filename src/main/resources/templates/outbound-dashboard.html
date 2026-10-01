@@ -9,6 +9,7 @@
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <link rel="stylesheet" th:href="@{/css/agent-live.css}">
     <link rel="stylesheet" th:href="@{/css/agent-trainings.css}">
+    <link rel="stylesheet" th:href="@{/css/campaign-forms.css}">
     <style>
         .ob-chat-scroll { max-height: 60vh; overflow-y: auto; padding: 4px; }
         .ob-chat-msg { max-width: 82%; margin-bottom: .6rem; display: flex; }
@@ -276,7 +277,7 @@
 
 <!-- ===================== MODALE — APPEL DE CAMPAGNE (défilement séquentiel) ===================== -->
 <div class="modal fade" id="obCampaignCallModal" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="bi bi-telephone-outbound-fill"></i> <span id="obCallCampaignName"></span></h5>
@@ -568,6 +569,7 @@
 <script th:src="@{/js/session.js}"></script>
 <script th:src="@{/js/agent-live.js}"></script>
 <script th:src="@{/js/agent-trainings.js}"></script>
+<script th:src="@{/js/campaign-forms.js}"></script>
 <script th:src="@{/js/outbound-dashboard.js}"></script>
 </body>
 </html>

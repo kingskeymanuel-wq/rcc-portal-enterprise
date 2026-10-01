@@ -15,9 +15,69 @@ import java.util.Map;
 public class CampaignController {
 
     private final CampaignService campaignService;
+    private final com.ecobank.rccportal.service.CampaignResultsService results;
+    private final com.ecobank.rccportal.service.CampaignFormAiService formAi;
 
-    public CampaignController(CampaignService campaignService) {
+    public CampaignController(CampaignService campaignService, com.ecobank.rccportal.service.CampaignResultsService results,
+                              com.ecobank.rccportal.service.CampaignFormAiService formAi) {
         this.campaignService = campaignService;
+        this.results = results;
+        this.formAi = formAi;
+    }
+
+    // ───────────── Formulaires avancés (concepteur du Team Leader) ─────────────
+
+    @PutMapping("/{id}")
+    public CampaignResponse update(@PathVariable Integer id, @RequestBody CampaignRequest request, @AuthenticationPrincipal AuthenticatedUser requester) {
+        return campaignService.updateCampaign(requester, id, request);
+    }
+
+    @PostMapping("/{id}/duplicate")
+    public CampaignResponse duplicate(@PathVariable Integer id, @AuthenticationPrincipal AuthenticatedUser requester) {
+        return campaignService.duplicateCampaign(requester, id);
+    }
+
+    @PostMapping("/{id}/reopen")
+    public void reopen(@PathVariable Integer id, @AuthenticationPrincipal AuthenticatedUser requester) {
+        campaignService.reopenCampaign(requester, id);
+    }
+
+    /** Bibliothèque de modèles de formulaires (prêt, carte, NPS, digitalisation, épargne, KYC, assurance). */
+    @GetMapping("/form/templates")
+    public List<Map<String, Object>> templates(@AuthenticationPrincipal AuthenticatedUser requester) {
+        campaignService.requireCanManage(requester);
+        return com.ecobank.rccportal.service.CampaignFormTemplates.all().stream().map(t -> Map.<String, Object>of("code", t.code(), "title", t.title(),
+                "description", t.description(), "icon", t.icon(),
+                "form", com.ecobank.rccportal.service.CampaignFormEngine.normalize(t.form()))).toList();
+    }
+
+    /** Formulaire généré depuis une description libre (IA si configurée, sinon modèle le plus proche). */
+    @PostMapping("/form/generate")
+    public Map<String, Object> generate(@RequestBody Map<String, String> body, @AuthenticationPrincipal AuthenticatedUser requester) {
+        campaignService.requireCanManage(requester);
+        return formAi.generate(body.get("prompt"));
+    }
+
+    /** Contrôle d'un formulaire sans l'enregistrer : formulaire complété, ou message exact de ce qui ne va pas. */
+    @PostMapping("/form/check")
+    public com.fasterxml.jackson.databind.JsonNode check(@RequestBody com.fasterxml.jackson.databind.JsonNode form, @AuthenticationPrincipal AuthenticatedUser requester) {
+        campaignService.requireCanManage(requester);
+        return com.ecobank.rccportal.service.CampaignFormEngine.normalize(form);
+    }
+
+    /** Résultats : entonnoir, synthèse par question, scores, agents, activité quotidienne. */
+    @GetMapping("/{id}/results")
+    public Map<String, Object> results(@PathVariable Integer id, @AuthenticationPrincipal AuthenticatedUser requester) {
+        return results.results(requester, id);
+    }
+
+    @GetMapping("/{id}/results.csv")
+    public org.springframework.http.ResponseEntity<byte[]> resultsCsv(@PathVariable Integer id, @AuthenticationPrincipal AuthenticatedUser requester) {
+        byte[] body = results.exportCsv(requester, id);
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"campagne-" + id + "-reponses.csv\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("text/csv; charset=UTF-8"))
+                .body(body);
     }
 
     @PostMapping

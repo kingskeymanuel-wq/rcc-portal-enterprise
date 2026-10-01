@@ -1015,7 +1015,6 @@
     var campaignContactsCache = [];
     var currentContactStatusFilter = null; // null = tous
     var teamMembersCache = [];
-    var editingCampaignFields = []; // questions de la campagne en cours de création — voir renderCampaignFieldsEditor
 
     var STATUS_COLORS = { PENDING: "#adb5bd", GREEN: "#00A651", RED: "#dc3545", YELLOW: "#F5A623" };
     var STATUS_LABELS_CALL = { PENDING: "À appeler", GREEN: "Interaction", RED: "Pas de réponse", YELLOW: "RDV pris" };
@@ -1063,6 +1062,7 @@
 
     function loadCampaigns() {
         getJson("/api/campaigns").then(function (campaigns) {
+            campaignsListCache = campaigns;
             var container = $("tlCampaignsList");
             if (!campaigns.length) { container.innerHTML = '<p class="text-muted text-center">Aucune campagne pour l\'instant.</p>'; return; }
             container.innerHTML = campaigns.map(function (c) {
@@ -1093,73 +1093,49 @@
         });
     }
 
-    $("tlNewCampaignBtn").addEventListener("click", function () {
-        $("tlCampaignName").value = ""; $("tlCampaignDescription").value = "";
-        $("tlCampaignStart").value = ""; $("tlCampaignEnd").value = "";
-        $("tlCampaignTargetService").value = CHANNEL_CAMPAIGN_TARGET[myChannel] || "";
-        $("tlCampaignIcon").value = "bi-megaphone-fill";
-        $("tlCampaignColorFrom").value = "#0057B8";
-        $("tlCampaignColorTo").value = "#00A651";
-        editingCampaignFields = [];
-        renderCampaignFieldsEditor();
-        newCampaignModal.show();
-    });
+    // ───────────── Campagne et son formulaire avancé (RccFormBuilder) ─────────────
 
-    /** Constructeur de questions — une ligne par question, type/options/obligatoire, comme
-     *  vu par l'agent dans la modale d'appel séquentielle du tableau de bord Outbound. */
-    function renderCampaignFieldsEditor() {
-        var container = $("tlCampaignFieldsEditor");
-        if (!editingCampaignFields.length) {
-            container.innerHTML = '<p class="text-muted small mb-2">Aucune question — les 4 boutons de statut (À appeler/Interaction/Pas de réponse/RDV pris) suffisent pour cette campagne.</p>';
-            return;
+    var formBuilder = null, editingCampaignId = null, campaignsListCache = [];
+
+    function openCampaignEditor(campaign) {
+        editingCampaignId = campaign ? campaign.campaignId : null;
+        $("tlCampaignModalTitle").textContent = campaign ? "Modifier « " + campaign.name + " »" : "Nouvelle campagne";
+        $("tlSaveCampaignLbl").textContent = campaign ? "Enregistrer les modifications" : "Créer la campagne";
+        $("tlCampaignName").value = campaign ? campaign.name : "";
+        $("tlCampaignDescription").value = campaign && campaign.description ? campaign.description : "";
+        $("tlCampaignStart").value = campaign && campaign.startDate ? campaign.startDate : "";
+        $("tlCampaignEnd").value = campaign && campaign.endDate ? campaign.endDate : "";
+        $("tlCampaignTargetService").value = campaign ? (campaign.targetService || "") : (CHANNEL_CAMPAIGN_TARGET[myChannel] || "");
+        $("tlCampaignIcon").value = campaign && campaign.iconClass ? campaign.iconClass : "bi-megaphone-fill";
+        $("tlCampaignColorFrom").value = campaign && campaign.colorFrom ? campaign.colorFrom : "#0057B8";
+        $("tlCampaignColorTo").value = campaign && campaign.colorTo ? campaign.colorTo : "#00A651";
+        $("tlCampaignMeta").open = !campaign;
+        $("tlBuilderNotice").textContent = campaign && campaign.totalContacts ? campaign.totalContacts + " contact(s) : les réponses déjà saisies sont conservées." : "";
+        $("tlBuilderStatus").textContent = "";
+        var form = campaign && campaign.form ? campaign.form : RccFormBuilder.emptyForm();
+        if (!formBuilder) {
+            formBuilder = RccFormBuilder.mount($("tlFormBuilder"), {
+                form: form,
+                campaignName: function () { return $("tlCampaignName").value.trim(); },
+                onNotice: function (msg) { $("tlBuilderNotice").textContent = msg; }
+            });
+        } else {
+            formBuilder.setForm(form);
         }
-        container.innerHTML = editingCampaignFields.map(function (f, idx) {
-            var showOptions = f.type === "SELECT" || f.type === "RADIO";
-            return '<div class="border rounded p-2 mb-2" data-field-idx="' + idx + '">' +
-                '<div class="row g-2 align-items-center">' +
-                    '<div class="col-md-5"><input type="text" class="form-control form-control-sm tl-field-label" placeholder="Intitulé de la question" value="' + escapeHtml(f.label) + '"></div>' +
-                    '<div class="col-md-3"><select class="form-select form-select-sm tl-field-type">' +
-                        ["TEXT", "TEXTAREA", "SELECT", "RADIO", "DATE", "TIME"].map(function (t) {
-                            return '<option value="' + t + '" ' + (t === f.type ? "selected" : "") + '>' + t + '</option>';
-                        }).join("") + '</select></div>' +
-                    '<div class="col-md-2 form-check form-switch pt-1"><input class="form-check-input tl-field-required" type="checkbox" ' + (f.required ? "checked" : "") + '><label class="form-check-label small">Obligatoire</label></div>' +
-                    '<div class="col-md-2 text-end"><button class="btn btn-sm btn-outline-danger tl-field-remove" type="button"><i class="bi bi-trash"></i></button></div>' +
-                '</div>' +
-                '<div class="mt-2" style="' + (showOptions ? "" : "display:none;") + '">' +
-                    '<label class="form-label small mb-1">Choix proposés (un par ligne)</label>' +
-                    '<textarea class="form-control form-control-sm tl-field-options" rows="3">' + escapeHtml((f.options || []).join("\n")) + '</textarea>' +
-                '</div>' +
-            '</div>';
-        }).join("");
-
-        Array.prototype.forEach.call(container.querySelectorAll("[data-field-idx]"), function (row) {
-            var idx = Number(row.getAttribute("data-field-idx"));
-            row.querySelector(".tl-field-label").addEventListener("input", function () { editingCampaignFields[idx].label = this.value; });
-            row.querySelector(".tl-field-required").addEventListener("change", function () { editingCampaignFields[idx].required = this.checked; });
-            row.querySelector(".tl-field-options").addEventListener("input", function () {
-                editingCampaignFields[idx].options = this.value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
-            });
-            row.querySelector(".tl-field-type").addEventListener("change", function () {
-                editingCampaignFields[idx].type = this.value;
-                row.querySelector(".mt-2").style.display = (this.value === "SELECT" || this.value === "RADIO") ? "" : "none";
-            });
-            row.querySelector(".tl-field-remove").addEventListener("click", function () {
-                editingCampaignFields.splice(idx, 1);
-                renderCampaignFieldsEditor();
-            });
-        });
+        newCampaignModal.show();
     }
 
-    $("tlCampaignAddFieldBtn").addEventListener("click", function () {
-        editingCampaignFields.push({ id: "q" + Date.now() + "_" + editingCampaignFields.length, label: "", type: "TEXT", options: [], required: false });
-        renderCampaignFieldsEditor();
-    });
+    $("tlNewCampaignBtn").addEventListener("click", function () { openCampaignEditor(null); });
 
     $("tlSaveCampaignBtn").addEventListener("click", function () {
         var name = $("tlCampaignName").value.trim();
-        if (!name) { alert("Le nom de la campagne est obligatoire."); return; }
-        var fields = editingCampaignFields.filter(function (f) { return f.label.trim(); });
-        sendJson("/api/campaigns", "POST", {
+        if (!name) { $("tlCampaignMeta").open = true; $("tlCampaignName").focus(); $("tlBuilderStatus").textContent = "Le nom de la campagne est obligatoire."; return; }
+        var problems = formBuilder.issues();
+        if (problems.length) { $("tlBuilderStatus").innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-triangle"></i> ' + escapeHtml(problems[0]) + '</span>'; return; }
+        var btn = $("tlSaveCampaignBtn");
+        btn.disabled = true;
+        $("tlBuilderStatus").textContent = "Enregistrement…";
+        var body = {
             name: name,
             description: $("tlCampaignDescription").value.trim() || null,
             startDate: $("tlCampaignStart").value || null,
@@ -1168,18 +1144,70 @@
             iconClass: $("tlCampaignIcon").value.trim() || null,
             colorFrom: $("tlCampaignColorFrom").value || null,
             colorTo: $("tlCampaignColorTo").value || null,
-            fields: fields
-        }).then(function () {
+            form: formBuilder.getForm()
+        };
+        sendJson(editingCampaignId ? "/api/campaigns/" + editingCampaignId : "/api/campaigns", editingCampaignId ? "PUT" : "POST", body).then(function () {
+            btn.disabled = false;
             newCampaignModal.hide();
             loadCampaigns();
+            if (editingCampaignId && currentCampaignId === editingCampaignId) refreshCurrentCampaign();
+        }).catch(function (e) {
+            btn.disabled = false;
+            $("tlBuilderStatus").innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-triangle"></i> ' + escapeHtml(e.message) + '</span>';
+        });
+    });
+
+    function refreshCurrentCampaign() {
+        getJson("/api/campaigns").then(function (list) {
+            campaignsListCache = list;
+            var c = list.find(function (x) { return x.campaignId === currentCampaignId; });
+            if (c) updateCampaignHeader(c);
+            if ($("tlCpResults").style.display !== "none") loadCampaignResults();
+        });
+    }
+
+    function currentCampaignObj() { return campaignsListCache.find(function (c) { return c.campaignId === currentCampaignId; }); }
+
+    function updateCampaignHeader(c) {
+        $("tlCampaignDetailTitle").innerHTML = '<i class="bi bi-megaphone-fill"></i> ' + escapeHtml(c.name) + (c.status === "ACTIVE" ? "" : ' <span class="badge bg-secondary">Clôturée</span>');
+        $("tlCampaignStateBtn").innerHTML = c.status === "ACTIVE" ? '<i class="bi bi-lock"></i> Clôturer' : '<i class="bi bi-unlock"></i> Réouvrir';
+    }
+
+    $("tlCampaignEditBtn").addEventListener("click", function () {
+        var c = currentCampaignObj();
+        if (c) { campaignDetailModal.hide(); openCampaignEditor(c); }
+    });
+    $("tlCampaignDupBtn").addEventListener("click", function () {
+        var c = currentCampaignObj();
+        if (!c || !confirm("Dupliquer « " + c.name + " » (formulaire et visuel, sans les contacts) ?")) return;
+        sendJson("/api/campaigns/" + c.campaignId + "/duplicate", "POST", {}).then(function (copy) {
+            campaignDetailModal.hide();
+            loadCampaigns();
+            openCampaignEditor(copy);
         }).catch(function (e) { alert("Erreur : " + e.message); });
     });
+    $("tlCampaignStateBtn").addEventListener("click", function () {
+        var c = currentCampaignObj();
+        if (!c) return;
+        var closing = c.status === "ACTIVE";
+        if (!confirm(closing ? "Clôturer la campagne ? Elle disparaît de l'onglet Campagne des agents." : "Réouvrir la campagne pour les agents ?")) return;
+        sendJson("/api/campaigns/" + c.campaignId + (closing ? "/close" : "/reopen"), "POST", {}).then(function () { loadCampaigns(); refreshCurrentCampaign(); })
+            .catch(function (e) { alert("Erreur : " + e.message); });
+    });
+
+    function loadCampaignResults() {
+        var box = $("tlCpResults");
+        box.innerHTML = '<p class="text-muted text-center py-4"><span class="spinner-border spinner-border-sm"></span> Calcul des résultats…</p>';
+        getJson("/api/campaigns/" + currentCampaignId + "/results").then(function (d) {
+            RccFormResults.render(box, d, { onRefresh: loadCampaignResults });
+        }).catch(function (e) { box.innerHTML = '<p class="text-danger">Erreur : ' + escapeHtml(e.message) + '</p>'; });
+    }
 
     function openCampaignDetail(campaignId, campaigns) {
         currentCampaignId = campaignId;
         currentContactStatusFilter = null;
         var campaign = campaigns.find(function (c) { return c.campaignId === campaignId; });
-        $("tlCampaignDetailTitle").innerHTML = '<i class="bi bi-megaphone-fill"></i> ' + escapeHtml(campaign ? campaign.name : "");
+        if (campaign) updateCampaignHeader(campaign);
         $("tlCampaignImportFile").value = "";
         $("tlCampaignImportStatus").textContent = "";
         $("tlImportReport").innerHTML = "";
@@ -1685,6 +1713,7 @@
             $(x.getAttribute("data-cp-pane")).style.display = on ? "" : "none";
         });
         if (pane === "tlCpPerformance") loadCampaignPerformance();
+        if (pane === "tlCpResults") loadCampaignResults();
     }
 
     // ===================== COACHING QA (MY TODO) =====================

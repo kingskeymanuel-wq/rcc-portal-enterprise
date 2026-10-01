@@ -47,8 +47,12 @@ public class CampaignContact {
 
     /** Réponses aux questions dynamiques de la campagne (voir Campaign.fieldsJson) — JSON
      *  {"champId": "valeur", ...}. Distinct de Notes, qui reste le commentaire libre agent. */
-    @Column(name = "AnswersJson", length = 4000)
+    @Column(name = "AnswersJson", columnDefinition = "NVARCHAR(MAX)")
     private String answersJson;
+
+    /** Score du lead (0–100 %) calculé par le serveur à partir des réponses (CampaignFormEngine) — null sans notation. */
+    @Column(name = "LeadScore")
+    private Integer leadScore;
 
     /** Toute colonne du fichier importé qui ne correspond ni au nom, au téléphone, au compte,
      *  à l'agent, ni à une question du modèle de campagne — JSON {"En-tête original": "valeur"}.
