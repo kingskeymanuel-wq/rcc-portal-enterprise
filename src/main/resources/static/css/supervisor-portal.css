@@ -8,15 +8,17 @@
 /* Onglets dans l'ordre d'un superviseur : l'activité d'abord, l'administratif ensuite. */
 .hr-viewer #hrTabs [data-tab="overview"]{order:1}
 .hr-viewer #hrTabs [data-tab="live"]{order:2}
-.hr-viewer #hrTabs [data-tab="perf"]{order:3}
-.hr-viewer #hrTabs [data-tab="sv-quality"]{order:4}
-.hr-viewer #hrTabs [data-tab="sv-supervision"]{order:5}
-.hr-viewer #hrTabs [data-tab="org"]{order:6}
-.hr-viewer #hrTabs [data-tab="people"]{order:7}
-.hr-viewer #hrTabs [data-tab="leave"]{order:8}
-.hr-viewer #hrTabs [data-tab="exits"]{order:9}
-.hr-viewer #hrTabs [data-tab="growth"]{order:10}
-.hr-viewer #hrTabs [data-tab="sv-crm"]{order:11}
+.hr-viewer #hrTabs [data-tab="sv-alerts"]{order:3}
+.hr-viewer #hrTabs [data-tab="perf"]{order:4}
+.hr-viewer #hrTabs [data-tab="sv-quality"]{order:5}
+.hr-viewer #hrTabs [data-tab="sv-supervision"]{order:6}
+.hr-viewer #hrTabs [data-tab="org"]{order:7}
+.hr-viewer #hrTabs [data-tab="people"]{order:8}
+.hr-viewer #hrTabs [data-tab="leave"]{order:9}
+.hr-viewer #hrTabs [data-tab="exits"]{order:10}
+.hr-viewer #hrTabs [data-tab="growth"]{order:11}
+.hr-viewer #hrTabs [data-tab="sv-tools"]{order:12}
+.hr-viewer #hrTabs [data-tab="sv-crm"]{order:13}
 
 /* Plages de dates (ventes, rendez-vous). */
 .sv-range{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.6rem;margin-bottom:.8rem}

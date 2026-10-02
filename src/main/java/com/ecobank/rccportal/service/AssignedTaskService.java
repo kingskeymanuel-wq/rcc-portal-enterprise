@@ -200,7 +200,7 @@ public class AssignedTaskService {
         try {
             List<String> emails = recipients.stream().map(User::getEmail).filter(Objects::nonNull).filter(e -> !e.isBlank()).toList();
             if (!emails.isEmpty()) {
-                notificationService.sendBroadcastEmail(emails, "RCC Portal — Nouvelle tâche assignée",
+                notificationService.sendBroadcastEmail(emails, "Portail Front Office — Nouvelle tâche assignée",
                         content + (task.getDescription() != null ? "\n\n" + task.getDescription() : ""));
             }
         } catch (ApiException e) {

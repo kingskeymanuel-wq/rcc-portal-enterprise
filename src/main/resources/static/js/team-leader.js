@@ -16,9 +16,22 @@
     var salesByAgentCache = {}; // agentName -> count (mois du reporting en cours), Outbound uniquement
     var agentModal;
 
-    var TABS = ["Reporting", "Members", "Planning", "Qa", "PerfFiles", "Sales", "Rdv", "Campaigns", "Kb", "Alerts", "Competitions", "Meetings"];
+    var TABS = ["Reporting", "Members", "Planning", "Qa", "PerfFiles", "Sales", "Rdv", "Campaigns", "Kb", "Tools", "Alerts", "Competitions", "Meetings"];
 
     var perfFilesMounted = false;
+
+    var incidentsMounted = false;
+
+    /** Incidents de shift à justifier : pastille de l'onglet « Alertes » et bandeau en haut du portail. */
+    function showIncidentCount(n) {
+        var badge = $("tlIncidentTabCount"), banner = $("tlIncidentBanner");
+        badge.style.display = n > 0 ? "" : "none";
+        badge.textContent = n;
+        banner.innerHTML = n > 0 ? '<div class="si-banner"><i class="bi bi-bell-fill"></i><span>' + n + " incident(s) de shift à justifier : absences, dépassements de pause ou débordements de vos agents.</span>" +
+            '<button type="button" class="btn btn-sm btn-danger" id="tlIncidentGo">Justifier</button></div>' : "";
+        var go = $("tlIncidentGo");
+        if (go) go.addEventListener("click", function () { switchTab("alerts"); $("tlShiftIncidents").scrollIntoView({ behavior: "smooth" }); });
+    }
 
     function switchTab(tab) {
         TABS.forEach(function (t) {
@@ -30,6 +43,7 @@
         });
         if (tab === "reporting") loadReporting();
         if (tab === "kb" && window.RccKbEmbed) RccKbEmbed.mount($("tlKbRoot"));
+        if (tab === "tools" && window.RccExternalTools && !$("tlToolsGrid").children.length) RccExternalTools.render("tlToolsGrid");
         if (tab === "members") loadMembers();
         if (tab === "planning") loadPlanningTab();
         if (tab === "qa") loadQa();
@@ -37,7 +51,13 @@
         if (tab === "sales") loadSales();
         if (tab === "rdv") loadRdv();
         if (tab === "campaigns") loadCampaigns();
-        if (tab === "alerts") loadAlerts();
+        if (tab === "alerts") {
+            loadAlerts();
+            if (!incidentsMounted && window.RccShiftIncidents) {
+                incidentsMounted = true;
+                RccShiftIncidents.mount($("tlShiftIncidents"), { canJustify: true, onCount: showIncidentCount });
+            }
+        }
         if (tab === "competitions") loadTeamLeaderCompetitions();
         if (tab === "meetings") loadMeetings();
     }
@@ -1946,6 +1966,7 @@
         $("tlTabRdvBtn").addEventListener("click", function () { switchTab("rdv"); });
         $("tlTabCampaignsBtn").addEventListener("click", function () { switchTab("campaigns"); });
         $("tlTabKbBtn").addEventListener("click", function () { switchTab("kb"); });
+        $("tlTabToolsBtn").addEventListener("click", function () { switchTab("tools"); });
         $("tlTabAlertsBtn").addEventListener("click", function () { switchTab("alerts"); });
         $("tlTabCompetitionsBtn").addEventListener("click", function () { switchTab("competitions"); });
         $("tlTabMeetingsBtn").addEventListener("click", function () { switchTab("meetings"); });
@@ -1975,7 +1996,7 @@
                 if (hero) hero.setAttribute("data-channel", myChannel);
                 var kicker = document.querySelector(".tl-hero-kicker");
                 if (kicker) kicker.innerHTML = '<i class="bi ' + (CHANNEL_ICONS[myChannel] || "bi-people-fill") + '"></i> Espace Team Leader ' + teamLabel(myTeam);
-                document.title = "RCC Portal — Portail Team Leader " + teamLabel(myTeam);
+                document.title = "Portail Front Office — Portail Team Leader " + teamLabel(myTeam);
             }
             $("tlContent").style.display = "";
             if (myTeam === "OUTBOUND") {
@@ -1986,6 +2007,7 @@
             }
             loadReporting();
             refreshMeetingCounts();
+            if (window.RccShiftIncidents) RccShiftIncidents.count().then(showIncidentCount);
             if (/[?&]tab=meetings\b/.test(location.search)) switchTab("meetings");
             checkPendingNotificationPopup(notifPopupModal);
             loadTlToolBadges();

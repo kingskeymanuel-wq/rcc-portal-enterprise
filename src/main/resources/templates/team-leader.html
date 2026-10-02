@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>RCC Portal Enterprise — Portail Team Leader</title>
+    <title>Portail Front Office Ecobank — Portail Team Leader</title>
     <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}" rel="stylesheet">
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
@@ -16,6 +16,8 @@
     <link rel="stylesheet" th:href="@{/css/campaign-forms.css}">
     <link rel="stylesheet" th:href="@{/css/rcc-guides.css}">
     <link rel="stylesheet" th:href="@{/css/kb-embed.css}">
+    <link rel="stylesheet" th:href="@{/css/shift-incidents.css}">
+    <link rel="stylesheet" th:href="@{/css/tool-profiles.css}">
     <style>
         .tl-tab-nav { gap: .35rem; padding: .7rem .8rem; background: #F5F8FC; border-radius: 1rem 1rem 0 0; }
         .tl-tab-nav .btn.nav-link { border: 0; border-radius: 999px; color: #4B5A70; font-weight: 700; font-size: .86rem; padding: .45rem .95rem; transition: background .2s ease, color .2s ease, box-shadow .2s ease; }
@@ -153,6 +155,8 @@
                 </div>
 
                 <div id="tlContent" style="display:none;">
+                    <!-- Alertes de shift à justifier (shift-incidents.js) -->
+                    <div id="tlIncidentBanner"></div>
                     <div class="tl-kpis">
                         <div class="tl-kpi"><span class="tl-kpi-ico blue"><i class="bi bi-people"></i></span>
                             <div><div class="tl-stat-value" id="tlStatMembers">—</div><small>Agents dans l'équipe</small></div></div>
@@ -194,8 +198,9 @@
                                 <button class="btn nav-link" id="tlTabSalesBtn" style="display:none;"><i class="bi bi-graph-up-arrow"></i> Ventes équipe</button>
                                 <button class="btn nav-link" id="tlTabRdvBtn" style="display:none;"><i class="bi bi-calendar-check"></i> RDV équipe</button>
                                 <button class="btn nav-link" id="tlTabCampaignsBtn" style="display:none;"><i class="bi bi-megaphone-fill"></i> Campagnes</button>
+                                <button class="btn nav-link" id="tlTabToolsBtn"><i class="bi bi-tools"></i> Outils</button>
                                 <button class="btn nav-link" id="tlTabKbBtn" style="display:none;"><i class="bi bi-journal-bookmark-fill"></i> Base de connaissance</button>
-                                <button class="btn nav-link" id="tlTabAlertsBtn"><i class="bi bi-exclamation-triangle"></i> Alertes</button>
+                                <button class="btn nav-link" id="tlTabAlertsBtn"><i class="bi bi-exclamation-triangle"></i> Alertes <span class="tl-tab-count" id="tlIncidentTabCount" style="display:none;">0</span></button>
                                 <button class="btn nav-link" id="tlTabCompetitionsBtn"><i class="bi bi-trophy-fill"></i> Compétitions</button>
                                 <button class="btn nav-link" id="tlTabMeetingsBtn"><i class="bi bi-chat-square-heart"></i> Meetings <span class="tl-tab-count" id="tlMeetingsTabCount" style="display:none;">0</span></button>
                             </nav>
@@ -374,6 +379,8 @@
 
                         <!-- ===================== ALERTES ===================== -->
                         <div id="tlPaneAlerts" class="card-body" style="display:none;">
+                            <div id="tlShiftIncidents" class="mb-4"></div>
+                            <h6 class="fw-bold"><i class="bi bi-graph-down-arrow"></i> Alertes de performance</h6>
                             <p class="text-muted small">Détection automatique chaque nuit à 23h (présence, score QA, score d'évaluation, performance globale, chutes par rapport au mois précédent) — uniquement les agents de votre équipe.</p>
                             <div class="table-responsive">
                                 <table class="table table-hover table-sm align-middle">
@@ -405,6 +412,18 @@
                         <!-- ===================== CAMPAGNES (OUTBOUND) ===================== -->
                         <!-- Base de connaissance (Team Leader Outbound — kb-embed.js) -->
                         <div id="tlPaneKb" class="card-body" style="display:none;"><div id="tlKbRoot"></div></div>
+
+                        <!-- Outils & Portails : catalogue et profils d'accès des agents (external-tools.js, tool-profiles.js) -->
+                        <div id="tlPaneTools" class="card-body" style="display:none;">
+                                <ul class="nav nav-tabs mb-3" role="tablist">
+                                    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tlToolsCat" type="button"><i class="bi bi-grid-3x3-gap-fill"></i> Outils</button></li>
+                                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tlToolsProfiles" type="button" data-tp-mount="tlProfilesRoot"><i class="bi bi-person-badge"></i> Profils</button></li>
+                                </ul>
+                                <div class="tab-content">
+                                    <div class="tab-pane fade show active" id="tlToolsCat"><div class="row g-4" id="tlToolsGrid"></div></div>
+                                    <div class="tab-pane fade" id="tlToolsProfiles"><div id="tlProfilesRoot"></div></div>
+                                </div>
+                        </div>
 
                         <div id="tlPaneCampaigns" class="card-body" style="display:none;">
                             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -797,6 +816,9 @@
 <script th:src="@{/js/guides-data.js}"></script>
 <script th:src="@{/js/rcc-guides.js}"></script>
 <script th:src="@{/js/kb-embed.js}"></script>
+<script th:src="@{/js/shift-incidents.js}"></script>
+<script th:src="@{/js/external-tools.js}"></script>
+<script th:src="@{/js/tool-profiles.js}"></script>
 <script th:src="@{/js/campaign-forms.js}"></script>
 <script th:src="@{/js/campaign-form-builder.js}"></script>
 <script th:src="@{/js/team-leader.js}"></script>

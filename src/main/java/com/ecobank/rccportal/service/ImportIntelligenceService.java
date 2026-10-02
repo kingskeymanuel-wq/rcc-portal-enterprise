@@ -111,7 +111,7 @@ public class ImportIntelligenceService {
         }
 
         String systemPrompt = "Tu rédiges une note courte en français (4-6 phrases maximum) à l'intention d'un " +
-                "responsable QA du RCC Portal Ecobank qui vient de lancer un import de fichier Excel. On te " +
+                "responsable QA du Portail Front Office Ecobank qui vient de lancer un import de fichier Excel. On te " +
                 "fournit une liste déjà établie d'anomalies et de rapprochements de noms — ne recalcule et " +
                 "n'invente AUCUN chiffre, contente-toi de résumer clairement ce qui mérite une vérification " +
                 "humaine, par ordre de priorité. Reste factuel et actionnable.";

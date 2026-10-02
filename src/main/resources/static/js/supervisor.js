@@ -13,6 +13,12 @@
     // onglets propres (Supervision, Qualité, CRM) se chargent à leur première ouverture (événement « hr:tab »).
 
     var mounted = {};
+
+    /** Incidents de shift non encore justifiés par les Team Leaders : pastille de l'onglet « Alertes de shift ». */
+    function incidentCount(n) {
+        var b = $("svIncidentCount");
+        if (b) b.textContent = n > 0 ? n : "";
+    }
     var ON_SHOW = {
         "sv-supervision": function () {
             if (!mounted.workflow && window.RccSupervision) { mounted.workflow = true; RccSupervision.mountManager($("spManager"), { scope: "RCC" }); }
@@ -20,6 +26,15 @@
         "sv-quality": function () {
             loadQa();
             if (!mounted.qaTeam && window.RccQaTeam) { mounted.qaTeam = true; RccQaTeam.mount($("svQaTeamMount")); }
+        },
+        "sv-alerts": function () {
+            if (!mounted.alerts && window.RccShiftIncidents) {
+                mounted.alerts = true;
+                RccShiftIncidents.mount($("svShiftIncidents"), { canJustify: false, teamFilter: true, onCount: incidentCount });
+            }
+        },
+        "sv-tools": function () {
+            if (!mounted.tools && window.RccExternalTools) { mounted.tools = true; RccExternalTools.render("svToolsGrid"); }
         },
         "sv-crm": function () { if (!mounted.crm) { mounted.crm = true; loadCrmCampaigns(); } }
     };
@@ -203,6 +218,7 @@
         wireCrmSubTabs();
         initCrmDefaults();
         window.addEventListener("hr:tab", function (e) { var f = ON_SHOW[e.detail]; if (f) f(); });
+        if (window.RccShiftIncidents) RccShiftIncidents.count().then(incidentCount);
         // Nombre de demandes escaladées (support-requests.js) reporté sur l'onglet « Supervision ».
         var src = document.querySelector("[data-sr-mount='supervisor'] [data-sr-count]"), dst = $("svEscalatedCount");
         if (src && dst && window.MutationObserver) {

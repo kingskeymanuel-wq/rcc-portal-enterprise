@@ -1,7 +1,7 @@
 "use strict";
 
 /* ==========================================================
-   RCC Portal Enterprise
+   Portail Front Office Ecobank
    Login Enterprise V2
 ========================================================== */
 
@@ -669,6 +669,6 @@ function escapeHtmlLogin(s) {
 
 console.log(
 
-    "RCC Portal Enterprise Login V2 chargé."
+    "Portail Front Office Ecobank Login V2 chargé."
 
 );

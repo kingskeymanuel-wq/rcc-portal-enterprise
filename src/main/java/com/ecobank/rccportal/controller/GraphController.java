@@ -42,7 +42,7 @@ public class GraphController {
         requireEmail(from, "Votre compte n'a pas d'adresse e-mail renseignée.");
         requireEmail(to, "Le destinataire n'a pas d'adresse e-mail renseignée.");
 
-        String subject = body.getOrDefault("subject", "Message depuis RCC Portal — " + from.getName());
+        String subject = body.getOrDefault("subject", "Message depuis Portail Front Office — " + from.getName());
         String message = body.getOrDefault("message", "");
         graphClient.sendMail(from.getEmail(), to.getEmail(), subject, message);
         return Map.of("status", "sent");

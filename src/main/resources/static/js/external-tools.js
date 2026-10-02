@@ -110,5 +110,23 @@ window.RccExternalTools = (function () {
         }).join("");
     }
 
-    return { render: render };
+    /** Code stable d'un outil (accès des agents, ToolAccessService) : explicite, sinon dérivé du nom. */
+    function codeOf(t) {
+        if (t.code) return t.code;
+        return String(t.name).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+    }
+
+    /** Catalogue à plat : [{ code, name, host, url, category, icon, color }] — 100 % = tous ces outils. */
+    function catalog() {
+        var out = [];
+        CATEGORIES.forEach(function (cat) {
+            cat.tools.forEach(function (t) {
+                out.push({ code: codeOf(t), name: t.name, host: t.host, url: t.url, category: cat.title, icon: cat.icon, color: cat.color });
+            });
+        });
+        return out;
+    }
+
+    return { render: render, catalog: catalog, categories: function () { return CATEGORIES; } };
 })();

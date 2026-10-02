@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title th:text="${viewer} ? 'RCC Portal Enterprise — Portail Superviseur' : 'RCC Portal Enterprise — Portail RH'">RCC Portal Enterprise — Portail RH</title>
+    <title th:text="${viewer} ? 'Portail Front Office Ecobank — Portail Superviseur' : 'Portail Front Office Ecobank — Portail RH'">Portail Front Office Ecobank — Portail RH</title>
     <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}" rel="stylesheet">
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
     <link th:href="@{/vendor/flatpickr/flatpickr.min.css}" rel="stylesheet">
@@ -16,6 +16,8 @@
         <link rel="stylesheet" th:href="@{/css/supervision.css}">
         <link rel="stylesheet" th:href="@{/css/support-requests.css}">
         <link rel="stylesheet" th:href="@{/css/supervisor-portal.css}">
+        <link rel="stylesheet" th:href="@{/css/shift-incidents.css}">
+        <link rel="stylesheet" th:href="@{/css/tool-profiles.css}">
     </th:block>
 </head>
 <body th:classappend="${viewer} ? 'hr-viewer' : ''">
@@ -29,12 +31,12 @@
                     <div class="hr-hero-art" aria-hidden="true"><span></span><span></span><span></span></div>
                     <div class="hr-hero-copy">
                         <th:block th:unless="${viewer}">
-                        <div class="eyebrow"><i class="bi bi-buildings"></i> RCC PORTAL ENTERPRISE · RESSOURCES HUMAINES</div>
+                        <div class="eyebrow"><i class="bi bi-buildings"></i> PORTAIL FRONT OFFICE ECOBANK · RESSOURCES HUMAINES</div>
                         <h1>Portail RH</h1>
                         <p>Parcours des équipes (Outsource, Stagiaires, Staff Ecobank), performance, congés, sorties et formation — par filiale.</p>
                         </th:block>
                         <th:block th:if="${viewer}">
-                        <div class="eyebrow"><i class="bi bi-binoculars-fill"></i> RCC PORTAL ENTERPRISE · SUPERVISION</div>
+                        <div class="eyebrow"><i class="bi bi-binoculars-fill"></i> PORTAIL FRONT OFFICE ECOBANK · SUPERVISION</div>
                         <h1>Portail Superviseur</h1>
                         <p>Toute l'activité des équipes et des agents — shifts en direct, performance, qualité, effectifs et congés — par filiale.</p>
                         <span class="sv-viewer-chip"><i class="bi bi-eye-fill"></i> Lecture seule · les modifications restent au RH et aux Team Leaders</span>
@@ -76,8 +78,10 @@
                         <button type="button" data-tab="growth"><i class="bi bi-mortarboard"></i> Formation &amp; suivi</button>
                         <button type="button" data-tab="people"><i class="bi bi-folder2-open"></i> Annuaire &amp; dossiers <b id="tabCountPeople"></b></button>
                         <th:block th:if="${viewer}">
+                        <button type="button" data-tab="sv-alerts"><i class="bi bi-bell-fill"></i> Alertes de shift <b id="svIncidentCount"></b></button>
                         <button type="button" data-tab="sv-supervision"><i class="bi bi-diagram-3-fill"></i> Supervision <b id="svEscalatedCount"></b></button>
                         <button type="button" data-tab="sv-quality"><i class="bi bi-patch-check"></i> Qualité</button>
+                        <button type="button" data-tab="sv-tools"><i class="bi bi-tools"></i> Outils</button>
                         <button type="button" data-tab="sv-crm"><i class="bi bi-telephone-outbound-fill"></i> CRM Outbound</button>
                         </th:block>
                         <span class="hr-tabs-ink" aria-hidden="true"></span>
@@ -249,6 +253,21 @@
                         </div>
                     </div>
                     <th:block th:if="${viewer}">
+                    <!-- ============ ALERTES DE SHIFT (Superviseur, lecture) ============ -->
+                    <div class="hr-pane" data-pane="sv-alerts"><div class="hr-card"><div id="svShiftIncidents"></div></div></div>
+
+                    <!-- ============ OUTILS & PROFILS (Superviseur, lecture) ============ -->
+                    <div class="hr-pane" data-pane="sv-tools"><div class="hr-card">
+                                <ul class="nav nav-tabs mb-3" role="tablist">
+                                    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#svToolsCat" type="button"><i class="bi bi-grid-3x3-gap-fill"></i> Outils</button></li>
+                                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#svToolsProfiles" type="button" data-tp-mount="svProfilesRoot"><i class="bi bi-person-badge"></i> Profils</button></li>
+                                </ul>
+                                <div class="tab-content">
+                                    <div class="tab-pane fade show active" id="svToolsCat"><div class="row g-4" id="svToolsGrid"></div></div>
+                                    <div class="tab-pane fade" id="svToolsProfiles"><div id="svProfilesRoot"></div></div>
+                                </div>
+                    </div></div>
+
                     <!-- ============ SUPERVISION (Superviseur) ============ -->
                     <div class="hr-pane" data-pane="sv-supervision">
                         <div class="hr-card mb-4" data-sr-mount="supervisor">
@@ -472,6 +491,9 @@
     <script th:src="@{/js/support-requests.js}"></script>
     <script th:src="@{/js/qa-team.js}"></script>
     <script th:src="@{/js/supervision.js}"></script>
+    <script th:src="@{/js/shift-incidents.js}"></script>
+    <script th:src="@{/js/external-tools.js}"></script>
+    <script th:src="@{/js/tool-profiles.js}"></script>
     <script th:src="@{/js/supervisor.js}"></script>
 </th:block>
 </body>

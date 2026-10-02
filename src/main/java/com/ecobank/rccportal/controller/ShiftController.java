@@ -216,6 +216,35 @@ public class ShiftController {
 
     /** Statut EN DIRECT de chaque agent — pour le bouton "En direct" du suivi de shift.
      *  Admin/RH/QA/Superviseur/Excelliam voient tout ; Team Leader ne voit que sa propre équipe. */
+    // ───────────── Alertes de shift (absences, dépassements de pause, débordements) ─────────────
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ecobank.rccportal.service.ShiftIncidentService incidentService;
+
+    /** Team Leader : son équipe ; Superviseur, RH, admin, QA : toutes les équipes (filtre « team »). 7 derniers jours par défaut. */
+    @GetMapping("/incidents")
+    public com.ecobank.rccportal.service.ShiftIncidentService.Summary incidents(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String team,
+            @AuthenticationPrincipal AuthenticatedUser requester) {
+        return incidentService.incidents(requester, from, to, team);
+    }
+
+    @GetMapping("/incidents/reasons")
+    public List<String> incidentReasons() {
+        return com.ecobank.rccportal.service.ShiftIncidentService.REASONS;
+    }
+
+    public record JustifyRequest(String username, @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date, String type, String reason, String comment) {}
+
+    /** Justification d'un incident par le Team Leader de l'agent. */
+    @PostMapping("/incidents/justify")
+    public com.ecobank.rccportal.service.ShiftIncidentService.Justification justify(@RequestBody JustifyRequest body,
+                                                                                   @AuthenticationPrincipal AuthenticatedUser requester) {
+        return incidentService.justify(requester, body.username(), body.date(), body.type(), body.reason(), body.comment());
+    }
+
     @GetMapping("/live")
     public List<com.ecobank.rccportal.dto.LiveShiftStatusResponse> live(@AuthenticationPrincipal AuthenticatedUser requester) {
         boolean isAdmin = "admin".equalsIgnoreCase(requester.role());

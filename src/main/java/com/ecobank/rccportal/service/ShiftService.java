@@ -375,6 +375,35 @@ public class ShiftService {
      * Seuils de dépassement — pause courte au-delà de 15 min, pause déjeuner au-delà de 60 min.
      * Choix par défaut documentés ici ; à ajuster si la vraie politique Ecobank diffère.
      */
+    /** Dépassement de pause (pause > 15 min, déjeuner > 60 min) : agent, jour, type, durée réelle et durée autorisée. */
+    public record PauseOverrun(String username, LocalDate date, String type, LocalDateTime start, long minutes, long allowed) {}
+
+    /** Tous les dépassements de pause d'une période (une requête), pour les alertes de shift du Team Leader. */
+    @Transactional(readOnly = true)
+    public List<PauseOverrun> pauseOverruns(LocalDate from, LocalDate to) {
+        List<PauseOverrun> out = new java.util.ArrayList<>();
+        java.util.Map<String, Object[]> open = new java.util.HashMap<>(); // username → {type, start}
+        for (ShiftEvent e : shiftEventRepository.findByOccurredAtBetweenOrderByUser_UsernameAscOccurredAtAsc(
+                from.atStartOfDay(), to.plusDays(1).atStartOfDay())) {
+            if (e.getUser() == null || e.getUser().getUsername() == null) continue;
+            String u = e.getUser().getUsername();
+            switch (e.getEventType()) {
+                case "PAUSE_START" -> open.put(u, new Object[]{"PAUSE", e.getOccurredAt()});
+                case "LUNCH_START" -> open.put(u, new Object[]{"LUNCH", e.getOccurredAt()});
+                case "PAUSE_END", "LUNCH_END" -> {
+                    Object[] o = open.remove(u);
+                    if (o == null || !e.getEventType().startsWith((String) o[0])) break;
+                    LocalDateTime start = (LocalDateTime) o[1];
+                    long minutes = java.time.Duration.between(start, e.getOccurredAt()).toMinutes();
+                    long allowed = "PAUSE".equals(o[0]) ? PAUSE_OVERRUN_MINUTES : LUNCH_OVERRUN_MINUTES;
+                    if (minutes > allowed) out.add(new PauseOverrun(u, start.toLocalDate(), (String) o[0], start, minutes, allowed));
+                }
+                default -> { }
+            }
+        }
+        return out;
+    }
+
     private static final int PAUSE_OVERRUN_MINUTES = 15;
     private static final int LUNCH_OVERRUN_MINUTES = 60;
 

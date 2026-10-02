@@ -312,7 +312,7 @@
 
         renderTools(session.profile);
 
-        if (session.profile === "AGENT" || session.profile === "QA") {
+        if (session.profile === "AGENT" || session.profile === "QA" || session.profile === "ADMIN") {
             document.getElementById("externalToolsBtn").classList.remove("d-none");
             window.RccExternalTools.render("externalToolsGrid");
         }

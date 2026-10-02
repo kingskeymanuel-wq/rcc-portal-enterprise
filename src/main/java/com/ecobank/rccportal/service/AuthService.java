@@ -268,7 +268,7 @@ public class AuthService {
         if (excelliamUser != null && "excelliam".equalsIgnoreCase(getPrimaryRole(excelliamUser))) {
             log.warn("[EXCELLIAM] Connexion refusée (portail supprimé) username={}", normalizedUsername);
             throw ApiException.forbidden("portal_removed",
-                    "Le portail Excelliam a été supprimé : ce compte n'a plus d'accès au RCC Portal. Contactez l'administrateur.");
+                    "Le portail Excelliam a été supprimé : ce compte n'a plus d'accès au Portail Front Office Ecobank. Contactez l'administrateur.");
         }
 
         TestBypassProperties.Account bypassAccount = findBypassAccount(normalizedUsername);
@@ -1285,7 +1285,7 @@ public class AuthService {
                     .toList());
             // Destinataire garanti — reçoit toujours l'alerte, même si aucun admin n'a d'e-mail renseigné en base.
             emails.add("edoudou@ecobank.com");
-            notificationService.sendBroadcastEmail(new java.util.ArrayList<>(emails), "RCC Portal — " + subject, message);
+            notificationService.sendBroadcastEmail(new java.util.ArrayList<>(emails), "Portail Front Office — " + subject, message);
         } catch (ApiException e) {
             log.warn("Alerte IT : e-mail non envoyé (SMTP non configuré), notification en app conservée : {}", e.getMessage());
         }

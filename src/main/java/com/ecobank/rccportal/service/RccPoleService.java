@@ -206,7 +206,7 @@ public class RccPoleService {
             }
             try {
                 graphClient.sendMail(from.getEmail(), manager.getEmail(),
-                        "RCC Portal — Alerte pôle " + pole.getName(), content);
+                        "Portail Front Office — Alerte pôle " + pole.getName(), content);
             } catch (Exception ignored) {
                 // Best-effort — idem.
             }
