@@ -553,6 +553,17 @@ public class UserService {
         }
     }
 
+    /** Compte verrouillé, pour la liste « Comptes verrouillés » de l'administration. */
+    public record LockedAccount(Long id, String username, String name, String email, int failedAttempts) {}
+
+    @Transactional(readOnly = true)
+    public List<LockedAccount> lockedAccounts() {
+        return userRepository.findByAccountLockedTrueOrderByNameAsc().stream()
+                .map(u -> new LockedAccount(u.getId(), u.getUsername(), u.getName(), u.getEmail(),
+                        u.getFailedAttempts() == null ? 0 : u.getFailedAttempts()))
+                .toList();
+    }
+
     /**
      * Réactive un compte verrouillé après échecs de connexion — sans toucher au statut
      * d'approbation ni à accountEnabled (contrairement à approve(), destiné aux demandes

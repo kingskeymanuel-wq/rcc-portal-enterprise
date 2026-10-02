@@ -1040,14 +1040,71 @@
                     var username = btn.getAttribute("data-username");
                     var ids = btn.getAttribute("data-ids").split(",").map(Number);
                     if (!confirm("Réactiver le compte « " + username + " » ?")) return;
-                    fetch("/api/users/" + encodeURIComponent(username) + "/unlock", { method: "POST", credentials: "same-origin" })
-                        .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); })
-                        .then(function () { return sendJson("/api/admin/login-alerts/resolve", "POST", ids); })
-                        .then(loadLoginAlerts)
+                    btn.disabled = true;
+                    unlockAccounts([username])
+                        .then(function () { return sendJson("/api/admin/login-alerts/resolve", "POST", ids).catch(function () {}); })
+                        .then(refreshLockState)
                         .catch(function (e) { alert("Erreur : " + e.message); });
                 });
             });
         }).catch(function (e) { console.error(e); });
+    }
+
+    function unlockAccounts(usernames) {
+        return fetch("/api/users/unlock", {
+            method: "POST", credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(usernames)
+        }).then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); });
+    }
+
+    function refreshLockState() {
+        loadLockedAccounts();
+        loadLoginAlerts();
+    }
+
+    function loadLockedAccounts() {
+        var container = document.getElementById("lockedList");
+        var countBadge = document.getElementById("lockedCount");
+        var allBtn = document.getElementById("unlockAllBtn");
+        if (!container) return;
+        getJson("/api/users/locked").then(function (rows) {
+            countBadge.style.display = rows.length ? "" : "none";
+            countBadge.textContent = rows.length;
+            allBtn.style.display = rows.length > 1 ? "" : "none";
+            if (!rows.length) {
+                container.innerHTML = '<p class="text-muted text-center mb-0"><i class="bi bi-check-circle text-success"></i> Aucun compte verrouillé.</p>';
+                return;
+            }
+            container.innerHTML = rows.map(function (u) {
+                return '<div class="d-flex justify-content-between align-items-center border-bottom py-2 flex-wrap gap-2">' +
+                    '<div><i class="bi bi-lock-fill text-danger"></i> <strong>' + escapeHtml(u.name || u.username) + '</strong>' +
+                    ' <span class="text-muted small">' + escapeHtml(u.username) + (u.email ? ' · ' + escapeHtml(u.email) : '') + '</span>' +
+                    (u.failedAttempts ? '<div class="small text-muted">' + u.failedAttempts + ' échec(s) de connexion</div>' : '') + '</div>' +
+                    '<button class="btn btn-sm btn-success unlock-locked-btn" data-username="' + escapeHtml(u.username) + '">' +
+                    '<i class="bi bi-unlock-fill"></i> Réactiver</button></div>';
+            }).join("");
+            Array.prototype.forEach.call(container.querySelectorAll(".unlock-locked-btn"), function (btn) {
+                btn.addEventListener("click", function () {
+                    btn.disabled = true;
+                    unlockAccounts([btn.getAttribute("data-username")]).then(refreshLockState)
+                        .catch(function (e) { btn.disabled = false; alert("Erreur : " + e.message); });
+                });
+            });
+        }).catch(function (e) { console.error(e); });
+    }
+
+    function wireUnlockAll() {
+        var btn = document.getElementById("unlockAllBtn");
+        if (!btn) return;
+        btn.addEventListener("click", function () {
+            var n = document.getElementById("lockedCount").textContent;
+            if (!confirm("Réactiver les " + n + " comptes verrouillés ?")) return;
+            btn.disabled = true;
+            unlockAccounts([]).then(refreshLockState)
+                .catch(function (e) { alert("Erreur : " + e.message); })
+                .then(function () { btn.disabled = false; });
+        });
     }
 
     /**
@@ -1071,6 +1128,7 @@
                 currentProfile = computeProfile(user);
                 document.getElementById("pendingSection").style.display = currentProfile === "ADMIN" ? "" : "none";
                 document.getElementById("loginAlertsSection").style.display = currentProfile === "ADMIN" ? "" : "none";
+                document.getElementById("lockedSection").style.display = currentProfile === "ADMIN" ? "" : "none";
                 document.getElementById("createUserBtn").style.display = currentProfile === "ADMIN" ? "" : "none";
                 document.getElementById("deleteUserBtn").style.display = currentProfile === "ADMIN" ? "" : "none";
                 wireAddButtons();
@@ -1087,7 +1145,7 @@
                 wireSync();
                 loadUsers(true);
                 loadPending();
-                if (currentProfile === "ADMIN") loadLoginAlerts();
+                if (currentProfile === "ADMIN") { loadLoginAlerts(); loadLockedAccounts(); wireUnlockAll(); }
                 return loadRoleAndServiceCatalogs();
             })
             .catch(function (e) { console.error("users.js init failed:", e); });

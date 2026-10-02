@@ -383,6 +383,16 @@ public class AdministrationService {
                 .toList();
     }
 
+    /** Une fois le compte réactivé, ses alertes « Compte verrouillé » n'ont plus lieu d'être. */
+    @Transactional
+    public void resolveUnlockAlerts(String username) {
+        if (username == null) return;
+        List<com.ecobank.rccportal.model.RccNotification> stale = rccNotificationRepository.findAll().stream()
+                .filter(n -> "UNLOCK_ACCOUNT".equals(n.getActionType()) && username.equalsIgnoreCase(n.getActionTarget()))
+                .toList();
+        if (!stale.isEmpty()) rccNotificationRepository.deleteAll(stale);
+    }
+
     /** Retire une alerte de la liste (toutes ses copies, une par admin) — "marquer comme traitée". */
     @Transactional
     public void resolveLoginAlert(List<Integer> notificationIds) {

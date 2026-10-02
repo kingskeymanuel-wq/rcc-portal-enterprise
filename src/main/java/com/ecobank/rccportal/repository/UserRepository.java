@@ -30,4 +30,6 @@ public interface UserRepository
     List<User> findByStatus(
             String status
     );
+
+    List<User> findByAccountLockedTrueOrderByNameAsc();
 }
