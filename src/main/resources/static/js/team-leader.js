@@ -467,7 +467,7 @@
 
     function planShiftOptions() {
         return planShiftCodes.map(function (s) { return '<option value="' + escapeHtml(s.code) + '">' + escapeHtml(shiftHours(s)) + ' (' + escapeHtml(s.code) + ')</option>'; }).join("") +
-            '<option value="OFF">Repos (OFF)</option>';
+            '<option value="OFF">Repos (OFF)</option><option value="CONGE">Congé</option>';
     }
 
     function loadPlanShiftCodes() {
@@ -484,17 +484,19 @@
     var planAgents = [], planDrafts = {}, planCurrent = null, planBrush = "M", planPicker = null, planExisting = {};
 
     function planCodesMap() {
-        var m = { OFF: { color: "#94A3B8", label: "Repos (OFF)" } };
+        var m = { OFF: { color: "#94A3B8", label: "Repos (OFF)" }, CONGE: { color: "#F59E0B", label: "Congé" } };
         planShiftCodes.forEach(function (s) { m[s.code] = { color: s.color || "#0057B8", label: s.code + " · " + shiftHours(s) }; });
         return m;
     }
 
     function renderBrushes() {
         var codes = planCodesMap();
-        $("tlPlanShiftLegend").innerHTML = planShiftCodes.map(function (s) { return s.code; }).concat(["OFF"]).map(function (c) {
+        $("tlPlanShiftLegend").innerHTML = planShiftCodes.map(function (s) { return s.code; }).concat(["OFF", "CONGE"]).map(function (c) {
             var info = codes[c], light = isLightColor(info.color);
+            var title = c === "OFF" ? "Repos" : c === "CONGE" ? "Congé" : c;
+            var sub = c === "OFF" ? "OFF" : c === "CONGE" ? "jours de congé" : info.label.split(" · ")[1];
             return '<button type="button" class="pa-brush' + (c === planBrush ? " on" : "") + '" data-brush="' + escapeHtml(c) + '" style="background:' + escapeHtml(info.color) +
-                ';color:' + (light ? "#122240" : "#fff") + '">' + escapeHtml(c === "OFF" ? "Repos" : c) + '<small>' + escapeHtml(c === "OFF" ? "OFF" : info.label.split(" · ")[1]) + '</small></button>';
+                ';color:' + (light ? "#122240" : "#fff") + '">' + escapeHtml(title) + '<small>' + escapeHtml(sub) + '</small></button>';
         }).join("");
     }
 

@@ -843,12 +843,13 @@ public class ScheduleService {
         for (com.ecobank.rccportal.dto.PlanifyShiftsRequest.AgentShiftAssignment a : request.assignments()) {
             if (a.username() == null || a.username().isBlank()) continue;
             String code = a.shiftCode() == null ? "" : a.shiftCode().trim().toUpperCase();
-            boolean isOff = "OFF".equals(code);
+            boolean isLeave = LEAVE_CODE.equals(code);
+            boolean isOff = "OFF".equals(code) || isLeave;
             Map<String, ShiftDef> shifts = fixedShifts();
             ShiftDef def = shifts.get(code);
             if (!isOff && def == null) {
                 throw ApiException.badRequest("Shift inconnu : \"" + code + "\" — attendu : "
-                        + String.join(", ", shifts.keySet()) + " ou OFF.");
+                        + String.join(", ", shifts.keySet()) + ", OFF ou CONGE.");
             }
 
             User user = userRepository.findFirstByUsernameIgnoreCase(a.username().trim()).orElse(null);
@@ -870,8 +871,9 @@ public class ScheduleService {
                 final LocalDate day = d;
                 AgentSchedule schedule = agentScheduleRepository.findByUserAndWorkDate(user, day)
                         .orElseGet(() -> AgentSchedule.builder().user(scheduleUser).workDate(day).build());
-                schedule.setShiftCode(off ? "OFF" : code);
-                schedule.setShiftLabel(off ? "Repos hebdomadaire" : def.label());
+                boolean leaveDay = isLeave && selected;
+                schedule.setShiftCode(leaveDay ? LEAVE_CODE : off ? "OFF" : code);
+                schedule.setShiftLabel(leaveDay ? "Congé" : off ? "Repos hebdomadaire" : def.label());
                 schedule.setPlannedStartTime(off ? null : def.start());
                 schedule.setPlannedEndTime(off ? null : def.end());
                 schedule.setOvernightCrossesMidnight(!off && def.overnight());
@@ -1012,10 +1014,62 @@ public class ScheduleService {
     public List<com.ecobank.rccportal.dto.AgentScheduleResponse> planningForUser(String username, LocalDate from, LocalDate to) {
         User user = userRepository.findFirstByUsernameIgnoreCase(username)
                 .orElseThrow(() -> ApiException.notFound("Unknown user."));
-        return agentScheduleRepository.findByUserAndWorkDateBetweenOrderByWorkDateAsc(user, from, to).stream()
+        List<com.ecobank.rccportal.dto.AgentScheduleResponse> rows = agentScheduleRepository.findByUserAndWorkDateBetweenOrderByWorkDateAsc(user, from, to).stream()
                 .filter(s -> "APPROVED".equals(s.getApprovalStatus()))
                 .map(this::toResponse)
                 .toList();
+        return withApprovedLeave(rows, from, to, u -> u.getId() != null && u.getId().equals(user.getId()));
+    }
+
+    /** Code planning d'un jour de congé (posé par le Team Leader, ou issu d'une demande de congé validée). */
+    public static final String LEAVE_CODE = "CONGE";
+
+    private com.ecobank.rccportal.repository.WorkflowRequestRepository workflowRequests;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setWorkflowRequests(com.ecobank.rccportal.repository.WorkflowRequestRepository workflowRequests) {
+        this.workflowRequests = workflowRequests;
+    }
+
+    /**
+     * Demandes de congé validées (Workflow, type LEAVE, statut APPROVED) reportées dans le planning : chaque jour
+     * couvert devient « Congé », qu'il y ait un shift prévu ce jour-là (remplacé à l'affichage) ou non (ajouté).
+     * Rien n'est écrit en base : retirer la validation retire le congé du planning.
+     */
+    private List<com.ecobank.rccportal.dto.AgentScheduleResponse> withApprovedLeave(
+            List<com.ecobank.rccportal.dto.AgentScheduleResponse> rows, LocalDate from, LocalDate to,
+            java.util.function.Predicate<User> inScope) {
+        if (workflowRequests == null) return rows;
+        Map<String, com.ecobank.rccportal.dto.AgentScheduleResponse> byKey = new java.util.LinkedHashMap<>();
+        for (var r : rows) byKey.put(leaveKey(r.username(), r.workDate()), r);
+        boolean changed = false;
+        for (com.ecobank.rccportal.model.WorkflowRequest req : workflowRequests.findByTypeAndStatus("LEAVE", "APPROVED")) {
+            User u;
+            try {
+                u = req.getRequestedBy();
+                if (u == null || u.getUsername() == null || req.getPeriodFrom() == null || req.getPeriodTo() == null) continue;
+            } catch (jakarta.persistence.EntityNotFoundException orphan) {
+                continue; // demandeur supprimé
+            }
+            if (req.getPeriodTo().isBefore(from) || req.getPeriodFrom().isAfter(to) || !inScope.test(u)) continue;
+            LocalDate start = req.getPeriodFrom().isBefore(from) ? from : req.getPeriodFrom();
+            LocalDate end = req.getPeriodTo().isAfter(to) ? to : req.getPeriodTo();
+            for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
+                byKey.put(leaveKey(u.getUsername(), d), new com.ecobank.rccportal.dto.AgentScheduleResponse(
+                        u.getUsername(), u.getName(), u.getActivity(), d, null, null, LEAVE_CODE, "Congé (demande validée)",
+                        false, "APPROVED", null, "LEAVE_REQUEST"));
+                changed = true;
+            }
+        }
+        if (!changed) return rows;
+        return byKey.values().stream()
+                .sorted(java.util.Comparator.comparing(com.ecobank.rccportal.dto.AgentScheduleResponse::workDate)
+                        .thenComparing(r -> r.username() == null ? "" : r.username(), String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    private static String leaveKey(String username, LocalDate day) {
+        return (username == null ? "" : username.toLowerCase(java.util.Locale.ROOT)) + "|" + day;
     }
 
     /** Même principe, pour toute une équipe (activity) — portail Team Leader/Superviseur/RH.
@@ -1032,7 +1086,8 @@ public class ScheduleService {
         if (!includePending) {
             schedules = schedules.stream().filter(s -> "APPROVED".equals(s.getApprovalStatus())).toList();
         }
-        return schedules.stream().map(this::toResponse).toList();
+        return withApprovedLeave(schedules.stream().map(this::toResponse).toList(), from, to,
+                u -> team == null || team.isBlank() || com.ecobank.rccportal.util.TeamClassifier.matchesTeam(team, u.getActivity()));
     }
 
     /**
