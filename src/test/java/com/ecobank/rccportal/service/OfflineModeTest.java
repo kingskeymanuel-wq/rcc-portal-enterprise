@@ -114,4 +114,14 @@ class OfflineModeTest {
         assertTrue(offline.stream().anyMatch(p -> p.contains("LibreTranslate")), offline.toString());
         assertTrue(offline.stream().noneMatch(p -> p.contains("MyMemory") || p.contains("DeepL")), offline.toString());
     }
+
+    @Test
+    void administratorSwitchTakesEffectImmediately() {
+        OfflineMode mode = new OfflineMode(false);
+        assertFalse(mode.isEnabled());
+        mode.setEnabled(true);
+        assertTrue(mode.isEnabled());
+        mode.setEnabled(false);
+        assertFalse(mode.isEnabled());
+    }
 }

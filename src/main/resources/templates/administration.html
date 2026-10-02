@@ -552,7 +552,13 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                             <h6 class="card-title mb-0"><i class="bi bi-wifi-off"></i> Fonctionnement sans Internet</h6>
-                            <button class="btn btn-sm btn-outline-primary" type="button" data-od-run><i class="bi bi-activity"></i> Lancer le diagnostic</button>
+                            <div class="d-flex align-items-center gap-3 flex-wrap">
+                                <div class="form-check form-switch mb-0" title="Bascule immédiate, conservée après redémarrage">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="offlineSwitch" data-od-switch disabled>
+                                    <label class="form-check-label fw-semibold" for="offlineSwitch" data-od-switch-label>Mode hors ligne</label>
+                                </div>
+                                <button class="btn btn-sm btn-outline-primary" type="button" data-od-run><i class="bi bi-activity"></i> Lancer le diagnostic</button>
+                            </div>
                         </div>
                         <p class="text-muted small mb-2">Services locaux nécessaires sur un serveur isolé (base, authentification, IA locale, transcription, traduction, OCR, carte)
                             et services Internet encore actifs. Installation : kit <code>scripts/offline-kit</code>.</p>

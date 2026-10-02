@@ -24,7 +24,7 @@
             var active = r.internet.filter(function (c) { return c.status === "ON"; }).length;
             body.innerHTML =
                 '<div class="d-flex flex-wrap gap-3 align-items-center mb-3">' +
-                '<div><div class="small text-muted">Mode hors ligne (RCC_OFFLINE)</div><b>' + (r.offlineMode ? '<i class="bi bi-toggle-on text-success"></i> Activé' : '<i class="bi bi-toggle-off text-muted"></i> Désactivé') + "</b></div>" +
+                '<div><div class="small text-muted">Mode hors ligne</div><b>' + (r.offlineMode ? '<i class="bi bi-toggle-on text-success"></i> Activé' : '<i class="bi bi-toggle-off text-muted"></i> Désactivé') + "</b></div>" +
                 '<div style="min-width:220px;flex:1"><div class="small text-muted">Services locaux prêts : ' + r.ready + " / " + r.total + "</div>" +
                 '<div class="progress" style="height:10px"><div class="progress-bar bg-' + color + '" style="width:' + r.percent + '%"></div></div></div>' +
                 '<div><div class="small text-muted">Services Internet actifs</div><b class="' + (active ? "text-warning" : "text-success") + '">' + active + "</b></div></div>" +
@@ -34,9 +34,36 @@
         }).catch(function (e) { body.innerHTML = '<div class="alert alert-danger small mb-0">' + esc(e.message) + "</div>"; });
     }
 
+    function showSwitch(root, on) {
+        var sw = root.querySelector("[data-od-switch]");
+        var label = root.querySelector("[data-od-switch-label]");
+        sw.checked = !!on;
+        sw.disabled = false;
+        label.innerHTML = on ? '<span class="text-success">Hors ligne : activé</span>' : "Hors ligne : désactivé";
+    }
+
+    function wireSwitch(root) {
+        var sw = root.querySelector("[data-od-switch]");
+        if (!sw) return;
+        RccApi.getJson("/api/admin/offline-mode").then(function (r) { showSwitch(root, r.enabled); }).catch(function () {});
+        sw.addEventListener("change", function () {
+            var on = sw.checked;
+            var msg = on
+                ? "Passer le portail en mode hors ligne ?\n\nPlus aucun service Internet ne sera appelé (IA en ligne, Teams/Outlook, traducteurs en ligne, recherche web, carte OpenStreetMap). " +
+                  "Les fonctions utilisent les services locaux installés, ou leur repli. Effet immédiat pour tous les utilisateurs."
+                : "Rétablir les services Internet ?\n\nLe portail rappellera de nouveau les services en ligne. Effet immédiat pour tous les utilisateurs.";
+            if (!confirm(msg)) { sw.checked = !on; return; }
+            sw.disabled = true;
+            RccApi.sendJson("/api/admin/offline-mode", "PUT", { enabled: on })
+                .then(function (r) { showSwitch(root, r.enabled); run(root); })
+                .catch(function (e) { sw.checked = !on; sw.disabled = false; alert("Erreur : " + e.message); });
+        });
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
         var root = document.getElementById("offlineDiag");
         if (!root) return;
         root.querySelector("[data-od-run]").addEventListener("click", function () { run(root); });
+        wireSwitch(root);
     });
 })();

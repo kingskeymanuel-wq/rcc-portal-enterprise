@@ -120,6 +120,26 @@ public class AdministrationController {
         return offlineDiagnosticService.run();
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ecobank.rccportal.service.OfflineMode offlineMode;
+
+    @GetMapping("/offline-mode")
+    public java.util.Map<String, Boolean> offlineMode(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return java.util.Map.of("enabled", offlineMode.isEnabled());
+    }
+
+    /** Bascule le portail en mode hors ligne (ou le rétablit) — effet immédiat, conservé au redémarrage. */
+    @PutMapping("/offline-mode")
+    public java.util.Map<String, Boolean> setOfflineMode(@RequestBody java.util.Map<String, Boolean> body,
+                                                         @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        boolean on = Boolean.TRUE.equals(body == null ? null : body.get("enabled"));
+        offlineMode.setEnabled(on);
+        org.slf4j.LoggerFactory.getLogger(getClass()).info("Mode hors ligne {} par {}", on ? "activé" : "désactivé", requester.username());
+        return java.util.Map.of("enabled", offlineMode.isEnabled());
+    }
+
     /** Contrôle en direct : base utilisée, droits SQL, test d'écriture réel (annulé), données qui faussent les accès. */
     @GetMapping("/db-health")
     public com.ecobank.rccportal.service.DbHealthService.Report dbHealth(@AuthenticationPrincipal AuthenticatedUser requester) {

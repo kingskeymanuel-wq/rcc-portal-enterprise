@@ -12,14 +12,41 @@ import org.springframework.stereotype.Component;
 @Component
 public class OfflineMode {
 
-    private final boolean enabled;
+    /** Réglage enregistré (dbo.SiteSettings) quand l'administrateur bascule le mode depuis l'Administration. */
+    public static final String SETTING_KEY = "portal.offline";
+
+    private volatile boolean enabled;
+    private SiteSettingService settings;
+    private volatile boolean loaded;
 
     public OfflineMode(@Value("${rcc.offline:false}") boolean enabled) {
         this.enabled = enabled;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setSettings(@org.springframework.context.annotation.Lazy SiteSettingService settings) {
+        this.settings = settings;
+    }
+
+    /** Valeur de démarrage (RCC_OFFLINE), remplacée par le choix de l'administrateur s'il en a fait un. */
     public boolean isEnabled() {
+        if (!loaded && settings != null) {
+            loaded = true;
+            try {
+                String v = settings.get(SETTING_KEY);
+                if (v != null) enabled = Boolean.parseBoolean(v);
+            } catch (RuntimeException e) {
+                loaded = false; // base momentanément indisponible : nouvel essai au prochain appel
+            }
+        }
         return enabled;
+    }
+
+    /** Bascule immédiate (sans redémarrage) et conservée après redémarrage. */
+    public void setEnabled(boolean on) {
+        if (settings != null) settings.set(SETTING_KEY, Boolean.toString(on));
+        enabled = on;
+        loaded = true;
     }
 
     /** Hôte sur Internet (pas une adresse locale ou privée) : à ne pas appeler en mode hors ligne. */
