@@ -198,11 +198,13 @@ public class RccPoleService {
 
         if (graphClient.isConfigured() && from.getEmail() != null && !from.getEmail().isBlank()
                 && manager.getEmail() != null && !manager.getEmail().isBlank()) {
-            try {
-                graphClient.sendTeamsMessage(from.getEmail(), manager.getEmail(),
-                        "Alerte pôle " + pole.getName() + " — " + content);
-            } catch (Exception ignored) {
-                // Best-effort — la notification in-app fait déjà foi.
+            if (graphClient.isTeamsEnabled()) { // liaison Teams coupée par défaut : rien n'est envoyé dans Teams
+                try {
+                    graphClient.sendTeamsMessage(from.getEmail(), manager.getEmail(),
+                            "Alerte pôle " + pole.getName() + " — " + content);
+                } catch (Exception ignored) {
+                    // Best-effort — la notification in-app fait déjà foi.
+                }
             }
             try {
                 graphClient.sendMail(from.getEmail(), manager.getEmail(),

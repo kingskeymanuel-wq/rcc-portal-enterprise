@@ -93,6 +93,9 @@ graph:
   tenant-id: ${AZURE_TENANT_ID:}
   client-id: ${AZURE_CLIENT_ID:}
   client-secret: ${AZURE_CLIENT_SECRET:}
+  # Liaison Microsoft Teams COUPÉE : le portail n'envoie rien dans Teams (ni message, ni alerte de pôle) et
+  # n'affiche plus de bouton Teams. Outlook (e-mail) n'est pas concerné. Mettre RCC_TEAMS_ENABLED=true pour la rétablir.
+  teams-enabled: ${RCC_TEAMS_ENABLED:false}
 # Recherche web — complément de la barre de recherche globale et de RAF quand la Base de
 # connaissances / les procédures internes ne suffisent pas. Plusieurs moteurs, essayés dans
 # l'ordre de provider-order jusqu'au premier qui répond. Bing Web Search API a été RETIRÉE
