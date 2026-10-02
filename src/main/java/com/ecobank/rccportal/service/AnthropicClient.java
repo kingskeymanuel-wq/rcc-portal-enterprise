@@ -37,8 +37,36 @@ public class AnthropicClient {
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public boolean isConfigured() {
+    /** IA installée sur le réseau interne (Ollama) : utilisée hors ligne ou sans clé Anthropic. */
+    private LocalAiClient local;
+    private OfflineMode offlineMode;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setLocal(LocalAiClient local) {
+        this.local = local;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setOfflineMode(OfflineMode offlineMode) {
+        this.offlineMode = offlineMode;
+    }
+
+    private boolean offline() {
+        return offlineMode != null && offlineMode.isEnabled();
+    }
+
+    private boolean cloudKey() {
         return apiKey != null && !apiKey.isBlank();
+    }
+
+    /** IA locale retenue : mode hors ligne, ou pas de clé Anthropic. */
+    public boolean usesLocal() {
+        return local != null && local.isConfigured() && (offline() || !cloudKey());
+    }
+
+    /** Une IA est disponible : locale, ou Anthropic (jamais Anthropic en mode hors ligne). */
+    public boolean isConfigured() {
+        return usesLocal() || (cloudKey() && !offline());
     }
 
     /**
@@ -51,11 +79,13 @@ public class AnthropicClient {
 
     /** Clé renseignée ET pas de refus récent : l'IA peut être appelée sans risque d'attente inutile. */
     public boolean isAvailable() {
-        return isConfigured() && System.currentTimeMillis() >= pausedUntil;
+        return usesLocal() || (isConfigured() && System.currentTimeMillis() >= pausedUntil);
     }
 
     /** Raison courte de l'indisponibilité (pour l'affichage), {@code null} si l'IA est disponible. */
     public String unavailableReason() {
+        if (usesLocal()) return null;
+        if (offline()) return "IA locale non configurée (mode hors ligne)";
         if (!isConfigured()) return "IA non configurée";
         return System.currentTimeMillis() < pausedUntil ? pauseReason : null;
     }
@@ -98,6 +128,7 @@ public class AnthropicClient {
      *  a besoin de plus. Avant ce changement, un timeout unique de 2 minutes faisait attendre
      *  l'utilisateur bien trop longtemps en cas de lenteur/indisponibilité d'Anthropic. */
     public String chat(String systemPrompt, String userPrompt, int maxTokens, int timeoutSeconds) {
+        if (usesLocal()) return local.chat(systemPrompt, userPrompt, maxTokens);
         checkAvailable();
         try {
             String requestJson = objectMapper.writeValueAsString(Map.of(
@@ -138,6 +169,10 @@ public class AnthropicClient {
      * ManualKpiEntryService.importFromScreenshot()) — même contrat d'erreur que chat().
      */
     public String chatWithImage(String systemPrompt, String userPrompt, String imageBase64, String mediaType, int maxTokens) {
+        if (local != null && local.isVisionConfigured() && (offline() || !cloudKey())) {
+            return local.chatWithImage(systemPrompt, userPrompt, imageBase64, mediaType, maxTokens);
+        }
+        if (offline()) throw ApiException.serviceUnavailable("Lecture d'image : modèle de vision local non configuré (mode hors ligne).");
         checkAvailable();
         try {
             List<Map<String, Object>> content = List.of(

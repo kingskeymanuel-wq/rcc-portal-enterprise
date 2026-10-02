@@ -31,5 +31,16 @@ des cas, base de connaissances, masques de mail, MON RCC, formation, QA, RH, pla
 | Teams / Outlook (Graph), Copilot, DeepL, Azure, Anthropic | désactivés tant que non configurés | clés dans `application-secrets.yml` |
 | Vidéos YouTube / Vimeo de formation | non lues | déposer les vidéos dans le portail (upload local) |
 
-Pour couper explicitement tout appel externe : `WEBSEARCH_ENABLED=false` et
-`RCC_TRANSLATION_MYMEMORY_ENABLED=false`.
+## Mode « serveur sans Internet » (v229)
+`RCC_OFFLINE=true` coupe d'un coup tous les services hébergés sur Internet et bascule sur les services locaux :
+
+| Variable | Rôle |
+|---|---|
+| `RCC_OFFLINE=true` | Aucun appel Internet (IA cloud, Graph, Copilot, recherche web, traducteurs en ligne, tuiles OSM) |
+| `RCC_LOCAL_AI_URL`, `RCC_LOCAL_AI_MODEL` | IA locale Ollama (réécriture, campagnes, analyses, QA, RAF) |
+| `RCC_LOCAL_AI_VISION_MODEL` | Facultatif : lecture des captures KPI |
+| `RCC_LOCAL_WHISPER_URL` | Transcription des appels QA (Whisper local) |
+| `RCC_OCR_PYTHON_EXECUTABLE`, `RCC_OCR_SCRIPT_PATH` | OCR local (PaddleOCR) |
+
+Installation complète sans Internet : kit **`scripts/offline-kit`** (voir son `LISEZ-MOI.md`).
+Contrôle : **Administration → Maintenance → Fonctionnement sans Internet**. Analyse : `docs/ANALYSE_HORS_LIGNE.md`.

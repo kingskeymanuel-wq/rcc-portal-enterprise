@@ -470,6 +470,28 @@ public class TranslationService {
     // Sources
     // ══════════════════════════════════════════════════════════════════════
 
+    /** Mode « serveur sans Internet » (RCC_OFFLINE=true) : ce service hébergé sur Internet n'est pas appelé. */
+    private OfflineMode offlineMode;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setOfflineMode(OfflineMode offlineMode) {
+        this.offlineMode = offlineMode;
+    }
+
+    private boolean offline() {
+        return offlineMode != null && offlineMode.isEnabled();
+    }
+
+    /** Hors ligne : seules les sources du réseau interne (Argos local, LibreTranslate, service interne). */
+    private boolean allowedOffline(Provider p) {
+        return switch (p.id()) {
+            case "local" -> true;
+            case "libretranslate" -> !OfflineMode.isInternetUrl(libreUrl);
+            case "custom" -> !OfflineMode.isInternetUrl(customUrl);
+            default -> false; // DeepL, Azure, MyMemory : sur Internet
+        };
+    }
+
     private List<Provider> orderedProviders() {
         Map<String, Provider> all = new LinkedHashMap<>();
         for (Provider p : List.of(localProvider(), customProvider(), libreProvider(), deeplProvider(),
@@ -484,6 +506,7 @@ public class TranslationService {
             }
         }
         ordered.addAll(all.values()); // sources non citées : à la fin, jamais oubliées
+        if (offline()) ordered.removeIf(p -> !allowedOffline(p));
         return ordered;
     }
 

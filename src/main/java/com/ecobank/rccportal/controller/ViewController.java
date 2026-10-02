@@ -48,9 +48,14 @@ public class ViewController {
     @Value("${rcc.map.tile-url:}")
     private String mapTileUrl;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.ecobank.rccportal.service.OfflineMode offlineMode;
+
     @GetMapping("/knowledge")
     public String knowledge(Model model) {
-        model.addAttribute("mapTileUrl", mapTileUrl);
+        // Hors ligne : un serveur de tuiles sur Internet (OpenStreetMap) est ignoré — fond vectoriel local.
+        model.addAttribute("mapTileUrl", offlineMode != null && offlineMode.isEnabled()
+                && com.ecobank.rccportal.service.OfflineMode.isInternetUrl(mapTileUrl) ? "" : mapTileUrl);
         return "knowledge";
     }
 

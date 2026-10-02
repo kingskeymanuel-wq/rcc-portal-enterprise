@@ -37,12 +37,39 @@ public class AzureOpenAiClient {
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public boolean isConfigured() {
+    /** IA installée sur le réseau interne (Ollama) : utilisée hors ligne ou sans ressource Azure. */
+    private LocalAiClient local;
+    private OfflineMode offlineMode;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setLocal(LocalAiClient local) {
+        this.local = local;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setOfflineMode(OfflineMode offlineMode) {
+        this.offlineMode = offlineMode;
+    }
+
+    private boolean cloudConfigured() {
         return endpoint != null && !endpoint.isBlank() && apiKey != null && !apiKey.isBlank();
+    }
+
+    private boolean offline() {
+        return offlineMode != null && offlineMode.isEnabled();
+    }
+
+    public boolean usesLocal() {
+        return local != null && local.isConfigured() && (offline() || !cloudConfigured());
+    }
+
+    public boolean isConfigured() {
+        return usesLocal() || (cloudConfigured() && !offline());
     }
 
     /** Lève une ApiException claire si l'IA n'est pas configurée — jamais de réponse inventée en silence. */
     public String chat(String systemPrompt, String userPrompt, double temperature, int maxTokens) {
+        if (usesLocal()) return local.chat(systemPrompt, userPrompt, temperature, maxTokens);
         if (!isConfigured()) {
             throw ApiException.serviceUnavailable(
                     "Azure OpenAI Service n'est pas configuré (quality.ai.azure-openai-endpoint / -key). " +

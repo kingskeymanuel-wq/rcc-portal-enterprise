@@ -110,6 +110,16 @@ public class AdministrationController {
     @org.springframework.beans.factory.annotation.Autowired
     private com.ecobank.rccportal.service.DbHealthService dbHealthService;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ecobank.rccportal.service.OfflineDiagnosticService offlineDiagnosticService;
+
+    /** Fonctionnement sans Internet : état des services locaux et des services Internet encore actifs. */
+    @GetMapping("/offline-diagnostic")
+    public com.ecobank.rccportal.service.OfflineDiagnosticService.Report offlineDiagnostic(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return offlineDiagnosticService.run();
+    }
+
     /** Contrôle en direct : base utilisée, droits SQL, test d'écriture réel (annulé), données qui faussent les accès. */
     @GetMapping("/db-health")
     public com.ecobank.rccportal.service.DbHealthService.Report dbHealth(@AuthenticationPrincipal AuthenticatedUser requester) {

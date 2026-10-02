@@ -11,7 +11,13 @@
  * basculent d'une filiale à l'autre depuis l'en-tête ; chaque appel au serveur porte la filiale choisie (en-tête
  * X-RCC-Filiale) et tous les écrans de pilotage n'affichent que ses données. Ignoré par le serveur pour les autres profils.
  */
-window.RccFiliale = (function () {
+window.RccFiliale = /** Serveur sans Internet (RCC_OFFLINE=true, balise posée par fragments/header.html) : liens et appels vers Internet masqués. */
+window.RccOffline = (function () {
+    var m = document.querySelector('meta[name="rcc-offline"]');
+    return !!(m && m.getAttribute("content") === "true");
+})();
+
+(function () {
     var KEY = "rcc.filiale", LABELS = { CI: "RCC ECI", TG: "RCC ETG" }, NAMES = { CI: "Côte d'Ivoire", TG: "Togo — Lomé" };
     function get() { try { var v = localStorage.getItem(KEY); return LABELS[v] ? v : "CI"; } catch (e) { return "CI"; } }
     function set(c) {
@@ -652,7 +658,7 @@ window.RccSession = (function () {
         if (!results.length && !webHtml) {
             resultsBox.innerHTML = '<p class="text-muted text-center">Aucun résultat pour « ' + RccApi.escapeHtml(term) + ' ».</p>' +
                 '<div class="text-center"><a class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" ' +
-                'href="https://www.google.com/search?q=' + encodeURIComponent(term) + '">' +
+                'href="https://www.google.com/search?q=' + encodeURIComponent(term) + '"' + (window.RccOffline ? ' style="display:none"' : '') + '>' +
                 '<i class="bi bi-box-arrow-up-right"></i> Chercher « ' + RccApi.escapeHtml(term) + ' » sur Google</a></div>';
             return;
         }
@@ -684,7 +690,7 @@ window.RccSession = (function () {
         }, 0);
         resultsBox.innerHTML = internalHtml + webHtml +
             '<div class="text-center mt-2 pt-2 border-top">' +
-                '<a class="small text-muted" target="_blank" rel="noopener" href="https://www.google.com/search?q=' + encodeURIComponent(term) + '">' +
+                '<a class="small text-muted" target="_blank" rel="noopener" href="https://www.google.com/search?q=' + encodeURIComponent(term) + '"' + (window.RccOffline ? ' style="display:none"' : '') + '>' +
                 '<i class="bi bi-box-arrow-up-right"></i> Chercher aussi « ' + RccApi.escapeHtml(term) + ' » sur Google</a></div>';
     }
 

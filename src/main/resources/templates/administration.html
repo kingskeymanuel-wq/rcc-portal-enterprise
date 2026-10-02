@@ -530,6 +530,18 @@
 
                 </section>
                 <section class="adm-pane" data-pane="maintenance" hidden>
+                <!-- Fonctionnement sans Internet (admin-offline.js, /api/admin/offline-diagnostic) -->
+                <div class="card dashboard-card shadow-sm mb-4" id="offlineDiag">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                            <h6 class="card-title mb-0"><i class="bi bi-wifi-off"></i> Fonctionnement sans Internet</h6>
+                            <button class="btn btn-sm btn-outline-primary" type="button" data-od-run><i class="bi bi-activity"></i> Lancer le diagnostic</button>
+                        </div>
+                        <p class="text-muted small mb-2">Services locaux nécessaires sur un serveur isolé (base, authentification, IA locale, transcription, traduction, OCR, carte)
+                            et services Internet encore actifs. Installation : kit <code>scripts/offline-kit</code>.</p>
+                        <div data-od-body></div>
+                    </div>
+                </div>
                 <p class="text-muted small">Opérations ponctuelles de remise en ordre des comptes. Chacune demande confirmation.</p>
                 <!-- Détection de doublons — même nom complet. Ne supprime rien automatiquement :
                      l'admin choisit lequel garder, via le bouton Supprimer de la fiche détaillée. -->
@@ -784,6 +796,7 @@
 <script th:src="@{/js/admin-agency.js}"></script>
 <script th:src="@{/js/admin-hierarchy.js}"></script>
 <script th:src="@{/js/admin-db-log.js}"></script>
+<script th:src="@{/js/admin-offline.js}"></script>
 <script th:src="@{/js/admin-db-editor.js}"></script>
 <script th:src="@{/js/admin-tabs.js}"></script>
 <script th:src="@{/js/admin-shifts.js}"></script>

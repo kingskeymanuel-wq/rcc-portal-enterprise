@@ -48,8 +48,20 @@ public class MicrosoftGraphClient {
     private String cachedToken;
     private Instant tokenExpiry = Instant.EPOCH;
 
+    /** Mode « serveur sans Internet » (RCC_OFFLINE=true) : ce service Microsoft 365 (cloud) n'est pas appelé. */
+    private OfflineMode offlineMode;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setOfflineMode(OfflineMode offlineMode) {
+        this.offlineMode = offlineMode;
+    }
+
+    private boolean offline() {
+        return offlineMode != null && offlineMode.isEnabled();
+    }
+
     public boolean isConfigured() {
-        return tenantId != null && !tenantId.isBlank()
+        return !offline() && tenantId != null && !tenantId.isBlank()
                 && clientId != null && !clientId.isBlank()
                 && clientSecret != null && !clientSecret.isBlank();
     }
