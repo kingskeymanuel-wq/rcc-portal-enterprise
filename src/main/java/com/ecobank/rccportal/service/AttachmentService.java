@@ -111,6 +111,14 @@ public class AttachmentService {
         return toResponse(attachmentRepository.save(attachment), null);
     }
 
+    /** Objet auquel la pièce jointe est rattachée (null si autre type ou introuvable). */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public Integer entityIdOf(Integer attachmentId, String entityType) {
+        return attachmentRepository.findById(attachmentId)
+                .filter(a -> entityType.equals(a.getEntityType()))
+                .map(com.ecobank.rccportal.model.Attachment::getEntityId).orElse(null);
+    }
+
     @Transactional
     public void remove(Integer attachmentId, AuthenticatedUser requester) {
         Attachment attachment = attachmentRepository.findById(attachmentId)

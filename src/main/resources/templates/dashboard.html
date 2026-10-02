@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>Portail Front Office Ecobank — Accueil</title>
+    <title th:text="${cibPortal} ? 'Portail Front Office Ecobank — Portail CIB' : 'Portail Front Office Ecobank — Accueil'">Portail Front Office Ecobank — Accueil</title>
 
     <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}"
           rel="stylesheet">
@@ -20,7 +20,7 @@
 
 </head>
 
-<body>
+<body th:attr="data-portal=${cibPortal} ? 'CIB' : null">
 
 <div class="layout">
 
@@ -42,6 +42,10 @@
                      style="min-height:280px;border:none;overflow:hidden;background:linear-gradient(120deg,#0057B8,#003E8A);background-size:cover;background-position:center;">
                     <div class="position-absolute top-0 start-0 w-100 h-100" style="background:rgba(0,20,50,.45);"></div>
                     <div class="card-body position-relative d-flex flex-column justify-content-center" style="min-height:280px;">
+                        <span th:if="${cibPortal}" id="cibPortalBadge" class="badge rounded-pill mb-2 fw-semibold"
+                              style="width:fit-content;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);font-size:.85rem;">
+                            <i class="bi bi-buildings-fill"></i> Portail CIB — traitements des entreprises
+                        </span>
                         <h1 class="fw-bold mb-2" id="heroHeadline">Bienvenue sur Portail Front Office Ecobank</h1>
                         <p class="mb-3 opacity-90" id="heroSubheadline" style="max-width:600px;">
                             Retrouvez vos procédures, formations et outils au même endroit.

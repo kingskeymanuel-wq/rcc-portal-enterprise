@@ -88,6 +88,7 @@
                     <button type="button" data-tab="apparence"><i class="bi bi-palette-fill"></i><span>Apparence</span><small>Connexion, bannières</small></button>
                     <button type="button" data-tab="sla"><i class="bi bi-stopwatch-fill"></i><span>Référentiel SLA</span><small>Délais par motif</small></button>
                     <button type="button" data-tab="maintenance"><i class="bi bi-tools"></i><span>Maintenance</span><small>Doublons, rattrapages</small></button>
+                    <button type="button" data-tab="cib"><i class="bi bi-buildings-fill"></i><span>Base CIB</span><small>Connaissance entreprises, fichiers</small></button>
                 </nav>
                 <section class="adm-pane" data-pane="personnes">
                 <!-- Réclamations — alertes remontées depuis la page de connexion (admin uniquement) -->
@@ -546,6 +547,31 @@
                 </div>
 
                 </section>
+                <!-- Base de connaissance CIB (admin-kb-cib.js) : séparée de la base générale, visible des seuls agents CIB. -->
+                <section class="adm-pane" data-pane="cib" hidden>
+                    <div class="card dashboard-card shadow-sm mb-4" id="cibKb">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                <h5 class="card-title mb-0"><i class="bi bi-buildings-fill"></i> Base de connaissance CIB</h5>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <a class="btn btn-sm btn-outline-secondary" href="/knowledge?space=CIB" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Voir comme un agent CIB</a>
+                                    <button type="button" class="btn btn-sm btn-primary" data-cib-new><i class="bi bi-folder-plus"></i> Nouvelle rubrique</button>
+                                </div>
+                            </div>
+                            <p class="text-muted small mb-3">Traitements qui concernent les entreprises. Cette base est <b>séparée</b> de la base générale :
+                                seuls les agents et Team Leaders CIB la voient (et l'encadrement). Le reste du portail CIB — Pas à pas, formations,
+                                catégorisation des cas, informations — est le même que pour les autres équipes.</p>
+                            <form class="row g-2 align-items-end mb-3" data-cib-form hidden>
+                                <div class="col-md-3"><label class="form-label small mb-0">Code</label><input class="form-control form-control-sm" name="code" placeholder="ex. CIB_COMPTES" required></div>
+                                <div class="col-md-5"><label class="form-label small mb-0">Titre</label><input class="form-control form-control-sm" name="title" placeholder="ex. Ouverture de compte entreprise" required></div>
+                                <div class="col-md-2"><label class="form-label small mb-0">Icône</label><input class="form-control form-control-sm" name="icon" placeholder="bi-briefcase"></div>
+                                <div class="col-md-2 d-flex gap-1"><button class="btn btn-sm btn-primary" type="submit">Créer</button><button class="btn btn-sm btn-outline-secondary" type="button" data-cib-cancel>Annuler</button></div>
+                            </form>
+                            <div data-cib-body><p class="text-muted small mb-0">Chargement…</p></div>
+                        </div>
+                    </div>
+                </section>
+
                 <section class="adm-pane" data-pane="maintenance" hidden>
                 <!-- Fonctionnement sans Internet (admin-offline.js, /api/admin/offline-diagnostic) -->
                 <div class="card dashboard-card shadow-sm mb-4" id="offlineDiag">
@@ -820,6 +846,7 @@
 <script th:src="@{/js/admin-hierarchy.js}"></script>
 <script th:src="@{/js/admin-db-log.js}"></script>
 <script th:src="@{/js/admin-offline.js}"></script>
+<script th:src="@{/js/admin-kb-cib.js}"></script>
 <script th:src="@{/js/admin-db-editor.js}"></script>
 <script th:src="@{/js/admin-tabs.js}"></script>
 <script th:src="@{/js/admin-shifts.js}"></script>

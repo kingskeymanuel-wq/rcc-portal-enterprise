@@ -185,7 +185,7 @@ public class UserService {
 
     /** Portails d'agent (accueil compris). */
     static final java.util.Set<String> AGENT_PORTALS = java.util.Set.of("/dashboard", "/portail-mail", "/portail-tchat", "/portail-rafiki",
-            "/portail-televente", "/outbound-dashboard");
+            "/portail-televente", "/outbound-dashboard", "/portail-cib");
 
     /** Portail de chaque profil d'encadrement. */
     static final java.util.Map<String, String> PROFILE_HOMES = java.util.Map.of("TEAM_LEADER", "/team-leader", "SUPERVISOR", "/supervisor",
@@ -221,7 +221,7 @@ public class UserService {
                 put("AGENT_RAFIKI", "/portail-rafiki");
                 put("AGENT_INBOUND", "/dashboard");
                 put("AGENT_INBOUND_MAIL", "/portail-mail");
-                put("AGENT_CIB", "/dashboard");
+                put("AGENT_CIB", "/portail-cib");
                 put("AGENCE_CAISSIER", "/agence");
                 put("AGENCE_GESTIONNAIRE", "/agence");
                 put("AGENCE", "/agence");
@@ -235,6 +235,7 @@ public class UserService {
         if (activity == null) return null;
         String a = activity.toUpperCase(java.util.Locale.ROOT);
         if (a.contains("RAFIKI")) return "/portail-rafiki";
+        if (a.matches(".*\\bCIB\\b.*")) return "/portail-cib";
         String folded = java.text.Normalizer.normalize(a, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "");
         if (folded.contains("TELEVENTE") || folded.contains("TELEVENDEUR")) return "/portail-televente";
         if (a.contains("TCHAT") || a.contains("LIVE CHAT") || a.matches(".*\\bCHAT\\b.*") || folded.contains("RESEAU")) return "/portail-tchat";

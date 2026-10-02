@@ -41,7 +41,7 @@ public class MonRccSpaceService {
             "RAFIKI", "Rafiki", "OUTBOUND", "Outbound", "CIB", "CIB", "TELEVENTE", "Télévente", "DIGITALISATION", "Digitalisation");
 
     private static final Map<String, String> PORTAL_LABELS = Map.ofEntries(
-            Map.entry("/dashboard", "Portail agent"), Map.entry("/portail-tchat", "Portail agent Réseaux sociaux"), Map.entry("/portail-mail", "Portail agent Inbound Mail"), Map.entry("/portail-rafiki", "Portail agent Rafiki"),
+            Map.entry("/dashboard", "Portail agent"), Map.entry("/portail-tchat", "Portail agent Réseaux sociaux"), Map.entry("/portail-mail", "Portail agent Inbound Mail"), Map.entry("/portail-rafiki", "Portail agent Rafiki"), Map.entry("/portail-cib", "Portail CIB"),
             Map.entry("/outbound-dashboard", "Portail Outbound — Digitalisation"), Map.entry("/portail-televente", "Portail Télévente"), Map.entry("/team-leader", "Portail Team Leader"), Map.entry("/qa", "Portail Quality Assurance"),
             Map.entry("/qa-supervisor", "Portail Head QA"), Map.entry("/rh", "Portail RH"), Map.entry("/supervisor", "Portail Superviseur"),
             Map.entry("/agence", "Portail Agence"), Map.entry("/training", "Centre de formation"));

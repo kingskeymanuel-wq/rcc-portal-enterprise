@@ -180,7 +180,7 @@ window.RccSession = (function () {
             // Portail Outbound = Digitalisation ; un agent Télévente a son propre portail.
             if (featureCode === "outbound-dashboard" && (!outboundAgent || channelPortal === "/portail-televente")) isAllowed = false;
             // Portails Tchat / Rafiki / Télévente : chaque agent ne voit que le sien (l'administrateur voit tout).
-            if ((featureCode === "portail-mail" || featureCode === "portail-tchat" || featureCode === "portail-rafiki" || featureCode === "portail-televente") && profile !== "ADMIN"
+            if ((featureCode === "portail-mail" || featureCode === "portail-tchat" || featureCode === "portail-rafiki" || featureCode === "portail-televente" || featureCode === "portail-cib") && profile !== "ADMIN"
                 && channelPortal !== "/" + featureCode) isAllowed = false;
 
             isAllowed = computeFeatureAllowed(featureCode, isAllowed, overridesByCode, denied);
@@ -787,7 +787,7 @@ window.RccSession = (function () {
      * fonctionnalités ou l'équipe changent → la page se recharge pour appliquer les nouveaux droits.
      */
     /** Portails d'accueil des agents : un agent n'ouvre que celui de son équipe. */
-    var AGENT_HOME_PORTALS = ["/dashboard", "/outbound-dashboard", "/portail-mail", "/portail-tchat", "/portail-rafiki", "/portail-televente"];
+    var AGENT_HOME_PORTALS = ["/dashboard", "/outbound-dashboard", "/portail-mail", "/portail-tchat", "/portail-rafiki", "/portail-televente", "/portail-cib"];
 
     function watchAccessChanges(user, profile) {
         var roleSig = String(user.role || "") + "|" + String(user.service || "");
@@ -873,7 +873,7 @@ window.RccSession = (function () {
                     var teamStatus = results[2];
 
                     var isOutboundAgent = profile === "AGENT" && /^\/(outbound-dashboard|portail-televente)$/.test(teamStatus.redirectTo || "");
-                    var channelPortal = profile === "AGENT" && /^\/portail-(mail|tchat|rafiki|televente)$/.test(teamStatus.redirectTo || "") ? teamStatus.redirectTo : null;
+                    var channelPortal = profile === "AGENT" && /^\/portail-(mail|tchat|rafiki|televente|cib)$/.test(teamStatus.redirectTo || "") ? teamStatus.redirectTo : null;
                     // Un agent est toujours ramené sur SON portail d'équipe : accueil générique, favori ou ancien
                     // portail après un changement d'accès dans l'Administration (Réseaux sociaux, Rafiki, Télévente…).
                     var here = window.location.pathname;

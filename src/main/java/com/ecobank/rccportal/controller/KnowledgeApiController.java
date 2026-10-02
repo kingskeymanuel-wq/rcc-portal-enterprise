@@ -36,9 +36,20 @@ public class KnowledgeApiController {
 
     @GetMapping("/categories")
     public List<KnowledgeCategoryResponse> categories(@RequestParam(required = false) String team,
+                                                        @RequestParam(required = false) String space,
                                                         @AuthenticationPrincipal AuthenticatedUser requester) {
-        // Paramètre « team » conservé pour compatibilité mais ignoré : base commune à toutes les équipes.
-        return knowledgeService.listCategoriesFor(requester);
+        // « team » ignoré (compatibilité). « space » : base CIB ou générale, au choix de l'encadrement uniquement.
+        return knowledgeService.listCategoriesFor(requester, space);
+    }
+
+    /** Base vue par l'utilisateur : CIB, GENERAL, ou null (encadrement : les deux, au choix). */
+    @GetMapping("/space")
+    public java.util.Map<String, Object> space(@AuthenticationPrincipal AuthenticatedUser requester) {
+        String s = knowledgeService.spaceFor(requester, null);
+        java.util.Map<String, Object> out = new java.util.HashMap<>();
+        out.put("space", s);
+        out.put("canChoose", s == null);
+        return out;
     }
 
     @PostMapping("/categories")
@@ -81,13 +92,15 @@ public class KnowledgeApiController {
     @GetMapping("/articles")
     public List<KnowledgeArticleResponse> listArticles(@RequestParam Integer categoryId,
                                                         @RequestParam(required = false) String countryCode,
-                                                        @RequestParam(required = false) String serviceCode) {
+                                                        @RequestParam(required = false) String serviceCode,
+                                                        @AuthenticationPrincipal AuthenticatedUser requester) {
+        knowledgeService.checkCategoryAccess(requester, categoryId);
         return knowledgeService.listArticles(categoryId, countryCode, serviceCode);
     }
 
     @GetMapping("/articles/search")
-    public List<KnowledgeArticleResponse> search(@RequestParam String q) {
-        return knowledgeService.search(q);
+    public List<KnowledgeArticleResponse> search(@RequestParam String q, @AuthenticationPrincipal AuthenticatedUser requester) {
+        return knowledgeService.search(q, requester);
     }
 
     /** Lien profond depuis la recherche globale (session.js) : l'article seul ne suffit pas à
@@ -95,8 +108,8 @@ public class KnowledgeApiController {
      *  catégorie et sa filiale pour que le front puisse d'abord positionner le bon contexte
      *  (modale pays réutilisée, voir knowledge.js) avant d'ouvrir l'article lui-même. */
     @GetMapping("/articles/{id}")
-    public KnowledgeArticleResponse getArticle(@PathVariable Integer id) {
-        return knowledgeService.getArticle(id);
+    public KnowledgeArticleResponse getArticle(@PathVariable Integer id, @AuthenticationPrincipal AuthenticatedUser requester) {
+        return knowledgeService.getArticle(id, requester);
     }
 
     @PostMapping("/articles")
@@ -147,7 +160,7 @@ public class KnowledgeApiController {
     @DeleteMapping("/articles/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeArticle(@PathVariable Integer id, @AuthenticationPrincipal AuthenticatedUser requester) {
-        requireQaOnly(requester);
+        requireEditor(requester, knowledgeService.categoryOfArticle(id));
         knowledgeService.removeArticle(id);
     }
 
@@ -162,7 +175,9 @@ public class KnowledgeApiController {
     // ------------------- FICHIERS JOINTS -------------------
 
     @GetMapping("/articles/{id}/attachments")
-    public List<AttachmentResponse> listAttachments(@PathVariable Integer id) {
+    public List<AttachmentResponse> listAttachments(@PathVariable Integer id, @AuthenticationPrincipal AuthenticatedUser requester) {
+        Integer categoryId = knowledgeService.categoryOfArticle(id);
+        if (categoryId != null) knowledgeService.checkCategoryAccess(requester, categoryId);
         return attachmentService.listFor(ATTACHMENT_ENTITY_TYPE, id);
     }
 
@@ -172,7 +187,7 @@ public class KnowledgeApiController {
     public AttachmentResponse uploadAttachment(@PathVariable Integer id,
                                                @RequestParam("file") MultipartFile file,
                                                @AuthenticationPrincipal AuthenticatedUser requester) {
-        requireQaOnly(requester);
+        requireEditor(requester, knowledgeService.categoryOfArticle(id));
         String storageUrl = documentStorageService.store(file);
         return attachmentService.attachLocalFile(
                 ATTACHMENT_ENTITY_TYPE, id, file.getOriginalFilename(), file.getContentType(), storageUrl, requester.username());
@@ -201,7 +216,7 @@ public class KnowledgeApiController {
                                           @RequestParam(required = false) String countryCode,
                                           @RequestParam("file") MultipartFile file,
                                           @AuthenticationPrincipal AuthenticatedUser requester) {
-        requireQaOnly(requester);
+        requireEditor(requester, categoryId);
         KnowledgeArticle container = knowledgeService.findOrCreateContainer(categoryId, serviceCode, countryCode, null);
         String storageUrl = documentStorageService.store(file);
         return attachmentService.attachLocalFile(
@@ -217,7 +232,7 @@ public class KnowledgeApiController {
                                               @RequestParam(required = false) String countryCode,
                                               @jakarta.validation.Valid @RequestBody com.ecobank.rccportal.dto.AttachmentRequest request,
                                               @AuthenticationPrincipal AuthenticatedUser requester) {
-        requireQaOnly(requester);
+        requireEditor(requester, categoryId);
         KnowledgeArticle container = knowledgeService.findOrCreateContainer(categoryId, serviceCode, countryCode, null);
         return attachmentService.attach(ATTACHMENT_ENTITY_TYPE, container.getArticleId(), request, requester.username());
     }
@@ -225,7 +240,8 @@ public class KnowledgeApiController {
     @DeleteMapping("/attachments/{attachmentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeAttachment(@PathVariable Integer attachmentId, @AuthenticationPrincipal AuthenticatedUser requester) {
-        requireQaOnly(requester);
+        Integer articleId = attachmentService.entityIdOf(attachmentId, ATTACHMENT_ENTITY_TYPE);
+        requireEditor(requester, articleId == null ? null : knowledgeService.categoryOfArticle(articleId));
         attachmentService.remove(attachmentId, requester);
     }
 
@@ -245,6 +261,13 @@ public class KnowledgeApiController {
         if (!isQa) {
             throw ApiException.forbidden("Only Quality Assurance can manage knowledge base articles.");
         }
+    }
+
+    /** QA partout ; l'administrateur aussi dans la base CIB (dépôt de fichiers depuis l'Administration). */
+    private void requireEditor(AuthenticatedUser requester, Integer categoryId) {
+        boolean isAdmin = requester != null && "admin".equalsIgnoreCase(requester.role());
+        if (isAdmin && knowledgeService.isCibCategory(categoryId)) return;
+        requireQaOnly(requester);
     }
 
     /** Insertion d'image — réservé à l'administrateur uniquement, même la QA ne peut pas. */

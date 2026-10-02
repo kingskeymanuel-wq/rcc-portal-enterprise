@@ -23,6 +23,14 @@ public class ViewController {
         return "dashboard";
     }
 
+    /** Portail CIB (traitements des entreprises) : même accueil que les autres agents — Pas à pas, formations,
+     *  catégorisation, informations — avec sa propre base de connaissance (voir KnowledgeService.spaceFor). */
+    @GetMapping("/portail-cib")
+    public String cibPortal(org.springframework.ui.Model model) {
+        model.addAttribute("cibPortal", true);
+        return "dashboard";
+    }
+
     @GetMapping("/administration")
     public String administration() {
         return "administration";
