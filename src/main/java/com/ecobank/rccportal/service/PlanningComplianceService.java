@@ -133,11 +133,23 @@ public class PlanningComplianceService {
     // Calcul
     // ══════════════════════════════════════════════════════════════════════
 
+    /** Faux pour une ligne orpheline : l'utilisateur référencé a été supprimé de dbo.USERS (sinon EntityNotFoundException). */
+    private static boolean exists(User u) {
+        if (u == null) return false;
+        try {
+            u.getUsername();
+            return true;
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            return false;
+        }
+    }
+
     @Transactional(readOnly = true)
     public List<PlanningComplianceResponse> forDate(LocalDate date, String team) {
         Map<Long, AgentSchedule> scheduleByUser = new LinkedHashMap<>();
         for (AgentSchedule s : agentScheduleRepository.findByWorkDate(date)) {
             if (!"APPROVED".equals(s.getApprovalStatus())) continue;
+            if (!exists(s.getUser())) continue; // planning d'un compte supprimé
             scheduleByUser.put(s.getUser().getId(), s);
         }
 
@@ -148,6 +160,7 @@ public class PlanningComplianceService {
         Map<Long, User> users = new LinkedHashMap<>();
         for (ShiftEvent e : shiftEventRepository.findByOccurredAtBetweenOrderByUser_UsernameAscOccurredAtAsc(from, to)) {
             User u = e.getUser();
+            if (!exists(u)) continue; // pointage d'un compte supprimé
             AgentSchedule s = scheduleByUser.get(u.getId());
             if (e.getOccurredAt().isAfter(windowEnd(date, s)) || e.getOccurredAt().equals(windowEnd(date, s))) continue;
             eventsByUser.computeIfAbsent(u.getId(), k -> new ArrayList<>()).add(e);

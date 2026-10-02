@@ -385,8 +385,13 @@ public class ShiftService {
         java.util.Map<String, Object[]> open = new java.util.HashMap<>(); // username → {type, start}
         for (ShiftEvent e : shiftEventRepository.findByOccurredAtBetweenOrderByUser_UsernameAscOccurredAtAsc(
                 from.atStartOfDay(), to.plusDays(1).atStartOfDay())) {
-            if (e.getUser() == null || e.getUser().getUsername() == null) continue;
-            String u = e.getUser().getUsername();
+            String u;
+            try {
+                u = e.getUser() == null ? null : e.getUser().getUsername();
+            } catch (jakarta.persistence.EntityNotFoundException orphan) {
+                continue; // pointage d'un compte supprimé
+            }
+            if (u == null || e.getEventType() == null) continue;
             switch (e.getEventType()) {
                 case "PAUSE_START" -> open.put(u, new Object[]{"PAUSE", e.getOccurredAt()});
                 case "LUNCH_START" -> open.put(u, new Object[]{"LUNCH", e.getOccurredAt()});
