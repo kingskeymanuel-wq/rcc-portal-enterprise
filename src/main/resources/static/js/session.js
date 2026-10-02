@@ -11,13 +11,13 @@
  * basculent d'une filiale à l'autre depuis l'en-tête ; chaque appel au serveur porte la filiale choisie (en-tête
  * X-RCC-Filiale) et tous les écrans de pilotage n'affichent que ses données. Ignoré par le serveur pour les autres profils.
  */
-window.RccFiliale = /** Serveur sans Internet (RCC_OFFLINE=true, balise posée par fragments/header.html) : liens et appels vers Internet masqués. */
+/** Serveur sans Internet (RCC_OFFLINE=true, balise posée par fragments/header.html) : liens et appels vers Internet masqués. */
 window.RccOffline = (function () {
     var m = document.querySelector('meta[name="rcc-offline"]');
     return !!(m && m.getAttribute("content") === "true");
 })();
 
-(function () {
+window.RccFiliale = (function () {
     var KEY = "rcc.filiale", LABELS = { CI: "RCC ECI", TG: "RCC ETG" }, NAMES = { CI: "Côte d'Ivoire", TG: "Togo — Lomé" };
     function get() { try { var v = localStorage.getItem(KEY); return LABELS[v] ? v : "CI"; } catch (e) { return "CI"; } }
     function set(c) {
