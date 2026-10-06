@@ -97,7 +97,10 @@ window.RccKbEmbed = (function () {
                 root.querySelector(".kbe-search").style.visibility = g ? "hidden" : "";
                 if (g && !guides.getAttribute("data-mounted") && window.RccGuide && window.RccGuide.mountLibrary) {
                     guides.setAttribute("data-mounted", "1");
-                    window.RccGuide.mountLibrary(guides);
+                    // Team Leader CIB : pas à pas Omni ; autres équipes : pas à pas habituels.
+                    getJson("/api/kb/space").then(function (r) { return r && r.space === "CIB" ? "CIB" : "GENERAL"; })
+                        .catch(function () { return "GENERAL"; })
+                        .then(function (aud) { window.RccGuide.mountLibrary(guides, { audience: aud }); });
                 } else if (g && !window.RccGuide) guides.innerHTML = '<div class="kbe-empty">Pas à pas disponibles dans la base complète (onglet « Pas à pas »).</div>';
             }
         });

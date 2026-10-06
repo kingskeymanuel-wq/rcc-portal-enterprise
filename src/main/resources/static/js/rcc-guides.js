@@ -71,10 +71,10 @@ window.RccGuide = (function () {
     }
 
     /** Appareil affiché selon la plateforme : téléphone (défaut), navigateur web, guichet automatique. */
-    function deviceHtml(device) {
+    function deviceHtml(device, url) {
         var touch = '<div class="gp-finger"><i class="bi bi-hand-index-thumb-fill"></i></div><div class="gp-ring"></div>';
         if (device === "browser") {
-            return '<div class="gp-browser"><div class="gp-bchrome"><span></span><span></span><span></span><div class="gp-url"><i class="bi bi-lock-fill"></i> <b>https://</b>ecobank.com/ci</div></div>' +
+            return '<div class="gp-browser"><div class="gp-bchrome"><span></span><span></span><span></span><div class="gp-url"><i class="bi bi-lock-fill"></i> <b>https://</b>' + esc(url || "ecobank.com/ci") + '</div></div>' +
                 '<div class="gp-screen">' + touch + '</div></div>';
         }
         if (device === "atm") {
@@ -116,7 +116,7 @@ window.RccGuide = (function () {
         }
 
         root.innerHTML = '<div class="gp dev-' + esc(device) + '">' +
-            '<div class="gp-stage"><div class="gp-who" style="display:none"></div>' + deviceHtml(device) + '</div>' +
+            '<div class="gp-stage"><div class="gp-who" style="display:none"></div>' + deviceHtml(device, p.url) + '</div>' +
             '<div class="gp-side">' +
             '<div class="gp-head"><span class="gp-plat" style="background:' + esc(p.color) + '"><i class="bi ' + esc(p.icon) + '"></i> ' + esc(p.name) + '</span>' +
             (g.source === "guide" ? '<span class="gp-src ok"><i class="bi bi-patch-check-fill"></i> Guide officiel</span>' : '<span class="gp-src" title="Reconstitué d\'après l\'application — à valider par l\'équipe Digital"><i class="bi bi-magic"></i> Pas à pas indicatif</span>') +
@@ -283,10 +283,20 @@ window.RccGuide = (function () {
 
     // ───────────── Bibliothèque (base de connaissance) ─────────────
 
-    function mountLibrary(root) {
-        var st = { platform: "ecobank-mobile", q: "", cat: "" };
+    /** Plateformes d'une base : « CIB » → uniquement Omni Lite / Omni Plus ; sinon toutes les autres. */
+    function platformsFor(audience) {
+        var cib = audience === "CIB";
+        return data().platforms.filter(function (x) { return cib ? x.audience === "CIB" : x.audience !== "CIB"; });
+    }
+
+    function mountLibrary(root, opts) {
+        opts = opts || {};
+        var audience = opts.audience || window.RccKbSpace || "GENERAL";
+        var st = { platform: null, q: "", cat: "" };
         function draw() {
-            var plats = data().platforms, p = plats.filter(function (x) { return x.id === st.platform; })[0] || plats[0];
+            var plats = platformsFor(audience), p = plats.filter(function (x) { return x.id === st.platform; })[0] || plats[0];
+            if (!p) { root.innerHTML = '<p class="text-muted">Aucun pas à pas pour cette base.</p>'; return; }
+            st.platform = p.id;
             var cats = [];
             p.guides.forEach(function (g) { if (cats.indexOf(g.category) === -1) cats.push(g.category); });
             var q = st.q.toLowerCase();
@@ -307,6 +317,9 @@ window.RccGuide = (function () {
                         (g.source === "guide" ? '<span class="ok"><i class="bi bi-patch-check-fill"></i> Officiel</span>' : '<span>Indicatif</span>') + '</span><span class="gl-play"><i class="bi bi-play-circle-fill"></i> Lancer</span></button>';
                 }).join("") : '<p class="text-muted">Aucun pas à pas ne correspond.</p>') + '</div></div>';
         }
+        if (root.__glHandlers) { draw(); return; } // remontage (changement de base) : mêmes écouteurs
+        root.__glHandlers = true;
+        root.__glRedraw = function (aud) { audience = aud; st.platform = null; st.cat = ""; draw(); };
         root.addEventListener("click", function (e) {
             var b = e.target.closest("button");
             if (!b) return;

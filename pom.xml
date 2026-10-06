@@ -113,6 +113,13 @@
             <artifactId>poi-ooxml</artifactId>
             <version>5.2.5</version>
         </dependency>
+        <!-- Anciens formats Office (.doc, .xls, .ppt — y compris un .doc renommé en .docx) : lecture du texte des
+             supports de formation et des documents importés -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-scratchpad</artifactId>
+            <version>5.2.5</version>
+        </dependency>
         <!-- Extraction de texte des PDF — import intelligent de documents (procédures, articles...) -->
         <dependency>
             <groupId>org.apache.pdfbox</groupId>

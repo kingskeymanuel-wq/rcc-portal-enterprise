@@ -56,7 +56,20 @@ public class DocumentStorageService {
      * Relit un document déjà stocké (/kb-files/…) — génération d'une évaluation à partir du support d'un cours.
      * Refuse tout chemin hors du dossier de stockage.
      */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ImageStorageService uploads;
+
     public MultipartFile open(String storageUrl, String originalName) {
+        if (storageUrl != null && storageUrl.startsWith("/uploaded-photos/") && uploads != null) {
+            // Vidéo téléversée du cours (même dossier que les photos)
+            java.nio.file.Path p = uploads.resolve(storageUrl);
+            try {
+                String display = originalName != null && !originalName.isBlank() ? originalName : p.getFileName().toString();
+                return new StoredFile(display, Files.readAllBytes(p));
+            } catch (IOException e) {
+                throw ApiException.serviceUnavailable("Lecture du fichier impossible.");
+            }
+        }
         if (storageUrl == null || !storageUrl.startsWith("/kb-files/")) throw ApiException.badRequest("Document inconnu.");
         String name = storageUrl.substring("/kb-files/".length());
         if (name.isBlank() || name.contains("/") || name.contains("\\") || name.contains("..")) throw ApiException.badRequest("Document inconnu.");

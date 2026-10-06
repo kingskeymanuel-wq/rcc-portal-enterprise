@@ -128,6 +128,8 @@
 
     function applySpaceLabels() {
         var cib = kbSpace === "CIB";
+        window.RccKbSpace = kbSpace;
+        document.dispatchEvent(new CustomEvent("rcc:kb-space", { detail: kbSpace }));
         $("kbTitle").textContent = cib ? "Base de connaissance CIB" : "Knowledge Base";
         $("kbSubtitle").textContent = cib
             ? "Traitements des entreprises — base propre à l'équipe CIB, séparée de la base générale"

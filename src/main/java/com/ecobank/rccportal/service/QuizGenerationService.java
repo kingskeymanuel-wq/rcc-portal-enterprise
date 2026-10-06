@@ -44,9 +44,46 @@ public class QuizGenerationService {
         this.extraction = extraction;
     }
 
-    /** Texte source : le fichier déposé s'il y en a un, sinon le texte fourni (contenu du cours). */
+    private LocalAiClient localAi;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setLocalAi(LocalAiClient localAi) {
+        this.localAi = localAi;
+    }
+
+    private static final Pattern MEDIA = Pattern.compile("(?i).*\\.(mp4|m4v|mov|webm|avi|mkv|mp3|wav|m4a|ogg|aac)$");
+
+    static boolean isMedia(MultipartFile file) {
+        String n = file.getOriginalFilename() == null ? "" : file.getOriginalFilename();
+        String t = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+        return MEDIA.matcher(n).matches() || t.startsWith("video/") || t.startsWith("audio/");
+    }
+
+    /** Vidéo ou enregistrement audio du cours : le texte est obtenu par la transcription locale (Whisper). */
+    private String transcribe(MultipartFile file) {
+        if (localAi == null || !localAi.isWhisperConfigured()) {
+            throw ApiException.badRequest("Pour générer l'évaluation à partir d'une vidéo, la transcription locale (Whisper) doit être "
+                    + "installée sur le serveur (kit hors ligne, RCC_LOCAL_WHISPER_URL). En attendant, joignez le support écrit du cours "
+                    + "(PDF, Word, PowerPoint) ou rédigez son contenu.");
+        }
+        java.nio.file.Path tmp = null;
+        try {
+            String name = file.getOriginalFilename() == null ? "video.mp4" : file.getOriginalFilename();
+            String ext = name.contains(".") ? name.substring(name.lastIndexOf('.')) : ".mp4";
+            tmp = java.nio.file.Files.createTempFile("rcc-cours-", ext);
+            file.transferTo(tmp.toFile());
+            return localAi.transcribe(tmp);
+        } catch (java.io.IOException e) {
+            throw ApiException.badRequest("Lecture de la vidéo impossible : " + e.getMessage());
+        } finally {
+            if (tmp != null) try { java.nio.file.Files.deleteIfExists(tmp); } catch (java.io.IOException ignored) { /* fichier temporaire */ }
+        }
+    }
+
+    /** Texte source : le fichier déposé s'il y en a un (document, ou vidéo transcrite), sinon le texte fourni (contenu du cours). */
     public String sourceText(MultipartFile file, String text) {
-        String raw = file != null && !file.isEmpty() ? extraction.extractForAnalysis(file) : text;
+        String raw = file != null && !file.isEmpty()
+                ? (isMedia(file) ? transcribe(file) : extraction.extractForAnalysis(file)) : text;
         String clean = raw == null ? "" : stripHtml(raw).replaceAll("[ \\t\\x0B\\f\\r]+", " ").replaceAll("\\n{3,}", "\n\n").trim();
         if (clean.length() < 200) {
             throw ApiException.badRequest("Pas assez de texte pour rédiger une évaluation (au moins quelques paragraphes). "
@@ -140,18 +177,45 @@ public class QuizGenerationService {
             "votre", "vous", "avec", "ainsi", "afin", "après", "auprès", "cela", "ceci", "dont", "jamais", "puis", "était",
             "seront", "serait", "ensuite", "pendant", "parce", "lorsque", "lorsqu", "chez", "vers", "contre", "durant",
             "apres", "avant", "ainsi", "egalement", "toutefois", "cependant", "certains", "certaines", "plusieurs", "aucun", "aucune",
-            "etre", "etait", "deja", "tres", "meme", "memes", "auront", "devra", "devez", "pouvoir", "sera", "celles"));
+            "etre", "etait", "deja", "tres", "meme", "memes", "auront", "devra", "devez", "pouvoir", "sera", "celles",
+            "exemple", "ensemble", "pourra", "quelque", "pareils", "permet", "permettent", "notamment", "suivants", "suivantes",
+            "cliquer", "cliquez", "selectionner", "renseigner", "saisir", "choisir", "afficher", "affiche", "possible",
+            "donne", "donnent", "dehors", "permet", "contient", "situe", "situee", "apparait", "suivant"));
 
     private static final Pattern WORD = Pattern.compile("[\\p{L}][\\p{L}\\p{Nd}'’\\-]{3,}");
 
     /** Questions « phrase à compléter » : la bonne réponse est un terme clé de la phrase, les autres réponses des
      *  termes clés d'autres passages du document. Déterministe pour un même texte. */
+    /**
+     * Texte de PDF remis en phrases : les lignes coupées par la mise en page sont recollées, et les lignes répétées
+     * sur plusieurs pages (en-têtes, pieds de page, « Page 2 / 7 ») retirées.
+     */
+    static String reflow(String text) {
+        String[] lines = text.replace("\r", "").split("\n");
+        Map<String, Integer> seen = new HashMap<>();
+        for (String l : lines) { String k = l.trim().replaceAll("\\d+", "#"); if (!k.isEmpty()) seen.merge(k, 1, Integer::sum); }
+        StringBuilder out = new StringBuilder();
+        for (String raw : lines) {
+            String l = raw.trim();
+            if (l.isEmpty()) { out.append("\n"); continue; }
+            if (seen.getOrDefault(l.replaceAll("\\d+", "#"), 0) >= 3 || l.matches("(?i).*p\\s?a\\s?g\\s?e\\s*\\|?\\s*\\d+\\s*/\\s*\\d+.*")) continue;
+            boolean startsItem = l.matches("^([-•▪●*]|\\d{1,2}[.)]|[a-z][.)]|ÉTAPE|Étape|ETAPE)\\s*.*");
+            int len = out.length();
+            char last = len == 0 ? '\n' : out.charAt(len - 1);
+            if (len > 0 && last != '\n' && !startsItem && ".!?:;".indexOf(last) < 0) out.append(' ');
+            else if (len > 0 && last != '\n') out.append('\n');
+            out.append(l);
+        }
+        return out.toString();
+    }
+
     static List<Draft> localDrafts(String text, int n, Random rnd) {
+        text = reflow(text);
         List<String> sentences = new ArrayList<>();
         for (String s : text.split("(?<=[.!?;:])\\s+|\\n+")) {
             String t = s.trim().replaceAll("^[•\\-*▪●\\d.)\\s]+", "");
             int words = t.split("\\s+").length;
-            if (t.length() >= 50 && t.length() <= 260 && words >= 8) sentences.add(t);
+            if (t.length() >= 50 && t.length() <= 260 && words >= 8 && !sentences.contains(t)) sentences.add(t);
         }
         Map<String, Integer> freq = new HashMap<>();
         Map<String, String> display = new HashMap<>();
@@ -201,6 +265,7 @@ public class QuizGenerationService {
                 Integer r = rank.get(k);
                 if (r == null || usedAnswers.contains(stem(k))) continue;
                 if (freq.get(k) < 2 && k.length() < 7) continue; // réponse : un terme du sujet, pas un mot de passage
+                if (!"nom".equals(kind(w)) || w.matches("(?i).*(re|oir|ra|rait)$")) continue; // pas un verbe (« correspondre », « pourra »)
                 if (r < bestRank) { bestRank = r; best = k; bestWord = w; }
             }
             if (best == null) continue;
@@ -233,7 +298,9 @@ public class QuizGenerationService {
             for (String d : distractors.subList(0, 3)) options.add(matchCase(display.get(d), c.answerWord()));
             Collections.shuffle(options, rnd);
             int correct = options.indexOf(c.answerWord());
-            String blanked = c.sentence().replaceFirst(Pattern.quote(c.answerWord()), "_____");
+            // Le mot entier seulement (« paiement » ne doit pas trouer « paiements »).
+            String blanked = c.sentence().replaceFirst("(?<![\\p{L}])" + Pattern.quote(c.answerWord()) + "(?![\\p{L}])", "_____");
+            if (!blanked.contains("_____")) continue;
             out.add(new Draft("Complétez selon le support : « " + blanked + " »", options, correct, c.sentence()));
         }
         return out;
@@ -264,6 +331,7 @@ public class QuizGenerationService {
 
     private static String matchCase(String word, String model) {
         if (word == null || word.isEmpty() || model.isEmpty()) return word;
+        if (word.length() > 1 && word.equals(word.toUpperCase(Locale.ROOT))) return word; // sigle (UEMOA, SICA…)
         boolean upper = Character.isUpperCase(model.charAt(0));
         String first = upper ? word.substring(0, 1).toUpperCase(Locale.ROOT) : word.substring(0, 1).toLowerCase(Locale.ROOT);
         return first + word.substring(1);

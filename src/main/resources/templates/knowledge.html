@@ -500,12 +500,18 @@
 <script th:src="@{/js/card-agency.js}"></script>
 <script th:src="@{/js/card-availability.js}"></script>
 <script th:src="@{/js/guides-data.js}"></script>
+<script th:src="@{/js/guides-data-cib.js}"></script>
 <script th:src="@{/js/rcc-guides.js}"></script>
 <script>
     // Bibliothèque « Pas à pas », chargée à la première ouverture de l'onglet (ou via #pas-a-pas dans l'adresse).
     (function () {
         var mounted = false;
+        // Base CIB : pas à pas Omni Lite / Omni Plus ; base générale : les autres (window.RccKbSpace, voir knowledge.js).
         function mount() { if (!mounted && window.RccGuide) { mounted = true; RccGuide.mountLibrary(document.getElementById("kbGuides")); } }
+        document.addEventListener("rcc:kb-space", function (e) {
+            var el = document.getElementById("kbGuides");
+            if (mounted && el.__glRedraw) el.__glRedraw(e.detail);
+        });
         document.addEventListener("DOMContentLoaded", function () {
             var btn = document.getElementById("kbGuidesTabBtn");
             btn.addEventListener("shown.bs.tab", mount);

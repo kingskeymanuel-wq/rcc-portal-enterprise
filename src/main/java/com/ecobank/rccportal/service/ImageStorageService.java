@@ -72,4 +72,14 @@ public class ImageStorageService {
             default -> "";
         };
     }
+
+    /** Fichier déjà téléversé (/uploaded-photos/…, ex. vidéo d'un cours) relu depuis le disque — refuse tout autre chemin. */
+    public java.nio.file.Path resolve(String url) {
+        if (url == null || !url.startsWith("/uploaded-photos/")) throw com.ecobank.rccportal.util.ApiException.badRequest("Fichier inconnu.");
+        String name = url.substring("/uploaded-photos/".length());
+        if (name.isBlank() || name.contains("/") || name.contains("\\") || name.contains("..")) throw com.ecobank.rccportal.util.ApiException.badRequest("Fichier inconnu.");
+        java.nio.file.Path base = java.nio.file.Path.of(storageDir).normalize(), p = base.resolve(name).normalize();
+        if (!p.startsWith(base) || !java.nio.file.Files.isRegularFile(p)) throw com.ecobank.rccportal.util.ApiException.notFound("Fichier introuvable sur le serveur.");
+        return p;
+    }
 }
