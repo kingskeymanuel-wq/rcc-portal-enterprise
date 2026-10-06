@@ -28,6 +28,9 @@ spring:
       keepalive-time: 300000
       max-lifetime: 1800000
       validation-timeout: 5000
+  # Dates envoyées aux pages : heure de Côte d'Ivoire (GMT), voir RccPortalApplication.PORTAL_TIME_ZONE et js/rcc-time.js.
+  jackson:
+    time-zone: Africa/Abidjan
   jpa:
     hibernate:
       ddl-auto: none
