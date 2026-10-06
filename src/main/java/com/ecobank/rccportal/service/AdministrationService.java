@@ -853,6 +853,29 @@ public class AdministrationService {
     }
 
     /** Retire les rôles et services d'équipe d'agent. */
+    /** Place un agent dans une équipe — rôle, service, équipe (activité) et portail, comme depuis l'Administration. */
+    @Transactional
+    public void assignAgentTeam(Long userId, String team) {
+        if (agentTeam(team) == null) throw ApiException.badRequest("Équipe inconnue : " + team + ".");
+        syncAgentTeam(userId, team);
+    }
+
+    /**
+     * Retire un agent de son équipe : rôle et service d'agent de l'équipe retirés, équipe (activité) vidée. Il garde
+     * le rôle de base « agent » pour pouvoir se connecter en attendant d'être placé ailleurs.
+     */
+    @Transactional
+    public void clearAgentTeam(Long userId) {
+        User user = userRepository.findById(userId).orElseThrow(() -> ApiException.notFound("Unknown user."));
+        clearAgentTeams(userId);
+        if (userRoleRepository.findByUser_Id(userId).isEmpty()) {
+            roleRepository.findByNameIgnoreCase("AGENT").ifPresent(r -> userRoleRepository.save(UserRole.builder().user(user).role(r).build()));
+        }
+        user.setActivity(null);
+        userRepository.save(user);
+        log.info("[TEAM] Agent retiré de son équipe (userId={})", userId);
+    }
+
     private void clearAgentTeams(Long userId) {
         userRoleRepository.findByUser_Id(userId).stream()
                 .filter(ur -> ur.getRole() != null && agentTeamOfRole(ur.getRole().getName()) != null)

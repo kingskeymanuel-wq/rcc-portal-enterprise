@@ -398,4 +398,16 @@ public class HrOrganizationService {
         List<Double> v = values.stream().filter(Objects::nonNull).toList();
         return v.isEmpty() ? null : Math.round(v.stream().mapToDouble(Double::doubleValue).average().orElse(0) * 10) / 10.0;
     }
+
+    /**
+     * Équipe changée par un Team Leader : le placement RH manuel d'équipe (dbo.HrAssignments.HrTeam) ne doit plus
+     * contredire la nouvelle équipe — il est effacé, la population (Outsource, interne…) est conservée.
+     */
+    public void clearTeamOverride(Long userId) {
+        try {
+            jdbc.update("UPDATE dbo.HrAssignments SET HrTeam = NULL, UpdatedAt = SYSUTCDATETIME() WHERE UserId = ? AND HrTeam IS NOT NULL", userId);
+        } catch (RuntimeException e) {
+            // table absente (aucun placement manuel) : rien à corriger
+        }
+    }
 }

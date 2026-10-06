@@ -55,6 +55,19 @@ public class TeamLeaderService {
         this.hrOrganization = hrOrganization;
     }
 
+    private AdministrationService administration;
+    private com.ecobank.rccportal.repository.AgentScheduleRepository schedules;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setAdministration(@org.springframework.context.annotation.Lazy AdministrationService administration) {
+        this.administration = administration;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setSchedules(com.ecobank.rccportal.repository.AgentScheduleRepository schedules) {
+        this.schedules = schedules;
+    }
+
     public TeamLeaderService(UserRepository userRepository, ReportingService reportingService,
                               AttendanceService attendanceService, QualityEvaluationService qualityEvaluationService,
                               UserService userService, com.ecobank.rccportal.repository.UserRoleRepository userRoleRepository) {
@@ -258,9 +271,16 @@ public class TeamLeaderService {
             List<User> leaders = userRepository.findAll().stream().filter(u -> u.getLedTeam() != null && !u.getLedTeam().isBlank()).toList();
             oldLeader = TeamClassifier.leaderFor(user.getActivity(), leaders, User::getLedTeam);
         }
-        user.setActivity(CHANNEL_TO_ACTIVITY.getOrDefault(code, TEAM_TO_ACTIVITY.get(team)));
-        userRepository.save(user);
-        syncAgentService(user, code);
+        if (administration != null) {
+            // Même mise à jour que depuis l'Administration : rôle, service, équipe et portail de l'agent, en base.
+            administration.assignAgentTeam(userId, code);
+            user = userRepository.findById(userId).orElse(user);
+        } else {
+            user.setActivity(CHANNEL_TO_ACTIVITY.getOrDefault(code, TEAM_TO_ACTIVITY.get(team)));
+            userRepository.save(user);
+            syncAgentService(user, code);
+        }
+        if (hrOrganization != null) hrOrganization.clearTeamOverride(userId);
 
         String leaderName = requester.name() != null && !requester.name().isBlank() ? requester.name() : requester.username();
         String teamLabel = TEAM_LABELS.getOrDefault(code, code);
@@ -341,9 +361,26 @@ public class TeamLeaderService {
                 user = userRepository.findById(userId).orElse(user);
             }
             user.setAccountEnabled(false);
+            userRepository.save(user);
+            // Sortie du centre : son planning à venir est retiré (plus d'absence signalée à tort).
+            if (schedules != null) {
+                java.time.LocalDate today = java.time.LocalDate.now();
+                var future = schedules.findByUserAndWorkDateBetweenOrderByWorkDateAsc(user, today, today.plusYears(2));
+                if (!future.isEmpty()) schedules.deleteAll(future);
+            }
         }
-        user.setActivity(null);
-        userRepository.save(user);
+        if (administration != null) {
+            // Rôle et service d'agent de l'équipe retirés, équipe vidée : il quitte l'équipe partout sur le site.
+            administration.clearAgentTeam(userId);
+        } else {
+            user.setActivity(null);
+            userRepository.save(user);
+        }
+        if (hrOrganization != null) hrOrganization.clearTeamOverride(userId);
+        notify(userRepository.findById(userId).orElse(user), "DEPARTURE".equalsIgnoreCase(mode)
+                ? "Votre sortie du centre a été enregistrée par votre Team Leader."
+                : "Vous avez été retiré(e) de l'équipe de " + (requester.name() != null && !requester.name().isBlank() ? requester.name() : requester.username())
+                  + ". Vous serez rattaché(e) à votre nouvelle équipe prochainement.");
     }
 
     /** Appartenance à l'équipe menée par l'appelant (même règle que la liste des membres). */
