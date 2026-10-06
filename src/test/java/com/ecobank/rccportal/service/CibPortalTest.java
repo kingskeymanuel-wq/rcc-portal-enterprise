@@ -44,4 +44,15 @@ class CibPortalTest {
         assertFalse(KnowledgeService.isKbManager(new AuthenticatedUser("g", "agent", "AGENT_CIB", "G")));
         assertFalse(KnowledgeService.isKbManager(new AuthenticatedUser("t", "team_leader", "TEAM_LEADER_CIB", "T")));
     }
+
+    @Test
+    void cibStarterCategoriesFitTheTable() {
+        java.util.Set<String> codes = new java.util.HashSet<>();
+        for (String[] c : com.ecobank.rccportal.config.CibSetupBootstrap.CIB_CATEGORIES) {
+            assertTrue(c[0].startsWith("CIB_"), c[0]);
+            assertTrue(c[0].length() <= 50 && c[1].length() <= 100 && c[2].length() <= 50, c[0]);
+            assertTrue(codes.add(c[0]), "code en double : " + c[0]);
+        }
+        assertTrue(codes.size() >= 10);
+    }
 }

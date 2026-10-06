@@ -30,6 +30,7 @@ public class CibSetupBootstrap implements CommandLineRunner {
             ensureService("AGENT_CIB", "Agent CIB", "Conseiller clientèle — pôle CIB (traitements des entreprises)", 14);
             ensureService("TEAM_LEADER_CIB", "Team Leader CIB", "Responsable de l'équipe CIB", 24);
             ensureTeam();
+            seedKnowledgeCategories();
         } catch (RuntimeException e) {
             log.warn("[CIB] Mise en place de l'équipe CIB incomplète : {}", e.getMessage());
         }
@@ -69,6 +70,53 @@ public class CibSetupBootstrap implements CommandLineRunner {
         }
         jdbc.update("INSERT INTO dbo.Teams (Code, Label, IconGlyph, AccentColor, IsActive) VALUES ('CIB', 'CIB', NULL, NULL, 1)");
         log.info("[CIB] Équipe CIB créée.");
+    }
+
+    /**
+     * Rubriques de départ de la base de connaissance CIB (vides : l'administrateur y dépose ses fichiers depuis
+     * Administration → Base CIB, et les renomme ou les supprime à sa guise). Posées une seule fois : dès qu'une
+     * rubrique CIB existe, rien n'est recréé — une rubrique supprimée ne revient pas au redémarrage.
+     */
+    public static final String[][] CIB_CATEGORIES = {
+            {"CIB_COMPTES", "Ouverture & gestion de compte entreprise", "bi-building-add"},
+            {"CIB_KYC", "KYC & mise à jour des dossiers", "bi-person-vcard"},
+            {"CIB_SIGNATAIRES", "Mandataires & signatures autorisées", "bi-pen"},
+            {"CIB_VIREMENTS", "Virements locaux & internationaux (SWIFT)", "bi-globe2"},
+            {"CIB_PAIEMENTS_MASSE", "Paiements de masse & salaires", "bi-people"},
+            {"CIB_CHEQUES", "Chèques & effets de commerce", "bi-receipt"},
+            {"CIB_COMMERCE_EXT", "Commerce extérieur (crédit & remise documentaires)", "bi-box-seam"},
+            {"CIB_GARANTIES", "Garanties & cautions bancaires", "bi-shield-check"},
+            {"CIB_CREDITS", "Crédits & financements entreprises", "bi-cash-stack"},
+            {"CIB_TRESORERIE", "Cash management & trésorerie", "bi-graph-up-arrow"},
+            {"CIB_DIGITAL", "Banque en ligne entreprise (Omni)", "bi-laptop"},
+            {"CIB_RELEVES", "Relevés, attestations & certificats", "bi-file-earmark-text"},
+            {"CIB_TARIFS", "Tarification & conditions", "bi-percent"},
+            {"CIB_RECLAMATIONS", "Réclamations & suivi des incidents", "bi-exclamation-triangle"},
+            {"CIB_AUTRE", "Autres traitements", "bi-three-dots"}
+    };
+
+    private static final String SEEDED_KEY = "kb.cib.categories.seeded";
+
+    private void seedKnowledgeCategories() {
+        if (!hasColumn("KnowledgeCategories", "Team")) return;
+        boolean marker = hasColumn("SiteSettings", "SettingKey");
+        if (marker) {
+            Integer done = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.SiteSettings WHERE SettingKey = ?", Integer.class, SEEDED_KEY);
+            if (done != null && done > 0) return; // déjà posées une fois : les suppressions de l'administrateur sont respectées
+        } else {
+            Integer existing = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.KnowledgeCategories WHERE UPPER(Team) = 'CIB'", Integer.class);
+            if (existing != null && existing > 0) return;
+        }
+        int order = 0, created = 0;
+        for (String[] c : CIB_CATEGORIES) {
+            order++;
+            Integer taken = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.KnowledgeCategories WHERE UPPER(Code) = ?", Integer.class, c[0]);
+            if (taken != null && taken > 0) continue;
+            jdbc.update("INSERT INTO dbo.KnowledgeCategories (Code, Title, Icon, SortOrder, Team) VALUES (?, ?, ?, ?, 'CIB')", c[0], c[1], c[2], order);
+            created++;
+        }
+        if (marker) jdbc.update("INSERT INTO dbo.SiteSettings (SettingKey, SettingValue) VALUES (?, ?)", SEEDED_KEY, java.time.LocalDate.now().toString());
+        log.info("[CIB] {} rubrique(s) de la base de connaissance CIB créée(s).", created);
     }
 
     private boolean hasColumn(String table, String column) {

@@ -178,8 +178,18 @@ public class KnowledgeService {
 
     @Transactional
     public KnowledgeCategoryResponse createCategory(KnowledgeCategoryRequest request) {
+        String code = request.code() == null ? "" : request.code().trim().toUpperCase(java.util.Locale.ROOT).replaceAll("[^A-Z0-9_]+", "_");
+        if (code.isBlank() || request.title() == null || request.title().isBlank()) {
+            throw ApiException.badRequest("Le code et le titre de la rubrique sont obligatoires.");
+        }
+        // Rubrique de la base CIB : code préfixé, pour ne jamais entrer en collision avec la base générale (ex. « AUTRE »).
+        if (CIB.equalsIgnoreCase(request.team()) && !code.startsWith("CIB_")) code = "CIB_" + code;
+        if (code.length() > 50) code = code.substring(0, 50);
+        if (categoryRepository.findByCodeIgnoreCase(code).isPresent()) {
+            throw ApiException.badRequest("Une rubrique utilise déjà le code « " + code + " » — choisissez un autre code.");
+        }
         KnowledgeCategory saved = categoryRepository.save(KnowledgeCategory.builder()
-                .code(request.code()).title(request.title()).icon(request.icon())
+                .code(code).title(request.title().trim()).icon(request.icon())
                 .sortOrder(request.sortOrder() != null ? request.sortOrder() : 0)
                 .team(request.team())
                 .build());

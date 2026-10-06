@@ -35,7 +35,8 @@
             '<div class="d-flex gap-2 flex-wrap">' +
             '<label class="btn btn-sm btn-success mb-0"><i class="bi bi-upload"></i> Ajouter des fichiers' +
             '<input type="file" multiple class="d-none" data-cib-upload="' + c.categoryId + '"></label>' +
-            '<button type="button" class="btn btn-sm btn-outline-danger" data-cib-del="' + c.categoryId + '" data-title="' + esc(c.title) + '"><i class="bi bi-trash"></i></button>' +
+            '<button type="button" class="btn btn-sm btn-outline-secondary" data-cib-ren="' + c.categoryId + '" data-title="' + esc(c.title) + '" title="Renommer"><i class="bi bi-pencil"></i></button>' +
+            '<button type="button" class="btn btn-sm btn-outline-danger" data-cib-del="' + c.categoryId + '" data-title="' + esc(c.title) + '" title="Supprimer"><i class="bi bi-trash"></i></button>' +
             '</div></div>' +
             '<div class="small" data-cib-files="' + c.categoryId + '"><span class="text-muted">Chargement des fichiers…</span></div></div>';
     }
@@ -112,6 +113,15 @@
                 if (!confirm("Retirer ce fichier de la base CIB ?")) return;
                 fetch("/api/kb/attachments/" + rm.getAttribute("data-cib-rm"), { method: "DELETE", credentials: "same-origin" })
                     .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); renderFiles(rm.getAttribute("data-cat")); })
+                    .catch(function (err) { alert("Erreur : " + err.message); });
+                return;
+            }
+            var ren = e.target.closest("[data-cib-ren]");
+            if (ren) {
+                var title = prompt("Nouveau nom de la rubrique :", ren.getAttribute("data-title"));
+                if (!title || !title.trim() || title.trim() === ren.getAttribute("data-title")) return;
+                RccApi.sendJson("/api/kb/categories/" + ren.getAttribute("data-cib-ren"), "PUT", { title: title.trim(), team: "CIB" })
+                    .then(function () { load(root); })
                     .catch(function (err) { alert("Erreur : " + err.message); });
                 return;
             }
