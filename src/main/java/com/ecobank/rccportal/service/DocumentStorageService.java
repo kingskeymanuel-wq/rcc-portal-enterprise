@@ -51,4 +51,37 @@ public class DocumentStorageService {
 
         return "/kb-files/" + filename;
     }
+
+    /**
+     * Relit un document déjà stocké (/kb-files/…) — génération d'une évaluation à partir du support d'un cours.
+     * Refuse tout chemin hors du dossier de stockage.
+     */
+    public MultipartFile open(String storageUrl, String originalName) {
+        if (storageUrl == null || !storageUrl.startsWith("/kb-files/")) throw ApiException.badRequest("Document inconnu.");
+        String name = storageUrl.substring("/kb-files/".length());
+        if (name.isBlank() || name.contains("/") || name.contains("\\") || name.contains("..")) throw ApiException.badRequest("Document inconnu.");
+        Path path = Path.of(storageDir).resolve(name).normalize();
+        if (!path.startsWith(Path.of(storageDir).normalize()) || !Files.isRegularFile(path)) {
+            throw ApiException.notFound("Le document du cours est introuvable sur le serveur.");
+        }
+        try {
+            byte[] bytes = Files.readAllBytes(path);
+            String display = originalName != null && !originalName.isBlank() ? originalName : name;
+            return new StoredFile(display, bytes);
+        } catch (IOException e) {
+            throw ApiException.serviceUnavailable("Lecture du document impossible.");
+        }
+    }
+
+    /** Fichier déjà sur disque présenté comme un envoi (même extraction de texte que pour un fichier déposé). */
+    private record StoredFile(String originalName, byte[] bytes) implements MultipartFile {
+        @Override public String getName() { return "file"; }
+        @Override public String getOriginalFilename() { return originalName; }
+        @Override public String getContentType() { return null; }
+        @Override public boolean isEmpty() { return bytes.length == 0; }
+        @Override public long getSize() { return bytes.length; }
+        @Override public byte[] getBytes() { return bytes; }
+        @Override public java.io.InputStream getInputStream() { return new java.io.ByteArrayInputStream(bytes); }
+        @Override public void transferTo(java.io.File dest) throws IOException { Files.write(dest.toPath(), bytes); }
+    }
 }

@@ -52,6 +52,32 @@ public class QuizQuestionController {
         return service.create(request, resolveUserId(requester));
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ecobank.rccportal.service.QuizGenerationService generation;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ecobank.rccportal.service.DocumentStorageService documents;
+
+    /**
+     * Évaluation rédigée automatiquement à partir d'un support : fichier déposé, document déjà joint au cours
+     * (fileUrl) ou contenu du cours (text). Les questions rejoignent la banque de la rubrique (category).
+     */
+    @PostMapping(value = "/generate", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public com.ecobank.rccportal.service.QuizGenerationService.Result generate(
+            @RequestParam(value = "file", required = false) org.springframework.web.multipart.MultipartFile file,
+            @RequestParam(required = false) String fileUrl,
+            @RequestParam(required = false) String fileName,
+            @RequestParam(required = false) String text,
+            @RequestParam(required = false) String category,
+            @RequestParam(defaultValue = "10") int count,
+            @RequestParam(required = false) String difficulty,
+            @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireQaOrAdmin(requester);
+        org.springframework.web.multipart.MultipartFile source = file;
+        if ((source == null || source.isEmpty()) && fileUrl != null && !fileUrl.isBlank()) source = documents.open(fileUrl, fileName);
+        return generation.generate(source, text, category, count, difficulty, resolveUserId(requester));
+    }
+
     @PutMapping("/{id}")
     public QuizQuestionResponse update(@PathVariable Integer id, @RequestBody QuizQuestionRequest request,
                                         @AuthenticationPrincipal AuthenticatedUser requester) {

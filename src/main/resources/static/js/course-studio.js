@@ -42,7 +42,7 @@
     function blank() {
         return {
             courseId: null, step: 0, title: "", description: "", category: "", categoryLocked: false,
-            content: "", videoMode: "link", videoUrl: "", videoFile: null, docFile: null, existingFileName: null,
+            content: "", videoMode: "link", videoUrl: "", videoFile: null, docFile: null, existingFileName: null, existingFileUrl: null, genFile: null,
             coverFile: null, coverPreset: null, coverUrl: null,
             type: "SELF_ASSESSMENT", teamCode: "", mandatory: false, publish: "DRAFT", initialStatus: "DRAFT",
             questions: [], saving: false
@@ -153,7 +153,18 @@
             '<p class="cs-pane-sub">Banque commune à la rubrique <b id="csQuizCat"></b> — les mêmes questions alimentent le Centre d\'Évaluation. 3 questions minimum recommandées.</p>' +
             '<div id="csQuizOff" class="cs-note" hidden><i class="bi bi-info-circle"></i> Ce cours est un auto-diagnostic : pas de questions notées. ' +
             '<button type="button" class="btn btn-link btn-sm p-0" id="csToStandard">Passer en évaluation notée</button></div>' +
-            '<div id="csQuizOn"><div id="csQList" class="cs-qlist"></div>' +
+            '<div id="csQuizOn">' +
+            '<div class="cs-gen mb-3 p-3 rounded-3" style="background:linear-gradient(120deg,#EEF4FF,#F5F0FF);border:1px solid #D6E2FA">' +
+            '<div class="d-flex align-items-start gap-2 mb-2"><i class="bi bi-stars" style="font-size:1.3rem;color:#6D28D9"></i><div>' +
+            '<b>Générer l\'évaluation automatiquement</b><div class="cs-muted small" id="csGenSource">Le portail lit le support du cours et rédige les questions.</div></div></div>' +
+            '<div class="d-flex flex-wrap gap-2 align-items-center">' +
+            '<select class="form-select form-select-sm" id="csGenCount" style="width:auto" title="Nombre de questions">' +
+            [5, 10, 15, 20].map(function (n) { return '<option value="' + n + '"' + (n === 10 ? " selected" : "") + '>' + n + ' questions</option>'; }).join("") + '</select>' +
+            '<label class="btn btn-sm btn-outline-secondary mb-0" title="Utiliser un autre fichier (PDF, Word, TXT)"><i class="bi bi-paperclip"></i> Autre fichier' +
+            '<input type="file" class="d-none" id="csGenFile" accept=".pdf,.docx,.txt,.csv,.xlsx"></label>' +
+            '<button type="button" class="ef-btn ef-btn-primary btn-sm" id="csGenBtn"><i class="bi bi-magic"></i> Générer</button>' +
+            '</div><div class="small mt-2" id="csGenResult"></div></div>' +
+            '<div id="csQList" class="cs-qlist"></div>' +
             '<div class="cs-qform"><label class="cs-label" for="csQText">Nouvelle question</label>' +
             '<input type="text" class="form-control cs-input mb-2" id="csQText" placeholder="Ex. Quel est le délai de traitement d\'une réclamation GAB ?">' +
             '<div class="cs-qopts" id="csQOpts">' + [0, 1, 2, 3].map(function (i) {
@@ -247,6 +258,8 @@
 
         // Questions
         q("#csQAdd").addEventListener("click", addQuestion);
+        q("#csGenBtn").addEventListener("click", generateQuestions);
+        q("#csGenFile").addEventListener("change", function () { state.genFile = q("#csGenFile").files[0] || null; syncGenSource(); });
         q("#csQList").addEventListener("click", function (e) {
             var del = e.target.closest("[data-qdel]");
             if (!del || !confirm("Supprimer cette question de la banque de la rubrique ?")) return;
@@ -389,7 +402,7 @@
         q("#csQuizOff").hidden = on;
         q("#csQuizOn").hidden = !on;
         q("#csQuizCat").textContent = categoryName();
-        if (on) loadQuestions();
+        if (on) { syncGenSource(); loadQuestions(); }
     }
 
     function categoryName() { return (state.category || "").trim() || "Général"; }
@@ -412,6 +425,54 @@
                     return '<span class="' + (k === qq.correctOptionIndex ? "ok" : "") + '">' + "ABCD"[k] + ". " + esc(o) + '</span>';
                 }).join("") + '</div></div><button type="button" class="btn btn-sm btn-light" title="Supprimer" data-qdel="' + qq.questionId + '"><i class="bi bi-trash"></i></button></div>';
         }).join("") : '<div class="cs-empty-q"><i class="bi bi-patch-question"></i><b>Aucune question pour cette rubrique</b><small>Ajoutez-en au moins 3 pour une évaluation fiable.</small></div>';
+    }
+
+    /** Support utilisé pour la génération : autre fichier choisi > document du cours (nouveau ou déjà joint) > contenu. */
+    function genSource() {
+        if (state.genFile) return { label: "du fichier « " + state.genFile.name + " »", file: state.genFile };
+        if (state.docFile) return { label: "du document « " + state.docFile.name + " »", file: state.docFile };
+        if (state.existingFileUrl) return { label: "du document du cours « " + (state.existingFileName || "joint") + " »", fileUrl: state.existingFileUrl };
+        if (textOf(state.content).length > 200) return { label: "du contenu rédigé du cours", text: state.content };
+        return null;
+    }
+
+    function syncGenSource() {
+        var src = genSource();
+        q("#csGenSource").innerHTML = src
+            ? "Questions rédigées à partir " + esc(src.label) + ", ajoutées à la banque de la rubrique."
+            : '<span class="text-warning">Joignez d\'abord le support (étape Médias, ou « Autre fichier ») ou rédigez le contenu du cours.</span>';
+    }
+
+    function generateQuestions() {
+        var src = genSource();
+        if (!src) { syncGenSource(); return toast("Aucun support à analyser.", true); }
+        var fd = new FormData();
+        if (src.file) fd.append("file", src.file);
+        if (src.fileUrl) { fd.append("fileUrl", src.fileUrl); fd.append("fileName", state.existingFileName || ""); }
+        if (src.text) fd.append("text", src.text);
+        fd.append("category", categoryName());
+        fd.append("count", q("#csGenCount").value);
+        var btn = q("#csGenBtn"), out = q("#csGenResult");
+        btn.disabled = true;
+        out.innerHTML = '<span class="cs-muted"><span class="spinner-border spinner-border-sm"></span> Analyse du support et rédaction des questions…</span>';
+        fetch("/api/quiz-questions/generate", { method: "POST", credentials: "same-origin", body: fd })
+            .then(function (res) {
+                return res.text().then(function (t) {
+                    var data = null;
+                    try { data = t ? JSON.parse(t) : null; } catch (e) { /* réponse non JSON */ }
+                    if (!res.ok) throw new Error((data && (data.message || (data.error && data.error.message))) || ("HTTP " + res.status));
+                    return data;
+                });
+            })
+            .then(function (r) {
+                var how = r.source === "ia" ? "par l'IA" : r.source === "ia-locale" ? "par l'IA locale" : "par le générateur intégré";
+                out.innerHTML = '<span class="text-success"><i class="bi bi-check-circle"></i> ' + r.created + " question(s) rédigée(s) " + how +
+                    ". Relisez-les : vous pouvez supprimer celles qui ne conviennent pas.</span>" + (r.note ? '<div class="cs-muted">' + esc(r.note) + "</div>" : "");
+                toast(r.created + " question(s) ajoutée(s) ✓");
+                return loadQuestions();
+            })
+            .catch(function (e) { out.innerHTML = '<span class="text-danger">' + esc(e.message) + "</span>"; })
+            .then(function () { btn.disabled = false; });
     }
 
     function addQuestion() {
@@ -663,6 +724,7 @@
             state.videoUrl = c.videoUrl || "";
             state.videoMode = c.videoUrl ? "link" : "none";
             state.existingFileName = c.fileName || null;
+            state.existingFileUrl = c.fileUrl || null;
             state.coverUrl = c.imageUrl || null;
             state.type = c.type || "SELF_ASSESSMENT";
             state.teamCode = c.teamCode || "";
