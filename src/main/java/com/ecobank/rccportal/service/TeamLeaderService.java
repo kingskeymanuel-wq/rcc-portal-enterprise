@@ -55,6 +55,19 @@ public class TeamLeaderService {
         this.hrOrganization = hrOrganization;
     }
 
+    private AdministrationService administration;
+    private com.ecobank.rccportal.repository.AgentScheduleRepository schedules;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setAdministration(@org.springframework.context.annotation.Lazy AdministrationService administration) {
+        this.administration = administration;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setSchedules(com.ecobank.rccportal.repository.AgentScheduleRepository schedules) {
+        this.schedules = schedules;
+    }
+
     public TeamLeaderService(UserRepository userRepository, ReportingService reportingService,
                               AttendanceService attendanceService, QualityEvaluationService qualityEvaluationService,
                               UserService userService, com.ecobank.rccportal.repository.UserRoleRepository userRoleRepository) {
@@ -121,13 +134,16 @@ public class TeamLeaderService {
     /** Service agent de chaque équipe : aligné automatiquement quand un agent change d'équipe. */
     static final java.util.Map<String, String> TEAM_TO_AGENT_SERVICE = java.util.Map.of(
             "INBOUND_VOICE", "AGENT_INBOUND", "INBOUND_MAIL", "AGENT_INBOUND_MAIL", "TCHAT", "AGENT_TCHAT",
-            "RAFIKI", "AGENT_RAFIKI", "CIB", "AGENT_CIB", "OUTBOUND", "AGENT_OUTBOUND");
+            "RAFIKI", "AGENT_RAFIKI", "CIB", "AGENT_CIB", "OUTBOUND", "AGENT_OUTBOUND",
+            "TELEVENTE", "AGENT_TELEVENTE", "DIGITALISATION", "AGENT_DIGITALISATION");
 
     static final java.util.Map<String, String> TEAM_LABELS = java.util.Map.of("INBOUND_VOICE", "Inbound Voix", "INBOUND_MAIL", "Inbound Mail",
-            "TCHAT", "Tchat", "RAFIKI", "Rafiki", "CIB", "CIB", "OUTBOUND", "Outbound");
+            "TCHAT", "Réseaux sociaux", "RAFIKI", "Rafiki", "CIB", "CIB", "OUTBOUND", "Outbound",
+            "TELEVENTE", "Télévente", "DIGITALISATION", "Digitalisation");
 
-    /** Activité écrite sur un agent ajouté à une équipe de canal (Tchat, Rafiki). */
-    private static final java.util.Map<String, String> CHANNEL_TO_ACTIVITY = java.util.Map.of("TCHAT", "INBOUND TCHAT", "RAFIKI", "INBOUND RAFIKI");
+    /** Activité écrite sur un agent ajouté à une sous-équipe (Tchat, Rafiki, Télévente, Digitalisation). */
+    private static final java.util.Map<String, String> CHANNEL_TO_ACTIVITY = java.util.Map.of("TCHAT", "INBOUND TCHAT", "RAFIKI", "INBOUND RAFIKI",
+            "TELEVENTE", "OUTBOUND TELEVENTE", "DIGITALISATION", "OUTBOUND DIGITALISATION");
 
     /** Code de l'équipe menée tel qu'affecté (INBOUND_VOICE, INBOUND_MAIL, TCHAT, RAFIKI, CIB, OUTBOUND). */
     @Transactional(readOnly = true)
@@ -148,7 +164,7 @@ public class TeamLeaderService {
     }
 
     private boolean inTeam(String ledCode, User u) {
-        return TeamClassifier.belongsTo(ledCode, u.getActivity(), null);
+        return TeamClassifier.belongsTo(ledCode, u.getActivity(), null) && com.ecobank.rccportal.util.Filiale.matches(u.getAffiliateBranch());
     }
 
     /** Personne trouvée par la recherche élargie de l'onglet Membres. */
@@ -197,7 +213,7 @@ public class TeamLeaderService {
                 if (!all) continue;
             }
             boolean active = !Boolean.FALSE.equals(u.getAccountEnabled());
-            boolean mine = TeamClassifier.belongsTo(code, u.getActivity(), c);
+            boolean mine = TeamClassifier.belongsTo(code, u.getActivity(), c) && com.ecobank.rccportal.util.Filiale.matches(u.getAffiliateBranch());
             String management = managementLabel(roles.getOrDefault(u.getId(), List.of()), c);
             String reason = mine ? "Déjà dans votre équipe" : management != null ? "Compte de management (" + management + ")"
                     : !active ? "Compte désactivé — réintégration par le RH" : null;
@@ -255,9 +271,16 @@ public class TeamLeaderService {
             List<User> leaders = userRepository.findAll().stream().filter(u -> u.getLedTeam() != null && !u.getLedTeam().isBlank()).toList();
             oldLeader = TeamClassifier.leaderFor(user.getActivity(), leaders, User::getLedTeam);
         }
-        user.setActivity(CHANNEL_TO_ACTIVITY.getOrDefault(code, TEAM_TO_ACTIVITY.get(team)));
-        userRepository.save(user);
-        syncAgentService(user, code);
+        if (administration != null) {
+            // Même mise à jour que depuis l'Administration : rôle, service, équipe et portail de l'agent, en base.
+            administration.assignAgentTeam(userId, code);
+            user = userRepository.findById(userId).orElse(user);
+        } else {
+            user.setActivity(CHANNEL_TO_ACTIVITY.getOrDefault(code, TEAM_TO_ACTIVITY.get(team)));
+            userRepository.save(user);
+            syncAgentService(user, code);
+        }
+        if (hrOrganization != null) hrOrganization.clearTeamOverride(userId);
 
         String leaderName = requester.name() != null && !requester.name().isBlank() ? requester.name() : requester.username();
         String teamLabel = TEAM_LABELS.getOrDefault(code, code);
@@ -338,9 +361,26 @@ public class TeamLeaderService {
                 user = userRepository.findById(userId).orElse(user);
             }
             user.setAccountEnabled(false);
+            userRepository.save(user);
+            // Sortie du centre : son planning à venir est retiré (plus d'absence signalée à tort).
+            if (schedules != null) {
+                java.time.LocalDate today = java.time.LocalDate.now();
+                var future = schedules.findByUserAndWorkDateBetweenOrderByWorkDateAsc(user, today, today.plusYears(2));
+                if (!future.isEmpty()) schedules.deleteAll(future);
+            }
         }
-        user.setActivity(null);
-        userRepository.save(user);
+        if (administration != null) {
+            // Rôle et service d'agent de l'équipe retirés, équipe vidée : il quitte l'équipe partout sur le site.
+            administration.clearAgentTeam(userId);
+        } else {
+            user.setActivity(null);
+            userRepository.save(user);
+        }
+        if (hrOrganization != null) hrOrganization.clearTeamOverride(userId);
+        notify(userRepository.findById(userId).orElse(user), "DEPARTURE".equalsIgnoreCase(mode)
+                ? "Votre sortie du centre a été enregistrée par votre Team Leader."
+                : "Vous avez été retiré(e) de l'équipe de " + (requester.name() != null && !requester.name().isBlank() ? requester.name() : requester.username())
+                  + ". Vous serez rattaché(e) à votre nouvelle équipe prochainement.");
     }
 
     /** Appartenance à l'équipe menée par l'appelant (même règle que la liste des membres). */
@@ -399,7 +439,7 @@ public class TeamLeaderService {
     @Transactional(readOnly = true)
     public List<PerformanceResponse> teamReporting(AuthenticatedUser requester, YearMonth month) {
         String code = ledTeamCode(requester);
-        return reportingService.teamSummary(month != null ? month : YearMonth.now()).stream()
+        return reportingService.teamSummary(month != null ? month : YearMonth.now(), com.ecobank.rccportal.util.Filiale.current()).stream()
                 .filter(r -> TeamClassifier.belongsTo(code, r.activity(), null))
                 .toList();
     }

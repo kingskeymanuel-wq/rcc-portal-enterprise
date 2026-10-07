@@ -92,3 +92,10 @@
     .hl-search { margin-left: 0; width: 100%; }
     .hl-search input { min-width: 0; width: 100%; }
 }
+
+/* Débordement : encore en poste après la fin prévue du shift (jaune), clôture automatique à +1 h 30. */
+.hl-stat.over, .hl-pill.over { --c: #B7791F; }
+.hl-pill.over { background: #FEF3C7; color: #92400E; box-shadow: inset 0 0 0 1px #FCD34D; }
+.hl-stat.over { background: #FFFBEB; }
+.hl-team-stats .over { background: #FEF3C7; color: #92400E; }
+.hl-row > span > small.hl-over-time { color: #B45309; font-weight: 700; }

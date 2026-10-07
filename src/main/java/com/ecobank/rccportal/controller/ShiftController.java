@@ -23,6 +23,18 @@ import java.util.List;
 public class ShiftController {
 
     private final ShiftService shiftService;
+
+    /** Filiale active (RCC ECI / RCC ETG) — voir util.Filiale. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.ecobank.rccportal.service.FilialeScope filialeScope;
+
+    private <T> java.util.List<T> scopeById(java.util.List<T> list, java.util.function.Function<T, Long> id) {
+        return filialeScope == null ? list : filialeScope.byUserId(list, id);
+    }
+
+    private <T> java.util.List<T> scopeByName(java.util.List<T> list, java.util.function.Function<T, String> name) {
+        return filialeScope == null ? list : filialeScope.byUsername(list, name);
+    }
     private final com.ecobank.rccportal.repository.UserRepository userRepository;
 
     public ShiftController(ShiftService shiftService, com.ecobank.rccportal.repository.UserRepository userRepository) {
@@ -98,7 +110,7 @@ public class ShiftController {
             @RequestParam(required = false) String team,
             @AuthenticationPrincipal AuthenticatedUser requester) {
         requireOwnTeamOrSupervisor(requester, team);
-        return shiftService.forTeam(requester.username(), date, team);
+        return scopeByName(shiftService.forTeam(requester.username(), date, team), ShiftEventResponse::username);
     }
 
     /** Même principe, sur une plage — vues semaine/mois de l'onglet Équipe. */
@@ -109,7 +121,7 @@ public class ShiftController {
             @RequestParam(required = false) String team,
             @AuthenticationPrincipal AuthenticatedUser requester) {
         requireOwnTeamOrSupervisor(requester, team);
-        return shiftService.forTeamRange(requester.username(), from, to, team);
+        return scopeByName(shiftService.forTeamRange(requester.username(), from, to, team), ShiftEventResponse::username);
     }
 
     /**
@@ -204,6 +216,35 @@ public class ShiftController {
 
     /** Statut EN DIRECT de chaque agent — pour le bouton "En direct" du suivi de shift.
      *  Admin/RH/QA/Superviseur/Excelliam voient tout ; Team Leader ne voit que sa propre équipe. */
+    // ───────────── Alertes de shift (absences, dépassements de pause, débordements) ─────────────
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ecobank.rccportal.service.ShiftIncidentService incidentService;
+
+    /** Team Leader : son équipe ; Superviseur, RH, admin, QA : toutes les équipes (filtre « team »). 7 derniers jours par défaut. */
+    @GetMapping("/incidents")
+    public com.ecobank.rccportal.service.ShiftIncidentService.Summary incidents(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String team,
+            @AuthenticationPrincipal AuthenticatedUser requester) {
+        return incidentService.incidents(requester, from, to, team);
+    }
+
+    @GetMapping("/incidents/reasons")
+    public List<String> incidentReasons() {
+        return com.ecobank.rccportal.service.ShiftIncidentService.REASONS;
+    }
+
+    public record JustifyRequest(String username, @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date, String type, String reason, String comment) {}
+
+    /** Justification d'un incident par le Team Leader de l'agent. */
+    @PostMapping("/incidents/justify")
+    public com.ecobank.rccportal.service.ShiftIncidentService.Justification justify(@RequestBody JustifyRequest body,
+                                                                                   @AuthenticationPrincipal AuthenticatedUser requester) {
+        return incidentService.justify(requester, body.username(), body.date(), body.type(), body.reason(), body.comment());
+    }
+
     @GetMapping("/live")
     public List<com.ecobank.rccportal.dto.LiveShiftStatusResponse> live(@AuthenticationPrincipal AuthenticatedUser requester) {
         boolean isAdmin = "admin".equalsIgnoreCase(requester.role());

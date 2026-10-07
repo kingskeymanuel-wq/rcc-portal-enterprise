@@ -396,6 +396,10 @@ window.BankMap = (function () {
         var city = $("bankBranchFormCity").value.trim();
         var fullQuery = city ? query + ", " + city : query;
 
+        if (window.RccOffline || (document.querySelector('meta[name="rcc-offline"]') || {}).content === "true") {
+            resultsBox.innerHTML = '<div class="list-group-item small text-muted">Recherche d\'adresse indisponible sur un serveur sans Internet : saisissez la latitude et la longitude, ou cliquez sur la carte.</div>';
+            return;
+        }
         resultsBox.innerHTML = '<div class="list-group-item small text-muted">Recherche…</div>';
 
         fetch("https://nominatim.openstreetmap.org/search?format=json&limit=5&q=" + encodeURIComponent(fullQuery))

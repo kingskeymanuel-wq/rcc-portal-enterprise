@@ -21,6 +21,18 @@ import java.util.Set;
 public class ScheduleController {
 
     private final ScheduleService scheduleService;
+
+    /** Filiale active (RCC ECI / RCC ETG) — voir util.Filiale. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.ecobank.rccportal.service.FilialeScope filialeScope;
+
+    private <T> java.util.List<T> scopeById(java.util.List<T> list, java.util.function.Function<T, Long> id) {
+        return filialeScope == null ? list : filialeScope.byUserId(list, id);
+    }
+
+    private <T> java.util.List<T> scopeByName(java.util.List<T> list, java.util.function.Function<T, String> name) {
+        return filialeScope == null ? list : filialeScope.byUsername(list, name);
+    }
     private final com.ecobank.rccportal.service.PlanningComplianceService planningComplianceService;
     private final com.ecobank.rccportal.repository.UserRepository userRepository;
     private final com.ecobank.rccportal.service.PlanningExportService planningExportService;
@@ -105,7 +117,7 @@ public class ScheduleController {
     public List<AgentScheduleResponse> teamPlanning(@RequestParam String from, @RequestParam String to,
                                                       @RequestParam(required = false) String team,
                                                       @AuthenticationPrincipal AuthenticatedUser requester) {
-        return scheduleService.planningForTeamScoped(requester, team, LocalDate.parse(from), LocalDate.parse(to));
+        return scopeByName(scheduleService.planningForTeamScoped(requester, team, LocalDate.parse(from), LocalDate.parse(to)), AgentScheduleResponse::username);
     }
 
 

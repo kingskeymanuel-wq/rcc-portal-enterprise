@@ -92,10 +92,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   │ findOrProvisionUserFromGateway() — FIND-OR-CREATE : si le compte RCC   │
  *   │ n'existe pas encore, il est créé automatiquement (sans rôle, sans      │
  *   │ filiale/service/équipe) — voir provisionUserFromGateway().             │
- *   │ teamAssignmentLocked reste false, donc l'agent est redirigé vers       │
- *   │ l'écran team-setup après approbation admin : il ne peut choisir que    │
- *   │ parmi les filiales/services/équipes déjà configurés (jamais de saisie  │
- *   │ libre). assertAccountUsable() (enabled/locked/rôle) ; challenge        │
+ *   │ teamAssignmentLocked = true (valeur de tous les comptes) ; rôle,       │
+ *   │ équipe et services sont donnés par l'administrateur.                   │
+ *   │ assertAccountUsable() (enabled/locked/rôle) ; challenge                │
  *   │ consommé, pending retiré, failedAttempts remis à 0, issueSession()     │
  *   │ (JWT + refresh token).                                                 │
  *   └───────────────────────────────────────────────────────────────────────┘
@@ -269,7 +268,7 @@ public class AuthService {
         if (excelliamUser != null && "excelliam".equalsIgnoreCase(getPrimaryRole(excelliamUser))) {
             log.warn("[EXCELLIAM] Connexion refusée (portail supprimé) username={}", normalizedUsername);
             throw ApiException.forbidden("portal_removed",
-                    "Le portail Excelliam a été supprimé : ce compte n'a plus d'accès au RCC Portal. Contactez l'administrateur.");
+                    "Le portail Excelliam a été supprimé : ce compte n'a plus d'accès au Portail Front Office Ecobank. Contactez l'administrateur.");
         }
 
         TestBypassProperties.Account bypassAccount = findBypassAccount(normalizedUsername);
@@ -617,13 +616,9 @@ public class AuthService {
      * Find-or-CREATE : un compte RCC authentifié avec succès par la gateway réelle
      * (jamais en mode bypass — voir TestBypassProperties) mais absent de la base est
      * provisionné automatiquement, plutôt que rejeté. Le compte créé est volontairement
-     * vierge (aucun rôle, aucune filiale/service/équipe) : teamAssignmentLocked reste à
-     * false, ce qui le fait atterrir sur l'écran "team-setup" existant (voir
-     * WorkflowService.submitTeamAssignment) dès sa première connexion active — un choix
-     * obligatoire parmi les filiales/services/équipes DÉJÀ CONFIGURÉS dans le portail,
-     * jamais de saisie libre. Ça garantit qu'aucun compte n'entre dans le portail sans
-     * org connue, sans pour autant bloquer un agent réel juste parce que personne ne l'a
-     * créé à la main au préalable.
+     * vierge (aucun rôle, aucune filiale/service/équipe), teamAssignmentLocked à true comme
+     * tous les comptes : l'administrateur lui donne rôle, équipe et services (organigramme),
+     * sans bloquer un agent réel juste parce que personne ne l'a créé à la main au préalable.
      */
     private User findOrProvisionUserFromGateway(
             String requestedUsername,
@@ -788,7 +783,7 @@ public class AuthService {
                 .accountExpired(false)
                 .credentialsExpired(false)
                 .failedAttempts(0)
-                .teamAssignmentLocked(false) // force le passage par team-setup après l'approbation admin
+                .teamAssignmentLocked(true) // True par défaut pour tous les comptes (l'écran team-setup n'existe plus)
                 .build();
         created = userRepository.save(created);
 
@@ -1290,7 +1285,7 @@ public class AuthService {
                     .toList());
             // Destinataire garanti — reçoit toujours l'alerte, même si aucun admin n'a d'e-mail renseigné en base.
             emails.add("edoudou@ecobank.com");
-            notificationService.sendBroadcastEmail(new java.util.ArrayList<>(emails), "RCC Portal — " + subject, message);
+            notificationService.sendBroadcastEmail(new java.util.ArrayList<>(emails), "Portail Front Office — " + subject, message);
         } catch (ApiException e) {
             log.warn("Alerte IT : e-mail non envoyé (SMTP non configuré), notification en app conservée : {}", e.getMessage());
         }

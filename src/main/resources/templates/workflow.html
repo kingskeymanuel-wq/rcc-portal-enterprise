@@ -2,8 +2,10 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <!-- Heure de Côte d'Ivoire sur tous les postes (avant tout autre script) -->
+    <script th:src="@{/js/rcc-time.js}"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>RCC Portal Enterprise — Workflow</title>
+    <title>Portail Front Office Ecobank — Workflow</title>
     <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}" rel="stylesheet">
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
@@ -814,7 +816,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p class="text-muted small">Envoie une notification dans le portail, un message Teams et un e-mail au manager du pôle.</p>
+                <p class="text-muted small">Envoie une notification dans le portail et un e-mail au manager du pôle.</p>
                 <label class="form-label small mb-1">Message</label>
                 <textarea class="form-control mb-2" id="wfPoleAlertMessage" rows="3" placeholder="ex. Réclamations en attente à traiter sur ce pôle."></textarea>
                 <div id="wfPoleAlertResult" class="small mt-2"></div>

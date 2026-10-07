@@ -18,19 +18,35 @@
 
     // ===== Bascule des onglets Traduction / Correcteur =====
 
+    var REWRITE_SUBTITLE = "Réécriture d'un message : professionnel, courtois, concis ou plus simple — le sens, les montants et les références restent identiques.";
+
     function showTab(tab) {
+        if (["translate", "spellcheck", "rewrite"].indexOf(tab) === -1) tab = "translate";
         var isTranslate = tab === "translate";
         $("trPaneTranslate").style.display = isTranslate ? "" : "none";
-        $("trPaneSpellcheck").style.display = isTranslate ? "none" : "";
+        $("trPaneSpellcheck").style.display = tab === "spellcheck" ? "" : "none";
+        if ($("trPaneRewrite")) $("trPaneRewrite").style.display = tab === "rewrite" ? "" : "none";
         $("trTabTranslateBtn").classList.toggle("active", isTranslate);
-        $("trTabSpellcheckBtn").classList.toggle("active", !isTranslate);
+        $("trTabSpellcheckBtn").classList.toggle("active", tab === "spellcheck");
+        if ($("trTabRewriteBtn")) $("trTabRewriteBtn").classList.toggle("active", tab === "rewrite");
         $("diagnoseBtn").style.display = isTranslate ? "" : "none";
         $("diagnoseResult").style.display = "none";
-        $("trSubtitle").textContent = isTranslate ? TRANSLATE_SUBTITLE : SPELLCHECK_SUBTITLE;
+        $("trSubtitle").textContent = isTranslate ? TRANSLATE_SUBTITLE : tab === "spellcheck" ? SPELLCHECK_SUBTITLE : REWRITE_SUBTITLE;
         var providers = $("trProviders");
         if (providers) providers.style.display = isTranslate ? "" : "none";
         try { localStorage.setItem(TAB_KEY, tab); } catch (ignore) {}
     }
+
+    /** Onglets et passage de texte entre outils (réécriture → correcteur / traduction). */
+    window.RccTranslatorTabs = {
+        show: showTab,
+        toSpellcheck: function (text) { showTab("spellcheck"); $("scEditor").textContent = text; runCheck(); },
+        toTranslate: function (text) {
+            showTab("translate");
+            $("sourceText").value = text;
+            $("sourceText").dispatchEvent(new Event("input"));
+        }
+    };
 
     // ===== Correcteur =====
 
@@ -247,9 +263,10 @@
     document.addEventListener("DOMContentLoaded", function () {
         $("trTabTranslateBtn").addEventListener("click", function () { showTab("translate"); });
         $("trTabSpellcheckBtn").addEventListener("click", function () { showTab("spellcheck"); });
+        if ($("trTabRewriteBtn")) $("trTabRewriteBtn").addEventListener("click", function () { showTab("rewrite"); });
         var savedTab = null;
         try { savedTab = localStorage.getItem(TAB_KEY); } catch (ignore) {}
-        if (savedTab === "spellcheck") showTab("spellcheck");
+        if (savedTab === "spellcheck" || savedTab === "rewrite") showTab(savedTab);
 
         var editor = $("scEditor");
         editor.addEventListener("input", updateCharCount);

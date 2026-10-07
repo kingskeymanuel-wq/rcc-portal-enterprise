@@ -402,7 +402,7 @@
         getJson("/api/reporting/team?month=" + encodeURIComponent(document.getElementById("kpiImportMonth").value))
             .then(function (rows) {
                 var filtered = rows.filter(function (r) {
-                    var matchCountry = !countryCode || r.affiliateBranch === countryCode;
+                    var matchCountry = !countryCode || r.affiliateBranch === countryCode || (countryCode === "CI" && r.affiliateBranch === "K01");
                     var matchService = !serviceCode || (r.serviceName && serviceLabel && r.serviceName === serviceLabel);
                     return matchCountry && matchService;
                 });

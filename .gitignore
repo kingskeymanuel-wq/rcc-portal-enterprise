@@ -20,3 +20,4 @@ __pycache__/
 # Kit LibreTranslate hors ligne : binaires et modèles livrés à part (trop volumineux pour git)
 scripts/libretranslate-offline/wheels/
 scripts/libretranslate-offline/models/
+scripts/offline-kit/paquet/

@@ -53,13 +53,14 @@
     var directoryUsers = [];
 
     var FILIALE_LABELS = {
-        CI: "Côte d'Ivoire", SN: "Sénégal", CM: "Cameroun", TG: "Togo",
+        CI: "RCC ECI — Côte d'Ivoire", SN: "Sénégal", CM: "Cameroun", TG: "RCC ETG — Togo",
         BJ: "Bénin", ML: "Mali", BF: "Burkina Faso", NE: "Niger",
         GH: "Ghana", NG: "Nigeria", KE: "Kenya", GN: "Guinée"
     };
 
     function filialeLabel(code) {
         if (!code) return "Sans filiale";
+        if (String(code).toUpperCase() === "K01") code = "CI"; // code d'agence Ecobank Côte d'Ivoire
         return (FILIALE_LABELS[code] || code) + " (" + code + ")";
     }
 
@@ -79,7 +80,7 @@
     function groupByFilialeAndService(users) {
         var groups = {};
         users.forEach(function (u) {
-            var filiale = u.affiliateBranch || ""; // "" = pas de filiale — jamais de faux libellé "Sans filiale"
+            var filiale = u.affiliateBranch === "K01" ? "CI" : (u.affiliateBranch || ""); // K01 = Côte d'Ivoire ; "" = pas de filiale — jamais de faux libellé "Sans filiale"
             var regrouped = regroupRccTeams(u.service || "", u.activity || null); // "" = pas de service
             var service = regrouped.service;
             var team = regrouped.team;
@@ -97,6 +98,69 @@
         return groups;
     }
 
+    /** Niveaux de l'organigramme (/api/admin/hierarchy), dans l'ordre hiérarchique. */
+    var HIER_SECTIONS = [
+        ["SUPERVISEUR", "Superviseur · Head RCC", "bi-binoculars-fill"],
+        ["RH", "Ressources Humaines", "bi-person-vcard-fill"],
+        ["HEAD_QA", "Head QA", "bi-patch-check-fill"],
+        ["QA", "Quality Assurance & formateurs", "bi-headset"]
+    ];
+    var HIER_TAIL = [
+        ["ADMIN", "Administrateurs", "bi-shield-lock-fill"],
+        ["AGENCE", "Agences", "bi-shop-window"],
+        ["A_CLASSER", "À classer (aucun rôle reconnu)", "bi-question-diamond-fill"]
+    ];
+    var TEAM_ORDER = ["INBOUND_VOICE", "INBOUND_MAIL", "TCHAT", "RAFIKI", "CIB", "DIGITALISATION", "TELEVENTE", "OUTBOUND"];
+    var TEAM_NAMES = { INBOUND_VOICE: "Inbound Voix", INBOUND_MAIL: "Inbound Mail", TCHAT: "Réseaux sociaux", RAFIKI: "Rafiki", CIB: "CIB", OUTBOUND: "Outbound", DIGITALISATION: "Outbound — Digitalisation", TELEVENTE: "Télévente", SANS_EQUIPE: "Sans équipe" };
+    var LEVEL_BADGES = {
+        SUPERVISEUR: "Superviseur", RH: "RH", HEAD_QA: "Head QA", QA: "QA", TEAM_LEADER: "Team Leader",
+        AGENT: "Agent", ADMIN: "Admin", AGENCE: "Agence", A_CLASSER: "À classer"
+    };
+
+    /** Organigramme indexé par id (admin) — null si indisponible : l'annuaire garde alors l'ancien rangement. */
+    var hierarchyIndex = null;
+
+    function indexHierarchy(h) {
+        var idx = {};
+        var add = function (list) { (list || []).forEach(function (p) { idx[p.id] = p; }); };
+        [h.supervisors, h.rh, h.headQa, h.qa, h.admins, h.agencies, h.unclassified].forEach(add);
+        (h.teams || []).forEach(function (t) { add(t.leaders); add(t.agents); });
+        return idx;
+    }
+
+    /** Filiale → niveau hiérarchique (ou équipe, Team Leaders en tête) — même rangement que l'organigramme. */
+    function groupByFilialeAndHierarchy(users) {
+        var groups = {};
+        users.forEach(function (u) {
+            var h = hierarchyIndex[u.id];
+            var filiale = h ? h.country : (u.affiliateBranch || "");
+            var level = h ? h.level : "A_CLASSER";
+            var key, label, icon;
+            if (level === "TEAM_LEADER" || level === "AGENT") {
+                var team = (h && h.team) || "SANS_EQUIPE";
+                key = "T_" + team; label = "Équipe " + (TEAM_NAMES[team] || team); icon = "bi-people-fill";
+            } else {
+                var def = HIER_SECTIONS.concat(HIER_TAIL).filter(function (x) { return x[0] === level; })[0] || HIER_TAIL[2];
+                key = def[0]; label = def[1]; icon = def[2];
+            }
+            if (!groups[filiale]) groups[filiale] = { label: filialeLabel(filiale), sections: {} };
+            var sec = groups[filiale].sections;
+            if (!sec[key]) sec[key] = { label: label, icon: icon, users: [] };
+            sec[key].users.push(u);
+        });
+        return groups;
+    }
+
+    function sectionOrder(key) {
+        var head = HIER_SECTIONS.map(function (x) { return x[0]; });
+        if (head.indexOf(key) !== -1) return head.indexOf(key);
+        if (key.indexOf("T_") === 0) {
+            var t = TEAM_ORDER.indexOf(key.substring(2));
+            return 10 + (t === -1 ? (key === "T_SANS_EQUIPE" ? 30 : 20) : t);
+        }
+        return 50 + HIER_TAIL.map(function (x) { return x[0]; }).indexOf(key);
+    }
+
     function userRowHtml(u) {
         var statusBadge = u.active
             ? '<button class="btn btn-sm btn-outline-success toggle-status-btn" data-id="' + u.id + '" data-active="true">Actif</button>'
@@ -108,6 +172,7 @@
             '<div class="flex-grow-1">' +
             '<strong>' + escapeHtml(u.fullName) + '</strong> ' +
             '<span class="text-muted small">(' + escapeHtml(u.username) + ')</span> ' +
+            levelBadgeHtml(u) +
             statusBadge +
             '<div class="text-muted small">' +
             (u.role ? escapeHtml(u.role) : "—") +
@@ -123,6 +188,14 @@
             '<div class="w-100 inline-roles-panel" id="inline-roles-' + u.id + '" style="display:none;"></div>' +
             '<div class="w-100 inline-sessions-panel" id="inline-sessions-' + u.id + '" style="display:none;"></div>' +
             '</div>';
+    }
+
+    function levelBadgeHtml(u) {
+        var h = hierarchyIndex && hierarchyIndex[u.id];
+        if (!h) return "";
+        var cls = h.level === "TEAM_LEADER" ? "text-bg-primary" : h.level === "AGENT" ? "text-bg-success" : "text-bg-secondary";
+        return '<span class="badge ' + cls + ' me-1">' + escapeHtml(LEVEL_BADGES[h.level] || h.level) + '</span>' +
+            (h.leaderSource === "LED_TEAM" && h.active ? '<span class="badge text-bg-warning me-1" title="Team Leader uniquement par le champ « équipe menée »">à vérifier</span>' : "");
     }
 
     /** Panneau inline — liste les sessions actives (connexions ouvertes) de l'utilisateur,
@@ -206,6 +279,7 @@
                         // en compte. La ligne (badge de rôle affiché) se met à jour au prochain
                         // chargement normal de la liste, sans que ce soit gênant ici.
                         loadRolesInto(panel, userId);
+                        notifyChanged();
                     }).catch(function (e) {
                         alert("Erreur : " + e.message);
                         cb.checked = !cb.checked;
@@ -222,14 +296,15 @@
         var term = (filterTerm || "").trim().toLowerCase();
 
         var filtered = !term ? directoryUsers : directoryUsers.filter(function (u) {
-            return (u.fullName || "").toLowerCase().indexOf(term) !== -1 ||
-                (u.username || "").toLowerCase().indexOf(term) !== -1;
+            return [u.fullName, u.username, u.email, u.role, u.service, u.activity, u.affiliateBranch].join(" ").toLowerCase().indexOf(term) !== -1;
         });
 
         if (!filtered.length) {
             container.innerHTML = '<p class="text-muted text-center">Aucun utilisateur.</p>';
             return;
         }
+
+        if (hierarchyIndex) { renderHierarchyTree(container, filtered, !!term); wireDirectoryRows(container); return; }
 
         var groups = groupByFilialeAndService(filtered);
         var filialeKeys = Object.keys(groups).sort(function (a, b) {
@@ -311,6 +386,59 @@
                 header.closest(".directory-team").classList.toggle("open");
             });
         });
+        wireDirectoryRows(container);
+    }
+
+    function renderHierarchyTree(container, users, autoOpen) {
+        var groups = groupByFilialeAndHierarchy(users);
+        var keys = Object.keys(groups).sort(function (a, b) {
+            if (a === "CI") return -1;
+            if (b === "CI") return 1;
+            return groups[a].label.localeCompare(groups[b].label);
+        });
+        var byName = function (a, b) { return (a.fullName || "").localeCompare(b.fullName || ""); };
+        container.innerHTML = keys.map(function (fKey) {
+            var f = groups[fKey];
+            var secKeys = Object.keys(f.sections).sort(function (a, b) { return sectionOrder(a) - sectionOrder(b); });
+            var total = secKeys.reduce(function (n, k) { return n + f.sections[k].users.length; }, 0);
+            var body = secKeys.map(function (k) {
+                var sec = f.sections[k], content;
+                if (k.indexOf("T_") === 0) {
+                    var leaders = sec.users.filter(function (u) { return hierarchyIndex[u.id] && hierarchyIndex[u.id].level === "TEAM_LEADER"; }).sort(byName);
+                    var agents = sec.users.filter(function (u) { return leaders.indexOf(u) === -1; }).sort(byName);
+                    content = (leaders.length ? '<div class="small fw-bold text-uppercase text-muted mt-2">Team Leader</div>' + leaders.map(userRowHtml).join("") : "") +
+                        (agents.length ? '<div class="small fw-bold text-uppercase text-muted mt-2">Agents</div>' + agents.map(userRowHtml).join("") : "");
+                } else {
+                    content = sec.users.sort(byName).map(userRowHtml).join("");
+                }
+                return '<div class="directory-service' + (autoOpen ? " open" : "") + '">' +
+                    '<div class="directory-service-header">' +
+                    '<span><i class="bi bi-chevron-right chevron"></i> <i class="bi ' + sec.icon + '"></i> ' + escapeHtml(sec.label) + '</span>' +
+                    '<span class="badge bg-light text-dark border">' + sec.users.length + '</span>' +
+                    '</div>' +
+                    '<div class="directory-service-body">' + content + '</div>' +
+                    '</div>';
+            }).join("");
+            return '<div class="directory-branch' + (autoOpen ? " open" : "") + '">' +
+                '<div class="directory-branch-header">' +
+                '<span><i class="bi bi-chevron-right chevron"></i> <i class="bi bi-building"></i> ' + escapeHtml(f.label) + '</span>' +
+                '<span class="badge bg-primary">' + total + ' utilisateur' + (total > 1 ? "s" : "") + '</span>' +
+                '</div>' +
+                '<div class="directory-branch-body">' + body + '</div>' +
+                '</div>';
+        }).join("");
+        Array.prototype.forEach.call(container.querySelectorAll(".directory-branch-header"), function (header) {
+            header.addEventListener("click", function () { header.closest(".directory-branch").classList.toggle("open"); });
+        });
+        Array.prototype.forEach.call(container.querySelectorAll(".directory-service-header"), function (header) {
+            header.addEventListener("click", function (evt) {
+                evt.stopPropagation();
+                header.closest(".directory-service").classList.toggle("open");
+            });
+        });
+    }
+
+    function wireDirectoryRows(container) {
         Array.prototype.forEach.call(container.querySelectorAll(".view-detail-btn"), function (btn) {
             btn.addEventListener("click", function (evt) {
                 evt.stopPropagation();
@@ -338,15 +466,26 @@
                 var verb = isActive ? "désactiver" : "activer";
                 if (!confirm("Voulez-vous vraiment " + verb + " ce compte ?")) return;
                 sendJson("/api/users/" + id + "/" + action, "POST")
-                    .then(loadUsers)
+                    .then(function () { loadUsers(); })
                     .catch(function (e) { alert("Erreur : " + e.message); });
             });
         });
     }
 
-    function loadUsers() {
-        getJson("/api/users").then(function (users) {
-            directoryUsers = users;
+    /** Prévient l'organigramme (admin-hierarchy.js) qu'un compte a changé dans l'annuaire. */
+    function notifyChanged() {
+        document.dispatchEvent(new CustomEvent("rcc:users-changed", { detail: { source: "directory" } }));
+    }
+
+    /** fromSync : rechargement demandé par l'organigramme (ou au démarrage) — ne renvoie pas d'événement. */
+    function loadUsers(fromSync) {
+        if (fromSync !== true) notifyChanged();
+        var hierarchy = currentProfile === "ADMIN"
+            ? getJson("/api/admin/hierarchy").catch(function () { return null; })
+            : Promise.resolve(null);
+        Promise.all([getJson("/api/users"), hierarchy]).then(function (r) {
+            directoryUsers = r[0];
+            hierarchyIndex = r[1] ? indexHierarchy(r[1]) : null;
             renderDirectoryTree(document.getElementById("directoryFilter").value);
         }).catch(function (e) {
             document.getElementById("directoryTree").innerHTML =
@@ -457,8 +596,8 @@
      * Comparaison insensible à la casse sur le NOM du rôle réel (voir WorkflowSchemaBootstrap).
      */
     var ROLE_SERVICE_FILTER = [
-        { roleMatch: /team leader/i, serviceCodes: ["TEAM_LEADER_INBOUND_VOICE", "TEAM_LEADER_INBOUND_MAIL", "TEAM_LEADER_TCHAT", "TEAM_LEADER_RAFIKI", "TEAM_LEADER_OUTBOUND", "TEAM_LEADER_CIB"] },
-        { roleMatch: /agent/i, serviceCodes: ["AGENT_INBOUND", "AGENT_OUTBOUND", "AGENT_INBOUND_MAIL", "AGENT_TCHAT", "AGENT_RAFIKI", "AGENT_CIB"] },
+        { roleMatch: /team leader/i, serviceCodes: ["TEAM_LEADER_INBOUND_VOICE", "TEAM_LEADER_INBOUND_MAIL", "TEAM_LEADER_TCHAT", "TEAM_LEADER_RAFIKI", "TEAM_LEADER_OUTBOUND", "TEAM_LEADER_CIB", "TEAM_LEADER_TELEVENTE", "TEAM_LEADER_DIGITALISATION"] },
+        { roleMatch: /agent/i, serviceCodes: ["AGENT_INBOUND", "AGENT_OUTBOUND", "AGENT_INBOUND_MAIL", "AGENT_TCHAT", "AGENT_RAFIKI", "AGENT_CIB", "AGENT_TELEVENTE", "AGENT_DIGITALISATION"] },
         { roleMatch: /^quality assurance$/i, serviceCodes: ["QUALITY_ASSURANCE", "FORMATEUR", "COMMUNICATION"] }
     ];
     var ROLE_AUTO_SERVICE = [
@@ -505,6 +644,55 @@
         }).catch(function () { box.innerHTML = ""; });
     }
 
+    /** Sélectionne la valeur actuelle, en l'ajoutant si la liste ne la propose pas : sans cela le champ
+     *  s'affichait vide et l'enregistrement effaçait l'équipe réelle (« INBOUND VOICE », « CMB CIB »…). */
+    function setSelectValue(select, value) {
+        value = value || "";
+        if (value && !Array.prototype.some.call(select.options, function (o) { return o.value === value; })) {
+            var opt = document.createElement("option");
+            opt.value = value;
+            opt.textContent = value;
+            select.appendChild(opt);
+        }
+        select.value = value;
+    }
+
+    // ───────────── Accès (même liste et même synchronisation que l'organigramme) ─────────────
+
+    var ACCESS_TEAMS = [["INBOUND_VOICE", "Inbound Voix"], ["INBOUND_MAIL", "Inbound Mail"], ["TCHAT", "Réseaux sociaux"], ["RAFIKI", "Rafiki"],
+        ["CIB", "CIB"], ["DIGITALISATION", "Outbound — Digitalisation"], ["TELEVENTE", "Télévente"], ["OUTBOUND", "Outbound (pôle, sans sous-équipe)"]];
+    /** Appliqués par /api/admin/users/{id}/access-level (garde-fous : pas de retrait de ses propres droits admin ni du dernier admin). */
+    var ACCESS_OTHER = [["FORMATEUR:", "Formateur"], ["AGENCE:CAISSIER", "Agence · Caissier"], ["AGENCE:GESTIONNAIRE", "Agence · Gestionnaire clientèle"], ["ADMIN:", "Administrateur"]];
+    var ACCESS_MGMT = [["QA", "Quality Assurance"], ["HEAD_QA", "Head QA (Superviseur QA)"], ["RH", "Ressources Humaines"], ["SUPERVISEUR", "Superviseur · Head RCC"]];
+    var ACCESS_AGENT_SERVICES = { AGENT_INBOUND: "INBOUND_VOICE", AGENT_INBOUND_MAIL: "INBOUND_MAIL", AGENT_TCHAT: "TCHAT", AGENT_RAFIKI: "RAFIKI",
+        AGENT_CIB: "CIB", AGENT_OUTBOUND: "OUTBOUND", AGENT_TELEVENTE: "TELEVENTE", AGENT_DIGITALISATION: "DIGITALISATION" };
+
+    /** Accès réel d'une personne de l'organigramme : « AGENT:INBOUND_MAIL », « TEAM_LEADER:TCHAT », « RH: »… */
+    function currentAccess(p) {
+        if (!p) return "";
+        if (p.level === "TEAM_LEADER") return "TEAM_LEADER:" + (p.team || "");
+        if (ACCESS_MGMT.some(function (m) { return m[0] === p.level; })) return p.level + ":";
+        if (p.level === "ADMIN") return "ADMIN:";
+        if (p.level !== "AGENT") return "";
+        var teams = [];
+        (p.services || []).forEach(function (s) { var t = ACCESS_AGENT_SERVICES[String(s.code || "").toUpperCase()]; if (t && teams.indexOf(t) === -1) teams.push(t); });
+        if (!teams.length && p.team) teams.push(p.team);
+        return teams.length === 1 ? "AGENT:" + teams[0] : "";
+    }
+
+    function fillAccessSelect(select, p, ledTeam) {
+        var cur = currentAccess(p);
+        var opt = function (v, label) { return '<option value="' + v + '"' + (cur === v ? " selected" : "") + '>' + escapeHtml(label) + '</option>'; };
+        select.innerHTML = (cur ? "" : '<option value="" selected>— inchangé —</option>') +
+            '<optgroup label="Agent">' + ACCESS_TEAMS.map(function (t) { return opt("AGENT:" + t[0], "Agent · " + t[1]); }).join("") + '</optgroup>' +
+            '<optgroup label="Team Leader">' + ACCESS_TEAMS.map(function (t) { return opt("TEAM_LEADER:" + t[0], "Team Leader · " + t[1]); }).join("") + '</optgroup>' +
+            '<optgroup label="Encadrement">' + ACCESS_MGMT.map(function (m) { return opt(m[0] + ":", m[1]); }).join("") + '</optgroup>' +
+            '<optgroup label="Autres accès">' + ACCESS_OTHER.map(function (o) { return opt(o[0], o[1]); }).join("") + '</optgroup>';
+        select.disabled = false;
+        // Agent avec une « équipe menée » restée en base : l'enregistrement réapplique l'accès Agent et la vide.
+        select.setAttribute("data-initial", cur.indexOf("AGENT:") === 0 && ledTeam ? "" : cur);
+    }
+
     function openUserDetail(userId) {
         currentDetailUserId = userId;
         loadEffectiveAccess(userId);
@@ -519,8 +707,8 @@
             document.getElementById("editEmail").value = detail.email || "";
             document.getElementById("editGender").value = detail.gender || "";
             document.getElementById("editAffiliate").value = detail.affiliateBranch || "";
-            document.getElementById("editActivity").value = detail.activity || "";
-            document.getElementById("editLedTeam").value = detail.ledTeam || "";
+            setSelectValue(document.getElementById("editActivity"), detail.activity);
+            fillAccessSelect(document.getElementById("editAccess"), hierarchyIndex && hierarchyIndex[userId], detail.ledTeam);
             document.getElementById("editContractType").value = detail.contractType || "";
             document.getElementById("editContractStatus").value = detail.contractStatus || "";
             document.getElementById("editContractStartDate").value = detail.contractStartDate || "";
@@ -687,7 +875,6 @@
                 affiliateBranch: document.getElementById("editAffiliate").value.trim(),
                 gender: document.getElementById("editGender").value,
                 activity: document.getElementById("editActivity").value.trim(),
-                ledTeam: document.getElementById("editLedTeam").value.trim(),
                 contractType: document.getElementById("editContractType").value,
                 contractStatus: document.getElementById("editContractStatus").value,
                 contractStartDate: document.getElementById("editContractStartDate").value || null
@@ -697,9 +884,19 @@
             var originalLabel = submitBtn ? submitBtn.textContent : null;
             if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Enregistrement…"; }
 
-            sendJson("/api/users/" + currentDetailUserId, "PUT", payload)
+            var userId = currentDetailUserId;
+            var accessSel = document.getElementById("editAccess");
+            var access = accessSel.value, accessChanged = access && access !== accessSel.getAttribute("data-initial");
+            sendJson("/api/users/" + userId, "PUT", payload)
                 .then(function () {
-                    loadUsers();
+                    // Accès en dernier : il aligne rôle, service, équipe (activité) et portail — il prime sur le champ Équipe.
+                    if (!accessChanged) return null;
+                    var parts = access.split(":");
+                    var other = ACCESS_OTHER.some(function (o) { return o[0] === access; });
+                    return sendJson("/api/admin/users/" + userId + (other ? "/access-level" : "/access"), "PUT", { level: parts[0], team: parts[1] || null });
+                })
+                .then(function () {
+                    // L'annuaire et l'organigramme se rechargent à la fermeture de la fiche (voir wireSync).
                     var modalEl = document.getElementById("userDetailModal");
                     var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
                     modal.hide();
@@ -843,14 +1040,85 @@
                     var username = btn.getAttribute("data-username");
                     var ids = btn.getAttribute("data-ids").split(",").map(Number);
                     if (!confirm("Réactiver le compte « " + username + " » ?")) return;
-                    fetch("/api/users/" + encodeURIComponent(username) + "/unlock", { method: "POST", credentials: "same-origin" })
-                        .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); })
-                        .then(function () { return sendJson("/api/admin/login-alerts/resolve", "POST", ids); })
-                        .then(loadLoginAlerts)
+                    btn.disabled = true;
+                    unlockAccounts([username])
+                        .then(function () { return sendJson("/api/admin/login-alerts/resolve", "POST", ids).catch(function () {}); })
+                        .then(refreshLockState)
                         .catch(function (e) { alert("Erreur : " + e.message); });
                 });
             });
         }).catch(function (e) { console.error(e); });
+    }
+
+    function unlockAccounts(usernames) {
+        return fetch("/api/users/unlock", {
+            method: "POST", credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(usernames)
+        }).then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); });
+    }
+
+    function refreshLockState() {
+        loadLockedAccounts();
+        loadLoginAlerts();
+    }
+
+    function loadLockedAccounts() {
+        var container = document.getElementById("lockedList");
+        var countBadge = document.getElementById("lockedCount");
+        var allBtn = document.getElementById("unlockAllBtn");
+        if (!container) return;
+        getJson("/api/users/locked").then(function (rows) {
+            countBadge.style.display = rows.length ? "" : "none";
+            countBadge.textContent = rows.length;
+            allBtn.style.display = rows.length > 1 ? "" : "none";
+            if (!rows.length) {
+                container.innerHTML = '<p class="text-muted text-center mb-0"><i class="bi bi-check-circle text-success"></i> Aucun compte verrouillé.</p>';
+                return;
+            }
+            container.innerHTML = rows.map(function (u) {
+                return '<div class="d-flex justify-content-between align-items-center border-bottom py-2 flex-wrap gap-2">' +
+                    '<div><i class="bi bi-lock-fill text-danger"></i> <strong>' + escapeHtml(u.name || u.username) + '</strong>' +
+                    ' <span class="text-muted small">' + escapeHtml(u.username) + (u.email ? ' · ' + escapeHtml(u.email) : '') + '</span>' +
+                    (u.failedAttempts ? '<div class="small text-muted">' + u.failedAttempts + ' échec(s) de connexion</div>' : '') + '</div>' +
+                    '<button class="btn btn-sm btn-success unlock-locked-btn" data-username="' + escapeHtml(u.username) + '">' +
+                    '<i class="bi bi-unlock-fill"></i> Réactiver</button></div>';
+            }).join("");
+            Array.prototype.forEach.call(container.querySelectorAll(".unlock-locked-btn"), function (btn) {
+                btn.addEventListener("click", function () {
+                    btn.disabled = true;
+                    unlockAccounts([btn.getAttribute("data-username")]).then(refreshLockState)
+                        .catch(function (e) { btn.disabled = false; alert("Erreur : " + e.message); });
+                });
+            });
+        }).catch(function (e) { console.error(e); });
+    }
+
+    function wireUnlockAll() {
+        var btn = document.getElementById("unlockAllBtn");
+        if (!btn) return;
+        btn.addEventListener("click", function () {
+            var n = document.getElementById("lockedCount").textContent;
+            if (!confirm("Réactiver les " + n + " comptes verrouillés ?")) return;
+            btn.disabled = true;
+            unlockAccounts([]).then(refreshLockState)
+                .catch(function (e) { alert("Erreur : " + e.message); })
+                .then(function () { btn.disabled = false; });
+        });
+    }
+
+    /**
+     * Synchronisation annuaire ↔ organigramme : une modification faite dans l'organigramme recharge l'annuaire,
+     * et la fermeture de la fiche (rôles, services, champs modifiés) recharge l'annuaire puis l'organigramme.
+     */
+    function wireSync() {
+        document.addEventListener("rcc:users-changed", function (e) {
+            if (e.detail && e.detail.source === "directory") return;
+            clearTimeout(wireSync.t);
+            wireSync.t = setTimeout(function () { loadUsers(true); }, 250);
+        });
+        document.getElementById("userDetailModal").addEventListener("hidden.bs.modal", function () { loadUsers(); });
+        window.RccDirectory = { openUserDetail: openUserDetail, reload: function () { loadUsers(true); } };
     }
 
     function init() {
@@ -860,6 +1128,7 @@
                 currentProfile = computeProfile(user);
                 document.getElementById("pendingSection").style.display = currentProfile === "ADMIN" ? "" : "none";
                 document.getElementById("loginAlertsSection").style.display = currentProfile === "ADMIN" ? "" : "none";
+                document.getElementById("lockedSection").style.display = currentProfile === "ADMIN" ? "" : "none";
                 document.getElementById("createUserBtn").style.display = currentProfile === "ADMIN" ? "" : "none";
                 document.getElementById("deleteUserBtn").style.display = currentProfile === "ADMIN" ? "" : "none";
                 wireAddButtons();
@@ -873,9 +1142,10 @@
                 wireUsernameRemapButton();
                 wireFindDuplicatesButton();
                 wireUsernameDuplicatesButton();
-                loadUsers();
+                wireSync();
+                loadUsers(true);
                 loadPending();
-                if (currentProfile === "ADMIN") loadLoginAlerts();
+                if (currentProfile === "ADMIN") { loadLoginAlerts(); loadLockedAccounts(); wireUnlockAll(); }
                 return loadRoleAndServiceCatalogs();
             })
             .catch(function (e) { console.error("users.js init failed:", e); });

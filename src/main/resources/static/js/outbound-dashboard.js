@@ -17,6 +17,8 @@
     var currentReportCampaignFields = [];
     var pendingCallContactId = null; // contact en cours d'appel, si le RDV est ouvert depuis "Mes appels" (bouton jaune)
     var pendingCallAnswers = null; // réponses aux champs dynamiques collectées avant l'ouverture de la modale RDV (onglet Campagne)
+    var callForm = null; // formulaire avancé de la campagne (RccForm) pour le contact en cours d'appel
+    var agentName = "";
     var journeyStepIndex = 0;
     var currentJourney = null;
     var editingJourneyId = null;
@@ -31,11 +33,12 @@
     // ===================== ONGLETS =====================
 
     function switchTab(tab) {
-        ["Campaign", "Calls", "Sales", "Rdv", "Journeys"].forEach(function (t) {
+        ["Campaign", "Calls", "Sales", "Rdv", "Journeys", "Kb"].forEach(function (t) {
             $("obTab" + t + "Btn").classList.toggle("active", t.toLowerCase() === tab);
             $("obPane" + t).style.display = t.toLowerCase() === tab ? "" : "none";
         });
         if (tab === "journeys") renderJourneysGrid();
+        if (tab === "kb" && window.RccKbEmbed) RccKbEmbed.mount($("obKbRoot"));
         if (tab === "calls") loadMyCalls();
         if (tab === "campaign") loadCampaignGrid();
     }
@@ -249,6 +252,7 @@
             $("obCallClientPhone").textContent = "";
             $("obCallClientAccount").textContent = "";
             $("obCallExtraData").innerHTML = "";
+            if (callForm) { callForm.destroy(); callForm = null; }
             $("obCallDynamicFields").innerHTML = "";
             $("obCallComment").value = "";
             $("obCallComment").parentElement.style.display = "none";
@@ -297,8 +301,31 @@
      *  pratique pour les longues listes de motifs (voir capture "si non pourquoi ?", 16 options). */
     var SUGGESTION_MODAL_THRESHOLD = 5;
 
+    /** Formulaire avancé (sections, logique, contrôles, score) : rendu par RccForm, issue d'appel suggérée mise en avant. */
+    function renderCallForm(contact) {
+        if (callForm) { callForm.destroy(); callForm = null; }
+        var container = $("obCallDynamicFields");
+        callForm = RccForm.render(container, currentCampaign.form, {
+            answers: contact.answers || {},
+            draftKey: "contact-" + contact.contactId,
+            context: { client: { name: contact.clientName, phone: contact.clientPhone, account: contact.maskedAccountNumber },
+                agent: { name: agentName }, campaign: currentCampaign.name, extra: contact.extraData || {} },
+            onChange: function (ev) {
+                Array.prototype.forEach.call(document.querySelectorAll(".ob-call-disposition-row [data-disposition]"), function (b) {
+                    b.classList.toggle("rf-suggested", ev.suggestedStatus === b.getAttribute("data-disposition"));
+                });
+            }
+        });
+    }
+
+    function hasAdvancedForm() {
+        return !!(window.RccForm && currentCampaign && currentCampaign.form && RccForm.questions(currentCampaign.form).length);
+    }
+
     /** Rend les questions du modèle de campagne (Campaign.fields) — pré-remplies si le contact a déjà des réponses. */
     function renderDynamicFields(contact) {
+        if (hasAdvancedForm()) { renderCallForm(contact); return; }
+        if (callForm) { callForm.destroy(); callForm = null; }
         var fields = (currentCampaign && currentCampaign.fields) || [];
         var answers = contact.answers || {};
         var container = $("obCallDynamicFields");
@@ -385,6 +412,7 @@
     }
 
     function collectDynamicAnswers() {
+        if (callForm) return callForm.rawAnswers();
         var answers = {};
         Array.prototype.forEach.call($("obCallDynamicFields").querySelectorAll("[data-field-id]"), function (el) {
             if (el.hasAttribute("data-field-hidden")) { if (el.value) answers[el.getAttribute("data-field-id")] = el.value; return; }
@@ -396,6 +424,7 @@
     }
 
     function missingRequiredField() {
+        if (callForm) return callForm.validate() ? null : "les questions obligatoires du formulaire (signalées en rouge)";
         var fields = (currentCampaign && currentCampaign.fields) || [];
         var answers = collectDynamicAnswers();
         var missing = fields.find(function (f) { return f.required && !answers[f.id]; });
@@ -432,7 +461,7 @@
 
         sendJson("/api/campaigns/contacts/" + contact.contactId + "/call-status", "PUT",
             { callStatus: status, notes: comment, answers: answers })
-            .then(function () { advanceCallFlow(); })
+            .then(function () { if (callForm) callForm.clearDraft(); advanceCallFlow(); })
             .catch(function (e) { alert("Erreur : " + e.message); });
     }
 
@@ -442,6 +471,7 @@
     }
 
     function wireCampaignTab() {
+        if (window.RccSession) window.RccSession.init().then(function (s) { if (s && s.user) agentName = s.user.name || s.user.username || ""; });
         $("obCampaignBackToGridBtn").addEventListener("click", loadCampaignGrid);
         $("obCampaignStartCallBtn").addEventListener("click", startCallFlow);
         $("obCallPrevBtn").addEventListener("click", function () {
@@ -1316,6 +1346,7 @@
         $("obTabSalesBtn").addEventListener("click", function () { switchTab("sales"); });
         $("obTabRdvBtn").addEventListener("click", function () { switchTab("rdv"); });
         $("obTabJourneysBtn").addEventListener("click", function () { switchTab("journeys"); });
+        $("obTabKbBtn").addEventListener("click", function () { switchTab("kb"); });
 
         wireCampaignTab();
         wireCampaignManage();

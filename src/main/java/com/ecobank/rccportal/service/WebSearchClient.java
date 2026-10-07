@@ -83,8 +83,21 @@ public class WebSearchClient {
         this.properties = properties;
     }
 
+    /** Mode « serveur sans Internet » (RCC_OFFLINE=true) : ce service hébergé sur Internet n'est pas appelé. */
+    private OfflineMode offlineMode;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setOfflineMode(OfflineMode offlineMode) {
+        this.offlineMode = offlineMode;
+    }
+
+    private boolean offline() {
+        return offlineMode != null && offlineMode.isEnabled();
+    }
+
     public boolean isConfigured() {
-        return properties.isEnabled() && orderedProviders().stream().anyMatch(this::isProviderConfigured);
+        // Hors ligne : seul un SearXNG interne resterait joignable, mais il interroge lui-même Internet.
+        return !offline() && properties.isEnabled() && orderedProviders().stream().anyMatch(this::isProviderConfigured);
     }
 
     /**

@@ -66,6 +66,94 @@ public class ShiftService {
         this.userRoleRepository = userRoleRepository;
     }
 
+    /** Planning du jour : fin prévue du shift (débordement, clôture automatique). Facultatif pour les tests. */
+    private com.ecobank.rccportal.repository.AgentScheduleRepository schedules;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setSchedules(com.ecobank.rccportal.repository.AgentScheduleRepository schedules) {
+        this.schedules = schedules;
+    }
+
+    @org.springframework.beans.factory.annotation.Value("${rcc.shift.default-duration-hours:9}")
+    private int defaultShiftHours = com.ecobank.rccportal.util.ShiftOverflow.DEFAULT_SHIFT_HOURS;
+
+    /** Plannings du jour, par identifiant d'utilisateur (une seule requête pour les vues « En direct »). */
+    private java.util.Map<Long, com.ecobank.rccportal.model.AgentSchedule> todaySchedules() {
+        java.util.Map<Long, com.ecobank.rccportal.model.AgentSchedule> out = new java.util.HashMap<>();
+        if (schedules == null) return out;
+        try {
+            for (var s : schedules.findByWorkDate(LocalDate.now())) {
+                if (s.getUser() == null || "REJECTED".equalsIgnoreCase(s.getApprovalStatus())) continue;
+                out.put(s.getUser().getId(), s);
+            }
+        } catch (RuntimeException e) {
+            log.debug("Planning du jour indisponible : {}", e.getMessage());
+        }
+        return out;
+    }
+
+    /**
+     * Fin prévue du shift du jour : planning (code de shift travaillé), sinon première connexion + durée par
+     * défaut. Repos, congé ou absence au planning : aucune fin (pas de débordement calculé).
+     */
+    LocalDateTime plannedEndOf(com.ecobank.rccportal.model.AgentSchedule s, List<ShiftEvent> todayEvents) {
+        LocalDateTime firstLogin = todayEvents.stream().filter(e -> "LOGIN".equals(e.getEventType()))
+                .map(ShiftEvent::getOccurredAt).findFirst()
+                .orElse(todayEvents.isEmpty() ? null : todayEvents.get(0).getOccurredAt());
+        if (s != null && s.getShiftCode() != null && !s.getShiftCode().isBlank()) {
+            if (!HrLiveService.isWorkingCode(s.getShiftCode())) return null;
+            if (s.getPlannedEndTime() != null) {
+                return com.ecobank.rccportal.util.ShiftOverflow.plannedEnd(LocalDate.now(), s.getPlannedStartTime(), s.getPlannedEndTime(), firstLogin, defaultShiftHours);
+            }
+        }
+        return com.ecobank.rccportal.util.ShiftOverflow.plannedEnd(LocalDate.now(), null, null, firstLogin, defaultShiftHours);
+    }
+
+    private LocalDateTime plannedEndOf(User user, List<ShiftEvent> todayEvents) {
+        com.ecobank.rccportal.model.AgentSchedule s = null;
+        if (schedules != null) {
+            try {
+                s = schedules.findByUserAndWorkDate(user, LocalDate.now()).orElse(null);
+            } catch (RuntimeException ignored) {
+                // planning indisponible : durée par défaut
+            }
+        }
+        return plannedEndOf(s, todayEvents);
+    }
+
+    /**
+     * Clôture automatique des shifts restés ouverts 1 h 30 après leur fin prévue (oubli de « Fin de shift ») :
+     * un événement SHIFT_END est posé à fin prévue + 1 h 30 — le temps compté s'arrête là. Appelé chaque
+     * minute par ShiftOverflowJob. Renvoie le nombre de shifts clôturés.
+     */
+    @Transactional
+    public int autoCloseOverflows() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime from = LocalDate.now().atStartOfDay();
+        java.util.Map<String, List<ShiftEvent>> byUser = new java.util.LinkedHashMap<>();
+        for (ShiftEvent e : shiftEventRepository.findByOccurredAtBetweenOrderByUser_UsernameAscOccurredAtAsc(from, now)) {
+            if (e.getUser() == null || e.getUser().getUsername() == null) continue;
+            byUser.computeIfAbsent(e.getUser().getUsername().toLowerCase(), k -> new java.util.ArrayList<>()).add(e);
+        }
+        if (byUser.isEmpty()) return 0;
+        java.util.Map<Long, com.ecobank.rccportal.model.AgentSchedule> plan = todaySchedules();
+        int closed = 0;
+        for (List<ShiftEvent> events : byUser.values()) {
+            User user = events.get(0).getUser();
+            String state = timelineOf(events).state();
+            if (!com.ecobank.rccportal.util.ShiftOverflow.isActive(state)) continue;
+            LocalDateTime end = plannedEndOf(plan.get(user.getId()), events);
+            LocalDateTime closeAt = com.ecobank.rccportal.util.ShiftOverflow.autoCloseAt(end);
+            if (closeAt == null || now.isBefore(closeAt)) continue;
+            LocalDateTime last = events.get(events.size() - 1).getOccurredAt();
+            LocalDateTime at = closeAt.isAfter(last) ? closeAt : last.plusSeconds(1);
+            shiftEventRepository.save(ShiftEvent.builder().user(user).eventType("SHIFT_END").occurredAt(at).build());
+            log.info("Shift clôturé automatiquement (username={}, fin prévue={}, clôture={})", user.getUsername(), end, at);
+            closed++;
+        }
+        return closed;
+    }
+
     /** Usernames ayant le rôle TEAM_LEADER — un Team Leader dirige une équipe mais n'en est pas
      *  un membre à suivre : il ne doit jamais apparaître dans les vues "Équipe"/"En direct" du
      *  Suivi de shift (voir demande utilisateur), seulement dans sa propre vue "Moi-même". */
@@ -170,10 +258,11 @@ public class ShiftService {
         ShiftTimeline timeline = timelineOf(events);
         LocalDateTime now = LocalDateTime.now();
         List<ShiftEventResponse> responses = events.stream().map(this::toResponse).toList();
+        LocalDateTime plannedEnd = com.ecobank.rccportal.util.ShiftOverflow.isActive(timeline.state()) ? plannedEndOf(user, events) : null;
         return new ShiftStatusResponse(timeline.state(), responses, timeline.stateSince(),
                 timeline.lastDisconnectedAt(), timeline.lastReconnectedAt(),
                 timeline.absenceMinutes(now), timeline.absenceMinutesInCurrentState(now),
-                absencesOf(timeline, now));
+                absencesOf(timeline, now), plannedEnd, com.ecobank.rccportal.util.ShiftOverflow.autoCloseAt(plannedEnd));
     }
 
     /** Statut en direct de chaque agent (déduit du dernier événement du jour) — pour le
@@ -183,6 +272,7 @@ public class ShiftService {
     @Transactional(readOnly = true)
     public List<com.ecobank.rccportal.dto.LiveShiftStatusResponse> liveStatusForAllUsers() {
         java.util.Set<String> leaders = teamLeaderUsernames();
+        java.util.Map<Long, com.ecobank.rccportal.model.AgentSchedule> plan = todaySchedules();
         List<com.ecobank.rccportal.dto.LiveShiftStatusResponse> out = new java.util.ArrayList<>();
         for (User user : userRepository.findAll()) {
             if (user.getUsername() != null && leaders.contains(user.getUsername().toLowerCase())) continue;
@@ -193,7 +283,8 @@ public class ShiftService {
             out.add(new com.ecobank.rccportal.dto.LiveShiftStatusResponse(
                     user.getUsername(), user.getName() != null ? user.getName() : user.getUsername(), team,
                     timeline.state(), timeline.stateSince(), timeline.lastDisconnectedAt(),
-                    timeline.lastReconnectedAt(), timeline.absenceMinutes(now), timeline.absences().size()));
+                    timeline.lastReconnectedAt(), timeline.absenceMinutes(now), timeline.absences().size(),
+                    com.ecobank.rccportal.util.ShiftOverflow.isActive(timeline.state()) ? plannedEndOf(plan.get(user.getId()), events) : null));
         }
         return out;
     }
@@ -212,13 +303,15 @@ public class ShiftService {
             byUser.computeIfAbsent(e.getUser().getUsername().toLowerCase(), k -> new java.util.ArrayList<>()).add(e);
         }
         LocalDateTime now = LocalDateTime.now();
+        java.util.Map<Long, com.ecobank.rccportal.model.AgentSchedule> plan = todaySchedules();
         java.util.Map<String, com.ecobank.rccportal.dto.LiveShiftStatusResponse> out = new java.util.HashMap<>();
         byUser.forEach((username, events) -> {
             User user = events.get(0).getUser();
             ShiftTimeline t = timelineOf(events);
             out.put(username, new com.ecobank.rccportal.dto.LiveShiftStatusResponse(user.getUsername(),
                     user.getName() != null ? user.getName() : user.getUsername(), null, t.state(), t.stateSince(),
-                    t.lastDisconnectedAt(), t.lastReconnectedAt(), t.absenceMinutes(now), t.absences().size()));
+                    t.lastDisconnectedAt(), t.lastReconnectedAt(), t.absenceMinutes(now), t.absences().size(),
+                    com.ecobank.rccportal.util.ShiftOverflow.isActive(t.state()) ? plannedEndOf(plan.get(user.getId()), events) : null));
         });
         return out;
     }
@@ -282,6 +375,40 @@ public class ShiftService {
      * Seuils de dépassement — pause courte au-delà de 15 min, pause déjeuner au-delà de 60 min.
      * Choix par défaut documentés ici ; à ajuster si la vraie politique Ecobank diffère.
      */
+    /** Dépassement de pause (pause > 15 min, déjeuner > 60 min) : agent, jour, type, durée réelle et durée autorisée. */
+    public record PauseOverrun(String username, LocalDate date, String type, LocalDateTime start, long minutes, long allowed) {}
+
+    /** Tous les dépassements de pause d'une période (une requête), pour les alertes de shift du Team Leader. */
+    @Transactional(readOnly = true)
+    public List<PauseOverrun> pauseOverruns(LocalDate from, LocalDate to) {
+        List<PauseOverrun> out = new java.util.ArrayList<>();
+        java.util.Map<String, Object[]> open = new java.util.HashMap<>(); // username → {type, start}
+        for (ShiftEvent e : shiftEventRepository.findByOccurredAtBetweenOrderByUser_UsernameAscOccurredAtAsc(
+                from.atStartOfDay(), to.plusDays(1).atStartOfDay())) {
+            String u;
+            try {
+                u = e.getUser() == null ? null : e.getUser().getUsername();
+            } catch (jakarta.persistence.EntityNotFoundException orphan) {
+                continue; // pointage d'un compte supprimé
+            }
+            if (u == null || e.getEventType() == null) continue;
+            switch (e.getEventType()) {
+                case "PAUSE_START" -> open.put(u, new Object[]{"PAUSE", e.getOccurredAt()});
+                case "LUNCH_START" -> open.put(u, new Object[]{"LUNCH", e.getOccurredAt()});
+                case "PAUSE_END", "LUNCH_END" -> {
+                    Object[] o = open.remove(u);
+                    if (o == null || !e.getEventType().startsWith((String) o[0])) break;
+                    LocalDateTime start = (LocalDateTime) o[1];
+                    long minutes = java.time.Duration.between(start, e.getOccurredAt()).toMinutes();
+                    long allowed = "PAUSE".equals(o[0]) ? PAUSE_OVERRUN_MINUTES : LUNCH_OVERRUN_MINUTES;
+                    if (minutes > allowed) out.add(new PauseOverrun(u, start.toLocalDate(), (String) o[0], start, minutes, allowed));
+                }
+                default -> { }
+            }
+        }
+        return out;
+    }
+
     private static final int PAUSE_OVERRUN_MINUTES = 15;
     private static final int LUNCH_OVERRUN_MINUTES = 60;
 

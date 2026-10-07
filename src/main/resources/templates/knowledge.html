@@ -2,10 +2,13 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <!-- Heure de Côte d'Ivoire sur tous les postes (avant tout autre script) -->
+    <script th:src="@{/js/rcc-time.js}"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>RCC Portal Enterprise — Knowledge Base</title>
+    <title>Portail Front Office Ecobank — Knowledge Base</title>
     <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}" rel="stylesheet">
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/rcc-guides.css}">
     <!-- Onglet « Agences / Carte » — Leaflet (copie locale /vendor/leaflet, pas de CDN) + OpenStreetMap :
          carte réelle, interactive, sans dépendance à Google Maps (aucune clé API requise). -->
     <link rel="stylesheet" th:href="@{/vendor/leaflet/leaflet.min.css}">
@@ -81,8 +84,8 @@
 
                 <div class="welcome-banner d-flex justify-content-between align-items-start flex-wrap gap-2">
                     <div>
-                        <h2>Knowledge Base</h2>
-                        <p class="text-muted">Articles, fichiers, et assistant de recherche Ralph</p>
+                        <h2 id="kbTitle">Knowledge Base</h2>
+                        <p class="text-muted" id="kbSubtitle">Articles, fichiers, et assistant de recherche Ralph</p>
                     </div>
                     <button class="btn btn-primary btn-sm" id="newArticleBtn" style="display:none;">
                         <i class="bi bi-file-earmark-plus"></i> Nouvel article
@@ -192,6 +195,15 @@
                     </div>
                 </div>
 
+                <!-- Encadrement : base générale ou base CIB (deux bases séparées, voir KnowledgeService.spaceFor). -->
+                <div class="d-flex align-items-center gap-2 mb-3 flex-wrap" id="kbSpaceBar" style="display:none !important;">
+                    <span class="text-muted small"><i class="bi bi-collection"></i> Base :</span>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-primary" data-kb-space="GENERAL"><i class="bi bi-book"></i> Base générale</button>
+                        <button type="button" class="btn btn-outline-primary" data-kb-space="CIB"><i class="bi bi-buildings"></i> Base CIB</button>
+                    </div>
+                </div>
+
                 <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
                     <span class="text-muted small"><i class="bi bi-globe"></i> Filiale :</span>
                     <select class="form-select form-select-sm" id="countrySelect" style="max-width:240px;">
@@ -219,9 +231,17 @@
                             <i class="bi bi-credit-card-2-front"></i> Disponibilité des cartes
                         </button>
                     </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="kbGuidesTabBtn" data-bs-toggle="tab" data-bs-target="#kbGuidesTab" type="button" role="tab">
+                            <i class="bi bi-collection-play-fill"></i> Pas à pas
+                        </button>
+                    </li>
                 </ul>
 
                 <div class="tab-content">
+                    <!-- Pas à pas animés par plateforme (guides-data.js, rcc-guides.js) — mêmes pas à pas que dans les campagnes Outbound. -->
+                    <div class="tab-pane fade" id="kbGuidesTab" role="tabpanel"><div id="kbGuides"></div></div>
+
                     <div class="tab-pane fade show active" id="kbCategoriesTab" role="tabpanel">
                         <div class="row g-4 mb-4" id="categoryGrid"></div>
                         <p class="text-muted small">Cliquez sur une rubrique ci-dessus pour ouvrir son contenu.</p>
@@ -479,6 +499,26 @@
 <script th:src="@{/js/branch-viewer.js}"></script>
 <script th:src="@{/js/card-agency.js}"></script>
 <script th:src="@{/js/card-availability.js}"></script>
+<script th:src="@{/js/guides-data.js}"></script>
+<script th:src="@{/js/guides-data-cib.js}"></script>
+<script th:src="@{/js/rcc-guides.js}"></script>
+<script>
+    // Bibliothèque « Pas à pas », chargée à la première ouverture de l'onglet (ou via #pas-a-pas dans l'adresse).
+    (function () {
+        var mounted = false;
+        // Base CIB : pas à pas Omni Lite / Omni Plus ; base générale : les autres (window.RccKbSpace, voir knowledge.js).
+        function mount() { if (!mounted && window.RccGuide) { mounted = true; RccGuide.mountLibrary(document.getElementById("kbGuides")); } }
+        document.addEventListener("rcc:kb-space", function (e) {
+            var el = document.getElementById("kbGuides");
+            if (mounted && el.__glRedraw) el.__glRedraw(e.detail);
+        });
+        document.addEventListener("DOMContentLoaded", function () {
+            var btn = document.getElementById("kbGuidesTabBtn");
+            btn.addEventListener("shown.bs.tab", mount);
+            if (location.hash === "#pas-a-pas") bootstrap.Tab.getOrCreateInstance(btn).show();
+        });
+    })();
+</script>
 <script th:src="@{/js/knowledge.js}"></script>
 </body>
 </html>

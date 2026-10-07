@@ -245,6 +245,29 @@ public class UserController {
     public void unlock(@PathVariable String matricule, @AuthenticationPrincipal AuthenticatedUser requester) {
         requireAdmin(requester);
         userService.unlock(matricule);
+        administrationService.resolveUnlockAlerts(matricule);
+    }
+
+    /** Tous les comptes verrouillés, réclamation ou non. */
+    @GetMapping("/locked")
+    public List<UserService.LockedAccount> locked(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return userService.lockedAccounts();
+    }
+
+    /** Réactivation groupée : liste de matricules, ou tous les comptes verrouillés si la liste est vide. */
+    @PostMapping("/unlock")
+    public java.util.Map<String, Integer> unlockMany(@RequestBody(required = false) List<String> matricules,
+                                                     @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        List<String> targets = matricules == null || matricules.isEmpty()
+                ? userService.lockedAccounts().stream().map(UserService.LockedAccount::username).toList()
+                : matricules;
+        for (String m : targets) {
+            userService.unlock(m);
+            administrationService.resolveUnlockAlerts(m);
+        }
+        return java.util.Map.of("unlocked", targets.size());
     }
 
     @PostMapping("/{matricule}/reject")

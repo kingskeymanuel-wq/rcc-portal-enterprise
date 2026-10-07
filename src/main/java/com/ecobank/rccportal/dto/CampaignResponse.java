@@ -22,6 +22,8 @@ public record CampaignResponse(
         int callsMade,
         int contacted,
         int appointmentsTaken,
-        int unassigned
+        int unassigned,
+        /** Formulaire v2 de la campagne (toujours présent : l'ancienne liste de questions y est convertie). */
+        com.fasterxml.jackson.databind.JsonNode form
 ) {
 }

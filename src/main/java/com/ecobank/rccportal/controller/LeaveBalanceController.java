@@ -53,7 +53,9 @@ public class LeaveBalanceController {
         boolean isRh = requester != null && "rh".equalsIgnoreCase(requester.role());
         boolean isQa = requester != null && requester.service() != null
                 && "quality assurance".equals(requester.service().toLowerCase().replace('_', ' '));
-        if (isAdmin || isRh || isQa) return service.getAllBalances(year);
+        // Superviseur : mêmes soldes que le RH, en lecture (setAllocated reste réservé au RH / QA / admin).
+        boolean isSupervisor = requester != null && "supervisor".equalsIgnoreCase(requester.role());
+        if (isAdmin || isRh || isQa || isSupervisor) return service.getAllBalances(year);
 
         boolean isTeamLeader = requester != null && "team_leader".equalsIgnoreCase(requester.role());
         if (isTeamLeader) {

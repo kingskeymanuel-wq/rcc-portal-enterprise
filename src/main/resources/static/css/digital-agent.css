@@ -2,6 +2,7 @@
 .content { min-width: 0; }
 .da-page { --da-a: #0B8A8A; --da-b: #5B3CC4; --da-soft: #E7F6F6; }
 .da-page[data-channel="RAFIKI"] { --da-a: #1877F2; --da-b: #D6249F; --da-soft: #EAF1FE; }
+.da-page[data-channel="MAIL"] { --da-a: #0B3D91; --da-b: #0288D1; --da-soft: #E8F1FB; }
 
 .da-hero { position: relative; overflow: hidden; border-radius: 1.5rem; padding: 1.8rem 2rem; color: #fff; display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap;
     background: linear-gradient(120deg, var(--da-a), var(--da-b)); box-shadow: 0 18px 40px rgba(20, 30, 80, .18); margin-bottom: 1.4rem; }

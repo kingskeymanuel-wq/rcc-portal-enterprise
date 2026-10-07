@@ -88,7 +88,8 @@ public class CallCardAgent implements RafAgent {
 
         if (proc != null && !proc.steps().isEmpty()) {
             md.append("\n**🛠 ").append(RafText.get(lang, "callcard.do")).append("**");
-            proc.steps().stream().limit(4).forEach(s -> md.append("\n").append(s.number()).append(". ").append(Scoring.truncate(s.content(), 160)));
+            proc.steps().stream().limit(3).forEach(s -> md.append("\n").append(s.number()).append(". ").append(Scoring.truncate(s.content(), 120)));
+            if (proc.steps().size() > 3) md.append("\n… (").append(proc.steps().size() - 3).append(" étape(s) de plus : mode guidé)");
             citations.add(new RalphResultItem("PROCEDURE", proc.id(), proc.title(), Scoring.truncate(proc.steps().get(0).content(), 160)));
             reasoning.add("étapes : procédure « " + proc.title() + " »");
             payload.put("procedureId", proc.id());
@@ -109,6 +110,7 @@ public class CallCardAgent implements RafAgent {
             md.append("\n\n**📤 ").append(RafText.get(lang, "callcard.route")).append("** : ").append(route);
         }
         List<RafSuggestion> chips = new ArrayList<>();
+        String details = null;
         if (template != null) {
             md.append("\n\n**✉ ").append(RafText.get(lang, "callcard.template")).append("** : ").append(template.subject());
             citations.add(new RalphResultItem("MAIL_TEMPLATE", template.id(), template.subject(), template.categoryLabel()));
@@ -122,12 +124,13 @@ public class CallCardAgent implements RafAgent {
                     .filter(t -> t.term() != null && t.term().length() >= 2
                             && haystack.contains(" " + SearchText.normalize(t.term()) + " "))
                     .limit(4).map(t -> "**" + t.term() + "** : " + Scoring.truncate(t.definition(), 90)).toList();
-            if (!terms.isEmpty()) md.append("\n\n**📖 Termes utiles**\n").append(String.join("\n", terms));
+            // Termes utiles : seulement dans « Plus de détails » (la fiche d'appel reste lisible d'un coup d'œil).
+            if (!terms.isEmpty()) details = md + "\n\n**📖 Termes utiles**\n" + String.join("\n", terms);
             if (!proc.steps().isEmpty()) {
                 chips.add(0, new RafSuggestion("▶ " + RafText.get(lang, "guided.start"), null, "raf:proc:" + proc.id() + ":step:1"));
             }
         }
-        return new AgentAnswer(id(), RafIntent.CALL_CARD, score, true, md.toString(), null, citations, chips,
+        return new AgentAnswer(id(), RafIntent.CALL_CARD, score, true, md.toString(), details, citations, chips,
                 new RafAction("CALL_CARD", payload), null, reasoning);
     }
 }

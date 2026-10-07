@@ -28,6 +28,9 @@ spring:
       keepalive-time: 300000
       max-lifetime: 1800000
       validation-timeout: 5000
+  # Dates envoyées aux pages : heure de Côte d'Ivoire (GMT), voir RccPortalApplication.PORTAL_TIME_ZONE et js/rcc-time.js.
+  jackson:
+    time-zone: Africa/Abidjan
   jpa:
     hibernate:
       ddl-auto: none
@@ -93,6 +96,9 @@ graph:
   tenant-id: ${AZURE_TENANT_ID:}
   client-id: ${AZURE_CLIENT_ID:}
   client-secret: ${AZURE_CLIENT_SECRET:}
+  # Liaison Microsoft Teams COUPÉE : le portail n'envoie rien dans Teams (ni message, ni alerte de pôle) et
+  # n'affiche plus de bouton Teams. Outlook (e-mail) n'est pas concerné. Mettre RCC_TEAMS_ENABLED=true pour la rétablir.
+  teams-enabled: ${RCC_TEAMS_ENABLED:false}
 # Recherche web — complément de la barre de recherche globale et de RAF quand la Base de
 # connaissances / les procédures internes ne suffisent pas. Plusieurs moteurs, essayés dans
 # l'ordre de provider-order jusqu'au premier qui répond. Bing Web Search API a été RETIRÉE
@@ -125,6 +131,24 @@ websearch:
   wikipedia:
     enabled: ${WEBSEARCH_WIKIPEDIA_ENABLED:true}
 rcc:
+  # Serveur SANS Internet : true = aucun service hébergé sur Internet n'est appelé (Anthropic, Azure,
+  # Microsoft Graph, Copilot, recherche web, traducteurs en ligne, OpenStreetMap). Le portail utilise
+  # l'IA locale, Whisper, LibreTranslate et PaddleOCR installés par scripts/offline-kit.
+  # Diagnostic : Administration → Maintenance → « Fonctionnement sans Internet ». Voir docs/ANALYSE_HORS_LIGNE.md.
+  offline: ${RCC_OFFLINE:false}
+  # IA installée sur le réseau interne (Ollama, API compatible OpenAI) — utilisée hors ligne, ou quand aucune
+  # clé Anthropic / Azure n'est renseignée. Vide = désactivée.
+  local-ai:
+    url: "${RCC_LOCAL_AI_URL:}"
+    model: "${RCC_LOCAL_AI_MODEL:qwen2.5:7b}"
+    # Facultatif : lecture des captures d'écran KPI (ex. qwen2.5vl:7b) ; sinon OCR local.
+    vision-model: "${RCC_LOCAL_AI_VISION_MODEL:}"
+    timeout-seconds: ${RCC_LOCAL_AI_TIMEOUT_SECONDS:180}
+  # Transcription des appels QA par Whisper local (scripts/offline-kit/whisper_server.py). Vide = désactivée.
+  local-whisper:
+    url: "${RCC_LOCAL_WHISPER_URL:}"
+    model: "${RCC_LOCAL_WHISPER_MODEL:small}"
+    language: "${RCC_LOCAL_WHISPER_LANGUAGE:fr}"
   uploads:
     photos-dir: ${RCC_PHOTOS_DIR:C:/rcc-portal-photos}
     kb-files-dir: ${RCC_KB_FILES_DIR:C:/rcc-portal-kb-files}

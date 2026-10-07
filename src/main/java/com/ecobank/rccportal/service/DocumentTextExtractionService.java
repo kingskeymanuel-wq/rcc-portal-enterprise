@@ -65,8 +65,9 @@ public class DocumentTextExtractionService {
             if (filename.endsWith(".xlsx") || filename.endsWith(".xls")) {
                 return extractSpreadsheet(file);
             }
-            ExtractedDocument doc = extract(file);
-            return doc.rawText();
+            // Tout le texte du document : extract() ne renvoie que la PREMIÈRE section (découpage par titres en
+            // majuscules, utile pour l'import de procédures) — un guide entier était réduit à sa page de garde.
+            return readRawText(file);
         } catch (ApiException e) {
             throw e;
         } catch (Exception e) {
@@ -105,7 +106,8 @@ public class DocumentTextExtractionService {
         }
     }
 
-    public List<ExtractedDocument> extractMultiple(MultipartFile file) {
+    /** Texte brut complet du fichier (PDF, Office ancien ou récent, texte), d'après son contenu réel. */
+    private String readRawText(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw ApiException.badRequest("Le fichier est requis.");
         }
@@ -114,14 +116,23 @@ public class DocumentTextExtractionService {
         String rawText;
 
         try {
-            if (filename.endsWith(".pdf")) {
+            // Format réel lu dans les premiers octets, pas dans l'extension : un ancien .doc renommé en .docx (cas
+            // fréquent) passait par le lecteur Word moderne et échouait (« OLE2 Format… use HSSF instead of XSSF »).
+            byte[] head = new byte[8];
+            int read;
+            try (var in = file.getInputStream()) { read = in.readNBytes(head, 0, 8); }
+            boolean pdf = read >= 4 && head[0] == '%' && head[1] == 'P' && head[2] == 'D' && head[3] == 'F';
+            boolean office = read >= 4 && ((head[0] == 'P' && head[1] == 'K')                       // .docx, .xlsx, .pptx
+                    || ((head[0] & 0xFF) == 0xD0 && (head[1] & 0xFF) == 0xCF && (head[2] & 0xFF) == 0x11 && (head[3] & 0xFF) == 0xE0)); // .doc, .xls, .ppt
+            if (pdf) {
                 rawText = extractPdf(file);
-            } else if (filename.endsWith(".docx")) {
-                rawText = extractDocx(file);
-            } else if (filename.endsWith(".txt") || filename.endsWith(".csv")) {
+            } else if (office) {
+                rawText = extractOffice(file);
+            } else if (filename.endsWith(".txt") || filename.endsWith(".csv") || filename.endsWith(".md")) {
                 rawText = new String(file.getBytes(), StandardCharsets.UTF_8);
             } else {
-                throw ApiException.badRequest("Format non pris en charge pour l'extraction automatique. Formats acceptés : PDF, DOCX, TXT.");
+                throw ApiException.badRequest("Format non pris en charge pour l'extraction automatique. Formats acceptés : "
+                        + "PDF, Word (.docx, .doc), PowerPoint (.pptx, .ppt), Excel (.xlsx, .xls), TXT.");
             }
         } catch (IOException e) {
             throw ApiException.badRequest("Impossible de lire le fichier : " + e.getMessage());
@@ -132,6 +143,11 @@ public class DocumentTextExtractionService {
                     "Aucun texte n'a pu être extrait de ce fichier. S'il s'agit d'un PDF scanné (une image, pas du texte " +
                     "sélectionnable), l'extraction automatique ne peut pas le lire — utilisez un fichier avec du texte réel.");
         }
+        return rawText;
+    }
+
+    public List<ExtractedDocument> extractMultiple(MultipartFile file) {
+        String rawText = readRawText(file);
 
         List<String> sections = splitIntoSections(rawText);
         List<ExtractedDocument> results = new ArrayList<>();
@@ -175,6 +191,35 @@ public class DocumentTextExtractionService {
         try (PDDocument document = PDDocument.load(file.getInputStream())) {
             PDFTextStripper stripper = new PDFTextStripper();
             return stripper.getText(document);
+        }
+    }
+
+    /** Word, PowerPoint et Excel, anciens et nouveaux formats : POI choisit le bon lecteur d'après le contenu. */
+    private String extractOffice(MultipartFile file) throws IOException {
+        if (isRightsProtected(file)) {
+            throw ApiException.badRequest("Ce document est protégé par la gestion des droits Microsoft (étiquette de confidentialité "
+                    + "Ecobank) : son contenu est chiffré et ne peut être lu par aucun autre logiciel. Ouvrez-le dans Word, puis "
+                    + "enregistrez-le en PDF (Fichier → Exporter → PDF) ou retirez la protection, et déposez ce nouveau fichier.");
+        }
+        try (var in = file.getInputStream();
+             var extractor = org.apache.poi.extractor.ExtractorFactory.createExtractor(in)) {
+            return extractor.getText();
+        } catch (IOException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IOException("document Office illisible (" + e.getMessage() + ")", e);
+        }
+    }
+
+    /** Document Office chiffré (IRM / étiquette de confidentialité, ou mot de passe à l'ouverture) : conteneur OLE2
+     *  qui ne contient que le paquet chiffré (EncryptedPackage), jamais le texte. */
+    static boolean isRightsProtected(MultipartFile file) {
+        try (var in = file.getInputStream(); var fs = new org.apache.poi.poifs.filesystem.POIFSFileSystem(in)) {
+            var root = fs.getRoot();
+            return root.hasEntry("EncryptedPackage") || root.hasEntry("\u0006DataSpaces")
+                    || root.getEntryNames().stream().anyMatch(n -> n.toUpperCase(java.util.Locale.ROOT).contains("DATASPACES"));
+        } catch (Exception notOle2) {
+            return false; // .docx/.xlsx/.pptx classique (ZIP) : pas de chiffrement de ce type
         }
     }
 

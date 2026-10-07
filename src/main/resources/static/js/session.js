@@ -6,6 +6,56 @@
  * et gère le suivi de shift (pause/pause déjeuner/fin de shift). À inclure sur
  * toutes les pages protégées, AVANT les scripts propres à chaque page.
  */
+/**
+ * Filiale active — RCC ECI (Côte d'Ivoire) ou RCC ETG (Togo). Le Superviseur, le RH, l'administrateur et le Head QA
+ * basculent d'une filiale à l'autre depuis l'en-tête ; chaque appel au serveur porte la filiale choisie (en-tête
+ * X-RCC-Filiale) et tous les écrans de pilotage n'affichent que ses données. Ignoré par le serveur pour les autres profils.
+ */
+/** Serveur sans Internet (RCC_OFFLINE=true, balise posée par fragments/header.html) : liens et appels vers Internet masqués. */
+window.RccOffline = (function () {
+    var m = document.querySelector('meta[name="rcc-offline"]');
+    return !!(m && m.getAttribute("content") === "true");
+})();
+
+window.RccFiliale = (function () {
+    var KEY = "rcc.filiale", LABELS = { CI: "RCC ECI", TG: "RCC ETG" }, NAMES = { CI: "Côte d'Ivoire", TG: "Togo — Lomé" };
+    function get() { try { var v = localStorage.getItem(KEY); return LABELS[v] ? v : "CI"; } catch (e) { return "CI"; } }
+    function set(c) {
+        if (!LABELS[c]) return;
+        try { localStorage.setItem(KEY, c); localStorage.setItem("rccHrCountry", c); } catch (e) { /* stockage indisponible */ }
+        document.dispatchEvent(new CustomEvent("rcc:filiale-changed", { detail: { country: c } }));
+    }
+    var nativeFetch = window.fetch.bind(window);
+    window.fetch = function (input, init) {
+        try {
+            var url = typeof input === "string" ? input : (input && input.url) || "";
+            if (/^\/api\//.test(url) || url.indexOf(location.origin + "/api/") === 0) {
+                init = init || {};
+                var h = new Headers(init.headers || (typeof input !== "string" && input.headers) || {});
+                if (!h.has("X-RCC-Filiale")) h.set("X-RCC-Filiale", get());
+                init.headers = h;
+            }
+        } catch (e) { /* en-tête non ajouté : comportement d'origine */ }
+        return nativeFetch(input, init);
+    };
+    // Listes « Filiale » propres à certaines pages (Superviseur, Reporting) : alignées sur la filiale active, et un
+    // changement dans la liste bascule tout le portail.
+    document.addEventListener("DOMContentLoaded", function () {
+        ["svCountryFilter", "countryFilterInput"].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.value = get();
+            el.addEventListener("change", function () { if (LABELS[el.value]) { set(el.value); location.reload(); } });
+        });
+    });
+    document.addEventListener("rcc:filiale-changed", function (e) {
+        Array.prototype.forEach.call(document.querySelectorAll("#rccFilialeSwitch [data-filiale]"), function (b) {
+            b.classList.toggle("on", b.getAttribute("data-filiale") === e.detail.country);
+        });
+    });
+    return { get: get, set: set, label: function (c) { return LABELS[c || get()] || c; }, name: function (c) { return NAMES[c || get()] || c; }, LABELS: LABELS };
+})();
+
 // Visionneuse commune (articles, procédures, fichiers en fenêtre) — chargée sur toutes les pages.
 (function () {
     if (window.RccViewer || document.querySelector('script[data-rcc-viewer]')) return;
@@ -123,15 +173,14 @@ window.RccSession = (function () {
             var allowed = link.getAttribute("data-roles").split(",");
             var isAllowed = allowed.indexOf(profile) !== -1;
 
-            // Un conseiller Outbound a ses propres masques de mail (Digitalisation/Prêt/
-            // Assurance — voir seedOutboundMailTemplatesIfMissing()) donc GARDE ce lien ; en
-            // revanche les procédures/Knowledge Base/Formation génériques (pensées pour
-            // Inbound Voix/Mail) ne le concernent pas — remplacées par l'onglet "Parcours de
-            // vente" de son propre tableau de bord Outbound.
-            if ((featureCode === "procedures" || featureCode === "knowledge" || featureCode === "training" || featureCode === "performance") && outboundAgent) isAllowed = false;
-            if (featureCode === "outbound-dashboard" && !outboundAgent) isAllowed = false;
-            // Portails Tchat / Rafiki : chaque agent ne voit que celui de son canal (l'administrateur voit les deux).
-            if ((featureCode === "portail-tchat" || featureCode === "portail-rafiki") && profile !== "ADMIN"
+            // Un conseiller Outbound (Digitalisation, Télévente) garde ses masques de mail et la Base de
+            // connaissance (aussi intégrée à son portail, onglet « Base de connaissance ») ; les procédures et la
+            // formation génériques (pensées pour Inbound Voix/Mail) restent remplacées par ses « Parcours de vente ».
+            if ((featureCode === "procedures" || featureCode === "training" || featureCode === "performance") && outboundAgent) isAllowed = false;
+            // Portail Outbound = Digitalisation ; un agent Télévente a son propre portail.
+            if (featureCode === "outbound-dashboard" && (!outboundAgent || channelPortal === "/portail-televente")) isAllowed = false;
+            // Portails Tchat / Rafiki / Télévente : chaque agent ne voit que le sien (l'administrateur voit tout).
+            if ((featureCode === "portail-mail" || featureCode === "portail-tchat" || featureCode === "portail-rafiki" || featureCode === "portail-televente" || featureCode === "portail-cib") && profile !== "ADMIN"
                 && channelPortal !== "/" + featureCode) isAllowed = false;
 
             isAllowed = computeFeatureAllowed(featureCode, isAllowed, overridesByCode, denied);
@@ -146,7 +195,39 @@ window.RccSession = (function () {
         applyFeatureElementVisibility(overridesByCode, deniedTabCodes);
     }
 
+    /** Sélecteur de filiale dans l'en-tête : Superviseur, RH, administrateur, Head QA. */
+    var FILIALE_PROFILES = ["ADMIN", "SUPERVISOR", "RH", "QA_SUPERVISOR"];
+    function mountFilialeSwitch(profile) {
+        var right = document.querySelector(".topbar .right");
+        if (!right || FILIALE_PROFILES.indexOf(profile) === -1 || document.getElementById("rccFilialeSwitch")) return;
+        var cur = window.RccFiliale.get();
+        var box = document.createElement("div");
+        box.id = "rccFilialeSwitch";
+        box.className = "rcc-filiale";
+        box.title = "Filiale affichée dans tout le portail";
+        box.innerHTML = '<i class="bi bi-building"></i>' + Object.keys(window.RccFiliale.LABELS).map(function (c) {
+            return '<button type="button" data-filiale="' + c + '" class="' + (c === cur ? "on" : "") + '" title="' + RccApi.escapeHtml(window.RccFiliale.name(c)) + '">' + window.RccFiliale.label(c) + '</button>';
+        }).join("");
+        right.insertBefore(box, right.firstChild);
+        if (!document.getElementById("rccFilialeCss")) {
+            var st = document.createElement("style");
+            st.id = "rccFilialeCss";
+            st.textContent = ".rcc-filiale{display:inline-flex;align-items:center;gap:.2rem;background:#EEF3FB;border:1px solid #D5E0F2;border-radius:999px;padding:.15rem;margin-right:.6rem}" +
+                ".rcc-filiale>i{color:#0B3D91;margin:0 .3rem 0 .4rem}.rcc-filiale button{border:0;background:transparent;border-radius:999px;padding:.2rem .7rem;font-weight:700;font-size:.78rem;color:#4B5A70}" +
+                ".rcc-filiale button.on{background:#0B3D91;color:#fff}";
+            document.head.appendChild(st);
+        }
+        box.addEventListener("click", function (e) {
+            var b = e.target.closest("[data-filiale]");
+            if (!b || b.classList.contains("on")) return;
+            window.RccFiliale.set(b.getAttribute("data-filiale"));
+            // Tous les écrans de la page se rechargent sur la nouvelle filiale.
+            window.location.reload();
+        });
+    }
+
     function applyHeader(user, profile) {
+        mountFilialeSwitch(profile);
         var nameEl = document.getElementById("headerUserName");
         var roleEl = document.getElementById("headerUserRole");
         if (nameEl) nameEl.textContent = user.name || user.username || "—";
@@ -190,6 +271,11 @@ window.RccSession = (function () {
      * un minuteur en direct — vert en poste, rouge en pause, blanc si le shift n'a pas
      * commencé ou est terminé (rien à chronométrer).
      */
+    /**
+     * Heure de connexion du jour (premier LOGIN), fixe : une pause, une formation, une réunion ou une
+     * déconnexion/reconnexion ne la changent pas. En dessous, le temps écoulé depuis cette connexion,
+     * qui suit son cours normalement (jusqu'à la fin de shift).
+     */
     function updateShiftTimer(status) {
         var el = document.getElementById("shiftTimer");
         if (!el) return;
@@ -197,35 +283,40 @@ window.RccSession = (function () {
         clearInterval(shiftTimerInterval);
 
         var events = status.todayEvents || [];
-        var lastEvent = events.length ? events[events.length - 1] : null;
+        var login = events.filter(function (e) { return e.eventType === "LOGIN"; })[0] || events[0] || null;
+        var end = status.currentState === "SHIFT_ENDED"
+            ? events.filter(function (e) { return e.eventType === "SHIFT_END" || e.eventType === "LOGOUT"; }).slice(-1)[0] || events[events.length - 1]
+            : null;
 
-        if ((status.currentState === "SHIFT_ENDED" || status.currentState === "NOT_STARTED") || !lastEvent) {
+        el.style.color = "#22c55e";
+        if (!login) {
             shiftCurrentStateSince = null;
             updateResumeInfo(null);
-            el.textContent = "--:--:--";
-            el.style.color = "#ffffff";
+            el.innerHTML = '<div style="font-size:.7rem;font-weight:400;color:#cbd5e1">Heure de connexion</div>--:--';
             return;
         }
-
-        // Début de l'état courant calculé par le serveur : après une déconnexion/reconnexion le
-        // même jour, il est conservé — le minuteur reprend en continuité (absence comprise) au
-        // lieu de repartir de zéro. Repli sur le dernier événement pour un ancien serveur.
-        shiftCurrentStateSince = new Date(status.currentStateSince || lastEvent.occurredAt).getTime();
+        shiftCurrentStateSince = new Date(login.occurredAt).getTime();
         updateResumeInfo(status);
-        el.style.color = (status.currentState === "ON_PAUSE" || status.currentState === "ON_LUNCH") ? "#ef4444"
-            : status.currentState === "ON_TRAINING" ? "#0057B8"
-            : status.currentState === "ON_MEETING" ? "#F5A623"
-            : "#22c55e";
 
+        // Débordement : shift encore ouvert après sa fin prévue — temps de dépassement en jaune, clôture
+        // automatique 1 h 30 après la fin prévue (ShiftOverflowJob côté serveur).
+        var plannedEnd = !end && status.plannedEnd ? new Date(status.plannedEnd).getTime() : null;
+        var autoClose = status.autoCloseAt ? new Date(status.autoCloseAt).getTime() : null;
         function tick() {
-            var elapsed = Math.max(0, Math.floor((Date.now() - shiftCurrentStateSince) / 1000));
-            var h = String(Math.floor(elapsed / 3600)).padStart(2, "0");
-            var m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, "0");
-            var s = String(elapsed % 60).padStart(2, "0");
-            el.textContent = h + ":" + m + ":" + s;
+            var until = end ? new Date(end.occurredAt).getTime() : Date.now();
+            var minutes = Math.max(0, Math.floor((until - shiftCurrentStateSince) / 60000));
+            var over = plannedEnd && Date.now() > plannedEnd ? Math.floor((Date.now() - plannedEnd) / 60000) : -1;
+            el.style.color = over >= 0 ? "#facc15" : "#22c55e";
+            el.innerHTML = '<div style="font-size:.7rem;font-weight:400;color:#cbd5e1">Connecté à</div>' + hhmm(login.occurredAt) +
+                '<div style="font-size:.72rem;font-weight:400;color:#cbd5e1">' + (end ? "fin à " + hhmm(end.occurredAt) + " · " : "depuis ") + durationLabel(minutes) + '</div>' +
+                (over >= 0 ? '<div class="shift-overflow" title="Votre shift est terminé : pensez à « Fin de shift ». Sinon il sera clôturé automatiquement.">' +
+                    '<i class="bi bi-hourglass-bottom"></i> Débordement +' + durationLabel(over) +
+                    (autoClose ? '<small>clôture auto à ' + hhmm(status.autoCloseAt) + '</small>' : '') + '</div>' : '');
+            // Heure de clôture automatique passée : le serveur a clôturé le shift, on recharge le statut.
+            if (autoClose && Date.now() >= autoClose + 60000 && !tick.reloaded) { tick.reloaded = true; refreshShiftStatus(); }
         }
         tick();
-        shiftTimerInterval = setInterval(tick, 1000);
+        if (!end) shiftTimerInterval = setInterval(tick, 30000);
     }
 
     function hhmm(iso) {
@@ -251,7 +342,7 @@ window.RccSession = (function () {
         }
         var text = "Reprise à " + hhmm(status.lastReconnectedAt) + " (déconnecté à " + hhmm(status.lastDisconnectedAt) + ")";
         if (status.absenceMinutesInCurrentState > 0) {
-            text += " — minuteur en continuité, dont " + durationLabel(status.absenceMinutesInCurrentState) + " d'absence";
+            text += " — dont " + durationLabel(status.absenceMinutesInCurrentState) + " d'absence";
         }
         if (status.absenceMinutesToday > status.absenceMinutesInCurrentState) {
             text += " · absence totale du jour : " + durationLabel(status.absenceMinutesToday);
@@ -567,7 +658,7 @@ window.RccSession = (function () {
         if (!results.length && !webHtml) {
             resultsBox.innerHTML = '<p class="text-muted text-center">Aucun résultat pour « ' + RccApi.escapeHtml(term) + ' ».</p>' +
                 '<div class="text-center"><a class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" ' +
-                'href="https://www.google.com/search?q=' + encodeURIComponent(term) + '">' +
+                'href="https://www.google.com/search?q=' + encodeURIComponent(term) + '"' + (window.RccOffline ? ' style="display:none"' : '') + '>' +
                 '<i class="bi bi-box-arrow-up-right"></i> Chercher « ' + RccApi.escapeHtml(term) + ' » sur Google</a></div>';
             return;
         }
@@ -599,7 +690,7 @@ window.RccSession = (function () {
         }, 0);
         resultsBox.innerHTML = internalHtml + webHtml +
             '<div class="text-center mt-2 pt-2 border-top">' +
-                '<a class="small text-muted" target="_blank" rel="noopener" href="https://www.google.com/search?q=' + encodeURIComponent(term) + '">' +
+                '<a class="small text-muted" target="_blank" rel="noopener" href="https://www.google.com/search?q=' + encodeURIComponent(term) + '"' + (window.RccOffline ? ' style="display:none"' : '') + '>' +
                 '<i class="bi bi-box-arrow-up-right"></i> Chercher aussi « ' + RccApi.escapeHtml(term) + ' » sur Google</a></div>';
     }
 
@@ -695,9 +786,13 @@ window.RccSession = (function () {
      * 15 s (et au retour sur l'onglet). Si le profil change → bascule vers le bon portail ; si seuls les onglets,
      * fonctionnalités ou l'équipe changent → la page se recharge pour appliquer les nouveaux droits.
      */
+    /** Portails d'accueil des agents : un agent n'ouvre que celui de son équipe. */
+    var AGENT_HOME_PORTALS = ["/dashboard", "/outbound-dashboard", "/portail-mail", "/portail-tchat", "/portail-rafiki", "/portail-televente", "/portail-cib"];
+
     function watchAccessChanges(user, profile) {
         var roleSig = String(user.role || "") + "|" + String(user.service || "");
         var baseline = null;
+        var baselinePortal = null;
         var shown = false;
 
         function banner(text, target) {
@@ -722,9 +817,13 @@ window.RccSession = (function () {
             }).then(function (a) {
                 if (!a) return;
                 if (a.active === false) { window.location.href = "/login"; return; }
-                if (baseline === null) { baseline = a.signature; return; }
+                if (baseline === null) { baseline = a.signature; baselinePortal = a.redirectTo || null; return; }
                 if (a.signature === baseline) return;
-                if (String(a.role || "") + "|" + String(a.service || "") !== roleSig) {
+                // Nouveau portail (ex. Agent Inbound Mail → Agent Réseaux sociaux : même profil Agent, autre portail).
+                var portalChanged = (a.redirectTo || null) !== baselinePortal && a.redirectTo && a.redirectTo !== window.location.pathname;
+                if (portalChanged) {
+                    banner("Vos accès ont été mis à jour par l'administrateur : votre portail change.", a.redirectTo);
+                } else if (String(a.role || "") + "|" + String(a.service || "") !== roleSig) {
                     var newProfile = computeProfile(a);
                     banner("Vos accès ont été mis à jour par l'administrateur : " + (PROFILE_LABELS[newProfile] || newProfile) + ".", a.redirectTo || "/dashboard");
                 } else {
@@ -773,8 +872,16 @@ window.RccSession = (function () {
                     var deniedTabCodes = results[1].deniedTabCodes || [];
                     var teamStatus = results[2];
 
-                    var isOutboundAgent = profile === "AGENT" && teamStatus.redirectTo === "/outbound-dashboard";
-                    var channelPortal = profile === "AGENT" && /^\/portail-(tchat|rafiki)$/.test(teamStatus.redirectTo || "") ? teamStatus.redirectTo : null;
+                    var isOutboundAgent = profile === "AGENT" && /^\/(outbound-dashboard|portail-televente)$/.test(teamStatus.redirectTo || "");
+                    var channelPortal = profile === "AGENT" && /^\/portail-(mail|tchat|rafiki|televente|cib)$/.test(teamStatus.redirectTo || "") ? teamStatus.redirectTo : null;
+                    // Un agent est toujours ramené sur SON portail d'équipe : accueil générique, favori ou ancien
+                    // portail après un changement d'accès dans l'Administration (Réseaux sociaux, Rafiki, Télévente…).
+                    var here = window.location.pathname;
+                    if (profile === "AGENT" && teamStatus.redirectTo && AGENT_HOME_PORTALS.indexOf(teamStatus.redirectTo) !== -1
+                        && AGENT_HOME_PORTALS.indexOf(here) !== -1 && here !== teamStatus.redirectTo) {
+                        window.location.replace(teamStatus.redirectTo);
+                        return null;
+                    }
                     applySidebarVisibility(profile, permissionOverrides, deniedTabCodes, isOutboundAgent, channelPortal);
                     applyHeader(user, profile);
 

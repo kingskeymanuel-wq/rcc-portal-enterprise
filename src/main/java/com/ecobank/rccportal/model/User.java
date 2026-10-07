@@ -120,7 +120,7 @@ public class User {
      */
     @Column(name = "TEAM_ASSIGNMENT_LOCKED", nullable = false)
     @Builder.Default
-    private Boolean teamAssignmentLocked = false;
+    private Boolean teamAssignmentLocked = true; // True par défaut pour tous les comptes (demande de l'administration)
 
     @PrePersist
     protected void onCreate() {

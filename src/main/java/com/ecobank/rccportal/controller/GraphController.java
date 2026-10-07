@@ -31,7 +31,7 @@ public class GraphController {
     /** true si graph.tenant-id/client-id/client-secret sont renseignés — le frontend s'en sert pour savoir s'il doit proposer l'envoi réel ou le lien classique. */
     @GetMapping("/status")
     public Map<String, Boolean> status() {
-        return Map.of("configured", graphClient.isConfigured());
+        return Map.of("configured", graphClient.isConfigured(), "teams", graphClient.isTeamsEnabled());
     }
 
     @PostMapping("/send-outlook")
@@ -42,7 +42,7 @@ public class GraphController {
         requireEmail(from, "Votre compte n'a pas d'adresse e-mail renseignée.");
         requireEmail(to, "Le destinataire n'a pas d'adresse e-mail renseignée.");
 
-        String subject = body.getOrDefault("subject", "Message depuis RCC Portal — " + from.getName());
+        String subject = body.getOrDefault("subject", "Message depuis Portail Front Office — " + from.getName());
         String message = body.getOrDefault("message", "");
         graphClient.sendMail(from.getEmail(), to.getEmail(), subject, message);
         return Map.of("status", "sent");
@@ -51,6 +51,7 @@ public class GraphController {
     @PostMapping("/send-teams")
     public Map<String, String> sendTeams(@RequestBody Map<String, String> body,
                                           @AuthenticationPrincipal AuthenticatedUser requester) {
+        if (!graphClient.isTeamsEnabled()) throw ApiException.forbidden("La liaison avec Microsoft Teams est désactivée sur ce portail.");
         User from = findUser(requester.username());
         User to = findUser(body.get("toUsername"));
         requireEmail(from, "Votre compte n'a pas d'adresse e-mail renseignée.");

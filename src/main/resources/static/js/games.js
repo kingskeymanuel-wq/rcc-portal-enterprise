@@ -769,6 +769,7 @@ window.RccGames = (function () {
             window.RccSession.init().then(function (session) {
                 if (session) {
                     currentProfile = session.profile;
+                    if (window.RccAssessments && $("evAssessments")) RccAssessments.mountTab($("evAssessments"), currentProfile);
                     if (currentProfile === "QA" || currentProfile === "ADMIN") {
                         $("gmAdminToggleBtn").style.display = "";
                     }

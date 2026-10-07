@@ -512,7 +512,7 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         addColumnIfMissing("USERS", "ACTIVITY", "ALTER TABLE dbo.USERS ADD ACTIVITY NVARCHAR(100) NULL");
         addColumnIfMissing("USERS", "RESIDENCE_PLACE", "ALTER TABLE dbo.USERS ADD RESIDENCE_PLACE NVARCHAR(200) NULL");
         addColumnIfMissing("USERS", "LED_TEAM", "ALTER TABLE dbo.USERS ADD LED_TEAM NVARCHAR(30) NULL");
-        addColumnIfMissing("USERS", "TEAM_ASSIGNMENT_LOCKED", "ALTER TABLE dbo.USERS ADD TEAM_ASSIGNMENT_LOCKED BIT NOT NULL DEFAULT 0");
+        addColumnIfMissing("USERS", "TEAM_ASSIGNMENT_LOCKED", "ALTER TABLE dbo.USERS ADD TEAM_ASSIGNMENT_LOCKED BIT NOT NULL CONSTRAINT DF_USERS_TEAM_ASSIGNMENT_LOCKED DEFAULT 1");
         // Les comptes de test/démo (agent.conseiller, agent.qa, agent.admin, it.admin, rh.test)
         // existaient avant cette fonctionnalité — ils sont exemptés explicitement à CHAQUE
         // démarrage, sans dépendre d'une condition qui peut cesser d'être vraie (l'ancien
@@ -948,12 +948,17 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         seedServiceIfMissing("AGENCE_CAISSIER", "Agence — Caissier", "Caissier en agence : opérations de guichet, assistance client", 18);
         seedServiceIfMissing("AGENCE_GESTIONNAIRE", "Agence — Gestionnaire clientèle", "Gestionnaire de clientèle en agence : conseil, comptes, cartes, crédits", 19);
         // Agents des canaux digitaux : chacun atterrit sur son propre portail (/portail-tchat, /portail-rafiki).
-        seedServiceIfMissing("AGENT_TCHAT", "Agent Tchat", "Conseiller clientèle — Live chat", 20);
+        seedServiceIfMissing("AGENT_TCHAT", "Agent Réseaux sociaux", "Conseiller clientèle — Réseaux sociaux", 20);
         seedServiceIfMissing("AGENT_RAFIKI", "Agent Rafiki", "Conseiller clientèle — Rafiki (Facebook, Instagram, X)", 21);
         // Team Leaders des canaux digitaux : même portail Team Leader, restreint aux agents de leur canal.
-        seedServiceIfMissing("TEAM_LEADER_TCHAT", "Team Leader Tchat", "Responsable de l'équipe Tchat (live chat)", 22);
+        seedServiceIfMissing("TEAM_LEADER_TCHAT", "Team Leader Réseaux sociaux", "Responsable de l'équipe Réseaux sociaux", 22);
         seedServiceIfMissing("TEAM_LEADER_RAFIKI", "Team Leader Rafiki", "Responsable de l'équipe Rafiki (réseaux sociaux)", 23);
         seedServiceIfMissing("TEAM_LEADER_CIB", "Team Leader CIB", "Responsable de l'équipe CIB", 24);
+        seedServiceIfMissing("AGENT_TELEVENTE", "Agent Télévente", "Conseiller clientèle — Télévente (pôle Outbound)", 25);
+        seedServiceIfMissing("AGENT_DIGITALISATION", "Agent Digitalisation", "Conseiller clientèle — Digitalisation (pôle Outbound)", 26);
+        // Télévente et Digitalisation : chacune son Team Leader (portail Team Leader restreint à la sous-équipe).
+        seedServiceIfMissing("TEAM_LEADER_TELEVENTE", "Team Leader Télévente", "Responsable de l'équipe Télévente (pôle Outbound)", 27);
+        seedServiceIfMissing("TEAM_LEADER_DIGITALISATION", "Team Leader Digitalisation", "Responsable de l'équipe Digitalisation (pôle Outbound)", 28);
 
         createIfMissing("USERS", """
                 CREATE TABLE dbo.USERS (
@@ -1653,6 +1658,12 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         addColumnIfMissing("Campaigns", "CoverImageUrl", "ALTER TABLE dbo.Campaigns ADD CoverImageUrl NVARCHAR(500) NULL");
         addColumnIfMissing("CampaignContacts", "AnswersJson", "ALTER TABLE dbo.CampaignContacts ADD AnswersJson NVARCHAR(4000) NULL");
         addColumnIfMissing("CampaignContacts", "AccountKey", "ALTER TABLE dbo.CampaignContacts ADD AccountKey NVARCHAR(64) NULL");
+        // Formulaires de campagne v2 (sections, logique, score — CampaignFormEngine) et score du lead par contact.
+        addColumnIfMissing("Campaigns", "FormJson", "ALTER TABLE dbo.Campaigns ADD FormJson NVARCHAR(MAX) NULL");
+        addColumnIfMissing("CampaignContacts", "LeadScore", "ALTER TABLE dbo.CampaignContacts ADD LeadScore INT NULL");
+        if (tableExists("CampaignContacts") && columnExists("CampaignContacts", "AnswersJson")) {
+            jdbcTemplate.execute("IF COL_LENGTH('dbo.CampaignContacts', 'AnswersJson') <> -1 ALTER TABLE dbo.CampaignContacts ALTER COLUMN AnswersJson NVARCHAR(MAX) NULL");
+        }
         // Questionnaire construit depuis un fichier : listes de choix longues → au-delà de 4000 caractères.
         if (tableExists("Campaigns") && columnExists("Campaigns", "FieldsJson")) {
             jdbcTemplate.execute("IF COL_LENGTH('dbo.Campaigns', 'FieldsJson') <> -1 ALTER TABLE dbo.Campaigns ALTER COLUMN FieldsJson NVARCHAR(MAX) NULL");
@@ -1820,6 +1831,18 @@ public class WorkflowSchemaBootstrap implements CommandLineRunner {
         String[][] roles = {
                 {"Agent Inbound", "Conseiller clientèle — pôle Inbound (Voix ou Mail/Rafiki)"},
                 {"Agent Outbound", "Conseiller clientèle — pôle Outbound (appels sortants, vente)"},
+                {"Agent Réseaux sociaux", "Conseiller clientèle — Réseaux sociaux (portail ex-Tchat)"},
+                {"Agent Inbound Voice", "Conseiller clientèle — Inbound Voix"},
+                {"Agent Inbound Mail", "Conseiller clientèle — Inbound Mail"},
+                {"Agent Rafiki", "Conseiller clientèle — Rafiki"},
+                {"Agent CIB", "Conseiller clientèle — CIB"},
+                {"Agent Télévente", "Conseiller clientèle — Télévente (pôle Outbound)"},
+                {"Team Leader Télévente", "Responsable de l'équipe Télévente (pôle Outbound)"},
+                {"Agent Digitalisation", "Conseiller clientèle — Digitalisation (pôle Outbound)"},
+                {"Team Leader Digitalisation", "Responsable de l'équipe Digitalisation (pôle Outbound)"},
+                {"Team Leader Rafiki", "Responsable de l'équipe Rafiki"},
+                {"Team Leader CIB", "Responsable de l'équipe CIB"},
+                {"Team Leader Réseaux sociaux", "Responsable de l'équipe Réseaux sociaux"},
                 {"Team Leader", "Responsable d'équipe — accès générique, toutes équipes"},
                 {"Team Leader Inbound Voice", "Responsable de l'équipe Inbound Voix"},
                 {"Team Leader Inbound Mail", "Responsable de l'équipe Inbound Mail / Rafiki"},

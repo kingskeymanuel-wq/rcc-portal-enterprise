@@ -35,12 +35,12 @@ public class HrOrganizationService {
 
     public static final List<PopulationDef> POPULATIONS = List.of(
             new PopulationDef("OUTSOURCE", "Outsource", "bi-building", List.of(
-                    new TeamDef("VOICE", "Inbound Voix", "bi-headset"), new TeamDef("TCHAT", "Tchat", "bi-chat-dots"),
+                    new TeamDef("VOICE", "Inbound Voix", "bi-headset"), new TeamDef("TCHAT", "Réseaux sociaux", "bi-chat-dots"),
                     new TeamDef("MAIL", "Mail", "bi-envelope-at"), new TeamDef("RAFIKI", "Rafiki", "bi-robot"),
                     new TeamDef("CIB", "CIB", "bi-briefcase"))),
             new PopulationDef("STAGIAIRE", "Stagiaires", "bi-mortarboard", List.of(
                     new TeamDef("VOICE", "Inbound Voix", "bi-headset"), new TeamDef("RAFIKI", "Rafiki", "bi-robot"),
-                    new TeamDef("TCHAT", "Tchat", "bi-chat-dots"), new TeamDef("DIGITAL", "Digitalisation (Outbound Digital)", "bi-phone"))),
+                    new TeamDef("TCHAT", "Réseaux sociaux", "bi-chat-dots"), new TeamDef("DIGITAL", "Digitalisation (Outbound Digital)", "bi-phone"))),
             new PopulationDef("STAFF", "Staff Ecobank", "bi-bank", List.of(
                     new TeamDef("QA", "Quality Assurance", "bi-patch-check"), new TeamDef("CARD_OPS", "Service Opérations Cartes", "bi-credit-card-2-front"))));
 
@@ -109,11 +109,7 @@ public class HrOrganizationService {
     }
 
     static String country(String branch) {
-        if (branch == null || branch.isBlank()) return "CI";
-        String b = branch.trim().toUpperCase(Locale.ROOT);
-        if (b.startsWith("CI") || b.contains("IVOIRE")) return "CI";
-        if (b.startsWith("TG") || b.contains("TOGO")) return "TG";
-        return b.length() > 2 ? b.substring(0, 2) : b;
+        return com.ecobank.rccportal.util.Affiliates.countryOf(branch); // « K01 » = Côte d'Ivoire
     }
 
     private static String fold(String s) {
@@ -401,5 +397,17 @@ public class HrOrganizationService {
     private static Double avg(List<Double> values) {
         List<Double> v = values.stream().filter(Objects::nonNull).toList();
         return v.isEmpty() ? null : Math.round(v.stream().mapToDouble(Double::doubleValue).average().orElse(0) * 10) / 10.0;
+    }
+
+    /**
+     * Équipe changée par un Team Leader : le placement RH manuel d'équipe (dbo.HrAssignments.HrTeam) ne doit plus
+     * contredire la nouvelle équipe — il est effacé, la population (Outsource, interne…) est conservée.
+     */
+    public void clearTeamOverride(Long userId) {
+        try {
+            jdbc.update("UPDATE dbo.HrAssignments SET HrTeam = NULL, UpdatedAt = SYSUTCDATETIME() WHERE UserId = ? AND HrTeam IS NOT NULL", userId);
+        } catch (RuntimeException e) {
+            // table absente (aucun placement manuel) : rien à corriger
+        }
     }
 }

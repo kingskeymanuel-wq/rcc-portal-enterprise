@@ -76,6 +76,7 @@ class MonRccSpaceServiceTest {
         assertEquals("TCHAT", MonRccSpaceService.teamOf("INBOUND TCHAT", Set.of(), null));
         assertEquals("/portail-rafiki", UserService.digitalChannelPortal("INBOUND RAFIKI"));
         assertEquals("/portail-tchat", UserService.digitalChannelPortal("Live Chat"));
-        assertNull(UserService.digitalChannelPortal("INBOUND MAIL"));
+        assertEquals("/portail-mail", UserService.digitalChannelPortal("INBOUND MAIL"));   // portail Inbound Mail dédié
+        assertNull(UserService.digitalChannelPortal("INBOUND VOICE"));
     }
 }

@@ -37,12 +37,12 @@ public class MonRccSpaceService {
         boolean isAgent() { return !isTeamLeader() && !isQa() && !isRh() && !isSupervisor() && !isAgence() && team != null; }
     }
 
-    static final Map<String, String> TEAM_LABELS = Map.of("INBOUND_VOICE", "Inbound Voix", "INBOUND_MAIL", "Inbound Mail", "TCHAT", "Tchat",
-            "RAFIKI", "Rafiki", "OUTBOUND", "Outbound", "CIB", "CIB");
+    static final Map<String, String> TEAM_LABELS = Map.of("INBOUND_VOICE", "Inbound Voix", "INBOUND_MAIL", "Inbound Mail", "TCHAT", "Réseaux sociaux",
+            "RAFIKI", "Rafiki", "OUTBOUND", "Outbound", "CIB", "CIB", "TELEVENTE", "Télévente", "DIGITALISATION", "Digitalisation");
 
     private static final Map<String, String> PORTAL_LABELS = Map.ofEntries(
-            Map.entry("/dashboard", "Portail agent"), Map.entry("/portail-tchat", "Portail agent Tchat"), Map.entry("/portail-rafiki", "Portail agent Rafiki"),
-            Map.entry("/outbound-dashboard", "Portail Outbound"), Map.entry("/team-leader", "Portail Team Leader"), Map.entry("/qa", "Portail Quality Assurance"),
+            Map.entry("/dashboard", "Portail agent"), Map.entry("/portail-tchat", "Portail agent Réseaux sociaux"), Map.entry("/portail-mail", "Portail agent Inbound Mail"), Map.entry("/portail-rafiki", "Portail agent Rafiki"), Map.entry("/portail-cib", "Portail CIB"),
+            Map.entry("/outbound-dashboard", "Portail Outbound — Digitalisation"), Map.entry("/portail-televente", "Portail Télévente"), Map.entry("/team-leader", "Portail Team Leader"), Map.entry("/qa", "Portail Quality Assurance"),
             Map.entry("/qa-supervisor", "Portail Head QA"), Map.entry("/rh", "Portail RH"), Map.entry("/supervisor", "Portail Superviseur"),
             Map.entry("/agence", "Portail Agence"), Map.entry("/training", "Centre de formation"));
 
@@ -110,8 +110,9 @@ public class MonRccSpaceService {
 
     static String theme(String profile, String portal) {
         if ("/portail-tchat".equals(portal)) return "tchat";
+        if ("/portail-mail".equals(portal)) return "mail";
         if ("/portail-rafiki".equals(portal)) return "rafiki";
-        if ("/outbound-dashboard".equals(portal)) return "outbound";
+        if ("/outbound-dashboard".equals(portal) || "/portail-televente".equals(portal)) return "outbound";
         return switch (profile) {
             case "TEAM_LEADER" -> "tl";
             case "QA", "QA_SUPERVISOR" -> "qa";
@@ -150,7 +151,7 @@ public class MonRccSpaceService {
         java.util.function.BiConsumer<List<Member>, String> add = (list, group) -> list.stream()
                 .sorted(Comparator.comparing(m -> m.name() == null ? "" : m.name(), String.CASE_INSENSITIVE_ORDER))
                 .forEach(m -> out.putIfAbsent(m.username(), new Contact(m.username(), m.name(), roleLabel(m), group)));
-        String classifierTeam = self.team() == null ? null : ("TCHAT".equals(self.team()) || "RAFIKI".equals(self.team()) ? "INBOUND_MAIL" : self.team());
+        String classifierTeam = classifierOf(self.team());
         switch (profile) {
             case "TEAM_LEADER" -> {
                 String led = self.ledTeam() == null ? classifierTeam : self.ledTeam().toUpperCase(Locale.ROOT);
@@ -187,7 +188,7 @@ public class MonRccSpaceService {
     }
 
     private static String classifierOf(String team) {
-        return "TCHAT".equals(team) || "RAFIKI".equals(team) ? "INBOUND_MAIL" : team;
+        return team != null && TeamClassifier.isChannel(team) ? TeamClassifier.teamOf(team).name() : team;
     }
 
     private static String roleLabel(Member m) {
@@ -209,13 +210,16 @@ public class MonRccSpaceService {
                 case "MAIL": return "INBOUND_MAIL";
                 case "VOICE": return "INBOUND_VOICE";
                 case "CIB": return "CIB";
-                case "DIGITAL": return "OUTBOUND";
+                case "DIGITAL": return "DIGITALISATION";
+                case "TELEVENTE": return "TELEVENTE";
                 default: break;
             }
         }
         String a = activity == null ? "" : activity.toUpperCase(Locale.ROOT);
         if (a.contains("RAFIKI") || services.contains("AGENT_RAFIKI")) return "RAFIKI";
         if (a.contains("TCHAT") || a.contains("LIVE CHAT") || services.contains("AGENT_TCHAT")) return "TCHAT";
+        String sub = TeamClassifier.channel(activity, services);
+        if ("TELEVENTE".equals(sub) || "DIGITALISATION".equals(sub)) return sub;
         TeamClassifier.Team t = TeamClassifier.classify(activity, services);
         return t == TeamClassifier.Team.OTHER ? null : t.name();
     }

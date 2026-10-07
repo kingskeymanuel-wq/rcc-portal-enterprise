@@ -2,8 +2,10 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <!-- Heure de Côte d'Ivoire sur tous les postes (avant tout autre script) -->
+    <script th:src="@{/js/rcc-time.js}"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>RCC Portal Enterprise — Portail Team Leader</title>
+    <title>Portail Front Office Ecobank — Portail Team Leader</title>
     <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}" rel="stylesheet">
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
@@ -13,6 +15,11 @@
     <link rel="stylesheet" th:href="@{/css/meetings.css}">
     <link rel="stylesheet" th:href="@{/css/qa-team.css}">
     <link rel="stylesheet" th:href="@{/css/team-perf-files.css}">
+    <link rel="stylesheet" th:href="@{/css/campaign-forms.css}">
+    <link rel="stylesheet" th:href="@{/css/rcc-guides.css}">
+    <link rel="stylesheet" th:href="@{/css/kb-embed.css}">
+    <link rel="stylesheet" th:href="@{/css/shift-incidents.css}">
+    <link rel="stylesheet" th:href="@{/css/tool-profiles.css}">
     <style>
         .tl-tab-nav { gap: .35rem; padding: .7rem .8rem; background: #F5F8FC; border-radius: 1rem 1rem 0 0; }
         .tl-tab-nav .btn.nav-link { border: 0; border-radius: 999px; color: #4B5A70; font-weight: 700; font-size: .86rem; padding: .45rem .95rem; transition: background .2s ease, color .2s ease, box-shadow .2s ease; }
@@ -95,6 +102,8 @@
         .tl-remove-choice small { color: #6B7A90; }
         .tl-hero[data-channel="TCHAT"] { background: linear-gradient(120deg, #0B6E6E 0%, #0B8A8A 45%, #5B3CC4 100%); }
         .tl-hero[data-channel="RAFIKI"] { background: linear-gradient(120deg, #0C3C96 0%, #1877F2 50%, #D6249F 100%); }
+        .tl-hero[data-channel="TELEVENTE"] { background: linear-gradient(120deg, #4A148C 0%, #6A1B9A 50%, #AD1457 100%); }
+        .tl-hero[data-channel="DIGITALISATION"] { background: linear-gradient(120deg, #004D40 0%, #00796B 50%, #0288D1 100%); }
         .tl-status-badge.PLANNED, .tl-status-badge.PENDING { background: #fff3cd; color: #7a5b00; }
         .tl-status-badge.DONE, .tl-status-badge.CONFIRMED { background: #d1f2e0; color: #0a6b3f; }
         .tl-status-badge.NO_SHOW, .tl-status-badge.CANCELLED { background: #fde2e2; color: #b02a2a; }
@@ -148,6 +157,8 @@
                 </div>
 
                 <div id="tlContent" style="display:none;">
+                    <!-- Alertes de shift à justifier (shift-incidents.js) -->
+                    <div id="tlIncidentBanner"></div>
                     <div class="tl-kpis">
                         <div class="tl-kpi"><span class="tl-kpi-ico blue"><i class="bi bi-people"></i></span>
                             <div><div class="tl-stat-value" id="tlStatMembers">—</div><small>Agents dans l'équipe</small></div></div>
@@ -189,7 +200,9 @@
                                 <button class="btn nav-link" id="tlTabSalesBtn" style="display:none;"><i class="bi bi-graph-up-arrow"></i> Ventes équipe</button>
                                 <button class="btn nav-link" id="tlTabRdvBtn" style="display:none;"><i class="bi bi-calendar-check"></i> RDV équipe</button>
                                 <button class="btn nav-link" id="tlTabCampaignsBtn" style="display:none;"><i class="bi bi-megaphone-fill"></i> Campagnes</button>
-                                <button class="btn nav-link" id="tlTabAlertsBtn"><i class="bi bi-exclamation-triangle"></i> Alertes</button>
+                                <button class="btn nav-link" id="tlTabToolsBtn"><i class="bi bi-tools"></i> Outils</button>
+                                <button class="btn nav-link" id="tlTabKbBtn" style="display:none;"><i class="bi bi-journal-bookmark-fill"></i> Base de connaissance</button>
+                                <button class="btn nav-link" id="tlTabAlertsBtn"><i class="bi bi-exclamation-triangle"></i> Alertes <span class="tl-tab-count" id="tlIncidentTabCount" style="display:none;">0</span></button>
                                 <button class="btn nav-link" id="tlTabCompetitionsBtn"><i class="bi bi-trophy-fill"></i> Compétitions</button>
                                 <button class="btn nav-link" id="tlTabMeetingsBtn"><i class="bi bi-chat-square-heart"></i> Meetings <span class="tl-tab-count" id="tlMeetingsTabCount" style="display:none;">0</span></button>
                             </nav>
@@ -256,48 +269,55 @@
                                     <button type="button" class="btn btn-sm btn-success" id="tlPlanExportBtn"><i class="bi bi-download"></i> Exporter (Excel)</button>
                                 </div>
                             </div>
-                            <p class="text-muted small mb-2"><i class="bi bi-info-circle"></i> Construisez le planning de votre équipe puis <b>publiez-le</b> : il est en ligne tout de suite et chaque agent le voit dans son portail (il est prévenu).</p>
+                            <p class="text-muted small mb-2"><i class="bi bi-info-circle"></i> <b>1.</b> Cliquez un agent · <b>2.</b> choisissez un horaire · <b>3.</b> cliquez ses jours dans le calendrier (ou semaine, mois, Lun–Ven…). Chaque agent a ses propres jours et horaires ; ce qui est déjà en ligne apparaît en gris. <b>4.</b> Publiez : c'est en ligne tout de suite et chaque agent est prévenu.</p>
 
-                            <div class="exc-shift-legend mb-2">
-                                <span class="exc-shift-chip"><span class="dot"></span> 07h–16h (M)</span>
-                                <span class="exc-shift-chip"><span class="dot"></span> 08h–17h (M2)</span>
-                                <span class="exc-shift-chip"><span class="dot"></span> 12h–21h (A)</span>
-                                <span class="exc-shift-chip"><span class="dot"></span> 21h–06h (N)</span>
+                            <div class="pa-wrap">
+                                <!-- Agents de l'équipe : un clic ouvre son planning -->
+                                <aside class="pa-agents">
+                                    <div class="pa-agents-head">
+                                        <input type="search" class="form-control form-control-sm" id="paAgentSearch" placeholder="Rechercher un agent…">
+                                        <div class="small text-muted"><b id="paDraftCount">0</b> agent(s) avec des jours à publier</div>
+                                    </div>
+                                    <div class="pa-agents-list" id="tlPlanAgentList"><p class="text-muted text-center small p-3">Chargement des agents…</p></div>
+                                </aside>
+
+                                <!-- Planning de l'agent choisi -->
+                                <section class="pa-main" id="paMain">
+                                    <div class="pa-empty" id="paEmpty"><i class="bi bi-hand-index-thumb" style="font-size:1.6rem"></i><br>Cliquez un agent à gauche pour choisir ses jours et ses horaires.</div>
+                                    <div id="paEditor" hidden>
+                                        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                            <div><h6 class="mb-0" id="paAgentName">—</h6><small class="text-muted" id="paAgentInfo"></small></div>
+                                            <div class="d-flex gap-1">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary" id="paReloadBtn" title="Recharger ce qui est déjà en ligne"><i class="bi bi-arrow-clockwise"></i></button>
+                                                <button type="button" class="btn btn-sm btn-outline-danger" id="paClearBtn"><i class="bi bi-eraser"></i> Vider</button>
+                                            </div>
+                                        </div>
+                                        <div class="small fw-semibold mt-2">Horaire à appliquer :</div>
+                                        <!-- Horaires du catalogue des shifts (Administration → Équipes & accès → Horaires des shifts) -->
+                                        <div class="pa-brushes" id="tlPlanShiftLegend"></div>
+                                        <div id="tlPlanDayPicker"></div>
+                                        <details class="pa-copy">
+                                            <summary class="small fw-semibold"><i class="bi bi-files"></i> Copier ce planning vers d'autres agents</summary>
+                                            <div class="pa-copy-list" id="paCopyList"></div>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" id="paCopyBtn"><i class="bi bi-clipboard-check"></i> Copier vers les agents cochés</button>
+                                        </details>
+                                    </div>
+                                </section>
                             </div>
 
-                            <div class="tl-plan-mode" id="tlPlanMode" role="group" aria-label="Mode de sélection des jours">
-                                <button type="button" class="on" data-mode="range"><i class="bi bi-arrow-left-right"></i> Période continue</button>
-                                <button type="button" data-mode="days"><i class="bi bi-calendar3"></i> Jours choisis (semaines / mois)</button>
+                            <div class="pa-bottom">
+                                <span class="small"><b id="tlPlanCheckedCount">0</b> agent(s) · <b id="paDayCount">0</b> jour(s) à publier</span>
+                                <span id="tlPlanResult" class="text-muted small"></span>
+                                <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" id="paDiscardBtn">Tout annuler</button>
+                                <button type="button" class="btn btn-primary" id="tlPlanPublishDirectBtn"><i class="bi bi-lightning-charge-fill"></i> Publier le planning</button>
                             </div>
-                            <div id="tlPlanDaysBox" hidden>
-                                <div id="tlPlanDayPicker"></div>
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" id="tlPlanRestOthers">
-                                    <label class="form-check-label small" for="tlPlanRestOthers">Mettre en repos (OFF) les jours non choisis entre le premier et le dernier jour</label>
-                                </div>
-                            </div>
-                            <div class="exc-period-bar mb-3">
-                                <label class="small fw-semibold mb-0" id="tlPlanPeriodLabel">Période :</label>
+
+                            <!-- Période de l'état ci-dessous -->
+                            <div class="exc-period-bar mb-2 mt-3">
+                                <label class="small fw-semibold mb-0" id="tlPlanPeriodLabel">État du planning du</label>
                                 <input type="date" class="form-control form-control-sm" id="tlPlanFrom">
                                 <span class="small text-muted">au</span>
                                 <input type="date" class="form-control form-control-sm" id="tlPlanTo">
-                                <div class="form-check ms-auto">
-                                    <input class="form-check-input" type="checkbox" id="tlPlanCheckAll">
-                                    <label class="form-check-label small" for="tlPlanCheckAll">Tout cocher</label>
-                                </div>
-                            </div>
-
-                            <div id="tlPlanAgentList" class="exc-shift-picker">
-                                <p class="text-muted text-center small">Chargement des agents…</p>
-                            </div>
-
-                            <div class="exc-summary-bar">
-                                <span><b id="tlPlanCheckedCount">0</b> agent(s) sélectionné(s)</span>
-                                <span id="tlPlanResult" class="text-muted"></span>
-                            </div>
-
-                            <div class="d-flex justify-content-end align-items-center gap-2 mt-2 flex-wrap">
-                                <button type="button" class="btn btn-primary" id="tlPlanPublishDirectBtn"><i class="bi bi-lightning-charge-fill"></i> Publier le planning</button>
                             </div>
 
                             <hr>
@@ -314,6 +334,9 @@
 
                         <!-- ===================== ÉVALUATIONS QA ===================== -->
                         <div id="tlPaneQa" class="card-body" style="display:none;">
+                            <h6 class="fw-bold"><i class="bi bi-calendar-check"></i> Évaluations de formation de l'équipe</h6>
+                            <div id="tlAssessmentsRoot" class="mb-4"></div>
+                            <h6 class="fw-bold"><i class="bi bi-clipboard-check"></i> Évaluations QA (écoutes)</h6>
                             <div class="table-responsive">
                                 <table class="table table-hover align-middle table-sm">
                                     <thead><tr><th>Date</th><th>Agent</th><th>Motif</th><th>Score</th><th>Résultat</th><th></th></tr></thead>
@@ -361,6 +384,8 @@
 
                         <!-- ===================== ALERTES ===================== -->
                         <div id="tlPaneAlerts" class="card-body" style="display:none;">
+                            <div id="tlShiftIncidents" class="mb-4"></div>
+                            <h6 class="fw-bold"><i class="bi bi-graph-down-arrow"></i> Alertes de performance</h6>
                             <p class="text-muted small">Détection automatique chaque nuit à 23h (présence, score QA, score d'évaluation, performance globale, chutes par rapport au mois précédent) — uniquement les agents de votre équipe.</p>
                             <div class="table-responsive">
                                 <table class="table table-hover table-sm align-middle">
@@ -390,6 +415,21 @@
                         </div>
 
                         <!-- ===================== CAMPAGNES (OUTBOUND) ===================== -->
+                        <!-- Base de connaissance (Team Leader Outbound — kb-embed.js) -->
+                        <div id="tlPaneKb" class="card-body" style="display:none;"><div id="tlKbRoot"></div></div>
+
+                        <!-- Outils & Portails : catalogue et profils d'accès des agents (external-tools.js, tool-profiles.js) -->
+                        <div id="tlPaneTools" class="card-body" style="display:none;">
+                                <ul class="nav nav-tabs mb-3" role="tablist">
+                                    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tlToolsCat" type="button"><i class="bi bi-grid-3x3-gap-fill"></i> Outils</button></li>
+                                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tlToolsProfiles" type="button" data-tp-mount="tlProfilesRoot"><i class="bi bi-person-badge"></i> Profils</button></li>
+                                </ul>
+                                <div class="tab-content">
+                                    <div class="tab-pane fade show active" id="tlToolsCat"><div class="row g-4" id="tlToolsGrid"></div></div>
+                                    <div class="tab-pane fade" id="tlToolsProfiles"><div id="tlProfilesRoot"></div></div>
+                                </div>
+                        </div>
+
                         <div id="tlPaneCampaigns" class="card-body" style="display:none;">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h6 class="mb-0">Mes campagnes</h6>
@@ -421,50 +461,42 @@
                 </div>
                 </div>
 
-                <!-- ===================== MODALE — NOUVELLE CAMPAGNE ===================== -->
-                <div class="modal fade" id="tlNewCampaignModal" tabindex="-1">
-                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <!-- ===================== MODALE — CAMPAGNE ET SON FORMULAIRE (création / modification) ===================== -->
+                <div class="modal fade" id="tlNewCampaignModal" tabindex="-1" data-bs-backdrop="static">
+                    <div class="modal-dialog modal-fullscreen">
                         <div class="modal-content">
-                            <div class="modal-header"><h5 class="modal-title"><i class="bi bi-megaphone-fill"></i> Nouvelle campagne</h5>
+                            <div class="modal-header py-2">
+                                <h5 class="modal-title"><i class="bi bi-megaphone-fill"></i> <span id="tlCampaignModalTitle">Nouvelle campagne</span></h5>
+                                <span class="small text-muted ms-3" id="tlBuilderNotice"></span>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                            <div class="modal-body">
-                                <div class="mb-2"><label class="form-label small">Nom de la campagne</label>
-                                    <input type="text" class="form-control" id="tlCampaignName" placeholder="Ex. Relance clients CASHXPRESS — Août"></div>
-                                <div class="mb-2"><label class="form-label small">Description (optionnel)</label>
-                                    <textarea class="form-control" id="tlCampaignDescription" rows="2"></textarea></div>
-                                <div class="row g-2 mb-2">
-                                    <div class="col-6"><label class="form-label small">Début (optionnel)</label>
-                                        <input type="date" class="form-control" id="tlCampaignStart"></div>
-                                    <div class="col-6"><label class="form-label small">Fin (optionnel)</label>
-                                        <input type="date" class="form-control" id="tlCampaignEnd"></div>
-                                </div>
-                                <div class="mb-2">
-                                    <label class="form-label small">Équipe ciblée (onglet "Campagne" agent)</label>
-                                    <select class="form-select" id="tlCampaignTargetService">
-                                        <option value="">Toute l'équipe Outbound</option>
-                                        <option value="DIGITAL">Service Digital</option>
-                                        <option value="TELEVENTE">Télévente</option>
-                                    </select>
-                                </div>
-                                <div class="row g-2 mb-2">
-                                    <div class="col-4"><label class="form-label small">Icône (Bootstrap Icons)</label>
-                                        <input type="text" class="form-control" id="tlCampaignIcon" placeholder="bi-credit-card-2-front-fill"></div>
-                                    <div class="col-4"><label class="form-label small">Couleur début</label>
-                                        <input type="color" class="form-control form-control-color w-100" id="tlCampaignColorFrom" value="#0057B8"></div>
-                                    <div class="col-4"><label class="form-label small">Couleur fin</label>
-                                        <input type="color" class="form-control form-control-color w-100" id="tlCampaignColorTo" value="#00A651"></div>
-                                </div>
-
-                                <hr>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h6 class="mb-0">Questions de la campagne <span class="text-muted small">(affichées à l'agent pendant l'appel)</span></h6>
-                                    <button class="btn btn-sm btn-outline-primary" id="tlCampaignAddFieldBtn"><i class="bi bi-plus-lg"></i> Ajouter une question</button>
-                                </div>
-                                <div id="tlCampaignFieldsEditor"></div>
+                            <div class="modal-body pt-2">
+                                <details class="mb-2" id="tlCampaignMeta" open>
+                                    <summary class="fw-semibold small mb-2">Campagne : nom, période, équipe ciblée, visuel</summary>
+                                    <div class="row g-2">
+                                        <div class="col-lg-4"><label class="form-label small mb-0">Nom de la campagne</label>
+                                            <input type="text" class="form-control form-control-sm" id="tlCampaignName" placeholder="Ex. Relance carte Visa — octobre"></div>
+                                        <div class="col-lg-4"><label class="form-label small mb-0">Description</label>
+                                            <input type="text" class="form-control form-control-sm" id="tlCampaignDescription" placeholder="Objectif de la campagne"></div>
+                                        <div class="col-6 col-lg-2"><label class="form-label small mb-0">Début</label><input type="date" class="form-control form-control-sm" id="tlCampaignStart"></div>
+                                        <div class="col-6 col-lg-2"><label class="form-label small mb-0">Fin</label><input type="date" class="form-control form-control-sm" id="tlCampaignEnd"></div>
+                                        <div class="col-lg-3"><label class="form-label small mb-0">Équipe ciblée (onglet « Campagne » agent)</label>
+                                            <select class="form-select form-select-sm" id="tlCampaignTargetService">
+                                                <option value="">Toute l'équipe Outbound</option>
+                                                <option value="DIGITAL">Digitalisation</option>
+                                                <option value="TELEVENTE">Télévente</option>
+                                            </select></div>
+                                        <div class="col-lg-3"><label class="form-label small mb-0">Icône (Bootstrap Icons)</label>
+                                            <input type="text" class="form-control form-control-sm" id="tlCampaignIcon" placeholder="bi-credit-card-2-front-fill"></div>
+                                        <div class="col-6 col-lg-1"><label class="form-label small mb-0">Couleur 1</label><input type="color" class="form-control form-control-sm form-control-color w-100" id="tlCampaignColorFrom" value="#0057B8"></div>
+                                        <div class="col-6 col-lg-1"><label class="form-label small mb-0">Couleur 2</label><input type="color" class="form-control form-control-sm form-control-color w-100" id="tlCampaignColorTo" value="#00A651"></div>
+                                    </div>
+                                </details>
+                                <div id="tlFormBuilder"></div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer py-2">
+                                <span class="small text-muted me-auto" id="tlBuilderStatus"></span>
                                 <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
-                                <button class="btn btn-primary" id="tlSaveCampaignBtn">Créer</button>
+                                <button class="btn btn-primary" id="tlSaveCampaignBtn"><i class="bi bi-check2-circle"></i> <span id="tlSaveCampaignLbl">Créer la campagne</span></button>
                             </div>
                         </div>
                     </div>
@@ -477,10 +509,17 @@
                             <div class="modal-header"><h5 class="modal-title" id="tlCampaignDetailTitle"><i class="bi bi-megaphone-fill"></i></h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                             <div class="modal-body">
+                                <div class="d-flex gap-2 flex-wrap justify-content-end mb-2">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="tlCampaignEditBtn"><i class="bi bi-pencil-square"></i> Modifier la campagne et son formulaire</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="tlCampaignDupBtn"><i class="bi bi-copy"></i> Dupliquer</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="tlCampaignStateBtn"></button>
+                                </div>
                                 <nav class="cp-tabs" id="tlCampaignTabs">
                                     <button type="button" class="on" data-cp-pane="tlCpContacts"><i class="bi bi-people"></i> Contacts &amp; import</button>
+                                    <button type="button" data-cp-pane="tlCpResults"><i class="bi bi-bar-chart-line"></i> Résultats du formulaire</button>
                                     <button type="button" data-cp-pane="tlCpPerformance"><i class="bi bi-graph-up-arrow"></i> Performance</button>
                                 </nav>
+                                <div id="tlCpResults" style="display:none;"></div>
                                 <div id="tlCpPerformance" style="display:none;"></div>
                                 <div id="tlCpContacts">
                                 <div class="d-flex gap-2 align-items-end mb-3 flex-wrap">
@@ -599,9 +638,9 @@
                             <div class="modal-body">
                                 <div class="tl-remove-choice">
                                     <label><input type="radio" name="tlRemoveMode" value="TRANSFER" checked>
-                                        <span><b>Changement d'équipe</b><small>L'agent quitte seulement mon équipe ; son compte reste actif et il peut être ajouté par un autre Team Leader ou placé par le RH.</small></span></label>
+                                        <span><b>Changement d'équipe</b><small>L'agent quitte mon équipe partout sur le site (rôle, service, planning d'équipe, organigramme) ; son compte reste actif et il peut être ajouté par un autre Team Leader ou placé par le RH.</small></span></label>
                                     <label><input type="radio" name="tlRemoveMode" value="DEPARTURE">
-                                        <span><b>Sortie du centre</b><small>Démission, fin de contrat, fin de stage… : le compte est désactivé et la sortie apparaît au RH (réintégration possible).</small></span></label>
+                                        <span><b>Sortie du centre</b><small>Démission, fin de contrat, fin de stage… : le compte est désactivé, son planning à venir est retiré et la sortie apparaît au RH (réintégration possible).</small></span></label>
                                 </div>
                                 <div id="tlRemoveDepartureFields" class="mt-3" style="display:none;">
                                     <label class="form-label small">Motif</label>
@@ -779,6 +818,16 @@
 <script th:src="@{/js/team-perf-files.js}"></script>
 <script th:src="@{/js/supervision.js}"></script>
 <script th:src="@{/js/plan-day-picker.js}"></script>
+<script th:src="@{/js/guides-data.js}"></script>
+<script th:src="@{/js/guides-data-cib.js}"></script>
+<script th:src="@{/js/assessments.js}"></script>
+<script th:src="@{/js/rcc-guides.js}"></script>
+<script th:src="@{/js/kb-embed.js}"></script>
+<script th:src="@{/js/shift-incidents.js}"></script>
+<script th:src="@{/js/external-tools.js}"></script>
+<script th:src="@{/js/tool-profiles.js}"></script>
+<script th:src="@{/js/campaign-forms.js}"></script>
+<script th:src="@{/js/campaign-form-builder.js}"></script>
 <script th:src="@{/js/team-leader.js}"></script>
 <script>document.addEventListener("DOMContentLoaded", function () { RccSession.init().then(function (s) { if (s) RccSupervision.mountAssignee(document.getElementById("spMine")); }); });</script>
 </body>

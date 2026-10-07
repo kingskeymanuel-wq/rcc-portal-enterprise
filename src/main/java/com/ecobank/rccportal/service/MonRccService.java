@@ -360,6 +360,8 @@ public class MonRccService {
     static String country2(String code) {
         if (code == null || code.isBlank()) return null;
         String c = code.trim().toUpperCase();
+        String branch = com.ecobank.rccportal.util.Affiliates.BRANCH_CODES.get(c); // « K01 » = Côte d'Ivoire
+        if (branch != null) return branch;
         if (c.length() == 3) return ISO3_TO_ISO2.getOrDefault(c, c);
         return c;
     }

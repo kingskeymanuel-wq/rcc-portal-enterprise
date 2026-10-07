@@ -2,8 +2,10 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <!-- Heure de Côte d'Ivoire sur tous les postes (avant tout autre script) -->
+    <script th:src="@{/js/rcc-time.js}"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title th:text="${channel == 'RAFIKI'} ? 'RCC Portal — Portail agent Rafiki' : 'RCC Portal — Portail agent Tchat'">RCC Portal — Portail agent</title>
+    <title th:text="${channel == 'RAFIKI'} ? 'Portail Front Office — Portail agent Rafiki' : (${channel == 'MAIL'} ? 'Portail Front Office — Portail agent Inbound Mail' : 'Portail Front Office — Portail agent Réseaux sociaux')">Portail Front Office — Portail agent</title>
     <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}" rel="stylesheet">
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">

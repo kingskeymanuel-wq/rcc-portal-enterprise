@@ -19,9 +19,25 @@ import java.util.stream.Collectors;
 public class SpellCheckController {
 
     private final LocalSpellCheckClient spellCheckClient;
+    private final com.ecobank.rccportal.service.TextRewriteService rewriteService;
 
-    public SpellCheckController(LocalSpellCheckClient spellCheckClient) {
+    public SpellCheckController(LocalSpellCheckClient spellCheckClient, com.ecobank.rccportal.service.TextRewriteService rewriteService) {
         this.spellCheckClient = spellCheckClient;
+        this.rewriteService = rewriteService;
+    }
+
+    /** Réécriture : styles proposés et moteur disponible (IA si configurée, sinon règles locales). */
+    @GetMapping("/rewrite/styles")
+    public Map<String, Object> rewriteStyles() {
+        return Map.of("styles", rewriteService.styles(), "ai", rewriteService.aiAvailable());
+    }
+
+    /** Réécrit un texte : { text, lang, style, ai } → texte réécrit, moteur utilisé et liste des changements. */
+    @PostMapping("/rewrite")
+    public com.ecobank.rccportal.service.TextRewriteService.RewriteResult rewrite(@RequestBody Map<String, Object> body) {
+        Object ai = body.get("ai");
+        return rewriteService.rewrite((String) body.get("text"), (String) body.get("lang"), (String) body.get("style"),
+                ai == null || Boolean.parseBoolean(String.valueOf(ai)));
     }
 
     @PostMapping("/check")

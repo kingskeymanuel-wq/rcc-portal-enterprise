@@ -1,7 +1,7 @@
 "use strict";
 
 /**
- * Portail des agents des canaux digitaux (/portail-tchat, /portail-rafiki) : même page, contenu propre au canal —
+ * Portail des agents de l'Inbound Mail (/portail-mail, /portail-tchat, /portail-rafiki) : même page, contenu propre au canal —
  * performances de la semaine (rapport hebdo importé par la QA ou le Team Leader, mis à jour automatiquement),
  * règles de calcul, planning des 7 prochains jours, outils et bonnes pratiques.
  */
@@ -11,8 +11,23 @@
     var channel = page ? page.getAttribute("data-channel") : "TCHAT";
 
     var CHANNELS = {
+        MAIL: {
+            label: "Inbound Mail", icon: "bi-envelope-paper-fill", chip: "Mails & CIS",
+            text: "Vos mails assistés, dossiers CIS et rappels clients : votre production de la semaine face au target et votre planning, au même endroit.",
+            platforms: [["bi-envelope-at", "Boîte mails clients"], ["bi-folder2-open", "CIS"], ["bi-telephone-outbound", "Rappels"]],
+            rules: [
+                ["bi-plus-slash-minus", "Total activités", "CIS + Mails assistés + Sollicitations de la semaine."],
+                ["bi-graph-up", "Moyenne / jour", "Total activités ÷ jours travaillés."],
+                ["bi-bullseye", "Productivité", "Moyenne / jour ÷ target / jour. Vert à partir de 100 %, orange de 90 à 99 %, rouge sous 90 %."],
+                ["bi-patch-check", "Qualité", "Note du rapport hebdo, sinon moyenne de vos évaluations écrites."],
+                ["bi-calendar-check", "Présence", "Taux de présence d'après le pointage."]],
+            tipsTitle: "Bonnes pratiques mails",
+            tips: ["Accuser réception rapidement, même avant d'avoir la réponse définitive.", "Partir d'une réponse type puis la personnaliser (nom du client, numéro de dossier).",
+                "Vérifier l'identité du client avant toute information sur un compte.", "Une demande = un dossier CIS à jour, avec la date de rappel si besoin.",
+                "Relire avec le correcteur avant d'envoyer : ton clair, sans jargon."]
+        },
         TCHAT: {
-            label: "Tchat", icon: "bi-chat-text-fill", chip: "Live chat",
+            label: "Réseaux sociaux", icon: "bi-chat-text-fill", chip: "Live chat",
             text: "Vos conversations du live chat, votre production de la semaine face au target et votre planning, au même endroit.",
             platforms: [["bi-chat-dots", "Live chat Ecobank"]],
             rules: [

@@ -51,7 +51,7 @@ public class KnowledgeAgent implements RafAgent {
         Hit top = hits.get(0);
         String icon = "ARTICLE".equals(top.type()) ? "📖" : "🎓";
         // Phrases qui répondent vraiment à la question (et non les 450 premiers caractères).
-        String md = "**" + icon + " " + top.title() + "**\n\n" + SearchText.bestSentences(top.text(), request.terms(), 3, 500);
+        String md = "**" + icon + " " + top.title() + "**\n\n" + SearchText.bestSentences(top.text(), request.terms(), 2, 300);
         String details = "**" + icon + " " + top.title() + "**\n\n" + SearchText.bestSentences(top.text(), request.terms(), 10, 1800);
         List<RalphResultItem> citations = hits.stream().limit(5)
                 .map(h -> new RalphResultItem(h.type(), h.id(), h.title(), SearchText.snippetAround(h.text(), request.terms(), 160)))

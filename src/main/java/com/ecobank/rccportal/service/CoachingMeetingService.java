@@ -192,9 +192,9 @@ public class CoachingMeetingService {
 
         String when = r.scheduledAt().format(FR);
         notify(List.of(agent), "📅 Meeting de performance avec " + label(tl) + " le " + when + (location != null ? " (" + location + ")" : "")
-                + " — objectif : " + objective, "RCC Portal — Meeting avec votre Team Leader", id);
+                + " — objectif : " + objective, "Portail Front Office — Meeting avec votre Team Leader", id);
         notify(cc, "📅 Vous êtes en copie du meeting de performance de " + label(agent) + " avec " + label(tl) + " le " + when
-                + " — objectif : " + objective, "RCC Portal — Meeting de performance (copie)", id);
+                + " — objectif : " + objective, "Portail Front Office — Meeting de performance (copie)", id);
         return get(requester, id);
     }
 
@@ -225,7 +225,7 @@ public class CoachingMeetingService {
                     .category("MEETING_ACK").relatedMeetingId(id).build());
         }
         notify(List.of(agent), "📝 Compte rendu de votre meeting avec " + label(tl) + " disponible : merci de le lire et de l'approuver (Workflow → Tâches & notes).",
-                "RCC Portal — Compte rendu de meeting à approuver", id);
+                "Portail Front Office — Compte rendu de meeting à approuver", id);
         return get(requester, id);
     }
 
@@ -248,7 +248,7 @@ public class CoachingMeetingService {
         recipients.add(tl);
         notify(dedupe(recipients, me), "✅ Meeting de performance « lu et approuvé » par " + label(me) + " (Team Leader : " + label(tl)
                 + ") — objectif : " + m.objective + ". Compte rendu consultable dans Workflow → Meetings.",
-                "RCC Portal — Compte rendu de meeting approuvé", id);
+                "Portail Front Office — Compte rendu de meeting approuvé", id);
         return get(requester, id);
     }
 
@@ -264,7 +264,7 @@ public class CoachingMeetingService {
         List<User> recipients = new ArrayList<>(List.of(agent));
         recipients.addAll(ccUsers(m.cc));
         notify(dedupe(recipients, me), "❌ Meeting du " + m.scheduledAt.format(FR) + " avec " + label(agent) + " annulé par " + label(me) + ".",
-                "RCC Portal — Meeting annulé", id);
+                "Portail Front Office — Meeting annulé", id);
         return get(requester, id);
     }
 

@@ -6,6 +6,10 @@
  * de semaine ou sur le nom du mois pour tout (dé)sélectionner, raccourcis : jours de la semaine choisis
  * (ex. chaque lundi et mercredi), Lun–Ven, week-ends, sur 1, 2 ou 3 mois.
  * RccDayPicker.mount(root, { onChange }) → { days(), clear(), count() }.
+ *
+ * Mode « pinceau » (planning par agent) : { brush: () => code, codes: { M: {color, label} }, existing: { "2026-10-05": "M2" } }.
+ * Chaque jour reçoit le code du pinceau courant (M, M2, … ou OFF) ; un clic sur un jour déjà à ce code le libère.
+ * entries() → { jour: code }, load(entries) remplace la sélection, setExisting(map) affiche le planning déjà en ligne.
  */
 window.RccDayPicker = (function () {
     var DOW = ["L", "M", "M", "J", "V", "S", "D"];
@@ -25,6 +29,16 @@ window.RccDayPicker = (function () {
     function mount(root, opts) {
         opts = opts || {};
         var sel = {};
+        var paint = typeof opts.brush === "function";
+        var existing = opts.existing || {};
+        function value() { return paint ? opts.brush() : true; }
+        function codeInfo(c) { return (opts.codes && opts.codes[c]) || { color: c === "OFF" ? "#94A3B8" : "#0057B8", label: c }; }
+        function textColor(hex) {
+            var h = String(hex || "").replace("#", "");
+            if (h.length !== 6) return "#fff";
+            var r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16);
+            return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? "#122240" : "#fff";
+        }
         var today = new Date(); today.setHours(0, 0, 0, 0);
         var start = new Date(today.getFullYear(), today.getMonth(), 1);
         var last = null;
@@ -53,16 +67,24 @@ window.RccDayPicker = (function () {
             return out;
         }
 
+        /**
+         * Jours visés par les raccourcis (Lun–Ven, week-ends, un jour de la semaine…) : les N mois à venir à partir du
+         * premier jour affiché encore à venir — et non le seul mois affiché, dont il peut ne rester aucun jour (le 30 du
+         * mois, « tous les lundis sur 1 mois » ne sélectionnait rien).
+         */
         function targetDays() {
+            var from = start < today ? new Date(today) : new Date(start);
+            var end = new Date(from); end.setMonth(end.getMonth() + span);
             var out = [];
-            for (var i = 0; i < span; i++) out = out.concat(daysOfMonth(new Date(start.getFullYear(), start.getMonth() + i, 1)));
-            return out.filter(function (d) { return d >= today; });
+            for (var d = new Date(from); d < end; d.setDate(d.getDate() + 1)) out.push(new Date(d));
+            return out;
         }
 
-        function setMany(days, on) { days.forEach(function (d) { if (on) sel[iso(d)] = true; else delete sel[iso(d)]; }); }
-        function allSelected(days) { return days.length && days.every(function (d) { return sel[iso(d)]; }); }
+        function setMany(days, on) { var v = value(); days.forEach(function (d) { if (on) sel[iso(d)] = v; else delete sel[iso(d)]; }); }
+        function allSelected(days) { var v = value(); return days.length && days.every(function (d) { return sel[iso(d)] === v; }); }
 
-        function render() {
+        /** silent : affichage seul (agent chargé, planning en ligne), sans signaler de changement de sélection. */
+        function render(silent) {
             root.querySelector(".dp-months").innerHTML = monthsShown().map(function (m) {
                 var days = daysOfMonth(m);
                 var html = '<div class="dp-month"><button type="button" class="dp-mtitle" data-month="' + iso(m) + '">' + MONTHS[m.getMonth()] + ' ' + m.getFullYear() +
@@ -79,6 +101,15 @@ window.RccDayPicker = (function () {
                     row.forEach(function (d) {
                         if (!d) { html += '<span class="dp-e"></span>'; return; }
                         var k = iso(d), past = d < today;
+                        if (paint) {
+                            var code = sel[k], was = existing[k], info = code ? codeInfo(code) : null;
+                            html += '<button type="button" class="dp-d dp-paint' + (code ? " on" : "") + (dow(d) > 4 ? " we" : "") + (past ? " past" : "") +
+                                (k === iso(today) ? " today" : "") + '" data-day="' + k + '"' + (past ? " disabled" : "") +
+                                (info ? ' style="background:' + info.color + ';color:' + textColor(info.color) + '"' : '') +
+                                ' title="' + (code ? info.label : was ? "Déjà en ligne : " + codeInfo(was).label : "Libre") + '">' + d.getDate() +
+                                (code ? '<small>' + code + '</small>' : was ? '<small class="dp-was">' + was + '</small>' : '') + '</button>';
+                            return;
+                        }
                         html += '<button type="button" class="dp-d' + (sel[k] ? " on" : "") + (dow(d) > 4 ? " we" : "") + (past ? " past" : "") +
                             (k === iso(today) ? " today" : "") + '" data-day="' + k + '"' + (past ? " disabled" : "") + '>' + d.getDate() + '</button>';
                     });
@@ -94,8 +125,16 @@ window.RccDayPicker = (function () {
                 keys.forEach(function (k) { var d = parse(k); weeks[d.getFullYear() + "-" + isoWeek(d)] = 1; months[k.slice(0, 7)] = 1; });
                 summary.innerHTML = '<i class="bi bi-calendar-check"></i> <b>' + keys.length + ' jour(s)</b> sur ' + Object.keys(weeks).length + ' semaine(s) et ' +
                     Object.keys(months).length + ' mois — du ' + parse(keys[0]).toLocaleDateString("fr-FR") + ' au ' + parse(keys[keys.length - 1]).toLocaleDateString("fr-FR");
+                if (paint) {
+                    var per = {};
+                    keys.forEach(function (k) { per[sel[k]] = (per[sel[k]] || 0) + 1; });
+                    summary.innerHTML += ' · ' + Object.keys(per).map(function (c) {
+                        var info = codeInfo(c);
+                        return '<span class="dp-chip" style="background:' + info.color + ';color:' + textColor(info.color) + '">' + c + ' × ' + per[c] + '</span>';
+                    }).join(" ");
+                }
             }
-            if (opts.onChange) opts.onChange(keys);
+            if (opts.onChange && silent !== true) opts.onChange(keys);
         }
 
         root.addEventListener("click", function (e) {
@@ -108,11 +147,12 @@ window.RccDayPicker = (function () {
             if (b.hasAttribute("data-day")) {
                 var k = b.getAttribute("data-day"), d = parse(k);
                 if (e.shiftKey && last) {
-                    var a = parse(last), on = !!sel[last], lo = a < d ? a : d, hi = a < d ? d : a, range = [];
+                    var a = parse(last), on = sel[last] !== undefined, lo = a < d ? a : d, hi = a < d ? d : a, range = [];
                     for (var x = new Date(lo); x <= hi; x.setDate(x.getDate() + 1)) if (x >= today) range.push(new Date(x));
                     setMany(range, on);
                 } else {
-                    if (sel[k]) delete sel[k]; else sel[k] = true;
+                    var v = value();
+                    if (sel[k] === v) delete sel[k]; else sel[k] = v;
                     last = k;
                 }
                 render(); return;
@@ -145,7 +185,11 @@ window.RccDayPicker = (function () {
         return {
             days: function () { return Object.keys(sel).sort(); },
             count: function () { return Object.keys(sel).length; },
-            clear: function () { sel = {}; render(); }
+            clear: function () { sel = {}; render(); },
+            entries: function () { var o = {}; Object.keys(sel).forEach(function (k) { o[k] = sel[k]; }); return o; },
+            load: function (entries) { sel = {}; Object.keys(entries || {}).forEach(function (k) { sel[k] = entries[k]; }); last = null; render(true); },
+            setExisting: function (map) { existing = map || {}; render(true); },
+            render: render
         };
     }
 

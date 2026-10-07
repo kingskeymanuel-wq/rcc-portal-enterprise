@@ -103,8 +103,79 @@ public class CampaignService {
                 .coverImageUrl(blankToNull(request.coverImageUrl()))
                 .fieldsJson(serializeFields(request.fields()))
                 .build();
+        applyForm(campaign, request);
         campaign = campaignRepository.save(campaign);
         return toResponse(campaign, List.of());
+    }
+
+    /** Formulaire v2 fourni : contrôlé par le moteur, et sa version plate (FieldsJson) tenue à jour pour l'import de fichiers. */
+    private void applyForm(Campaign campaign, CampaignRequest request) {
+        if (request.form() == null || request.form().isNull()) return;
+        com.fasterxml.jackson.databind.node.ObjectNode form = CampaignFormEngine.normalize(request.form());
+        try {
+            campaign.setFormJson(objectMapper.writeValueAsString(form));
+        } catch (Exception e) {
+            throw ApiException.badRequest("Formulaire invalide : " + e.getMessage());
+        }
+        campaign.setFieldsJson(serializeFields(CampaignFormEngine.toLegacyFields(form)));
+    }
+
+    /** Formulaire v2 de la campagne ; une ancienne liste de questions est lue comme un formulaire d'une section. */
+    public com.fasterxml.jackson.databind.node.ObjectNode formOf(Campaign c) {
+        if (c.getFormJson() != null && !c.getFormJson().isBlank()) {
+            try {
+                return (com.fasterxml.jackson.databind.node.ObjectNode) objectMapper.readTree(c.getFormJson());
+            } catch (Exception e) {
+                // formulaire illisible : repli sur la liste de questions
+            }
+        }
+        return CampaignFormEngine.fromLegacy(deserializeFields(c.getFieldsJson()));
+    }
+
+    /** Modification d'une campagne (nom, période, cible, visuel, formulaire) — les réponses déjà saisies sont conservées. */
+    @Transactional
+    public CampaignResponse updateCampaign(AuthenticatedUser requester, Integer campaignId, CampaignRequest request) {
+        requireCanManage(requester);
+        Campaign c = campaignRepository.findById(campaignId).orElseThrow(() -> ApiException.notFound("Campagne introuvable."));
+        if (request.name() != null) {
+            if (request.name().isBlank()) throw ApiException.badRequest("Le nom de la campagne est obligatoire.");
+            c.setName(request.name().trim());
+        }
+        c.setDescription(blankToNull(request.description()));
+        c.setStartDate(request.startDate());
+        c.setEndDate(request.endDate());
+        c.setTargetService(normalizeTargetService(request.targetService()));
+        if (blankToNull(request.iconClass()) != null) c.setIconClass(request.iconClass().trim());
+        if (blankToNull(request.colorFrom()) != null) c.setColorFrom(request.colorFrom().trim());
+        if (blankToNull(request.colorTo()) != null) c.setColorTo(request.colorTo().trim());
+        c.setCoverImageUrl(blankToNull(request.coverImageUrl()));
+        if (request.form() != null && !request.form().isNull()) applyForm(c, request);
+        else if (request.fields() != null) { c.setFieldsJson(serializeFields(request.fields())); c.setFormJson(null); }
+        c = campaignRepository.save(c);
+        return toResponse(c, campaignContactRepository.findByCampaignIdOrderByClientNameAsc(c.getCampaignId()));
+    }
+
+    /** Copie d'une campagne (formulaire et visuel) sans ses contacts — pour relancer une opération. */
+    @Transactional
+    public CampaignResponse duplicateCampaign(AuthenticatedUser requester, Integer campaignId) {
+        requireCanManage(requester);
+        Campaign c = campaignRepository.findById(campaignId).orElseThrow(() -> ApiException.notFound("Campagne introuvable."));
+        Campaign copy = Campaign.builder()
+                .name(("Copie de " + c.getName()).length() > 200 ? c.getName() : "Copie de " + c.getName())
+                .description(c.getDescription()).createdByUserId(requireUser(requester).getId())
+                .status("ACTIVE").targetService(c.getTargetService()).iconClass(c.getIconClass())
+                .colorFrom(c.getColorFrom()).colorTo(c.getColorTo()).coverImageUrl(c.getCoverImageUrl())
+                .fieldsJson(c.getFieldsJson()).formJson(c.getFormJson()).build();
+        return toResponse(campaignRepository.save(copy), List.of());
+    }
+
+    /** Réouvre une campagne clôturée. */
+    @Transactional
+    public void reopenCampaign(AuthenticatedUser requester, Integer campaignId) {
+        requireCanManage(requester);
+        Campaign c = campaignRepository.findById(campaignId).orElseThrow(() -> ApiException.notFound("Campagne introuvable."));
+        c.setStatus("ACTIVE");
+        campaignRepository.save(c);
     }
 
     @Transactional(readOnly = true)
@@ -949,9 +1020,20 @@ public class CampaignService {
         if (!VALID_STATUSES.contains(status)) {
             throw ApiException.badRequest("Statut invalide : " + request.callStatus());
         }
+        Campaign campaign = campaignRepository.findById(contact.getCampaignId()).orElse(null);
+        Map<String, String> answers = request.answers();
+        if (answers != null && campaign != null && campaign.getFormJson() != null && !campaign.getFormJson().isBlank()) {
+            // Formulaire v2 : le serveur refait tout (questions affichées, contrôles, score) — rien n'est cru du navigateur.
+            CampaignFormEngine.Evaluation ev = CampaignFormEngine.evaluate(formOf(campaign), answers);
+            if (!"PENDING".equals(status) && !ev.valid()) {
+                throw ApiException.badRequest(String.join(" ", ev.errors().values().stream().limit(3).toList()));
+            }
+            answers = ev.answers();
+            contact.setLeadScore(ev.scorePct());
+        }
         contact.setCallStatus(status);
         if (request.notes() != null) contact.setNotes(blankToNull(request.notes()));
-        if (request.answers() != null) contact.setAnswersJson(serializeAnswers(request.answers()));
+        if (answers != null) contact.setAnswersJson(serializeAnswers(answers));
         contact.setLastCalledAt(LocalDateTime.now());
         contact = campaignContactRepository.save(contact);
         if (!"PENDING".equals(status)) {
@@ -980,7 +1062,7 @@ public class CampaignService {
                 .orElseThrow(() -> ApiException.unauthorized("Utilisateur inconnu."));
     }
 
-    void requireCanManage(AuthenticatedUser requester) {
+    public void requireCanManage(AuthenticatedUser requester) {
         if (!canManageOutboundTeam(requester)) {
             throw ApiException.forbidden("Réservé au Team Leader de l'équipe Outbound, à QA ou à l'admin.");
         }
@@ -996,7 +1078,8 @@ public class CampaignService {
         if (isAdmin || isSupervisor || isQa) return true;
         if ("team_leader".equalsIgnoreCase(requester.role())) {
             User u = userRepository.findFirstByUsernameIgnoreCase(requester.username()).orElse(null);
-            return u != null && "OUTBOUND".equalsIgnoreCase(u.getLedTeam());
+            // Team Leader du pôle Outbound ou de l'une de ses sous-équipes (Télévente, Digitalisation).
+            return u != null && com.ecobank.rccportal.util.TeamClassifier.teamOf(u.getLedTeam()) == com.ecobank.rccportal.util.TeamClassifier.Team.OUTBOUND;
         }
         return false;
     }
@@ -1033,7 +1116,7 @@ public class CampaignService {
         return new CampaignResponse(c.getCampaignId(), c.getName(), c.getDescription(), c.getStartDate(), c.getEndDate(),
                 c.getStatus(), c.getTargetService(), c.getIconClass(), c.getColorFrom(), c.getColorTo(), c.getCoverImageUrl(),
                 deserializeFields(c.getFieldsJson()), c.getCreatedAt(),
-                contacts.size(), calls, contacted, appointments, unassigned);
+                contacts.size(), calls, contacted, appointments, unassigned, formOf(c));
     }
 
     private CampaignContactResponse toContactResponse(CampaignContact c) {
@@ -1045,7 +1128,7 @@ public class CampaignService {
                 c.getClientName(), c.getClientPhone(), c.getMaskedAccountNumber(), c.getCallStatus(), c.getNotes(),
                 deserializeAnswers(c.getAnswersJson()),
                 deserializeAnswers(c.getExtraDataJson()),
-                c.getLastCalledAt(), c.getAppointmentId());
+                c.getLastCalledAt(), c.getAppointmentId(), c.getLeadScore());
     }
 
     String serializeFields(List<CampaignFieldDto> fields) {

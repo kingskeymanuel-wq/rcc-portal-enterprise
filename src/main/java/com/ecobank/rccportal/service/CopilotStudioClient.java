@@ -60,7 +60,20 @@ public class CopilotStudioClient {
                 copilotProperties.isEnabled(), secretPresent, copilotProperties.getDirectline().getEndpoint());
     }
 
+    /** Mode « serveur sans Internet » (RCC_OFFLINE=true) : ce service hébergé sur Internet n'est pas appelé. */
+    private OfflineMode offlineMode;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setOfflineMode(OfflineMode offlineMode) {
+        this.offlineMode = offlineMode;
+    }
+
+    private boolean offline() {
+        return offlineMode != null && offlineMode.isEnabled();
+    }
+
     public boolean isConfigured() {
+        if (offline()) return false;
         String secret = copilotProperties.getDirectline().getSecret();
         return copilotProperties.isEnabled() && secret != null && !secret.isBlank();
     }

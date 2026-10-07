@@ -341,7 +341,7 @@ IF OBJECT_ID('dbo.USERS', 'U') IS NULL
                                    ACTIVITY NVARCHAR(100) NULL,
                                    RESIDENCE_PLACE NVARCHAR(200) NULL,
                                    LED_TEAM NVARCHAR(30) NULL,
-                                   TEAM_ASSIGNMENT_LOCKED BIT NOT NULL CONSTRAINT DF_Users_TeamAssignLocked DEFAULT 0,
+                                   TEAM_ASSIGNMENT_LOCKED BIT NOT NULL CONSTRAINT DF_Users_TeamAssignLocked DEFAULT 1,
             /* Ne jamais stocker le vrai mot de passe AD ici — conservé pour compatibilité de schéma uniquement. */
                                    PASSWORD NVARCHAR(255) NULL,
                                    CREATED_AT DATETIMEOFFSET NULL,
@@ -379,7 +379,10 @@ IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.USERS'
 ALTER TABLE dbo.USERS ADD LED_TEAM NVARCHAR(30) NULL;
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.USERS') AND name = 'TEAM_ASSIGNMENT_LOCKED')
-ALTER TABLE dbo.USERS ADD TEAM_ASSIGNMENT_LOCKED BIT NOT NULL CONSTRAINT DF_Users_TeamAssignLocked2 DEFAULT 0;
+ALTER TABLE dbo.USERS ADD TEAM_ASSIGNMENT_LOCKED BIT NOT NULL CONSTRAINT DF_Users_TeamAssignLocked2 DEFAULT 1;
+GO
+-- Tous les comptes à True (demande de l'administration) ; le portail l'applique aussi au démarrage (DataPatchService).
+UPDATE dbo.USERS SET TEAM_ASSIGNMENT_LOCKED = 1 WHERE TEAM_ASSIGNMENT_LOCKED = 0;
 GO
 -- Status de compte (migration 001) — DEFAULT 'APPROVED' pour ne jamais bloquer un compte existant.
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.USERS') AND name = 'STATUS')

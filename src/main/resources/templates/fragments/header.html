@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <th:block th:fragment="header">
+    <!-- Mode « serveur sans Internet » (RCC_OFFLINE) : lu par session.js (window.RccOffline). -->
+    <meta name="rcc-offline" th:content="${@offlineMode.enabled}">
     <header class="topbar">
         <!-- Recherche -->
         <form class="search" id="globalSearchForm">

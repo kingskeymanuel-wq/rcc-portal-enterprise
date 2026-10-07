@@ -30,7 +30,7 @@ public class TeamPerformanceController {
                                                                @RequestParam(required = false) String from,
                                                                @RequestParam(required = false) String to,
                                                                @RequestParam(required = false) String countryCode) {
-        return teamPerformance.performance(requester, team, month, from, to, countryCode);
+        return teamPerformance.performance(requester, team, month, from, to, com.ecobank.rccportal.util.Filiale.orCurrent(countryCode));
     }
 
     @GetMapping("/api/qa-team/activity")

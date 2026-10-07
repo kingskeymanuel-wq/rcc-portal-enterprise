@@ -101,7 +101,7 @@ public class TeamPerfFileService {
                 c("totalActivities", "Total activités", "COUNT", true, "CIS + Mails assistés + Sollicitations", "TOTAL_ACTIVITES", "TOTAL_ACTIVITE", "TOTAL", "~TOTAL+ACTIVIT"),
                 avgPerDay("Total activités"), TARGET, PRODUCTIVITY, QUALITY, SENIORITY)));
         // Rapport « PERFORMANCE AGENTS CHATS » : production = Live Chat + autres activités, rapportée au target de la semaine.
-        CATALOG.put("TCHAT", new TeamDef("TCHAT", "Tchat", "totalProduction", List.of(
+        CATALOG.put("TCHAT", new TeamDef("TCHAT", "Réseaux sociaux", "totalProduction", List.of(
                 f("liveChat", "Live Chat", "COUNT", true, "LIVE_CHAT", "LIVE_CHATS", "CHATS", "CHATS_TRAITES", "NOMBRE_CHATS", "~LIVE+CHAT", "~CHAT+TRAIT"),
                 OTHER_ACTIVITIES, DAYS, WEEKLY_TARGET,
                 c("totalProduction", "Prod globale", "COUNT", true, "Live Chat + Activités annexes", "PROD_GLOBALE", "PRODUCTION_GLOBALE", "~PROD+GLOBAL"),
@@ -202,9 +202,11 @@ public class TeamPerfFileService {
         }
     }
 
-    /** Fichiers gérés selon le code d'équipe menée : un Team Leader Tchat ou Rafiki n'importe que son canal. */
+    /** Fichiers gérés selon le code d'équipe menée : un Team Leader Tchat ou Rafiki n'importe que son canal (Télévente, Digitalisation : fichier Outbound). */
     static Set<String> fileTeamsFor(String ledTeamCode) {
-        if (TeamClassifier.isChannel(ledTeamCode)) return Set.of(ledTeamCode.trim().toUpperCase(Locale.ROOT));
+        if (TeamClassifier.isChannel(ledTeamCode) && CATALOG.containsKey(ledTeamCode.trim().toUpperCase(Locale.ROOT))) {
+            return Set.of(ledTeamCode.trim().toUpperCase(Locale.ROOT));
+        }
         return fileTeamsFor(TeamClassifier.teamOf(ledTeamCode));
     }
 

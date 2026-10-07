@@ -70,6 +70,51 @@ public class QualityAiService {
     private final ProcedureStepRepository procedureStepRepository;
     private final QualityCriterionRepository criterionRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    static final String ANALYSIS_SYSTEM = "Tu es l'assistant qualité interne d'Ecobank. Tu analyses des transcriptions " +
+            "d'appels selon la grille de critères et les procédures Ecobank fournies en " +
+            "contexte. Réponds en français, de façon structurée et actionnable.";
+
+    /** IA et transcription installées sur le réseau interne : utilisées hors ligne ou sans ressource Azure. */
+    private LocalAiClient localAi;
+    private OfflineMode offlineMode;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setLocalAi(LocalAiClient localAi) {
+        this.localAi = localAi;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setOfflineMode(OfflineMode offlineMode) {
+        this.offlineMode = offlineMode;
+    }
+
+    private boolean offline() {
+        return offlineMode != null && offlineMode.isEnabled();
+    }
+
+    private boolean useLocalWhisper() {
+        return localAi != null && localAi.isWhisperConfigured() && (offline() || azureSpeechKey == null || azureSpeechKey.isBlank());
+    }
+
+    private boolean useLocalAi() {
+        boolean azure = azureOpenAiEndpoint != null && !azureOpenAiEndpoint.isBlank() && azureOpenAiKey != null && !azureOpenAiKey.isBlank();
+        return localAi != null && localAi.isConfigured() && (offline() || !azure);
+    }
+
+    /** Fichier audio de l'évaluation, vérifié sur le disque. */
+    private Path audioPathOf(Integer evaluationId) {
+        QualityEvaluation evaluation = findEvaluation(evaluationId);
+        if (evaluation.getRecordingRef() == null || evaluation.getRecordingRef().isBlank()) {
+            throw ApiException.badRequest("Cette évaluation n'a pas d'enregistrement audio associé.");
+        }
+        String filename = evaluation.getRecordingRef().substring(evaluation.getRecordingRef().lastIndexOf('/') + 1);
+        Path audioPath = Path.of(audioStorageDir).resolve(filename);
+        if (!Files.exists(audioPath)) {
+            throw ApiException.notFound("Fichier audio introuvable sur le disque (" + audioPath + ").");
+        }
+        return audioPath;
+    }
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(30))
             .build();
@@ -91,6 +136,10 @@ public class QualityAiService {
 
     @Transactional(readOnly = true)
     public TranscriptionResponse transcribe(Integer evaluationId) {
+        if (useLocalWhisper()) return new TranscriptionResponse(localAi.transcribe(audioPathOf(evaluationId)));
+        if (offline()) {
+            throw ApiException.serviceUnavailable("Transcription locale non configurée (mode hors ligne) : renseignez RCC_LOCAL_WHISPER_URL.");
+        }
         if (azureSpeechKey == null || azureSpeechKey.isBlank()) {
             throw ApiException.serviceUnavailable(
                     "Azure AI Speech n'est pas configuré (quality.ai.azure-speech-key). " +
@@ -177,6 +226,14 @@ public class QualityAiService {
 
     @Transactional(readOnly = true)
     public QualityAnalysisResponse analyze(Integer evaluationId, String transcript) {
+        if (useLocalAi()) {
+            if (transcript == null || transcript.isBlank()) throw ApiException.badRequest("Aucune transcription fournie à analyser.");
+            String prompt = buildAnalysisPrompt(findEvaluation(evaluationId), transcript);
+            return new QualityAnalysisResponse(localAi.chat(ANALYSIS_SYSTEM, prompt, 0.3, 1200));
+        }
+        if (offline()) {
+            throw ApiException.serviceUnavailable("IA locale non configurée (mode hors ligne) : renseignez RCC_LOCAL_AI_URL.");
+        }
         if (azureOpenAiEndpoint == null || azureOpenAiEndpoint.isBlank() || azureOpenAiKey == null || azureOpenAiKey.isBlank()) {
             throw ApiException.serviceUnavailable(
                     "Azure OpenAI Service n'est pas configuré (quality.ai.azure-openai-endpoint / -key). " +
@@ -197,10 +254,7 @@ public class QualityAiService {
         try {
             String requestJson = objectMapper.writeValueAsString(Map.of(
                     "messages", List.of(
-                            Map.of("role", "system", "content",
-                                    "Tu es l'assistant qualité interne d'Ecobank. Tu analyses des transcriptions " +
-                                    "d'appels selon la grille de critères et les procédures Ecobank fournies en " +
-                                    "contexte. Réponds en français, de façon structurée et actionnable."),
+                            Map.of("role", "system", "content", ANALYSIS_SYSTEM),
                             Map.of("role", "user", "content", userPrompt)
                     ),
                     "temperature", 0.3,

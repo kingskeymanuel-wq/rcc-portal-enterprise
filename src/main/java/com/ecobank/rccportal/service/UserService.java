@@ -142,6 +142,17 @@ public class UserService {
             String channel = digitalChannelPortal(user.getActivity());
             if (channel != null) redirectTo = channel;
         }
+        // Rôle « Réseaux sociaux » (ex-Tchat) ou « Rafiki » attribué : son portail de canal, même s'il garde un service
+        // Agent Inbound ou un autre rôle d'agent — Réseaux sociaux remplace le Tchat.
+        if (!isAdmin && (redirectTo == null || "/dashboard".equals(redirectTo))) {
+            for (UserRole r : roles) {
+                String n = r.getRole() == null ? null : r.getRole().getName();
+                String base = n == null ? null : com.ecobank.rccportal.security.AccessResolver.roleOfName(n);
+                if (n == null || (base != null && !"AGENT".equals(base)) || n.toUpperCase(java.util.Locale.ROOT).contains("QUALIT")) continue;
+                String channel = digitalChannelPortal(n);
+                if (channel != null) { redirectTo = channel; break; }
+            }
+        }
 
         // Redirection Outbound réservée aux simples agents (dernier repli, si ni Service ni
         // Rôle métier ci-dessus ne correspond) — un QA/Admin/RH/Superviseur/Team Leader dont
@@ -158,8 +169,27 @@ public class UserService {
             }
         }
 
+        // Portail aligné sur le profil réel (le même calcul que les droits, AccessResolver) : un Team Leader par
+        // son seul rôle (« Team Leader Rafiki »…) ou par son équipe menée, un Superviseur, un RH ou un compte
+        // Agence n'atterrit jamais sur l'accueil ou un portail d'agent.
+        if (!isAdmin) {
+            List<String> roleNames = roles.stream().map(r -> r.getRole() == null ? null : r.getRole().getName()).filter(java.util.Objects::nonNull).toList();
+            List<String> codes = userServiceAssignmentRepository.findServicesByUserId(user.getId()).stream()
+                    .filter(s -> s.getService() != null && s.getService().getCode() != null).map(s -> s.getService().getCode().trim()).toList();
+            String home = PROFILE_HOMES.get(com.ecobank.rccportal.security.AccessResolver.primaryRole(roleNames, codes, user.getLedTeam()));
+            if (home != null && (redirectTo == null || AGENT_PORTALS.contains(redirectTo))) redirectTo = home;
+        }
+
         return new com.ecobank.rccportal.dto.TeamStatusResponse(false, redirectTo);
     }
+
+    /** Portails d'agent (accueil compris). */
+    static final java.util.Set<String> AGENT_PORTALS = java.util.Set.of("/dashboard", "/portail-mail", "/portail-tchat", "/portail-rafiki",
+            "/portail-televente", "/outbound-dashboard", "/portail-cib");
+
+    /** Portail de chaque profil d'encadrement. */
+    static final java.util.Map<String, String> PROFILE_HOMES = java.util.Map.of("TEAM_LEADER", "/team-leader", "SUPERVISOR", "/supervisor",
+            "RH", "/rh", "AGENCE", "/agence");
 
     /**
      * Portail métier vers lequel rediriger automatiquement l'utilisateur juste après sa
@@ -182,23 +212,34 @@ public class UserService {
                 put("TEAM_LEADER_TCHAT", "/team-leader");
                 put("TEAM_LEADER_RAFIKI", "/team-leader");
                 put("TEAM_LEADER_CIB", "/team-leader");
+                put("TEAM_LEADER_TELEVENTE", "/team-leader");
+                put("TEAM_LEADER_DIGITALISATION", "/team-leader");
                 put("AGENT_OUTBOUND", "/outbound-dashboard");
+                put("AGENT_TELEVENTE", "/portail-televente");
+                put("AGENT_DIGITALISATION", "/outbound-dashboard");
                 put("AGENT_TCHAT", "/portail-tchat");
                 put("AGENT_RAFIKI", "/portail-rafiki");
                 put("AGENT_INBOUND", "/dashboard");
-                put("AGENT_INBOUND_MAIL", "/dashboard");
-                put("AGENT_CIB", "/dashboard");
+                put("AGENT_INBOUND_MAIL", "/portail-mail");
+                put("AGENT_CIB", "/portail-cib");
                 put("AGENCE_CAISSIER", "/agence");
                 put("AGENCE_GESTIONNAIRE", "/agence");
                 put("AGENCE", "/agence");
             }};
 
-    /** Portail du canal digital d'après l'activité : « RAFIKI » → /portail-rafiki, « TCHAT » / « LIVE CHAT » → /portail-tchat. */
+    /**
+     * Portail propre d'après l'activité (ou le nom du rôle) : « RAFIKI » → /portail-rafiki, « TCHAT » / « LIVE CHAT » →
+     * /portail-tchat, « MAIL » → /portail-mail, « TÉLÉVENTE » → /portail-televente (la Digitalisation garde le portail Outbound).
+     */
     static String digitalChannelPortal(String activity) {
         if (activity == null) return null;
         String a = activity.toUpperCase(java.util.Locale.ROOT);
         if (a.contains("RAFIKI")) return "/portail-rafiki";
-        if (a.contains("TCHAT") || a.contains("LIVE CHAT") || a.matches(".*\\bCHAT\\b.*")) return "/portail-tchat";
+        if (a.matches(".*\\bCIB\\b.*")) return "/portail-cib";
+        String folded = java.text.Normalizer.normalize(a, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "");
+        if (folded.contains("TELEVENTE") || folded.contains("TELEVENDEUR")) return "/portail-televente";
+        if (a.contains("TCHAT") || a.contains("LIVE CHAT") || a.matches(".*\\bCHAT\\b.*") || folded.contains("RESEAU")) return "/portail-tchat";
+        if (a.contains("MAIL")) return "/portail-mail";
         return null;
     }
 
@@ -278,7 +319,7 @@ public class UserService {
         if (request.residencePlace() != null) user.setResidencePlace(request.residencePlace().isBlank() ? null : request.residencePlace().trim());
         if (request.ledTeam() != null) {
             String lt = request.ledTeam().isBlank() ? null : request.ledTeam().trim().toUpperCase();
-            if (lt != null && !java.util.Set.of("INBOUND_VOICE", "INBOUND_MAIL", "TCHAT", "RAFIKI", "CIB", "OUTBOUND").contains(lt)) {
+            if (lt != null && !java.util.Set.of("INBOUND_VOICE", "INBOUND_MAIL", "TCHAT", "RAFIKI", "CIB", "OUTBOUND", "TELEVENTE", "DIGITALISATION").contains(lt)) {
                 throw ApiException.badRequest("ledTeam must be one of INBOUND_VOICE, INBOUND_MAIL, TCHAT, RAFIKI, CIB, OUTBOUND.");
             }
             user.setLedTeam(lt);
@@ -513,6 +554,17 @@ public class UserService {
         }
     }
 
+    /** Compte verrouillé, pour la liste « Comptes verrouillés » de l'administration. */
+    public record LockedAccount(Long id, String username, String name, String email, int failedAttempts) {}
+
+    @Transactional(readOnly = true)
+    public List<LockedAccount> lockedAccounts() {
+        return userRepository.findByAccountLockedTrueOrderByNameAsc().stream()
+                .map(u -> new LockedAccount(u.getId(), u.getUsername(), u.getName(), u.getEmail(),
+                        u.getFailedAttempts() == null ? 0 : u.getFailedAttempts()))
+                .toList();
+    }
+
     /**
      * Réactive un compte verrouillé après échecs de connexion — sans toucher au statut
      * d'approbation ni à accountEnabled (contrairement à approve(), destiné aux demandes
@@ -682,6 +734,8 @@ public class UserService {
                 put("TEAM_LEADER_OUTBOUND", "TEAM_LEADER");
                 put("TEAM_LEADER_TCHAT", "TEAM_LEADER");
                 put("TEAM_LEADER_RAFIKI", "TEAM_LEADER");
+                put("TEAM_LEADER_TELEVENTE", "TEAM_LEADER");
+                put("TEAM_LEADER_DIGITALISATION", "TEAM_LEADER");
                 put("AGENT_INBOUND", "AGENT");
                 put("AGENT_OUTBOUND", "AGENT");
                 put("AGENT_TCHAT", "AGENT");

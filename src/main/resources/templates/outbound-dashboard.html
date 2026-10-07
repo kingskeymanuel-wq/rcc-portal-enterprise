@@ -2,13 +2,18 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <!-- Heure de Côte d'Ivoire sur tous les postes (avant tout autre script) -->
+    <script th:src="@{/js/rcc-time.js}"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>RCC Portal Enterprise — Ventes &amp; RDV</title>
+    <title th:text="${outboundTeam == 'TELEVENTE'} ? 'Portail Front Office Ecobank — Portail Télévente' : 'Portail Front Office Ecobank — Portail Outbound Digitalisation'">Portail Front Office Ecobank — Ventes &amp; RDV</title>
     <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}" rel="stylesheet">
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <link rel="stylesheet" th:href="@{/css/agent-live.css}">
     <link rel="stylesheet" th:href="@{/css/agent-trainings.css}">
+    <link rel="stylesheet" th:href="@{/css/campaign-forms.css}">
+    <link rel="stylesheet" th:href="@{/css/rcc-guides.css}">
+    <link rel="stylesheet" th:href="@{/css/kb-embed.css}">
     <style>
         .ob-chat-scroll { max-height: 60vh; overflow-y: auto; padding: 4px; }
         .ob-chat-msg { max-width: 82%; margin-bottom: .6rem; display: flex; }
@@ -105,8 +110,9 @@
 
                 <div class="welcome-banner d-flex justify-content-between align-items-end flex-wrap gap-2">
                     <div>
-                        <h2><i class="bi bi-telephone-outbound-fill"></i> Ventes &amp; Rendez-vous</h2>
-                        <p class="text-muted mb-0">Votre tableau de bord Outbound — suivez vos ventes et vos rendez-vous clients</p>
+                        <h2 th:if="${outboundTeam == 'TELEVENTE'}"><i class="bi bi-headset"></i> Portail Télévente</h2>
+                        <h2 th:unless="${outboundTeam == 'TELEVENTE'}"><i class="bi bi-telephone-outbound-fill"></i> Portail Outbound — Digitalisation</h2>
+                        <p class="text-muted mb-0" th:text="${outboundTeam == 'TELEVENTE'} ? 'Votre espace Télévente — vos campagnes, vos ventes et vos rendez-vous clients' : 'Votre espace Digitalisation — vos campagnes, vos ventes et vos rendez-vous clients'">Votre tableau de bord Outbound — suivez vos ventes et vos rendez-vous clients</p>
                     </div>
                 </div>
 
@@ -148,6 +154,7 @@
                             <button class="btn nav-link" id="obTabSalesBtn"><i class="bi bi-graph-up-arrow"></i> Mes ventes</button>
                             <button class="btn nav-link" id="obTabRdvBtn"><i class="bi bi-calendar-check"></i> Mes rendez-vous</button>
                             <button class="btn nav-link" id="obTabJourneysBtn"><i class="bi bi-signpost-split-fill"></i> Parcours de vente</button>
+                            <button class="btn nav-link" id="obTabKbBtn"><i class="bi bi-journal-bookmark-fill"></i> Base de connaissance</button>
                         </nav>
                     </div>
 
@@ -234,6 +241,9 @@
                         </div>
                         <div class="row g-3" id="obJourneysGrid"></div>
                     </div>
+
+                    <!-- ===================== BASE DE CONNAISSANCE (kb-embed.js) ===================== -->
+                    <div id="obPaneKb" class="card-body" style="display:none;"><div id="obKbRoot"></div></div>
                 </div>
 
             </div>
@@ -275,7 +285,7 @@
 
 <!-- ===================== MODALE — APPEL DE CAMPAGNE (défilement séquentiel) ===================== -->
 <div class="modal fade" id="obCampaignCallModal" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="bi bi-telephone-outbound-fill"></i> <span id="obCallCampaignName"></span></h5>
@@ -567,6 +577,10 @@
 <script th:src="@{/js/session.js}"></script>
 <script th:src="@{/js/agent-live.js}"></script>
 <script th:src="@{/js/agent-trainings.js}"></script>
+<script th:src="@{/js/guides-data.js}"></script>
+<script th:src="@{/js/rcc-guides.js}"></script>
+<script th:src="@{/js/kb-embed.js}"></script>
+<script th:src="@{/js/campaign-forms.js}"></script>
 <script th:src="@{/js/outbound-dashboard.js}"></script>
 </body>
 </html>

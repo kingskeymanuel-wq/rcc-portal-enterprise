@@ -17,6 +17,7 @@ window.RccHrOrg = (function () {
     var assignModal = null, exitModal = null, assignTarget = null;
 
     function readCountry() {
+        if (window.RccFiliale) return window.RccFiliale.get();
         try { var c = localStorage.getItem("rccHrCountry"); if (c === "CI" || c === "TG") return c; } catch (e) { /* stockage indisponible */ }
         return "CI";
     }
@@ -39,7 +40,9 @@ window.RccHrOrg = (function () {
         window.RccHr.country = c;
         saveCountry(c);
         document.querySelectorAll("#hrCountrySwitch [data-country]").forEach(function (b) { b.classList.toggle("on", b.getAttribute("data-country") === c); });
-        document.querySelectorAll("[data-hro-country-label]").forEach(function (x) { x.textContent = c === "TG" ? "Togo" : "Côte d'Ivoire"; });
+        document.querySelectorAll("[data-hro-country-label]").forEach(function (x) { x.textContent = c === "TG" ? "RCC ETG" : "RCC ECI"; });
+        // Même filiale dans tout le portail (sélecteur de l'en-tête et données des autres écrans).
+        if (window.RccFiliale && window.RccFiliale.get() !== c) window.RccFiliale.set(c);
     }
 
     function loadAll() {

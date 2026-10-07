@@ -38,7 +38,8 @@ public class HrDossierController {
     @GetMapping("/{userId}")
     public List<AttachmentResponse> list(@PathVariable Long userId,
                                          @AuthenticationPrincipal AuthenticatedUser requester) {
-        requireHrOrAdmin(requester);
+        // Consultation : RH, admin et Superviseur (lecture seule) ; dépôt et suppression : RH et admin.
+        if (!"supervisor".equalsIgnoreCase(requester.role())) requireHrOrAdmin(requester);
         return attachmentService.listFor(ENTITY_TYPE, toEntityId(userId));
     }
 

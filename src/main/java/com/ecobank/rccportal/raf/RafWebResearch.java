@@ -107,7 +107,7 @@ public class RafWebResearch {
         List<WebSearchResultItem> top = results.subList(0, Math.min(5, results.size()));
         boolean official = top.stream().anyMatch(r -> r.url() != null && r.url().toLowerCase(Locale.ROOT).contains("ecobank"));
         String written = null;
-        if (writer != null && writer.isConfigured()) {
+        if (writer != null && writer.isAvailable()) {
             StringBuilder extracts = new StringBuilder();
             for (int i = 0; i < top.size(); i++) {
                 extracts.append("[").append(i + 1).append("] ").append(host(top.get(i).url()).replace("🔗 ", "")).append(" — ")

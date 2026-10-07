@@ -7,14 +7,31 @@
     var escapeHtml = RccApi.escapeHtml;
 
     var myTeam = null; // "INBOUND_VOICE" | "INBOUND_MAIL" | "CIB" | "OUTBOUND"
-    var myChannel = ""; // "TCHAT" | "RAFIKI" pour un Team Leader de canal (pôle Inbound Mail), sinon vide
+    var myChannel = ""; // "TCHAT" | "RAFIKI" (pôle Inbound Mail), "TELEVENTE" | "DIGITALISATION" (pôle Outbound) pour un Team Leader de sous-équipe, sinon vide
+    var CHANNEL_NAMES = { TCHAT: "Réseaux sociaux", RAFIKI: "Rafiki", TELEVENTE: "Télévente", DIGITALISATION: "Digitalisation" };
+    var CHANNEL_ICONS = { TCHAT: "bi-chat-text-fill", RAFIKI: "bi-chat-heart-fill", TELEVENTE: "bi-headset", DIGITALISATION: "bi-phone-fill" };
+    /** Cible de campagne propre à la sous-équipe Outbound du Team Leader (Campaign.targetService). */
+    var CHANNEL_CAMPAIGN_TARGET = { TELEVENTE: "TELEVENTE", DIGITALISATION: "DIGITAL" };
     var reportingCache = [];
     var salesByAgentCache = {}; // agentName -> count (mois du reporting en cours), Outbound uniquement
     var agentModal;
 
-    var TABS = ["Reporting", "Members", "Planning", "Qa", "PerfFiles", "Sales", "Rdv", "Campaigns", "Alerts", "Competitions", "Meetings"];
+    var TABS = ["Reporting", "Members", "Planning", "Qa", "PerfFiles", "Sales", "Rdv", "Campaigns", "Kb", "Tools", "Alerts", "Competitions", "Meetings"];
 
     var perfFilesMounted = false;
+
+    var incidentsMounted = false;
+
+    /** Incidents de shift à justifier : pastille de l'onglet « Alertes » et bandeau en haut du portail. */
+    function showIncidentCount(n) {
+        var badge = $("tlIncidentTabCount"), banner = $("tlIncidentBanner");
+        badge.style.display = n > 0 ? "" : "none";
+        badge.textContent = n;
+        banner.innerHTML = n > 0 ? '<div class="si-banner"><i class="bi bi-bell-fill"></i><span>' + n + " incident(s) de shift à justifier : absences, dépassements de pause ou débordements de vos agents.</span>" +
+            '<button type="button" class="btn btn-sm btn-danger" id="tlIncidentGo">Justifier</button></div>' : "";
+        var go = $("tlIncidentGo");
+        if (go) go.addEventListener("click", function () { switchTab("alerts"); $("tlShiftIncidents").scrollIntoView({ behavior: "smooth" }); });
+    }
 
     function switchTab(tab) {
         TABS.forEach(function (t) {
@@ -25,14 +42,22 @@
             pane.style.display = t.toLowerCase() === tab ? "" : "none";
         });
         if (tab === "reporting") loadReporting();
+        if (tab === "kb" && window.RccKbEmbed) RccKbEmbed.mount($("tlKbRoot"));
+        if (tab === "tools" && window.RccExternalTools && !$("tlToolsGrid").children.length) RccExternalTools.render("tlToolsGrid");
         if (tab === "members") loadMembers();
         if (tab === "planning") loadPlanningTab();
-        if (tab === "qa") loadQa();
+        if (tab === "qa") { loadQa(); if (window.RccAssessments) RccAssessments.mountManager($("tlAssessmentsRoot")); }
         if (tab === "perffiles" && !perfFilesMounted && window.RccPerfFiles) { perfFilesMounted = true; RccPerfFiles.mountImport($("tlPerfFilesRoot")); }
         if (tab === "sales") loadSales();
         if (tab === "rdv") loadRdv();
         if (tab === "campaigns") loadCampaigns();
-        if (tab === "alerts") loadAlerts();
+        if (tab === "alerts") {
+            loadAlerts();
+            if (!incidentsMounted && window.RccShiftIncidents) {
+                incidentsMounted = true;
+                RccShiftIncidents.mount($("tlShiftIncidents"), { canJustify: true, onCount: showIncidentCount });
+            }
+        }
         if (tab === "competitions") loadTeamLeaderCompetitions();
         if (tab === "meetings") loadMeetings();
     }
@@ -433,48 +458,134 @@
 
     var planStatusFromCache = null, planStatusToCache = null;
 
+    /** Shifts proposés : catalogue de l'administration (/api/shift-codes), horaires par défaut sinon. */
+    var planShiftCodes = [
+        { code: "M", start: "07:00", end: "16:00" }, { code: "M2", start: "08:00", end: "17:00" }, { code: "M3", start: "09:00", end: "18:00" },
+        { code: "M4", start: "10:00", end: "19:00" }, { code: "A", start: "12:00", end: "21:00" }, { code: "N", start: "21:00", end: "07:00" }];
+
+    function shiftHours(s) { return s.start.replace(":00", "h").replace(":", "h") + "–" + s.end.replace(":00", "h").replace(":", "h"); }
+
+    function planShiftOptions() {
+        return planShiftCodes.map(function (s) { return '<option value="' + escapeHtml(s.code) + '">' + escapeHtml(shiftHours(s)) + ' (' + escapeHtml(s.code) + ')</option>'; }).join("") +
+            '<option value="OFF">Repos (OFF)</option><option value="CONGE">Congé</option>';
+    }
+
+    function loadPlanShiftCodes() {
+        return getJson("/api/shift-codes").then(function (list) {
+            if (list && list.length) planShiftCodes = list;
+        }).catch(function () { /* horaires par défaut */ });
+    }
+
+    /**
+     * Planning par agent : chaque agent a son brouillon { jour: code } (M, M2… ou OFF). On clique un agent, on choisit
+     * l'horaire (pinceau) puis ses jours ; ce qui est déjà en ligne est affiché en gris. « Publier » envoie tous les
+     * brouillons, regroupés par horaire et par jours identiques (un envoi pour les agents qui ont le même planning).
+     */
+    var planAgents = [], planDrafts = {}, planCurrent = null, planBrush = "M", planPicker = null, planExisting = {};
+
+    function planCodesMap() {
+        var m = { OFF: { color: "#94A3B8", label: "Repos (OFF)" }, CONGE: { color: "#F59E0B", label: "Congé" } };
+        planShiftCodes.forEach(function (s) { m[s.code] = { color: s.color || "#0057B8", label: s.code + " · " + shiftHours(s) }; });
+        return m;
+    }
+
+    function renderBrushes() {
+        var codes = planCodesMap();
+        $("tlPlanShiftLegend").innerHTML = planShiftCodes.map(function (s) { return s.code; }).concat(["OFF", "CONGE"]).map(function (c) {
+            var info = codes[c], light = isLightColor(info.color);
+            var title = c === "OFF" ? "Repos" : c === "CONGE" ? "Congé" : c;
+            var sub = c === "OFF" ? "OFF" : c === "CONGE" ? "jours de congé" : info.label.split(" · ")[1];
+            return '<button type="button" class="pa-brush' + (c === planBrush ? " on" : "") + '" data-brush="' + escapeHtml(c) + '" style="background:' + escapeHtml(info.color) +
+                ';color:' + (light ? "#122240" : "#fff") + '">' + escapeHtml(title) + '<small>' + escapeHtml(sub) + '</small></button>';
+        }).join("");
+    }
+
+    function isLightColor(hex) {
+        var h = String(hex || "").replace("#", "");
+        if (h.length !== 6) return false;
+        return (parseInt(h.substr(0, 2), 16) * 299 + parseInt(h.substr(2, 2), 16) * 587 + parseInt(h.substr(4, 2), 16) * 114) / 1000 > 150;
+    }
+
+    function draftCount(u) { return Object.keys(planDrafts[u] || {}).length; }
+
+    function renderPlanAgents() {
+        var q = ($("paAgentSearch").value || "").trim().toLowerCase();
+        var list = planAgents.filter(function (u) { return !q || ((u.fullName || "") + " " + u.username).toLowerCase().indexOf(q) !== -1; });
+        $("tlPlanAgentList").innerHTML = list.length ? list.map(function (u) {
+            var n = draftCount(u.username);
+            return '<button type="button" class="pa-agent' + (planCurrent === u.username ? " on" : "") + '" data-agent="' + escapeHtml(u.username) + '">' +
+                '<div><b>' + escapeHtml(u.fullName || u.username) + '</b><small>' + escapeHtml(u.username) + '</small></div>' +
+                (n ? '<span class="pa-badge draft">' + n + ' j à publier</span>' : '') + '</button>';
+        }).join("") : '<p class="text-muted text-center small p-3">Aucun agent.</p>';
+        var agents = Object.keys(planDrafts).filter(function (k) { return draftCount(k); });
+        $("paDraftCount").textContent = agents.length;
+        $("tlPlanCheckedCount").textContent = agents.length;
+        $("paDayCount").textContent = agents.reduce(function (n, k) { return n + draftCount(k); }, 0);
+    }
+
+    function updatePlanCheckedCount() { renderPlanAgents(); }
+
+    /** Planning déjà en ligne de l'agent sur ~4 mois (affiché en gris dans le calendrier). */
+    function loadAgentExisting(username) {
+        var from = todayIso(), d = new Date(); d.setMonth(d.getMonth() + 4);
+        var to = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+        return getJson("/api/schedule/team?from=" + from + "&to=" + to).then(function (entries) {
+            planExisting = {};
+            (entries || []).forEach(function (e) {
+                if (!e.username || !e.shiftCode) return;
+                var k = e.username.toLowerCase();
+                (planExisting[k] = planExisting[k] || {})[e.workDate] = e.shiftCode;
+            });
+            if (planPicker && planCurrent) planPicker.setExisting(planExisting[planCurrent.toLowerCase()] || {});
+        }).catch(function () { /* affichage seulement */ });
+    }
+
+    function openPlanAgent(username) {
+        var u = planAgents.filter(function (x) { return x.username === username; })[0];
+        if (!u) return;
+        planCurrent = username;
+        $("paEmpty").hidden = true;
+        $("paEditor").hidden = false;
+        $("paAgentName").textContent = u.fullName || u.username;
+        $("paAgentInfo").textContent = u.username;
+        if (!planPicker) {
+            planPicker = RccDayPicker.mount($("tlPlanDayPicker"), {
+                brush: function () { return planBrush; },
+                codes: planCodesMap(),
+                onChange: function () {
+                    if (!planCurrent || !planPicker) return;
+                    planDrafts[planCurrent] = planPicker.entries();
+                    if (!Object.keys(planDrafts[planCurrent]).length) delete planDrafts[planCurrent];
+                    renderPlanAgents();
+                }
+            });
+        }
+        // Chaque agent a SON brouillon : on charge le sien (copie), jamais la sélection de l'agent précédent.
+        planPicker.load(Object.assign({}, planDrafts[username] || {}));
+        planPicker.setExisting(planExisting[username.toLowerCase()] || {});
+        $("paCopyList").innerHTML = planAgents.filter(function (x) { return x.username !== username; }).map(function (x) {
+            return '<label><input type="checkbox" class="form-check-input me-1" value="' + escapeHtml(x.username) + '">' + escapeHtml(x.fullName || x.username) + '</label>';
+        }).join("");
+        renderPlanAgents();
+    }
+
     function loadPlanningTab() {
         $("tlPlanFrom").value = todayIso();
         $("tlPlanTo").value = todayIso();
         $("tlPlanResult").textContent = "";
-        $("tlPlanCheckAll").checked = false;
         $("tlPlanStatusList").innerHTML = '<p class="text-muted small">Choisissez une période puis cliquez "Actualiser".</p>';
         $("tlPlanPublishBtn").classList.add("d-none");
 
-        getJson("/api/team-leader/members/full").then(function (members) {
-            var active = members.filter(function (u) { return u.active; })
+        Promise.all([getJson("/api/team-leader/members/full"), loadPlanShiftCodes()]).then(function (res) {
+            planAgents = res[0].filter(function (u) { return u.active; })
                 .sort(function (a, b) { return (a.fullName || "").localeCompare(b.fullName || "", "fr"); });
-
-            $("tlPlanAgentList").innerHTML = active.length ? active.map(function (u) {
-                return '<div class="exc-agent-row" data-username="' + escapeHtml(u.username) + '">' +
-                    '<input type="checkbox" class="form-check-input tl-plan-check">' +
-                    '<div class="exc-agent-name">' + escapeHtml(u.fullName || u.username) + '<small>' + escapeHtml(u.username) + '</small></div>' +
-                    '<select class="form-select form-select-sm exc-shift-select tl-plan-shift" disabled>' +
-                    '<option value="M">07h–16h (M)</option>' +
-                    '<option value="M2">08h–17h (M2)</option>' +
-                    '<option value="A">12h–21h (A)</option>' +
-                    '<option value="N">21h–06h (N)</option>' +
-                    '<option value="OFF">Repos (OFF)</option>' +
-                    '</select></div>';
-            }).join("") : '<p class="text-muted text-center small">Aucun agent actif dans votre équipe.</p>';
-
-            Array.prototype.forEach.call($("tlPlanAgentList").querySelectorAll(".exc-agent-row"), function (row) {
-                var checkbox = row.querySelector(".tl-plan-check");
-                var select = row.querySelector(".tl-plan-shift");
-                checkbox.addEventListener("change", function () {
-                    select.disabled = !checkbox.checked;
-                    row.classList.toggle("checked", checkbox.checked);
-                    updatePlanCheckedCount();
-                });
-            });
-            updatePlanCheckedCount();
+            if (!planShiftCodes.some(function (s) { return s.code === planBrush; })) planBrush = planShiftCodes.length ? planShiftCodes[0].code : "OFF";
+            renderBrushes();
+            renderPlanAgents();
+            loadAgentExisting(planCurrent || "");
         }).catch(function (e) {
-            $("tlPlanAgentList").innerHTML = '<p class="text-danger text-center small">Erreur : ' + escapeHtml(e.message) + '</p>';
+            $("tlPlanAgentList").innerHTML = '<p class="text-danger text-center small p-3">Erreur : ' + escapeHtml(e.message) + '</p>';
         });
-    }
-
-    function updatePlanCheckedCount() {
-        $("tlPlanCheckedCount").textContent = $("tlPlanAgentList").querySelectorAll(".tl-plan-check:checked").length;
     }
 
     // PENDING / VALIDATED : plannings envoyés à l'ancien portail Excelliam (supprimé), à publier par le Team Leader.
@@ -516,65 +627,84 @@
     }
 
     function wirePlanningTab() {
-        $("tlPlanCheckAll").addEventListener("change", function () {
-            var checkAll = $("tlPlanCheckAll").checked;
-            Array.prototype.forEach.call($("tlPlanAgentList").querySelectorAll(".tl-plan-check"), function (cb) {
-                if (cb.checked !== checkAll) { cb.checked = checkAll; cb.dispatchEvent(new Event("change")); }
-            });
+        $("paAgentSearch").addEventListener("input", renderPlanAgents);
+        $("tlPlanAgentList").addEventListener("click", function (e) {
+            var b = e.target.closest("[data-agent]");
+            if (b) openPlanAgent(b.getAttribute("data-agent"));
         });
-
-        // Deux façons de choisir les jours : une période continue (du … au …) ou des jours précis dans le
-        // calendrier, sur plusieurs semaines et plusieurs mois (plan-day-picker.js).
-        var planMode = "range";
-        var dayPicker = window.RccDayPicker ? RccDayPicker.mount($("tlPlanDayPicker"), {}) : null;
-        $("tlPlanMode").addEventListener("click", function (e) {
-            var b = e.target.closest("[data-mode]");
+        $("tlPlanShiftLegend").addEventListener("click", function (e) {
+            var b = e.target.closest("[data-brush]");
             if (!b) return;
-            planMode = b.getAttribute("data-mode");
-            Array.prototype.forEach.call(this.querySelectorAll("[data-mode]"), function (x) { x.classList.toggle("on", x === b); });
-            $("tlPlanDaysBox").hidden = planMode !== "days";
-            $("tlPlanFrom").closest(".exc-period-bar").querySelectorAll("input[type=date], #tlPlanPeriodLabel, .exc-period-bar > span").forEach(function (el) {
-                el.style.display = planMode === "days" ? "none" : "";
-            });
+            planBrush = b.getAttribute("data-brush");
+            renderBrushes();
+        });
+        $("paClearBtn").addEventListener("click", function () {
+            if (!planCurrent || !planPicker) return;
+            planPicker.clear();
+        });
+        $("paReloadBtn").addEventListener("click", function () { loadAgentExisting(planCurrent); });
+        $("paCopyBtn").addEventListener("click", function () {
+            if (!planCurrent) return;
+            var src = planDrafts[planCurrent] || {};
+            if (!Object.keys(src).length) { alert("Le planning de cet agent est vide : choisissez d'abord ses jours."); return; }
+            var targets = Array.prototype.map.call($("paCopyList").querySelectorAll("input:checked"), function (i) { return i.value; });
+            if (!targets.length) { alert("Cochez au moins un agent."); return; }
+            targets.forEach(function (t) { planDrafts[t] = Object.assign({}, src); });
+            $("paCopyList").querySelectorAll("input:checked").forEach(function (i) { i.checked = false; });
+            renderPlanAgents();
+            $("tlPlanResult").className = "text-success small";
+            $("tlPlanResult").textContent = "Planning copié vers " + targets.length + " agent(s) — à publier.";
+        });
+        $("paDiscardBtn").addEventListener("click", function () {
+            if (!Object.keys(planDrafts).some(function (k) { return draftCount(k); })) return;
+            if (!confirm("Annuler tous les jours choisis et non publiés ?")) return;
+            planDrafts = {};
+            if (planPicker) planPicker.clear();
+            renderPlanAgents();
         });
 
-        // Publication directe : en ligne tout de suite, chaque agent est prévenu.
+        // Publication agent par agent (un envoi par agent et par horaire) : chaque planning est indépendant — l'erreur
+        // sur un agent n'empêche ni ne modifie celui des autres.
         function submitPlanning() {
-            var from = $("tlPlanFrom").value, to = $("tlPlanTo").value;
             var resultBox = $("tlPlanResult");
-            var days = planMode === "days" && dayPicker ? dayPicker.days() : null;
-            if (days) {
-                if (!days.length) { resultBox.className = "text-danger"; resultBox.textContent = "Choisissez au moins un jour dans le calendrier."; return; }
-                from = days[0]; to = days[days.length - 1];
-            }
-            if (!from || !to) { resultBox.className = "text-danger"; resultBox.textContent = "Choisissez une période."; return; }
-
-            var assignments = [];
-            Array.prototype.forEach.call($("tlPlanAgentList").querySelectorAll(".exc-agent-row"), function (row) {
-                var checkbox = row.querySelector(".tl-plan-check");
-                if (!checkbox.checked) return;
-                assignments.push({ username: row.getAttribute("data-username"), shiftCode: row.querySelector(".tl-plan-shift").value });
+            var groups = [];
+            Object.keys(planDrafts).forEach(function (u) {
+                var perCode = {};
+                Object.keys(planDrafts[u] || {}).forEach(function (day) { (perCode[planDrafts[u][day]] = perCode[planDrafts[u][day]] || []).push(day); });
+                Object.keys(perCode).forEach(function (code) { groups.push({ code: code, days: perCode[code].sort(), users: [u] }); });
             });
-            if (!assignments.length) { resultBox.className = "text-danger"; resultBox.textContent = "Cochez au moins un agent."; return; }
-            if (!confirm("Publier ce planning maintenant" + (days ? " (" + days.length + " jour(s) choisi(s))" : "") + " ? Il sera immédiatement visible par les " + assignments.length + " agent(s) concerné(s).")) return;
+            var agents = Object.keys(planDrafts).filter(function (k) { return draftCount(k); });
+            if (!groups.length) { resultBox.className = "text-danger small"; resultBox.textContent = "Choisissez d'abord un agent et ses jours."; return; }
+            var total = agents.reduce(function (n, k) { return n + draftCount(k); }, 0);
+            if (!confirm("Publier " + total + " jour(s) de planning pour " + agents.length + " agent(s) ? Ce sera immédiatement visible par les agents concernés (ils sont prévenus).")) return;
 
-            resultBox.className = "text-muted";
+            resultBox.className = "text-muted small";
             resultBox.textContent = "Publication…";
-            fetch("/api/schedule/team/submit", {
-                method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ periodFrom: from, periodTo: to, assignments: assignments,
-                    days: days, restOnOtherDays: days ? $("tlPlanRestOthers").checked : null })
-            })
-                .then(readImportResponse)
-                .then(function (result) {
-                    resultBox.className = "text-success";
-                    resultBox.textContent = "Planning publié : " + result.agentsPlanified + " agent(s), " + result.entriesCreated + " jour(s) — en ligne et agents prévenus.";
-                    loadPlanningStatus();
-                })
-                .catch(function (e) {
-                    resultBox.className = "text-danger";
-                    resultBox.textContent = "Erreur : " + e.message;
+            $("tlPlanPublishDirectBtn").disabled = true;
+            var done = 0, entries = 0, errors = [];
+            groups.reduce(function (chain, g) {
+                return chain.then(function () {
+                    return fetch("/api/schedule/team/submit", {
+                        method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ periodFrom: g.days[0], periodTo: g.days[g.days.length - 1], days: g.days, restOnOtherDays: false,
+                            assignments: g.users.map(function (u) { return { username: u, shiftCode: g.code }; }) })
+                    }).then(readImportResponse).then(function (r) {
+                        done++;
+                        entries += r.entriesCreated || 0;
+                        g.users.forEach(function (u) { g.days.forEach(function (d) { if (planDrafts[u]) delete planDrafts[u][d]; }); });
+                    }).catch(function (e) { errors.push(g.users[0] + " (" + g.code + ") : " + e.message); });
                 });
+            }, Promise.resolve()).then(function () {
+                $("tlPlanPublishDirectBtn").disabled = false;
+                if (planPicker && planCurrent) planPicker.load(planDrafts[planCurrent] || {});
+                renderPlanAgents();
+                loadAgentExisting(planCurrent || "");
+                resultBox.className = errors.length ? "text-danger small" : "text-success small";
+                resultBox.textContent = errors.length
+                    ? "Publié en partie (" + entries + " jour(s)). Erreurs : " + errors.join(" ; ")
+                    : "Planning publié : " + agents.length + " agent(s), " + entries + " jour(s) — en ligne et agents prévenus.";
+                loadPlanningStatus();
+            });
         }
         $("tlPlanPublishDirectBtn").addEventListener("click", submitPlanning);
 
@@ -908,7 +1038,6 @@
     var campaignContactsCache = [];
     var currentContactStatusFilter = null; // null = tous
     var teamMembersCache = [];
-    var editingCampaignFields = []; // questions de la campagne en cours de création — voir renderCampaignFieldsEditor
 
     var STATUS_COLORS = { PENDING: "#adb5bd", GREEN: "#00A651", RED: "#dc3545", YELLOW: "#F5A623" };
     var STATUS_LABELS_CALL = { PENDING: "À appeler", GREEN: "Interaction", RED: "Pas de réponse", YELLOW: "RDV pris" };
@@ -956,6 +1085,7 @@
 
     function loadCampaigns() {
         getJson("/api/campaigns").then(function (campaigns) {
+            campaignsListCache = campaigns;
             var container = $("tlCampaignsList");
             if (!campaigns.length) { container.innerHTML = '<p class="text-muted text-center">Aucune campagne pour l\'instant.</p>'; return; }
             container.innerHTML = campaigns.map(function (c) {
@@ -986,73 +1116,49 @@
         });
     }
 
-    $("tlNewCampaignBtn").addEventListener("click", function () {
-        $("tlCampaignName").value = ""; $("tlCampaignDescription").value = "";
-        $("tlCampaignStart").value = ""; $("tlCampaignEnd").value = "";
-        $("tlCampaignTargetService").value = "";
-        $("tlCampaignIcon").value = "bi-megaphone-fill";
-        $("tlCampaignColorFrom").value = "#0057B8";
-        $("tlCampaignColorTo").value = "#00A651";
-        editingCampaignFields = [];
-        renderCampaignFieldsEditor();
-        newCampaignModal.show();
-    });
+    // ───────────── Campagne et son formulaire avancé (RccFormBuilder) ─────────────
 
-    /** Constructeur de questions — une ligne par question, type/options/obligatoire, comme
-     *  vu par l'agent dans la modale d'appel séquentielle du tableau de bord Outbound. */
-    function renderCampaignFieldsEditor() {
-        var container = $("tlCampaignFieldsEditor");
-        if (!editingCampaignFields.length) {
-            container.innerHTML = '<p class="text-muted small mb-2">Aucune question — les 4 boutons de statut (À appeler/Interaction/Pas de réponse/RDV pris) suffisent pour cette campagne.</p>';
-            return;
+    var formBuilder = null, editingCampaignId = null, campaignsListCache = [];
+
+    function openCampaignEditor(campaign) {
+        editingCampaignId = campaign ? campaign.campaignId : null;
+        $("tlCampaignModalTitle").textContent = campaign ? "Modifier « " + campaign.name + " »" : "Nouvelle campagne";
+        $("tlSaveCampaignLbl").textContent = campaign ? "Enregistrer les modifications" : "Créer la campagne";
+        $("tlCampaignName").value = campaign ? campaign.name : "";
+        $("tlCampaignDescription").value = campaign && campaign.description ? campaign.description : "";
+        $("tlCampaignStart").value = campaign && campaign.startDate ? campaign.startDate : "";
+        $("tlCampaignEnd").value = campaign && campaign.endDate ? campaign.endDate : "";
+        $("tlCampaignTargetService").value = campaign ? (campaign.targetService || "") : (CHANNEL_CAMPAIGN_TARGET[myChannel] || "");
+        $("tlCampaignIcon").value = campaign && campaign.iconClass ? campaign.iconClass : "bi-megaphone-fill";
+        $("tlCampaignColorFrom").value = campaign && campaign.colorFrom ? campaign.colorFrom : "#0057B8";
+        $("tlCampaignColorTo").value = campaign && campaign.colorTo ? campaign.colorTo : "#00A651";
+        $("tlCampaignMeta").open = !campaign;
+        $("tlBuilderNotice").textContent = campaign && campaign.totalContacts ? campaign.totalContacts + " contact(s) : les réponses déjà saisies sont conservées." : "";
+        $("tlBuilderStatus").textContent = "";
+        var form = campaign && campaign.form ? campaign.form : RccFormBuilder.emptyForm();
+        if (!formBuilder) {
+            formBuilder = RccFormBuilder.mount($("tlFormBuilder"), {
+                form: form,
+                campaignName: function () { return $("tlCampaignName").value.trim(); },
+                onNotice: function (msg) { $("tlBuilderNotice").textContent = msg; }
+            });
+        } else {
+            formBuilder.setForm(form);
         }
-        container.innerHTML = editingCampaignFields.map(function (f, idx) {
-            var showOptions = f.type === "SELECT" || f.type === "RADIO";
-            return '<div class="border rounded p-2 mb-2" data-field-idx="' + idx + '">' +
-                '<div class="row g-2 align-items-center">' +
-                    '<div class="col-md-5"><input type="text" class="form-control form-control-sm tl-field-label" placeholder="Intitulé de la question" value="' + escapeHtml(f.label) + '"></div>' +
-                    '<div class="col-md-3"><select class="form-select form-select-sm tl-field-type">' +
-                        ["TEXT", "TEXTAREA", "SELECT", "RADIO", "DATE", "TIME"].map(function (t) {
-                            return '<option value="' + t + '" ' + (t === f.type ? "selected" : "") + '>' + t + '</option>';
-                        }).join("") + '</select></div>' +
-                    '<div class="col-md-2 form-check form-switch pt-1"><input class="form-check-input tl-field-required" type="checkbox" ' + (f.required ? "checked" : "") + '><label class="form-check-label small">Obligatoire</label></div>' +
-                    '<div class="col-md-2 text-end"><button class="btn btn-sm btn-outline-danger tl-field-remove" type="button"><i class="bi bi-trash"></i></button></div>' +
-                '</div>' +
-                '<div class="mt-2" style="' + (showOptions ? "" : "display:none;") + '">' +
-                    '<label class="form-label small mb-1">Choix proposés (un par ligne)</label>' +
-                    '<textarea class="form-control form-control-sm tl-field-options" rows="3">' + escapeHtml((f.options || []).join("\n")) + '</textarea>' +
-                '</div>' +
-            '</div>';
-        }).join("");
-
-        Array.prototype.forEach.call(container.querySelectorAll("[data-field-idx]"), function (row) {
-            var idx = Number(row.getAttribute("data-field-idx"));
-            row.querySelector(".tl-field-label").addEventListener("input", function () { editingCampaignFields[idx].label = this.value; });
-            row.querySelector(".tl-field-required").addEventListener("change", function () { editingCampaignFields[idx].required = this.checked; });
-            row.querySelector(".tl-field-options").addEventListener("input", function () {
-                editingCampaignFields[idx].options = this.value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
-            });
-            row.querySelector(".tl-field-type").addEventListener("change", function () {
-                editingCampaignFields[idx].type = this.value;
-                row.querySelector(".mt-2").style.display = (this.value === "SELECT" || this.value === "RADIO") ? "" : "none";
-            });
-            row.querySelector(".tl-field-remove").addEventListener("click", function () {
-                editingCampaignFields.splice(idx, 1);
-                renderCampaignFieldsEditor();
-            });
-        });
+        newCampaignModal.show();
     }
 
-    $("tlCampaignAddFieldBtn").addEventListener("click", function () {
-        editingCampaignFields.push({ id: "q" + Date.now() + "_" + editingCampaignFields.length, label: "", type: "TEXT", options: [], required: false });
-        renderCampaignFieldsEditor();
-    });
+    $("tlNewCampaignBtn").addEventListener("click", function () { openCampaignEditor(null); });
 
     $("tlSaveCampaignBtn").addEventListener("click", function () {
         var name = $("tlCampaignName").value.trim();
-        if (!name) { alert("Le nom de la campagne est obligatoire."); return; }
-        var fields = editingCampaignFields.filter(function (f) { return f.label.trim(); });
-        sendJson("/api/campaigns", "POST", {
+        if (!name) { $("tlCampaignMeta").open = true; $("tlCampaignName").focus(); $("tlBuilderStatus").textContent = "Le nom de la campagne est obligatoire."; return; }
+        var problems = formBuilder.issues();
+        if (problems.length) { $("tlBuilderStatus").innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-triangle"></i> ' + escapeHtml(problems[0]) + '</span>'; return; }
+        var btn = $("tlSaveCampaignBtn");
+        btn.disabled = true;
+        $("tlBuilderStatus").textContent = "Enregistrement…";
+        var body = {
             name: name,
             description: $("tlCampaignDescription").value.trim() || null,
             startDate: $("tlCampaignStart").value || null,
@@ -1061,18 +1167,70 @@
             iconClass: $("tlCampaignIcon").value.trim() || null,
             colorFrom: $("tlCampaignColorFrom").value || null,
             colorTo: $("tlCampaignColorTo").value || null,
-            fields: fields
-        }).then(function () {
+            form: formBuilder.getForm()
+        };
+        sendJson(editingCampaignId ? "/api/campaigns/" + editingCampaignId : "/api/campaigns", editingCampaignId ? "PUT" : "POST", body).then(function () {
+            btn.disabled = false;
             newCampaignModal.hide();
             loadCampaigns();
+            if (editingCampaignId && currentCampaignId === editingCampaignId) refreshCurrentCampaign();
+        }).catch(function (e) {
+            btn.disabled = false;
+            $("tlBuilderStatus").innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-triangle"></i> ' + escapeHtml(e.message) + '</span>';
+        });
+    });
+
+    function refreshCurrentCampaign() {
+        getJson("/api/campaigns").then(function (list) {
+            campaignsListCache = list;
+            var c = list.find(function (x) { return x.campaignId === currentCampaignId; });
+            if (c) updateCampaignHeader(c);
+            if ($("tlCpResults").style.display !== "none") loadCampaignResults();
+        });
+    }
+
+    function currentCampaignObj() { return campaignsListCache.find(function (c) { return c.campaignId === currentCampaignId; }); }
+
+    function updateCampaignHeader(c) {
+        $("tlCampaignDetailTitle").innerHTML = '<i class="bi bi-megaphone-fill"></i> ' + escapeHtml(c.name) + (c.status === "ACTIVE" ? "" : ' <span class="badge bg-secondary">Clôturée</span>');
+        $("tlCampaignStateBtn").innerHTML = c.status === "ACTIVE" ? '<i class="bi bi-lock"></i> Clôturer' : '<i class="bi bi-unlock"></i> Réouvrir';
+    }
+
+    $("tlCampaignEditBtn").addEventListener("click", function () {
+        var c = currentCampaignObj();
+        if (c) { campaignDetailModal.hide(); openCampaignEditor(c); }
+    });
+    $("tlCampaignDupBtn").addEventListener("click", function () {
+        var c = currentCampaignObj();
+        if (!c || !confirm("Dupliquer « " + c.name + " » (formulaire et visuel, sans les contacts) ?")) return;
+        sendJson("/api/campaigns/" + c.campaignId + "/duplicate", "POST", {}).then(function (copy) {
+            campaignDetailModal.hide();
+            loadCampaigns();
+            openCampaignEditor(copy);
         }).catch(function (e) { alert("Erreur : " + e.message); });
     });
+    $("tlCampaignStateBtn").addEventListener("click", function () {
+        var c = currentCampaignObj();
+        if (!c) return;
+        var closing = c.status === "ACTIVE";
+        if (!confirm(closing ? "Clôturer la campagne ? Elle disparaît de l'onglet Campagne des agents." : "Réouvrir la campagne pour les agents ?")) return;
+        sendJson("/api/campaigns/" + c.campaignId + (closing ? "/close" : "/reopen"), "POST", {}).then(function () { loadCampaigns(); refreshCurrentCampaign(); })
+            .catch(function (e) { alert("Erreur : " + e.message); });
+    });
+
+    function loadCampaignResults() {
+        var box = $("tlCpResults");
+        box.innerHTML = '<p class="text-muted text-center py-4"><span class="spinner-border spinner-border-sm"></span> Calcul des résultats…</p>';
+        getJson("/api/campaigns/" + currentCampaignId + "/results").then(function (d) {
+            RccFormResults.render(box, d, { onRefresh: loadCampaignResults });
+        }).catch(function (e) { box.innerHTML = '<p class="text-danger">Erreur : ' + escapeHtml(e.message) + '</p>'; });
+    }
 
     function openCampaignDetail(campaignId, campaigns) {
         currentCampaignId = campaignId;
         currentContactStatusFilter = null;
         var campaign = campaigns.find(function (c) { return c.campaignId === campaignId; });
-        $("tlCampaignDetailTitle").innerHTML = '<i class="bi bi-megaphone-fill"></i> ' + escapeHtml(campaign ? campaign.name : "");
+        if (campaign) updateCampaignHeader(campaign);
         $("tlCampaignImportFile").value = "";
         $("tlCampaignImportStatus").textContent = "";
         $("tlImportReport").innerHTML = "";
@@ -1578,6 +1736,7 @@
             $(x.getAttribute("data-cp-pane")).style.display = on ? "" : "none";
         });
         if (pane === "tlCpPerformance") loadCampaignPerformance();
+        if (pane === "tlCpResults") loadCampaignResults();
     }
 
     // ===================== COACHING QA (MY TODO) =====================
@@ -1808,6 +1967,8 @@
         $("tlTabSalesBtn").addEventListener("click", function () { switchTab("sales"); });
         $("tlTabRdvBtn").addEventListener("click", function () { switchTab("rdv"); });
         $("tlTabCampaignsBtn").addEventListener("click", function () { switchTab("campaigns"); });
+        $("tlTabKbBtn").addEventListener("click", function () { switchTab("kb"); });
+        $("tlTabToolsBtn").addEventListener("click", function () { switchTab("tools"); });
         $("tlTabAlertsBtn").addEventListener("click", function () { switchTab("alerts"); });
         $("tlTabCompetitionsBtn").addEventListener("click", function () { switchTab("competitions"); });
         $("tlTabMeetingsBtn").addEventListener("click", function () { switchTab("meetings"); });
@@ -1836,17 +1997,19 @@
                 var hero = document.querySelector(".tl-hero");
                 if (hero) hero.setAttribute("data-channel", myChannel);
                 var kicker = document.querySelector(".tl-hero-kicker");
-                if (kicker) kicker.innerHTML = '<i class="bi ' + (myChannel === "RAFIKI" ? "bi-chat-heart-fill" : "bi-chat-text-fill") + '"></i> Espace Team Leader ' + teamLabel(myTeam);
-                document.title = "RCC Portal — Portail Team Leader " + teamLabel(myTeam);
+                if (kicker) kicker.innerHTML = '<i class="bi ' + (CHANNEL_ICONS[myChannel] || "bi-people-fill") + '"></i> Espace Team Leader ' + teamLabel(myTeam);
+                document.title = "Portail Front Office — Portail Team Leader " + teamLabel(myTeam);
             }
             $("tlContent").style.display = "";
             if (myTeam === "OUTBOUND") {
                 $("tlTabSalesBtn").style.display = "";
                 $("tlTabRdvBtn").style.display = "";
                 $("tlTabCampaignsBtn").style.display = "";
+                $("tlTabKbBtn").style.display = "";
             }
             loadReporting();
             refreshMeetingCounts();
+            if (window.RccShiftIncidents) RccShiftIncidents.count().then(showIncidentCount);
             if (/[?&]tab=meetings\b/.test(location.search)) switchTab("meetings");
             checkPendingNotificationPopup(notifPopupModal);
             loadTlToolBadges();
@@ -1858,7 +2021,7 @@
     }
 
     function teamLabel(team) {
-        if (myChannel) return myChannel === "RAFIKI" ? "Rafiki" : "Tchat";
+        if (myChannel) return CHANNEL_NAMES[myChannel] || myChannel;
         return { INBOUND_VOICE: "Inbound Voix", INBOUND_MAIL: "Inbound Mail", CIB: "CIB", OUTBOUND: "Outbound" }[team] || team;
     }
 

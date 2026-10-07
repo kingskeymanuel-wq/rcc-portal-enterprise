@@ -67,7 +67,7 @@ public class ReportingService {
     public List<PerformanceResponse> teamSummary(java.time.LocalDate periodStart, java.time.LocalDate periodEnd,
                                                    String periodLabel, String countryCode) {
         List<User> users = userRepository.findAll().stream()
-                .filter(u -> countryCode == null || countryCode.isBlank() || countryCode.equalsIgnoreCase(u.getAffiliateBranch()))
+                .filter(u -> countryCode == null || countryCode.isBlank() || com.ecobank.rccportal.util.Affiliates.sameCountry(countryCode, u.getAffiliateBranch()))
                 .toList();
 
         List<java.util.concurrent.CompletableFuture<PerformanceResponse>> futures = users.stream()

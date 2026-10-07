@@ -40,7 +40,7 @@
                   '<button type="button" class="btn btn-sm btn-outline-danger delete-category-btn" data-id="' + c.categoryId + '" title="Supprimer"><i class="bi bi-trash"></i></button>' +
                   '</div>'
                 : "";
-            var quickImportBtn = currentProfile === "QA"
+            var quickImportBtn = (currentProfile === "QA" || (currentProfile === "ADMIN" && kbSpace === "CIB"))
                 ? '<button type="button" class="btn btn-sm btn-primary position-absolute bottom-0 end-0 m-1 kb-quick-upload-btn" ' +
                   'data-category-id="' + c.categoryId + '" data-category-label="' + escapeHtml(c.title) + '" title="Importer un fichier">' +
                   '<i class="bi bi-upload"></i></button>'
@@ -76,7 +76,7 @@
                 var newTitle = prompt("Nouveau titre de la catégorie :", category.title);
                 if (!newTitle || !newTitle.trim()) return;
                 // Base commune à toutes les équipes : plus de choix d'équipe par rubrique.
-                sendJson("/api/kb/categories/" + category.categoryId, "PUT", { title: newTitle.trim(), team: "" })
+                sendJson("/api/kb/categories/" + category.categoryId, "PUT", { title: newTitle.trim(), team: category.team || "" })
                     .then(function () { loadCategories(currentCategoryId); })
                     .catch(function (e) { alert("Erreur : " + e.message); });
             });
@@ -123,8 +123,53 @@
 
     var currentTeamFilter = ""; // base commune : jamais de filtre par équipe
 
+    /** Base affichée : « CIB » ou « GENERAL ». L'encadrement choisit ; les autres reçoivent la leur du serveur. */
+    var kbSpace = "GENERAL", kbCanChoose = false;
+
+    function applySpaceLabels() {
+        var cib = kbSpace === "CIB";
+        window.RccKbSpace = kbSpace;
+        document.dispatchEvent(new CustomEvent("rcc:kb-space", { detail: kbSpace }));
+        $("kbTitle").textContent = cib ? "Base de connaissance CIB" : "Knowledge Base";
+        $("kbSubtitle").textContent = cib
+            ? "Traitements des entreprises — base propre à l'équipe CIB, séparée de la base générale"
+            : "Articles, fichiers, et assistant de recherche Ralph";
+        $("newCategoryTeam").value = cib ? "CIB" : "";
+        Array.prototype.forEach.call(document.querySelectorAll("[data-kb-space]"), function (b) {
+            var on = b.getAttribute("data-kb-space") === kbSpace;
+            b.classList.toggle("btn-primary", on);
+            b.classList.toggle("btn-outline-primary", !on);
+        });
+    }
+
+    function loadSpace() {
+        return getJson("/api/kb/space").then(function (r) {
+            kbCanChoose = !!r.canChoose;
+            if (kbCanChoose) {
+                var saved = null;
+                try { saved = localStorage.getItem("rcc.kbSpace"); } catch (e) { /* stockage indisponible */ }
+                kbSpace = saved === "CIB" ? "CIB" : "GENERAL";
+                var bar = $("kbSpaceBar");
+                bar.style.removeProperty("display");
+                bar.style.display = "flex";
+                Array.prototype.forEach.call(bar.querySelectorAll("[data-kb-space]"), function (b) {
+                    b.addEventListener("click", function () {
+                        kbSpace = b.getAttribute("data-kb-space");
+                        try { localStorage.setItem("rcc.kbSpace", kbSpace); } catch (e) { /* stockage indisponible */ }
+                        applySpaceLabels();
+                        currentCategoryId = null;
+                        loadCategories();
+                    });
+                });
+            } else {
+                kbSpace = r.space === "CIB" ? "CIB" : "GENERAL";
+            }
+            applySpaceLabels();
+        }).catch(function () { applySpaceLabels(); });
+    }
+
     function loadCategories(thenSelectCategoryId) {
-        var url = "/api/kb/categories" + (currentTeamFilter ? "?team=" + encodeURIComponent(currentTeamFilter) : "");
+        var url = "/api/kb/categories" + (kbCanChoose ? "?space=" + encodeURIComponent(kbSpace) : "");
         getJson(url).then(function (categories) {
             categoriesCache = categories;
             renderCategories();
@@ -700,8 +745,9 @@
             var params = new URLSearchParams(window.location.search);
             var deepLinkArticleId = params.get("article") ? Number(params.get("article")) : null;
             var deepLinkCategoryId = params.get("category") ? Number(params.get("category")) : null;
+            if (params.get("space") === "CIB") { try { localStorage.setItem("rcc.kbSpace", "CIB"); } catch (e) { /* stockage indisponible */ } }
 
-            loadCategories(deepLinkCategoryId);
+            loadSpace().then(function () { loadCategories(deepLinkCategoryId); });
 
             if (deepLinkArticleId) {
                 openArticleDeepLink(deepLinkArticleId, countriesLoaded);

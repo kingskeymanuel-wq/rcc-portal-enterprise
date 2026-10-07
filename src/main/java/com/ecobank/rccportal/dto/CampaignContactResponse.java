@@ -20,6 +20,8 @@ public record CampaignContactResponse(
          *  Lecture seule : affichage de référence pour l'agent, jamais modifiable depuis l'appel. */
         Map<String, String> extraData,
         LocalDateTime lastCalledAt,
-        Integer appointmentId
+        Integer appointmentId,
+        /** Score du lead calculé par le serveur (0–100), null sans notation. */
+        Integer leadScore
 ) {
 }

@@ -21,13 +21,21 @@ public class AdministrationController {
     private final CurrentUserAccessService currentUserAccessService;
     private final com.ecobank.rccportal.service.EffectiveAccessService effectiveAccessService;
     private final com.ecobank.rccportal.service.AdminHierarchyService hierarchyService;
+    private final com.ecobank.rccportal.service.DataPatchService dataPatchService;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ecobank.rccportal.service.AuditLogService auditLogService;
+    private final com.ecobank.rccportal.service.AccessLevelService accessLevelService;
 
     public AdministrationController(AdministrationService administrationService,
                                     UserFeaturePermissionService userFeaturePermissionService,
                                     CurrentUserAccessService currentUserAccessService,
                                     com.ecobank.rccportal.service.EffectiveAccessService effectiveAccessService,
-                                    com.ecobank.rccportal.service.AdminHierarchyService hierarchyService) {
+                                    com.ecobank.rccportal.service.AdminHierarchyService hierarchyService,
+                                    com.ecobank.rccportal.service.DataPatchService dataPatchService,
+                                    com.ecobank.rccportal.service.AccessLevelService accessLevelService) {
         this.hierarchyService = hierarchyService;
+        this.dataPatchService = dataPatchService;
+        this.accessLevelService = accessLevelService;
         this.administrationService = administrationService;
         this.userFeaturePermissionService = userFeaturePermissionService;
         this.currentUserAccessService = currentUserAccessService;
@@ -39,6 +47,173 @@ public class AdministrationController {
     public com.ecobank.rccportal.service.AdminHierarchyService.Hierarchy hierarchy(@AuthenticationPrincipal AuthenticatedUser requester) {
         requireAdmin(requester);
         return hierarchyService.hierarchy();
+    }
+
+    // ───────────── Base de données : tables des comptes, éditées sans SQL Server ─────────────
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ecobank.rccportal.service.AdminDataService adminDataService;
+
+    @GetMapping("/data")
+    public List<java.util.Map<String, String>> dataTables(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return adminDataService.tables();
+    }
+
+    @GetMapping("/data/options")
+    public java.util.Map<String, List<java.util.Map<String, Object>>> dataOptions(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return adminDataService.options();
+    }
+
+    @GetMapping("/data/{table}")
+    public com.ecobank.rccportal.service.AdminDataService.Page dataRows(@PathVariable String table,
+                                                                          @RequestParam(required = false) String q,
+                                                                          @RequestParam(defaultValue = "0") int page,
+                                                                          @RequestParam(defaultValue = "100") int size,
+                                                                          @RequestParam(required = false) String sort,
+                                                                          @RequestParam(defaultValue = "false") boolean desc,
+                                                                          @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return adminDataService.rows(table, q, page, size, sort, desc);
+    }
+
+    public record CellUpdate(String column, Object value) {}
+
+    @PatchMapping("/data/{table}/{id}")
+    public java.util.Map<String, Object> dataUpdate(@PathVariable String table, @PathVariable long id, @RequestBody CellUpdate body,
+                                                    @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return adminDataService.update(table, id, body.column(), body.value(), requester.username());
+    }
+
+    @PostMapping("/data/{table}")
+    public java.util.Map<String, Object> dataInsert(@PathVariable String table, @RequestBody java.util.Map<String, Object> values,
+                                                    @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return adminDataService.insert(table, values, requester.username());
+    }
+
+    @DeleteMapping("/data/{table}/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void dataDelete(@PathVariable String table, @PathVariable long id, @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        adminDataService.delete(table, id, requester.username());
+    }
+
+    @PostMapping("/data/links/clean")
+    public java.util.Map<String, Integer> dataCleanLinks(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return java.util.Map.of("removed", adminDataService.removeDuplicateLinks(requester.username()));
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ecobank.rccportal.service.DbHealthService dbHealthService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ecobank.rccportal.service.OfflineDiagnosticService offlineDiagnosticService;
+
+    /** Fonctionnement sans Internet : état des services locaux et des services Internet encore actifs. */
+    @GetMapping("/offline-diagnostic")
+    public com.ecobank.rccportal.service.OfflineDiagnosticService.Report offlineDiagnostic(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return offlineDiagnosticService.run();
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ecobank.rccportal.service.OfflineMode offlineMode;
+
+    @GetMapping("/offline-mode")
+    public java.util.Map<String, Boolean> offlineMode(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return java.util.Map.of("enabled", offlineMode.isEnabled());
+    }
+
+    /** Bascule le portail en mode hors ligne (ou le rétablit) — effet immédiat, conservé au redémarrage. */
+    @PutMapping("/offline-mode")
+    public java.util.Map<String, Boolean> setOfflineMode(@RequestBody java.util.Map<String, Boolean> body,
+                                                         @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        boolean on = Boolean.TRUE.equals(body == null ? null : body.get("enabled"));
+        offlineMode.setEnabled(on);
+        org.slf4j.LoggerFactory.getLogger(getClass()).info("Mode hors ligne {} par {}", on ? "activé" : "désactivé", requester.username());
+        return java.util.Map.of("enabled", offlineMode.isEnabled());
+    }
+
+    /** Contrôle en direct : base utilisée, droits SQL, test d'écriture réel (annulé), données qui faussent les accès. */
+    @GetMapping("/db-health")
+    public com.ecobank.rccportal.service.DbHealthService.Report dbHealth(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return dbHealthService.check(requester.username());
+    }
+
+    /** Correction proposée par le contrôle : liaisons en double / orphelines, équipes menées invalides. */
+    @PostMapping("/db-health/fix/{action}")
+    public java.util.Map<String, Integer> dbHealthFix(@PathVariable String action, @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return switch (action) {
+            case "clean-links" -> java.util.Map.of("fixed", adminDataService.removeDuplicateLinks(requester.username()));
+            case "clear-led-team" -> {
+                int n = dbHealthService.clearInvalidLedTeams();
+                auditLogService.record(requester.username(), com.ecobank.rccportal.service.AdminChangeJournal.ACTION,
+                        "Base — dbo.USERS : équipe menée invalide effacée sur " + n + " compte(s)");
+                yield java.util.Map.of("fixed", n);
+            }
+            default -> throw com.ecobank.rccportal.util.ApiException.badRequest("Correction inconnue : " + action);
+        };
+    }
+
+    /** Correctifs de données (planning, rôles…) : appliqués une fois au démarrage, résultat enregistré en base. */
+    @GetMapping("/data-patches")
+    public List<com.ecobank.rccportal.service.DataPatchService.PatchStatus> dataPatches(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return dataPatchService.list();
+    }
+
+    /** Réapplique un correctif (ex. après avoir créé un compte manquant) — écrit en base et journalisé. */
+    @PostMapping("/data-patches/{code}/run")
+    public java.util.Map<String, String> runDataPatch(@PathVariable String code, @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return java.util.Map.of("result", dataPatchService.run(code, requester.username()));
+    }
+
+    /** Dernières modifications d'administration enregistrées en base (journal d'audit « ADMINISTRATION »). */
+    @GetMapping("/changes")
+    public List<AuditLogResponse> recentChanges(@AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return auditLogService.recent(com.ecobank.rccportal.service.AdminChangeJournal.ACTION);
+    }
+
+    public record SetAccessRequest(String level, String team) {}
+
+    /** Accès choisi dans l'organigramme : Agent (éventuellement d'une équipe) ou Team Leader d'une équipe. */
+    @PutMapping("/users/{userId}/access")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void setAccess(@PathVariable Long userId, @RequestBody SetAccessRequest request,
+                          @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        administrationService.setAccess(userId, request.level(), request.team());
+    }
+
+    public record UserIdsRequest(List<Long> userIds) {}
+
+    /** Repasse en agent les comptes Team Leader uniquement par le champ équipe menée (voir AdministrationService). */
+    @PostMapping("/hierarchy/clear-led-team")
+    public java.util.Map<String, Integer> clearLedTeam(@RequestBody UserIdsRequest request,
+                                                       @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return java.util.Map.of("fixed", administrationService.clearLedTeamOnly(request.userIds()));
+    }
+
+    public record ChangeAccessLevelRequest(String level, String team) {}
+
+    /** Change le niveau d'accès en un geste (Team Leader → Agent, changement d'équipe…) — appliqué à tout le portail. */
+    @PutMapping("/users/{userId}/access-level")
+    public com.ecobank.rccportal.service.AccessLevelService.Result changeAccessLevel(@PathVariable Long userId,
+                                                                                    @RequestBody ChangeAccessLevelRequest request,
+                                                                                    @AuthenticationPrincipal AuthenticatedUser requester) {
+        requireAdmin(requester);
+        return accessLevelService.change(userId, request.level(), request.team(), requester == null ? null : requester.username());
     }
 
     /** Accès effectif d'un utilisateur (profil, équipe menée, portail) et ce qui manque — fiche utilisateur de l'admin. */
@@ -147,7 +322,8 @@ public class AdministrationController {
      * démarrage — un bouton dédié côté Administration, déclenché une seule fois à la demande.
      */
     private static final List<String> ROLES_TO_KEEP = List.of(
-            "Agent Inbound", "Agent Outbound", "Team Leader",
+            "Agent Inbound", "Agent Inbound Voice", "Agent Outbound", "Agent Réseaux sociaux", "Team Leader Réseaux sociaux",
+            "Agent Inbound Mail", "Agent Rafiki", "Agent CIB", "Agent Télévente", "Team Leader Télévente", "Agent Digitalisation", "Team Leader Digitalisation", "Team Leader Rafiki", "Team Leader CIB", "Team Leader",
             "Team Leader Inbound Voice", "Team Leader Inbound Mail", "Team Leader Outbound",
             "Formateur", "Quality Assurance", "Superviseur Qualité Assurance",
             "Head RCC (Superviseur)", "Head Outbound", "Head CIB-CMB", "Head Resolution"

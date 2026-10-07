@@ -40,9 +40,33 @@ public final class SearchText {
     private SearchText() {
     }
 
+    /**
+     * Textes longs (articles, documents joints) : normalisés et indexés une seule fois. Avant, chaque
+     * question de RAF re-normalisait le texte complet de chaque article (jusqu'à 300 000 caractères avec
+     * les pièces jointes) — plusieurs secondes d'attente par question.
+     */
+    private static final int CACHE_MIN_LENGTH = 400;
+    private static final int CACHE_MAX_ENTRIES = 4000;
+    private static final java.util.Map<String, String> NORMALIZED = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<String, Set<String>> INDEXES = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static <V> V cached(java.util.Map<String, V> cache, String key, java.util.function.Function<String, V> compute) {
+        if (key.length() < CACHE_MIN_LENGTH) return compute.apply(key);
+        V v = cache.get(key);
+        if (v != null) return v;
+        if (cache.size() >= CACHE_MAX_ENTRIES) cache.clear(); // catalogue rechargé : on repart de zéro
+        v = compute.apply(key);
+        cache.put(key, v);
+        return v;
+    }
+
     /** Minuscules, sans accent, ponctuation remplacée par des espaces. */
     public static String normalize(String text) {
         if (text == null || text.isEmpty()) return "";
+        return cached(NORMALIZED, text, SearchText::normalizeNow);
+    }
+
+    private static String normalizeNow(String text) {
         String withoutAccents = Normalizer.normalize(text, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
         return withoutAccents.toLowerCase(Locale.ROOT)
                 .replaceAll("[^\\p{L}\\p{Nd}]+", " ")
@@ -85,6 +109,11 @@ public final class SearchText {
 
     /** Index d'un champ : l'ensemble de ses mots racinisés. */
     public static Set<String> index(String text) {
+        if (text == null || text.isEmpty()) return Set.of();
+        return cached(INDEXES, text, t -> java.util.Collections.unmodifiableSet(indexNow(t)));
+    }
+
+    private static Set<String> indexNow(String text) {
         Set<String> tokens = new LinkedHashSet<>();
         for (String word : normalize(text).split(" ")) {
             if (!word.isEmpty()) tokens.add(stem(word));

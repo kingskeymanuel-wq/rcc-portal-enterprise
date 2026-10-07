@@ -2,8 +2,10 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <!-- Heure de Côte d'Ivoire sur tous les postes (avant tout autre script) -->
+    <script th:src="@{/js/rcc-time.js}"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>RCC Portal Enterprise — Formation</title>
+    <title>Portail Front Office Ecobank — Formation</title>
     <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}"
           rel="stylesheet">
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}"
@@ -23,7 +25,7 @@
                 <!-- ===================== EN-TÊTE + BARRE PERSONNELLE (modèle EduFun) ===================== -->
                 <div class="ef-top">
                     <div>
-                        <span class="ef-muted">RCC Portal • Centre de formation</span>
+                        <span class="ef-muted">Portail Front Office Ecobank • Centre de formation</span>
                         <h2>Formation</h2>
                     </div>
                     <div class="ef-personal">

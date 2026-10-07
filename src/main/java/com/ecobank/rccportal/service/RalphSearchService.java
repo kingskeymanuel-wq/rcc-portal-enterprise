@@ -128,7 +128,7 @@ public class RalphSearchService {
         // tableurs, mais un PDF/Word volumineux n'a pas cette limite en amont.
         String truncated = content.length() > 40000 ? content.substring(0, 40000) + "\n[... contenu tronqué ...]" : content;
 
-        String systemPrompt = "Tu es RAF, l'assistant du RCC Portal Ecobank. On te fournit le contenu réel d'un " +
+        String systemPrompt = "Tu es RAF, l'assistant du Portail Front Office Ecobank. On te fournit le contenu réel d'un " +
                 "fichier importé par un conseiller ou la QA — analyse-le sérieusement. Base-toi UNIQUEMENT sur " +
                 "les données ci-dessous, jamais de chiffre inventé. Si la question porte sur une analyse de " +
                 "données, dégage les tendances et chiffres clés visibles. Si on te demande des propositions " +

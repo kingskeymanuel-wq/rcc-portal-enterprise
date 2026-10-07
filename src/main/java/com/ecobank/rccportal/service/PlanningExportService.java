@@ -51,6 +51,10 @@ public class PlanningExportService {
     private final ScheduleService schedules;
     private final TeamLeaderService teamLeaders;
 
+    /** Horaires des lignes TOTAL : catalogue des shifts de l'administration (voir ShiftCatalogService). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ShiftCatalogService shiftCatalog;
+
     public PlanningExportService(ScheduleService schedules, TeamLeaderService teamLeaders) {
         this.schedules = schedules;
         this.teamLeaders = teamLeaders;
@@ -89,7 +93,13 @@ public class PlanningExportService {
             }
         }
         agents.sort(Comparator.comparing(a -> a[1], String.CASE_INSENSITIVE_ORDER));
-        byte[] content = workbook(teamLabel, from, to, agents, byAgent);
+        Map<String, LocalTime[]> catalogHours = new LinkedHashMap<>();
+        if (shiftCatalog != null) {
+            for (ShiftCatalogService.ShiftCode sc : shiftCatalog.active()) {
+                catalogHours.put(sc.code(), new LocalTime[]{LocalTime.parse(sc.start()), LocalTime.parse(sc.end())});
+            }
+        }
+        byte[] content = workbook(teamLabel, from, to, agents, byAgent, catalogHours);
         String filename = "planning_" + teamLabel.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_").replaceAll("^_|_$", "") + "_" + from + "_" + to + ".xlsx";
         return new Export(filename, content);
     }
@@ -104,7 +114,7 @@ public class PlanningExportService {
         return switch (c) {
             case "INBOUND_VOICE" -> "Inbound Voix";
             case "INBOUND_MAIL" -> "Inbound Mail";
-            case "TCHAT" -> "Tchat";
+            case "TCHAT" -> "Réseaux sociaux";
             case "RAFIKI" -> "Rafiki";
             case "OUTBOUND" -> "Outbound";
             case "CIB" -> "CIB";
@@ -115,6 +125,12 @@ public class PlanningExportService {
     /** Grille : titre, en-tête « Thu 01 », une ligne numérotée par agent, lignes TOTAL par code et TOTAL SHIFTS. */
     static byte[] workbook(String teamLabel, LocalDate from, LocalDate to, List<String[]> agents,
                            Map<String, Map<LocalDate, AgentScheduleResponse>> byAgent) {
+        return workbook(teamLabel, from, to, agents, byAgent, Map.of());
+    }
+
+    /** Idem, avec les horaires du catalogue des shifts de l'administration pour les lignes TOTAL. */
+    static byte[] workbook(String teamLabel, LocalDate from, LocalDate to, List<String[]> agents,
+                           Map<String, Map<LocalDate, AgentScheduleResponse>> byAgent, Map<String, LocalTime[]> catalogHours) {
         List<LocalDate> days = new ArrayList<>();
         for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) days.add(d);
         try (XSSFWorkbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -161,6 +177,7 @@ public class PlanningExportService {
 
             Map<String, LocalTime[]> hours = new LinkedHashMap<>();
             for (String c : List.of("M", "M2", "M3", "M4", "A", "N")) hours.put(c, DEFAULT_HOURS.get(c));
+            hours.putAll(catalogHours);
             Map<String, int[]> counts = new LinkedHashMap<>();
             int rowIdx = 4;
             for (int a = 0; a < agents.size(); a++) {

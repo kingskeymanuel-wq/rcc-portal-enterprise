@@ -23,6 +23,14 @@ public class ViewController {
         return "dashboard";
     }
 
+    /** Portail CIB (traitements des entreprises) : même accueil que les autres agents — Pas à pas, formations,
+     *  catégorisation, informations — avec sa propre base de connaissance (voir KnowledgeService.spaceFor). */
+    @GetMapping("/portail-cib")
+    public String cibPortal(org.springframework.ui.Model model) {
+        model.addAttribute("cibPortal", true);
+        return "dashboard";
+    }
+
     @GetMapping("/administration")
     public String administration() {
         return "administration";
@@ -48,9 +56,14 @@ public class ViewController {
     @Value("${rcc.map.tile-url:}")
     private String mapTileUrl;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.ecobank.rccportal.service.OfflineMode offlineMode;
+
     @GetMapping("/knowledge")
     public String knowledge(Model model) {
-        model.addAttribute("mapTileUrl", mapTileUrl);
+        // Hors ligne : un serveur de tuiles sur Internet (OpenStreetMap) est ignoré — fond vectoriel local.
+        model.addAttribute("mapTileUrl", offlineMode != null && offlineMode.isEnabled()
+                && com.ecobank.rccportal.service.OfflineMode.isInternetUrl(mapTileUrl) ? "" : mapTileUrl);
         return "knowledge";
     }
 
@@ -70,7 +83,8 @@ public class ViewController {
     }
 
     @GetMapping("/rh")
-    public String rhPortal() {
+    public String rhPortal(Model model) {
+        model.addAttribute("viewer", false);
         return "hr-parcours";
     }
 
@@ -121,9 +135,11 @@ public class ViewController {
         return "reports";
     }
 
+    /** Portail Superviseur : les vues du portail RH en lecture seule, plus Supervision, Qualité et CRM Outbound. */
     @GetMapping("/supervisor")
-    public String supervisor() {
-        return "supervisor";
+    public String supervisor(Model model) {
+        model.addAttribute("viewer", true);
+        return "hr-parcours";
     }
 
     @GetMapping("/team-leader")
@@ -131,8 +147,16 @@ public class ViewController {
         return "team-leader";
     }
 
+    /** Portail Outbound = équipe Digitalisation ; la Télévente a son propre portail (même socle, contenu Télévente). */
     @GetMapping("/outbound-dashboard")
-    public String outboundDashboard() {
+    public String outboundDashboard(org.springframework.ui.Model model) {
+        model.addAttribute("outboundTeam", "DIGITALISATION");
+        return "outbound-dashboard";
+    }
+
+    @GetMapping("/portail-televente")
+    public String televentePortal(org.springframework.ui.Model model) {
+        model.addAttribute("outboundTeam", "TELEVENTE");
         return "outbound-dashboard";
     }
 
@@ -140,6 +164,13 @@ public class ViewController {
     @GetMapping("/portail-tchat")
     public String chatPortal(org.springframework.ui.Model model) {
         model.addAttribute("channel", "TCHAT");
+        return "digital-agent";
+    }
+
+    /** Portail des agents Inbound Mail (mails, CIS, rappels) : même socle que Réseaux sociaux / Rafiki. */
+    @GetMapping("/portail-mail")
+    public String mailPortal(org.springframework.ui.Model model) {
+        model.addAttribute("channel", "MAIL");
         return "digital-agent";
     }
 

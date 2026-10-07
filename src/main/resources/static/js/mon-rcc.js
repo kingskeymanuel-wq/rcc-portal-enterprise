@@ -1016,12 +1016,13 @@
 
     /** Choix du canal de contact — envoi réel via Microsoft Graph si configuré, sinon lien classique (mailto:/Teams web) en repli. */
     var graphConfiguredCache = null;
+    var teamsEnabled = false; // liaison Microsoft Teams coupée par défaut côté serveur (graph.teams-enabled)
     function isGraphConfigured() {
         if (graphConfiguredCache !== null) return Promise.resolve(graphConfiguredCache);
         return fetch("/api/graph/status", { credentials: "same-origin" })
-            .then(function (res) { return res.ok ? res.json() : { configured: false }; })
-            .then(function (result) { graphConfiguredCache = !!result.configured; return graphConfiguredCache; })
-            .catch(function () { graphConfiguredCache = false; return false; });
+            .then(function (res) { return res.ok ? res.json() : { configured: false, teams: false }; })
+            .then(function (result) { graphConfiguredCache = !!result.configured; teamsEnabled = result.teams === true; return graphConfiguredCache; })
+            .catch(function () { graphConfiguredCache = false; teamsEnabled = false; return false; });
     }
 
     function openChannelChoice(username, name, email) {
@@ -1040,11 +1041,13 @@
         teamsBtn.title = email ? "" : "E-mail non renseigné pour cet agent";
         outlookBtn.title = email ? "" : "E-mail non renseigné pour cet agent";
 
+        teamsBtn.classList.add("d-none"); // masqué tant que le serveur n'a pas confirmé que Teams est autorisé
         isGraphConfigured().then(function (configured) {
             messageBox.classList.toggle("d-none", !configured);
+            teamsBtn.classList.toggle("d-none", !teamsEnabled);
 
             teamsBtn.onclick = function () {
-                if (!email) return;
+                if (!email || !teamsEnabled) return;
                 if (configured && messageBox.value.trim()) {
                     resultBox.textContent = "Envoi en cours…";
                     sendJson("POST", "/api/graph/send-teams", { toUsername: username, message: messageBox.value.trim() })

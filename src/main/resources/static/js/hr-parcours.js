@@ -1,6 +1,9 @@
 "use strict";
 
 (function () {
+    /** Portail Superviseur : mêmes vues que le RH, en lecture seule (aucune action d'écriture proposée). */
+    var VIEWER = document.body.classList.contains("hr-viewer");
+
     var getJson = RccApi.getJson;
     var escapeHtml = RccApi.escapeHtml;
     var employees = [];
@@ -142,6 +145,8 @@
     /** « CIV » / « CI » / vide → CI ; « TGO » / « TG » → TG (même règle que le serveur). */
     function countryOf(branch) {
         var b = String(branch || "").trim().toUpperCase();
+        if (b === "K01" || b === "CIV") return "CI"; // code d'agence Ecobank Côte d'Ivoire
+        if (b === "TGO") return "TG";
         if (!b || b.indexOf("CI") === 0 || b.indexOf("IVOIRE") !== -1) return "CI";
         if (b.indexOf("TG") === 0 || b.indexOf("TOGO") !== -1) return "TG";
         return b.slice(0, 2);
@@ -378,7 +383,7 @@
     function renderDossier(files) {
         el("dossierList").innerHTML = files.length ? files.map(function (f) {
             return '<div class="dossier-item"><a href="' + f.storageUrl + '" target="_blank" rel="noopener"><i class="bi bi-file-earmark-text"></i> ' + escapeHtml(f.fileName) + '</a>' +
-                '<button type="button" class="btn btn-sm btn-link text-danger dossier-remove" data-id="' + f.id + '"><i class="bi bi-trash"></i></button></div>';
+                (VIEWER ? '' : '<button type="button" class="btn btn-sm btn-link text-danger dossier-remove" data-id="' + f.id + '"><i class="bi bi-trash"></i></button>') + '</div>';
         }).join("") : '<div class="text-muted small">Aucun document chargé pour ce collaborateur.</div>';
         Array.prototype.forEach.call(el("dossierList").querySelectorAll(".dossier-remove"), function (btn) {
             btn.addEventListener("click", function () {
@@ -750,6 +755,7 @@
         Array.prototype.forEach.call(el("hrTabs").querySelectorAll("[data-tab]"), function (b) { b.classList.toggle("active", b.getAttribute("data-tab") === name); });
         Array.prototype.forEach.call(document.querySelectorAll(".hr-pane"), function (p) { p.classList.toggle("active", p.getAttribute("data-pane") === name); });
         moveInk();
+        try { window.dispatchEvent(new CustomEvent("hr:tab", { detail: name })); } catch (e) { /* ancien navigateur */ }
         if (name === "overview" && performanceChart) performanceChart.resize();
         if (name === "live" && window.RccHrLive) window.RccHrLive.load(true).then(renderLiveBadge);
         try { history.replaceState(null, "", "#" + name); } catch (e) { /* ignore */ }
@@ -763,10 +769,12 @@
         var hash = (location.hash || "").replace("#", "");
         var legacy = { employees: "people", followup: "growth", training: "growth", leave: "leave" };
         hash = legacy[hash] || hash;
-        if (["overview", "org", "live", "perf", "people", "leave", "exits", "growth"].indexOf(hash) !== -1) showTab(hash);
+        var known = Array.prototype.map.call(el("hrTabs").querySelectorAll("[data-tab]"), function (b) { return b.getAttribute("data-tab"); });
+        if (known.indexOf(hash) !== -1) showTab(hash);
     }
 
     function init() {
+        if (VIEWER) { var up = el("dossierUploadForm"); if (up) up.style.display = "none"; }
         teamRosterModal = new bootstrap.Modal(el("teamRosterModal"));
         dossierModal = new bootstrap.Modal(el("dossierModal"));
         controlDetailModal = new bootstrap.Modal(el("controlDetailModal"));
@@ -808,8 +816,10 @@
 
         window.RccSession.init().then(function (session) {
             currentProfile = session ? session.profile : null;
-            if (!session || (session.profile !== "RH" && session.profile !== "ADMIN")) {
-                showError("Cette interface est réservée au portail RH et à l’administrateur.");
+            var allowed = VIEWER ? ["SUPERVISOR", "ADMIN"] : ["RH", "ADMIN"];
+            if (!session || allowed.indexOf(session.profile) === -1) {
+                showError(VIEWER ? "Cette interface est réservée au Superviseur et à l’administrateur."
+                    : "Cette interface est réservée au portail RH et à l’administrateur.");
                 return;
             }
             loadAll();

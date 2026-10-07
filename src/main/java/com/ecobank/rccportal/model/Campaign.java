@@ -69,6 +69,11 @@ public class Campaign {
     @Column(name = "FieldsJson", columnDefinition = "NVARCHAR(MAX)")
     private String fieldsJson;
 
+    /** Formulaire v2 (sections, logique conditionnelle, contrôles, score — voir CampaignFormEngine). Null = ancienne
+     *  liste de questions (FieldsJson), lue comme un formulaire d'une section. */
+    @Column(name = "FormJson", columnDefinition = "NVARCHAR(MAX)")
+    private String formJson;
+
     @Column(name = "CreatedAt", nullable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

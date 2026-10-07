@@ -54,9 +54,107 @@ public class KnowledgeService {
      */
     @Transactional(readOnly = true)
     public List<KnowledgeCategoryResponse> listCategoriesFor(com.ecobank.rccportal.security.AuthenticatedUser requester) {
-        // Base de connaissances UNIQUE : toutes les équipes (Inbound Voix, Mail/Rafiki, CIB,
-        // Outbound, agences…) voient exactement les mêmes rubriques — plus de filtrage par équipe.
-        return listCategories();
+        return listCategoriesFor(requester, null);
+    }
+
+    /**
+     * Deux bases distinctes : la base CIB (rubriques d'équipe « CIB », traitements des entreprises) et la base
+     * générale (toutes les autres rubriques, communes à Inbound, Mail, Rafiki, Outbound, agences…). Un membre CIB
+     * ne voit que la base CIB, les autres équipes jamais la base CIB. L'encadrement (admin, QA, Head QA,
+     * superviseur, RH) consulte l'une ou l'autre via « space » (CIB / GENERAL), ou les deux si absent.
+     */
+    @Transactional(readOnly = true)
+    public List<KnowledgeCategoryResponse> listCategoriesFor(com.ecobank.rccportal.security.AuthenticatedUser requester, String requestedSpace) {
+        String space = spaceFor(requester, requestedSpace);
+        return categoryRepository.findAllByOrderBySortOrderAsc().stream()
+                .filter(c -> inSpace(c, space))
+                .map(c -> new KnowledgeCategoryResponse(c.getCategoryId(), c.getCode(), c.getTitle(), c.getIcon(), c.getImageUrl(), c.getSortOrder(), c.getTeam()))
+                .toList();
+    }
+
+    public static final String CIB = "CIB";
+    public static final String GENERAL = "GENERAL";
+
+    private com.ecobank.rccportal.repository.UserServiceAssignmentRepository serviceAssignments;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setServiceAssignments(com.ecobank.rccportal.repository.UserServiceAssignmentRepository serviceAssignments) {
+        this.serviceAssignments = serviceAssignments;
+    }
+
+    /** Rubrique de la base CIB. */
+    static boolean isCibCategory(KnowledgeCategory c) {
+        return c != null && CIB.equalsIgnoreCase(c.getTeam());
+    }
+
+    /** space null = les deux bases (encadrement sans choix). */
+    static boolean inSpace(KnowledgeCategory c, String space) {
+        if (space == null) return true;
+        return CIB.equals(space) == isCibCategory(c);
+    }
+
+    /** Base imposée par le profil ; l'encadrement choisit (requested), les agents et Team Leaders n'ont pas le choix. */
+    public String spaceFor(com.ecobank.rccportal.security.AuthenticatedUser requester, String requested) {
+        if (requester == null) return GENERAL;
+        if (isKbManager(requester)) {
+            if (requested == null || requested.isBlank()) return null;
+            return CIB.equalsIgnoreCase(requested.trim()) ? CIB : GENERAL;
+        }
+        return isCibMember(requester.username()) ? CIB : GENERAL;
+    }
+
+    /** Admin, QA, Head QA, superviseur, RH : voient et gèrent les deux bases. */
+    static boolean isKbManager(com.ecobank.rccportal.security.AuthenticatedUser r) {
+        String role = r.role() == null ? "" : r.role().toLowerCase(java.util.Locale.ROOT);
+        String service = r.service() == null ? "" : r.service().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
+        return role.equals("admin") || role.equals("supervisor") || role.equals("rh")
+                || service.equals("quality assurance") || service.equals("superviseur qa");
+    }
+
+    /** Agent ou Team Leader CIB : activité, équipe menée ou service CIB. */
+    public boolean isCibMember(String username) {
+        if (username == null) return false;
+        com.ecobank.rccportal.model.User u = userRepository.findFirstByUsernameIgnoreCase(username).orElse(null);
+        if (u == null) return false;
+        if (CIB.equalsIgnoreCase(u.getLedTeam())) return true;
+        java.util.List<String> codes = serviceAssignments == null ? java.util.List.of()
+                : serviceAssignments.findServicesByUserId(u.getId()).stream()
+                    .filter(a -> a.getService() != null && a.getService().getCode() != null)
+                    .map(a -> a.getService().getCode().trim().toUpperCase(java.util.Locale.ROOT)).toList();
+        if (codes.contains("AGENT_CIB") || codes.contains("TEAM_LEADER_CIB")) return true;
+        return com.ecobank.rccportal.util.TeamClassifier.classify(u.getActivity(), codes) == com.ecobank.rccportal.util.TeamClassifier.Team.CIB;
+    }
+
+    /** Refuse l'accès à une rubrique de l'autre base (lien direct, identifiant deviné). */
+    public void checkCategoryAccess(com.ecobank.rccportal.security.AuthenticatedUser requester, Integer categoryId) {
+        KnowledgeCategory c = categoryRepository.findById(categoryId).orElseThrow(() -> ApiException.notFound("Unknown category."));
+        if (!inSpace(c, spaceFor(requester, null))) throw ApiException.forbidden("Cette rubrique appartient à une autre base de connaissance.");
+    }
+
+    /** Rubrique CIB : l'administrateur y dépose aussi les fichiers (en plus de la QA). */
+    @Transactional(readOnly = true)
+    public boolean isCibCategory(Integer categoryId) {
+        return categoryId != null && categoryRepository.findById(categoryId).map(KnowledgeService::isCibCategory).orElse(false);
+    }
+
+    @Transactional(readOnly = true)
+    public Integer categoryOfArticle(Integer articleId) {
+        return articleRepository.findById(articleId).map(a -> a.getCategory() == null ? null : a.getCategory().getCategoryId()).orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<KnowledgeArticleResponse> search(String query, com.ecobank.rccportal.security.AuthenticatedUser requester) {
+        String space = spaceFor(requester, null);
+        java.util.Set<Integer> allowed = categoryRepository.findAll().stream().filter(c -> inSpace(c, space))
+                .map(KnowledgeCategory::getCategoryId).collect(java.util.stream.Collectors.toSet());
+        return search(query).stream().filter(a -> a.categoryId() == null ? !CIB.equals(space) : allowed.contains(a.categoryId())).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public KnowledgeArticleResponse getArticle(Integer id, com.ecobank.rccportal.security.AuthenticatedUser requester) {
+        KnowledgeArticleResponse a = getArticle(id);
+        if (a.categoryId() != null) checkCategoryAccess(requester, a.categoryId());
+        return a;
     }
 
     // ---------- Categories ----------
@@ -80,8 +178,18 @@ public class KnowledgeService {
 
     @Transactional
     public KnowledgeCategoryResponse createCategory(KnowledgeCategoryRequest request) {
+        String code = request.code() == null ? "" : request.code().trim().toUpperCase(java.util.Locale.ROOT).replaceAll("[^A-Z0-9_]+", "_");
+        if (code.isBlank() || request.title() == null || request.title().isBlank()) {
+            throw ApiException.badRequest("Le code et le titre de la rubrique sont obligatoires.");
+        }
+        // Rubrique de la base CIB : code préfixé, pour ne jamais entrer en collision avec la base générale (ex. « AUTRE »).
+        if (CIB.equalsIgnoreCase(request.team()) && !code.startsWith("CIB_")) code = "CIB_" + code;
+        if (code.length() > 50) code = code.substring(0, 50);
+        if (categoryRepository.findByCodeIgnoreCase(code).isPresent()) {
+            throw ApiException.badRequest("Une rubrique utilise déjà le code « " + code + " » — choisissez un autre code.");
+        }
         KnowledgeCategory saved = categoryRepository.save(KnowledgeCategory.builder()
-                .code(request.code()).title(request.title()).icon(request.icon())
+                .code(code).title(request.title().trim()).icon(request.icon())
                 .sortOrder(request.sortOrder() != null ? request.sortOrder() : 0)
                 .team(request.team())
                 .build());

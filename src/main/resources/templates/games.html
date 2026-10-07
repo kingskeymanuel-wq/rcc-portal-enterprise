@@ -2,8 +2,10 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <!-- Heure de Côte d'Ivoire sur tous les postes (avant tout autre script) -->
+    <script th:src="@{/js/rcc-time.js}"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>RCC Portal Enterprise — Évaluation</title>
+    <title>Portail Front Office Ecobank — Évaluation</title>
     <link th:href="@{/vendor/bootstrap/css/bootstrap.min.css}" rel="stylesheet">
     <link th:href="@{/vendor/bootstrap-icons/bootstrap-icons.min.css}" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
@@ -22,7 +24,7 @@
                 <div class="ef-page">
                 <div class="ef-top">
                     <div>
-                        <span class="ef-muted">RCC Portal • Centre d'Évaluation</span>
+                        <span class="ef-muted">Portail Front Office Ecobank • Centre d'Évaluation</span>
                         <h2>Évaluation</h2>
                     </div>
                     <div class="ef-personal">
@@ -37,6 +39,7 @@
 
                 <nav class="ef-tabs" id="evTabs" role="tablist">
                     <button type="button" class="active" data-ev-tab="jeux"><i class="bi bi-controller"></i> Les jeux</button>
+                    <button type="button" data-ev-tab="programmees"><i class="bi bi-calendar-check"></i> Évaluations programmées <span class="ef-tab-count" id="evAsCount" style="display:none;">0</span></button>
                     <button type="button" data-ev-tab="resultats"><i class="bi bi-clipboard-data"></i> Mes résultats</button>
                     <button type="button" data-ev-tab="classement"><i class="bi bi-bar-chart-steps"></i> Classement</button>
                     <button type="button" data-ev-tab="competitions"><i class="bi bi-trophy"></i> Compétitions <span class="ef-tab-count" id="evCompCount" style="display:none;">0</span></button>
@@ -85,6 +88,11 @@
                     <div id="gmGallery" class="ev-grid">
                         <p class="text-muted text-center">Chargement des jeux…</p>
                     </div>
+                </section>
+
+                <!-- ===================== ÉVALUATIONS PROGRAMMÉES ===================== -->
+                <section class="ef-pane" data-ev-pane="programmees">
+                    <div id="evAssessments"><p class="text-muted small">Chargement…</p></div>
                 </section>
 
                 <!-- ===================== MES RÉSULTATS ===================== -->
@@ -418,5 +426,6 @@
 <script th:src="@{/js/games-engines.js}"></script>
 <script th:src="@{/js/quiz-bank.js}"></script>
 <script th:src="@{/js/evaluation.js}"></script>
+<script th:src="@{/js/assessments.js}"></script>
 </body>
 </html>

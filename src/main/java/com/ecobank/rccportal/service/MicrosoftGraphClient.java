@@ -35,6 +35,14 @@ public class MicrosoftGraphClient {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MicrosoftGraphClient.class);
 
+    /** Liaison Teams coupée par défaut (graph.teams-enabled) : aucun message envoyé dans Microsoft Teams. */
+    @Value("${graph.teams-enabled:false}")
+    private boolean teamsEnabled;
+
+    public boolean isTeamsEnabled() {
+        return teamsEnabled;
+    }
+
     @Value("${graph.tenant-id:}")
     private String tenantId;
     @Value("${graph.client-id:}")
@@ -48,8 +56,20 @@ public class MicrosoftGraphClient {
     private String cachedToken;
     private Instant tokenExpiry = Instant.EPOCH;
 
+    /** Mode « serveur sans Internet » (RCC_OFFLINE=true) : ce service Microsoft 365 (cloud) n'est pas appelé. */
+    private OfflineMode offlineMode;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setOfflineMode(OfflineMode offlineMode) {
+        this.offlineMode = offlineMode;
+    }
+
+    private boolean offline() {
+        return offlineMode != null && offlineMode.isEnabled();
+    }
+
     public boolean isConfigured() {
-        return tenantId != null && !tenantId.isBlank()
+        return !offline() && tenantId != null && !tenantId.isBlank()
                 && clientId != null && !clientId.isBlank()
                 && clientSecret != null && !clientSecret.isBlank();
     }
@@ -143,6 +163,7 @@ public class MicrosoftGraphClient {
      * prévoir un repli (lien Teams classique) en cas d'échec.
      */
     public void sendTeamsMessage(String fromUserId, String toUserId, String message) {
+        if (!teamsEnabled) throw ApiException.forbidden("La liaison avec Microsoft Teams est désactivée sur ce portail.");
         String token = accessToken();
         try {
             // 1) Créer (ou retrouver) le chat 1:1 entre les deux utilisateurs.

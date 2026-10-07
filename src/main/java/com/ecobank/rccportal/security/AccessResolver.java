@@ -26,7 +26,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class AccessResolver {
 
-    public record Access(String role, String service, boolean enabled) {}
+    public record Access(String role, String service, boolean enabled, String country) {
+        public Access(String role, String service, boolean enabled) { this(role, service, enabled, null); }
+    }
 
     /** Du plus élevé au plus bas. */
     static final List<String> PRIORITY = List.of("ADMIN", "RH", "EXCELLIAM", "SUPERVISOR", "TEAM_LEADER", "AGENCE", "AGENT");
@@ -36,8 +38,8 @@ public class AccessResolver {
     static {
         SERVICE_TO_ROLE.put("RH", "RH");
         SERVICE_TO_ROLE.put("SUPERVISEUR", "SUPERVISOR");
-        for (String t : List.of("INBOUND_VOICE", "INBOUND_MAIL", "OUTBOUND", "TCHAT", "RAFIKI", "CIB")) SERVICE_TO_ROLE.put("TEAM_LEADER_" + t, "TEAM_LEADER");
-        for (String a : List.of("AGENT_INBOUND", "AGENT_OUTBOUND", "AGENT_TCHAT", "AGENT_RAFIKI", "AGENT_INBOUND_MAIL", "AGENT_CIB")) SERVICE_TO_ROLE.put(a, "AGENT");
+        for (String t : List.of("INBOUND_VOICE", "INBOUND_MAIL", "OUTBOUND", "TCHAT", "RAFIKI", "CIB", "TELEVENTE", "DIGITALISATION")) SERVICE_TO_ROLE.put("TEAM_LEADER_" + t, "TEAM_LEADER");
+        for (String a : List.of("AGENT_INBOUND", "AGENT_OUTBOUND", "AGENT_TCHAT", "AGENT_RAFIKI", "AGENT_INBOUND_MAIL", "AGENT_CIB", "AGENT_TELEVENTE", "AGENT_DIGITALISATION")) SERVICE_TO_ROLE.put(a, "AGENT");
         SERVICE_TO_ROLE.put("AGENCE_CAISSIER", "AGENCE");
         SERVICE_TO_ROLE.put("AGENCE_GESTIONNAIRE", "AGENCE");
         SERVICE_TO_ROLE.put("AGENCE", "AGENCE");
@@ -109,7 +111,8 @@ public class AccessResolver {
         // Seule la désactivation par l'admin/le RH coupe l'accès ; un verrouillage temporaire (mots de passe erronés)
         // n'éjecte pas une session déjà ouverte.
         boolean enabled = !Boolean.FALSE.equals(u.getAccountEnabled());
-        return new Access(primaryRole(roles, services, u.getLedTeam()), primaryService(services), enabled);
+        return new Access(primaryRole(roles, services, u.getLedTeam()), primaryService(services), enabled,
+                com.ecobank.rccportal.util.Affiliates.countryOf(u.getAffiliateBranch()));
     }
 
     /** Accès actuel (cache court) — null si l'utilisateur n'existe pas en base. */

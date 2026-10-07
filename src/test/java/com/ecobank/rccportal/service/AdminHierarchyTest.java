@@ -35,8 +35,10 @@ class AdminHierarchyTest {
     }
 
     private static AdminHierarchyService.Person p(long id, String name, String level, String team, boolean active) {
+        List<String> codes = level.equals("TEAM_LEADER") && team != null ? List.of("TEAM_LEADER_" + team) : List.of();
         return new AdminHierarchyService.Person(id, "u" + id, name, null, "CI", active, level, null, team, null, List.of(), List.of(),
-                AdminHierarchyService.warningsOf(level, team, active, List.of(), List.of()));
+                AdminHierarchyService.warningsOf(level, team, active, List.of(), codes), "CI", null,
+                AdminHierarchyService.leaderSourceOf(level, List.of(), codes));
     }
 
     @Test
@@ -54,5 +56,17 @@ class AdminHierarchyTest {
         assertEquals(1, none.leaders().size());
         assertEquals(1, none.agents().size());
         assertEquals(2, h.counts().get("WARNINGS"), "Team Leader et agent sans équipe (le compte désactivé n'est pas compté)");
+    }
+
+    @Test
+    void leaderOnlyByLedTeamIsFlagged() {
+        var agentRole = List.of(new AdminHierarchyService.Item(1L, "Agent Inbound", "Agent Inbound"));
+        var tlRole = List.of(new AdminHierarchyService.Item(2L, "Team Leader Inbound Mail", "Team Leader Inbound Mail"));
+        assertEquals("LED_TEAM", AdminHierarchyService.leaderSourceOf("TEAM_LEADER", agentRole, List.of("AGENT_INBOUND_MAIL")));
+        assertEquals("ROLE", AdminHierarchyService.leaderSourceOf("TEAM_LEADER", tlRole, List.of()));
+        assertEquals("SERVICE", AdminHierarchyService.leaderSourceOf("TEAM_LEADER", agentRole, List.of("TEAM_LEADER_TCHAT")));
+        assertNull(AdminHierarchyService.leaderSourceOf("AGENT", agentRole, List.of()));
+        assertTrue(AdminHierarchyService.warningsOf("TEAM_LEADER", "INBOUND_MAIL", true, agentRole, List.of("AGENT_INBOUND_MAIL"))
+                .stream().anyMatch(w -> w.contains("équipe menée")));
     }
 }
