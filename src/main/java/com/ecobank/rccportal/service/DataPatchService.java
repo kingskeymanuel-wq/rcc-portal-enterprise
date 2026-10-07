@@ -34,6 +34,9 @@ public class DataPatchService {
     /** Planning Team Inbound Voix d'octobre 2026, agents Inbound Voix, Team Leaders, libellé « Réseaux sociaux ». */
     public static final String INBOUND_VOIX_2026_10 = "INBOUND_VOIX_2026_10";
 
+    /** Planning Team Inbound Digital Mail / CIS d'octobre 2026 : visible des agents et de leur Team Leader. */
+    public static final String INBOUND_MAIL_2026_10 = "INBOUND_MAIL_2026_10";
+
     /** TEAM_ASSIGNMENT_LOCKED à True pour tous les comptes, et True par défaut en base pour les comptes à venir. */
     public static final String TEAM_ASSIGNMENT_LOCKED_TRUE = "TEAM_ASSIGNMENT_LOCKED_TRUE";
 
@@ -91,7 +94,11 @@ public class DataPatchService {
             new Patch(CAMPAGNES_OUTBOUND, "Campagnes Outbound Digital et Télévente",
                     "Crée deux campagnes actives avec leur parcours interactif : « Ecobank Mobile — Digitalisation » pour l'équipe Digitalisation "
                             + "(activation accompagnée et pas à pas de chaque fonctionnalité) et « Télévente — Prêts, comptes et produits digitaux » pour la Télévente "
-                            + "(besoin, produit recommandé, avantages, objections anticipées). Une campagne du même nom n'est jamais recréée."));
+                            + "(besoin, produit recommandé, avantages, objections anticipées). Une campagne du même nom n'est jamais recréée."),
+            new Patch(INBOUND_MAIL_2026_10, "Team Inbound Digital Mail — planning d'octobre 2026",
+                    "Planning d'octobre 2026 des 13 agents Inbound Digital Mail / CIS (shifts M, M2, M3, A, N, repos et congés). "
+                            + "Il s'affiche dans le portail de chaque agent et dans le planning d'équipe du Team Leader Inbound Mail ; "
+                            + "un agent pas encore rattaché au pôle Inbound Mail y est placé (déjà en Mail, Réseaux sociaux ou Rafiki : inchangé)."));
 
     static final String PLANNING_FILE = "data/planning/inbound-voix-2026-10.csv";
     static final String AGENT_ROLE = "Agent Inbound Voice";
@@ -157,6 +164,7 @@ public class DataPatchService {
             case INBOUND_MAIL_LEADERSHIP -> inboundMailLeadership();
             case TOGO_RCC_ETG -> togoTeam();
             case CAMPAGNES_OUTBOUND -> outboundCampaigns();
+            case INBOUND_MAIL_2026_10 -> inboundMail(by);
             default -> throw com.ecobank.rccportal.util.ApiException.notFound("Correctif inconnu : " + code);
         };
         jdbc.update("""
@@ -340,6 +348,36 @@ public class DataPatchService {
                     .append(u.getName()).append(" (").append(u.getUsername()).append(")\n");
         }
         out.append("• Team Leader Réseaux sociaux : aucun nom fourni — à désigner dans l'organigramme (Accès → Team Leader · Réseaux sociaux).\n");
+        return out.toString().trim();
+    }
+
+    static final String MAIL_PLANNING_FILE = "data/planning/inbound-mail-2026-10.csv";
+
+    /** Planning Inbound Digital Mail d'octobre 2026 : même import que l'écran Planning, puis rattachement des agents au pôle Mail. */
+    String inboundMail(String by) {
+        StringBuilder out = new StringBuilder();
+        byte[] csv = readResource(MAIL_PLANNING_FILE);
+        ScheduleImportResult r = scheduleService.importFromExcel(new BytesFile("inbound-mail-2026-10.csv", csv),
+                "AGENT_INBOUND_MAIL", "CI", "INBOUND MAIL", YearMonth.of(2026, 10), by);
+        out.append("Planning octobre 2026 : ").append(r.rowsProcessed()).append(" agent(s), ").append(r.entriesCreated())
+                .append(" jour(s) enregistré(s), ").append(r.usersAutoCreated()).append(" compte(s) créé(s) faute de compte existant.\n");
+
+        // Le Team Leader Inbound Mail voit les agents de son pôle : ceux qui n'y sont pas encore y sont placés. Un agent
+        // déjà en Mail, Réseaux sociaux ou Rafiki (sous-équipes du pôle) garde ses accès tels quels.
+        List<String> notFound = new ArrayList<>();
+        for (String name : planningNames(csv)) {
+            Optional<User> u = scheduleService.findUserByPlanningName(name);
+            if (u.isEmpty()) { notFound.add(name); continue; }
+            User user = u.get();
+            if (com.ecobank.rccportal.util.TeamClassifier.classify(user.getActivity()) == com.ecobank.rccportal.util.TeamClassifier.Team.INBOUND_MAIL) {
+                out.append("• ").append(user.getName()).append(" (").append(user.getUsername()).append(") : déjà dans le pôle Inbound Mail\n");
+                continue;
+            }
+            List<String> changes = administrationService.alignAgent(user.getId(), "INBOUND_MAIL", "Agent Inbound Mail", "CI");
+            out.append("• ").append(user.getName()).append(" (").append(user.getUsername()).append(") : ")
+                    .append(changes.isEmpty() ? "déjà conforme" : String.join(", ", changes)).append('\n');
+        }
+        if (!notFound.isEmpty()) out.append("⚠ Compte introuvable ou ambigu (à rattacher à la main) : ").append(String.join(", ", notFound)).append('\n');
         return out.toString().trim();
     }
 

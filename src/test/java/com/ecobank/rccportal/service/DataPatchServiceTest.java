@@ -46,6 +46,29 @@ class DataPatchServiceTest {
     }
 
     @Test
+    void inboundMailPlanningListsThe13AgentsWithTheirShifts() throws Exception {
+        byte[] csv;
+        try (var in = new ClassPathResource(DataPatchService.MAIL_PLANNING_FILE).getInputStream()) { csv = in.readAllBytes(); }
+        List<String> names = DataPatchService.planningNames(csv);
+        assertEquals(13, names.size());
+        assertEquals("ANGUETE OHOULO CHRISTELLE", names.get(0), "mention « (ESPAGNOL) » retirée du nom");
+        assertEquals("ZOUHO GERARD", names.get(6));
+        assertEquals("TIERO HULDA CHANCE EUNICE", names.get(12));
+        String[] lines = new String(csv, StandardCharsets.UTF_8).split("\\R");
+        assertTrue(lines[1].contains("Thu 01") && lines[1].endsWith("Sat 31"), "octobre 2026 : 1er jeudi, 31 jours");
+        int[] shifts = new int[31];
+        for (String l : lines) {
+            if (!l.matches("^\\d+,.*")) continue;
+            String[] c = l.replaceAll("\"[^\"]*\"", "x").split(",");
+            assertEquals(33, c.length, l);
+            for (int d = 0; d < 31; d++) if (List.of("M", "M2", "M3", "A", "N").contains(c[d + 2])) shifts[d]++;
+        }
+        // Ligne TOTAL SHIFTS du fichier (le 30 : 9 et non 8, le total M3 du fichier ayant un 0 saisi à la place de la formule).
+        int[] expected = {12, 10, 8, 5, 5, 10, 12, 11, 9, 8, 5, 5, 10, 12, 11, 9, 8, 5, 5, 10, 12, 11, 9, 8, 5, 5, 10, 12, 11, 9, 8};
+        assertArrayEquals(expected, shifts);
+    }
+
+    @Test
     void journalLabels() {
         assertEquals("Rôle ajouté", AdminChangeJournal.label("POST", "/roles"));
         assertEquals("Service retiré", AdminChangeJournal.label("DELETE", "/services/4"));
