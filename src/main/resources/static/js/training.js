@@ -175,7 +175,17 @@
         getJson("/api/quiz-questions/draw?category=" + encodeURIComponent(category) + "&count=1").then(function (questions) {
             if (questions.length) {
                 launchBtn.style.display = "";
-                launchBtn.href = "/games?category=" + encodeURIComponent(category) + "&autoplay=quiz-eclair";
+                // Même page, onglet « Quiz & défis » (les évaluations) — pas de nouvelle fenêtre.
+                launchBtn.href = "#";
+                launchBtn.removeAttribute("target");
+                launchBtn.onclick = function (e) {
+                    e.preventDefault();
+                    var tab = document.querySelector('#efTabs [data-ef-tab="quiz"]');
+                    if (!tab) { window.location.href = "/games?category=" + encodeURIComponent(category) + "&autoplay=quiz-eclair"; return; }
+                    tab.click();
+                    var tabs = document.getElementById("efTabs");
+                    window.scrollTo({ top: tabs ? tabs.offsetTop - 10 : 0, behavior: "smooth" });
+                };
             }
         }).catch(function () {});
     }
