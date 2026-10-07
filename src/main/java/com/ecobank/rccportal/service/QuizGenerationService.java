@@ -92,6 +92,35 @@ public class QuizGenerationService {
         return clean.length() > MAX_TEXT ? clean.substring(0, MAX_TEXT) : clean;
     }
 
+    /** Questions rédigées à partir d'un support, sans les enregistrer (évaluations programmées). */
+    public record DraftSet(String source, List<Draft> drafts, String note) {}
+
+    public DraftSet drafts(MultipartFile file, String text, int count) {
+        int n = Math.max(1, Math.min(MAX_QUESTIONS, count));
+        String source = sourceText(file, text);
+        List<Draft> drafts = null;
+        String origin = "local", note = null;
+        if (ai.isAvailable()) {
+            try {
+                drafts = parseAiDrafts(ai.chat(SYSTEM, prompt(source, n), 6000, 120));
+                origin = ai.usesLocal() ? "ia-locale" : "ia";
+            } catch (RuntimeException e) {
+                log.warn("[QUIZ] Génération IA indisponible ({}), repli sur le générateur local", e.getMessage());
+                note = "L'IA n'a pas répondu : questions rédigées par le générateur intégré.";
+            }
+        }
+        if (drafts == null || drafts.isEmpty()) {
+            drafts = localDrafts(source, n, new Random(source.hashCode()));
+            origin = "local";
+        }
+        if (drafts.isEmpty()) {
+            throw ApiException.badRequest("Aucune question n'a pu être tirée de ce support : il faut des phrases complètes (pas seulement des tableaux ou des titres).");
+        }
+        List<Draft> out = drafts.subList(0, Math.min(n, drafts.size()));
+        if (out.size() < n && note == null) note = out.size() + " question(s) seulement : le support ne permettait pas d'en tirer davantage.";
+        return new DraftSet(origin, new ArrayList<>(out), note);
+    }
+
     public Result generate(MultipartFile file, String text, String category, int count, String difficulty, Long requesterId) {
         String cat = category == null || category.isBlank() ? "Général" : category.trim();
         int n = Math.max(1, Math.min(MAX_QUESTIONS, count));

@@ -45,7 +45,7 @@
             content: "", videoMode: "link", videoUrl: "", videoFile: null, docFile: null, existingFileName: null, existingFileUrl: null, genFile: null,
             coverFile: null, coverPreset: null, coverUrl: null,
             type: "SELF_ASSESSMENT", teamCode: "", mandatory: false, publish: "DRAFT", initialStatus: "DRAFT",
-            questions: [], saving: false
+            questions: [], saving: false, autoCount: 0
         };
     }
 
@@ -149,6 +149,21 @@
             '</section>' +
             // 5 — Évaluation
             '<section class="cs-pane" data-pane="quiz" hidden>' +
+            '<div class="mb-3 p-3 rounded-3" id="csAuto" style="background:#F0FBF4;border:1px solid #BFE8CD">' +
+            '<div class="d-flex align-items-start gap-2 mb-2"><i class="bi bi-calendar-check" style="font-size:1.3rem;color:#0a8a3e"></i><div>' +
+            '<b>Évaluation de fin de formation (automatique)</b><div class="cs-muted small">Choisissez le genre d\'évaluation : à « Créer le cours », le portail analyse ' +
+            'le fichier de l\'étape Médias (vidéo ou PDF), rédige le quiz et le programme pour l\'équipe du cours. Après la formation, l\'agent est conduit vers ' +
+            'l\'onglet Évaluation pour le passer ; son Team Leader et la QA voient le résultat.</div></div></div>' +
+            '<div class="cs-choice-grid" id="csAutoKind">' +
+            [["0", "bi-x-circle", "Aucune", "Pas d'évaluation programmée"], ["5", "bi-ui-checks", "QCM court", "5 questions"],
+             ["10", "bi-ui-checks-grid", "QCM standard", "10 questions"], ["20", "bi-list-check", "QCM approfondi", "20 questions"]].map(function (k) {
+                return '<button type="button" class="cs-choice" data-auto="' + k[0] + '"><span class="cs-choice-ic" style="background:#e6f7ec;color:#0a8a3e"><i class="bi ' + k[1] + '"></i></span>' +
+                    '<b>' + k[2] + '</b><small>' + k[3] + '</small></button>';
+            }).join("") + '</div>' +
+            '<div class="row g-2 mt-1" id="csAutoOpts"><div class="col-sm-4"><label class="cs-label" for="csAutoFrom">Du</label><input type="date" class="form-control cs-input" id="csAutoFrom"></div>' +
+            '<div class="col-sm-4"><label class="cs-label" for="csAutoTo">Au</label><input type="date" class="form-control cs-input" id="csAutoTo"></div>' +
+            '<div class="col-sm-4"><label class="cs-label" for="csAutoPass">Réussite (%)</label><input type="number" min="1" max="100" value="70" class="form-control cs-input" id="csAutoPass"></div></div>' +
+            '<div class="small mt-2" id="csAutoNote"></div></div>' +
             '<h6 class="cs-pane-title">Questions de l\'évaluation</h6>' +
             '<p class="cs-pane-sub">Banque commune à la rubrique <b id="csQuizCat"></b> — les mêmes questions alimentent le Centre d\'Évaluation. 3 questions minimum recommandées.</p>' +
             '<div id="csQuizOff" class="cs-note" hidden><i class="bi bi-info-circle"></i> Ce cours est un auto-diagnostic : pas de questions notées. ' +
@@ -253,6 +268,9 @@
             b.addEventListener("click", function () { state.publish = b.getAttribute("data-pub"); syncChoices(); refresh(); });
         });
         q("#csFTeam").addEventListener("change", function () { state.teamCode = this.value; refresh(); });
+        qa("#csAutoKind [data-auto]").forEach(function (b) {
+            b.addEventListener("click", function () { state.autoCount = +b.getAttribute("data-auto"); syncAuto(); });
+        });
         q("#csFMandatory").addEventListener("change", function () { state.mandatory = this.checked; refresh(); });
         q("#csToStandard").addEventListener("click", function () { state.type = "STANDARD"; syncChoices(); renderSteps(); go(4); });
 
@@ -402,7 +420,64 @@
         q("#csQuizOff").hidden = on;
         q("#csQuizOn").hidden = !on;
         q("#csQuizCat").textContent = categoryName();
+        syncAuto();
         if (on) { syncGenSource(); loadQuestions(); }
+    }
+
+    function autoSource(course) {
+        course = course || {};
+        if (state.docFile || course.fileUrl || state.existingFileUrl) return { fileUrl: course.fileUrl || state.existingFileUrl, fileName: course.fileName || state.existingFileName, label: "le document du cours" };
+        var v = course.videoUrl || (state.videoMode === "upload" && state.videoFile ? "upload" : "");
+        if (v && (v === "upload" || v.charAt(0) === "/")) return { fileUrl: v === "upload" ? null : v, label: "la vidéo du cours (transcription)" };
+        if (textOf(state.content).length > 200) return { text: state.content, label: "le contenu rédigé du cours" };
+        return null;
+    }
+
+    function syncAuto() {
+        qa("#csAutoKind [data-auto]").forEach(function (b) { b.classList.toggle("active", +b.getAttribute("data-auto") === state.autoCount); });
+        q("#csAutoOpts").hidden = !state.autoCount;
+        if (!q("#csAutoFrom").value) q("#csAutoFrom").value = isoDay(0);
+        if (!q("#csAutoTo").value) q("#csAutoTo").value = isoDay(14);
+        var src = autoSource();
+        q("#csAutoNote").innerHTML = !state.autoCount ? "" : src
+            ? '<span class="text-success"><i class="bi bi-check-circle"></i> ' + state.autoCount + " questions rédigées à partir de " + esc(src.label) +
+              (state.publish === "PUBLISHED" ? ", programmées pour l'équipe du cours dès sa création." : " — le cours étant en brouillon, l'évaluation sera prête à programmer dans l'onglet Évaluation.") + "</span>"
+            : '<span class="text-warning">Joignez la vidéo ou le PDF du cours à l\'étape Médias (ou rédigez le contenu).</span>';
+    }
+
+    function isoDay(plus) { var d = new Date(); d.setDate(d.getDate() + plus); return d.toISOString().slice(0, 10); }
+
+    /** Après l'enregistrement : quiz rédigé depuis le support du cours, puis programmé pour l'équipe du cours. */
+    function createAutoAssessment(course) {
+        if (!state.autoCount) return Promise.resolve();
+        var src = autoSource(course);
+        if (!src || (!src.fileUrl && !src.text)) { toast("Évaluation non créée : aucun support à analyser.", true); return Promise.resolve(); }
+        overlay(true, "Analyse du support et rédaction de l'évaluation…", 100, src.label);
+        var fd = new FormData();
+        if (src.fileUrl) { fd.append("fileUrl", src.fileUrl); fd.append("fileName", src.fileName || ""); }
+        if (src.text) fd.append("text", src.text);
+        fd.append("title", "Évaluation — " + course.title);
+        fd.append("courseId", course.courseId);
+        fd.append("count", state.autoCount);
+        return fetch("/api/assessments/draft", { method: "POST", credentials: "same-origin", body: fd })
+            .then(function (res) {
+                return res.text().then(function (t) {
+                    var data = null;
+                    try { data = t ? JSON.parse(t) : null; } catch (e) { /* réponse non JSON */ }
+                    if (!res.ok) throw new Error((data && (data.message || (data.error && data.error.message))) || ("HTTP " + res.status));
+                    return data;
+                });
+            })
+            .then(function (draft) {
+                if (course.publicationStatus !== "PUBLISHED") { state.autoMsg = " Évaluation prête (brouillon) dans l'onglet Évaluation."; return; }
+                return getJson("/api/assessments/teams").then(function (teams) {
+                    var team = course.teamCode && teams[String(course.teamCode).toUpperCase()] ? String(course.teamCode).toUpperCase() : "ALL";
+                    return sendJson("/api/assessments/" + draft.id + "/publish", "POST", {
+                        teamCode: team, startsOn: q("#csAutoFrom").value, endsOn: q("#csAutoTo").value, passScore: +q("#csAutoPass").value || 70
+                    });
+                }).then(function (a) { state.autoMsg = " Évaluation de " + a.questionCount + " questions programmée pour " + a.teamLabel + "."; });
+            })
+            .catch(function (e) { toast("Cours enregistré, mais évaluation non créée : " + e.message, true); });
     }
 
     function categoryName() { return (state.category || "").trim() || "Général"; }
@@ -623,11 +698,13 @@
                     .catch(function (e) { toast("Cours enregistré, mais publication impossible : " + e.message, true); });
             }
         }).then(function () {
+            return createAutoAssessment(course);
+        }).then(function () {
             state.saving = false;
             state.saved = true;
             overlay(false);
             bsModal.hide();
-            toast(course.publicationStatus === "PUBLISHED" ? "Cours publié — visible par les agents ✓" : "Cours enregistré en brouillon ✓");
+            toast((course.publicationStatus === "PUBLISHED" ? "Cours publié — visible par les agents ✓" : "Cours enregistré en brouillon ✓") + (state.autoMsg || ""));
             document.dispatchEvent(new CustomEvent("rcc:course-saved", { detail: course }));
         }).catch(function (e) {
             state.saving = false;

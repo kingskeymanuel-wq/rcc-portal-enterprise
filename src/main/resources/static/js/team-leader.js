@@ -46,7 +46,7 @@
         if (tab === "tools" && window.RccExternalTools && !$("tlToolsGrid").children.length) RccExternalTools.render("tlToolsGrid");
         if (tab === "members") loadMembers();
         if (tab === "planning") loadPlanningTab();
-        if (tab === "qa") loadQa();
+        if (tab === "qa") { loadQa(); if (window.RccAssessments) RccAssessments.mountManager($("tlAssessmentsRoot")); }
         if (tab === "perffiles" && !perfFilesMounted && window.RccPerfFiles) { perfFilesMounted = true; RccPerfFiles.mountImport($("tlPerfFilesRoot")); }
         if (tab === "sales") loadSales();
         if (tab === "rdv") loadRdv();

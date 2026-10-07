@@ -421,6 +421,7 @@
         });
         video.addEventListener("ended", function () {
             if (videoProgressCourseId) reportVideoProgress(videoProgressCourseId, 100, false);
+            redirectToAssessment(video.parentNode);
         });
         videoProgressReportTimer = setInterval(function () {
             if (videoProgressCourseId) reportVideoProgress(videoProgressCourseId, currentWatchedPercent(video), false);
@@ -445,8 +446,49 @@
 
     // ===== Lecteur de cours (agent) =====
 
+    // Évaluation programmée liée au cours : l'agent y est conduit à la fin de sa formation.
+    var currentAssessmentId = null;
+
+    function assessmentUrl(id) { return "/games?assessment=" + id + "#programmees"; }
+
+    function assessmentBox() {
+        if (!currentAssessmentId) return "";
+        return '<div class="alert alert-primary d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">' +
+            '<span><i class="bi bi-calendar-check"></i> <strong>Évaluation de fin de formation</strong> — une fois le cours terminé, passez l\'évaluation correspondante.</span>' +
+            '<a class="btn btn-primary btn-sm" href="' + assessmentUrl(currentAssessmentId) + '"><i class="bi bi-play-fill"></i> J\'ai terminé : passer l\'évaluation</a></div>';
+    }
+
+    /** Fin de la vidéo : redirection vers l'onglet Évaluation après un court compte à rebours (annulable). */
+    function redirectToAssessment(container) {
+        if (!currentAssessmentId || !container) return;
+        var id = currentAssessmentId, left = 5;
+        var box = document.createElement("div");
+        box.className = "alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2";
+        box.innerHTML = '<span><i class="bi bi-check-circle"></i> Formation terminée. Redirection vers votre évaluation dans <b>' + left + '</b> s…</span>' +
+            '<span><a class="btn btn-success btn-sm" href="' + assessmentUrl(id) + '">Y aller maintenant</a> ' +
+            '<button type="button" class="btn btn-outline-secondary btn-sm">Rester ici</button></span>';
+        container.appendChild(box);
+        var timer = setInterval(function () {
+            left--;
+            box.querySelector("b").textContent = left;
+            if (left <= 0) { clearInterval(timer); window.location.href = assessmentUrl(id); }
+        }, 1000);
+        box.querySelector("button").addEventListener("click", function () { clearInterval(timer); box.remove(); });
+    }
+
     function openCoursePlayer(courseId) {
         currentCourseId = courseId;
+        currentAssessmentId = null;
+        getJson("/api/assessments/for-course/" + courseId).then(function (r) {
+            currentAssessmentId = r && r.assessmentId ? r.assessmentId : null;
+            var body = $("coursePlayerBody");
+            if (currentAssessmentId && body && currentCourseId === courseId && !body.querySelector("[data-as-link]")) {
+                var holder = document.createElement("div");
+                holder.setAttribute("data-as-link", "");
+                holder.innerHTML = assessmentBox();
+                body.appendChild(holder);
+            }
+        }).catch(function () { /* pas d'évaluation programmée */ });
         var course = coursesCache.filter(function (c) { return c.courseId === courseId; })[0];
         if (!course) return;
 
@@ -526,6 +568,7 @@
             html += '<button class="btn btn-primary" id="submitCourseBtn">Valider</button>';
         }
 
+        if (currentAssessmentId) html += '<div data-as-link>' + assessmentBox() + '</div>';
         body.innerHTML = html;
 
         var watchBtn = $("watchVideoBtn");
@@ -563,7 +606,8 @@
     function renderCourseResult(course, attempt) {
         var body = $("coursePlayerBody");
         if (course.type === "SELF_ASSESSMENT") {
-            body.innerHTML = '<div class="alert alert-success">Auto-diagnostic complété. Merci pour vos réponses.</div>';
+            body.innerHTML = '<div class="alert alert-success">Auto-diagnostic complété. Merci pour vos réponses.</div>' +
+                (currentAssessmentId ? '<div data-as-link>' + assessmentBox() + '</div>' : "");
             return;
         }
 
@@ -581,6 +625,7 @@
                 '<button class="btn btn-outline-primary btn-sm" id="retryCourseBtn">Retenter (dernière chance)</button>';
         }
 
+        if (currentAssessmentId) html += '<div data-as-link>' + assessmentBox() + '</div>';
         body.innerHTML = html;
 
         var retryBtn = $("retryCourseBtn");

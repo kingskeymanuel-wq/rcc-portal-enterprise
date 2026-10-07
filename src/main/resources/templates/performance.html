@@ -341,6 +341,15 @@
                     <div id="teamResultsTree"><p class="text-center text-muted">Chargement…</p></div>
                 </div>
 
+                <!-- Évaluations programmées : résultats de l'agent, ou suivi d'équipe (Team Leader, QA, encadrement) -->
+                <div class="pf-section" id="perfAssessmentsCard" style="display:none;">
+                    <div class="pf-section-head">
+                        <h6 class="pf-section-title"><i class="bi bi-calendar-check"></i> Évaluations de formation</h6>
+                        <a class="pf-section-hint" th:href="@{/games#programmees}">Onglet Évaluation →</a>
+                    </div>
+                    <div id="perfAssessments"><p class="text-muted small mb-0">Chargement…</p></div>
+                </div>
+
                 <div class="pf-section">
                     <div class="pf-section-head">
                         <h6 class="pf-section-title"><i class="bi bi-bar-chart"></i> KPI du mois</h6>
@@ -389,5 +398,18 @@
 <script th:src="@{/js/shift-timeline.js}"></script>
 <script th:src="@{/js/team-perf-files.js}"></script>
 <script th:src="@{/js/performance.js}"></script>
+<script th:src="@{/js/assessments.js}"></script>
+<script>
+    (function () {
+        if (!window.RccSession || !window.RccAssessments) return;
+        RccSession.init().then(function (session) {
+            if (!session) return;
+            var root = document.getElementById("perfAssessments");
+            document.getElementById("perfAssessmentsCard").style.display = "";
+            if (session.profile === "AGENT") RccAssessments.mountMyResults(root);
+            else RccAssessments.mountManager(root);
+        });
+    })();
+</script>
 </body>
 </html>
