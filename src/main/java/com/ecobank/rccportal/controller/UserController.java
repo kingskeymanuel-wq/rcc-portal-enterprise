@@ -15,6 +15,7 @@ import com.ecobank.rccportal.service.CurrentUserAccessService;
 import com.ecobank.rccportal.service.UserFeaturePermissionService;
 import com.ecobank.rccportal.service.UserService;
 import com.ecobank.rccportal.util.ApiException;
+import com.ecobank.rccportal.util.Filiale;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -48,11 +49,11 @@ public class UserController {
         this.authService = authService;
     }
 
-    /** Annuaire complet — réservé à l'administrateur. */
+    /** Annuaire complet — réservé à l'administrateur, limité à la filiale affichée (RCC ECI ou RCC ETG). */
     @GetMapping
     public List<UserResponse> listAll(@AuthenticationPrincipal AuthenticatedUser requester) {
         requireAdmin(requester);
-        return userService.listAll();
+        return userService.listAll().stream().filter(u -> Filiale.matches(u.affiliateBranch())).toList();
     }
 
     /** Création directe par un admin — le compte est actif immédiatement, sans passer par l'auto-inscription. */
@@ -172,8 +173,9 @@ public class UserController {
         if (!isAdmin && !isRh && !isSupervisor) {
             throw ApiException.forbidden("Only Human Resources, a Supervisor or an administrator can view contract tracking.");
         }
-        // Le portail RH couvre les deux filiales (sélecteur Côte d'Ivoire / Togo) : filtrage par filiale côté page.
-        return userService.listContractsForHr(requester.username(), isAdmin || isSupervisor || isRh);
+        // Le portail RH couvre les deux filiales (sélecteur Côte d'Ivoire / Togo) : seule la filiale affichée est rendue.
+        return userService.listContractsForHr(requester.username(), isAdmin || isSupervisor || isRh).stream()
+                .filter(u -> Filiale.matches(u.affiliateBranch())).toList();
     }
 
     /** Aperçu : comptes « RCC » / sans équipe rapprochés de leur double qui a une vraie équipe. */
@@ -201,7 +203,8 @@ public class UserController {
         List<UserResponse> users = (role != null && !role.isBlank())
                 ? userService.listByRole(role)
                 : userService.listAll();
-        return users.stream().map(this::toDirectory).toList();
+        return users.stream().filter(u -> Filiale.visibleInDirectory(u.affiliateBranch(), u.role()))
+                .map(this::toDirectory).toList();
     }
 
     /** Auto-lookup équipe + Team Leader d'un agent — pour le formulaire "Évaluer un appel" (QA). */
@@ -214,7 +217,8 @@ public class UserController {
     @GetMapping("/search")
     public List<UserDirectoryResponse> search(@RequestParam String q) {
         if (q == null || q.trim().length() < 2) return List.of();
-        return userService.search(q).stream().map(this::toDirectory).toList();
+        return userService.search(q).stream().filter(u -> Filiale.visibleInDirectory(u.affiliateBranch(), u.role()))
+                .map(this::toDirectory).toList();
     }
 
     private UserDirectoryResponse toDirectory(UserResponse u) {

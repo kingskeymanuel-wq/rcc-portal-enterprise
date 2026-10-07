@@ -180,7 +180,8 @@ public class UserService {
             if (home != null && (redirectTo == null || AGENT_PORTALS.contains(redirectTo))) redirectTo = home;
         }
 
-        return new com.ecobank.rccportal.dto.TeamStatusResponse(false, redirectTo);
+        return new com.ecobank.rccportal.dto.TeamStatusResponse(false, redirectTo,
+                com.ecobank.rccportal.util.Affiliates.countryOf(user.getAffiliateBranch()));
     }
 
     /** Portails d'agent (accueil compris). */

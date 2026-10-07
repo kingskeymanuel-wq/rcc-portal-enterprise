@@ -6,6 +6,7 @@ package com.ecobank.rccportal.dto;
  * direct au portail dans tous les cas.
  * redirectTo : portail vers lequel rediriger automatiquement (service/rôle métier attribué,
  * ou "/outbound-dashboard" si l'agent est classé Outbound — voir TeamClassifier), sinon null.
+ * country : filiale du compte (« CI » = RCC ECI, « TG » = RCC ETG) — filiale affichée par défaut dans le portail.
  */
-public record TeamStatusResponse(boolean needsSetup, String redirectTo) {
+public record TeamStatusResponse(boolean needsSetup, String redirectTo, String country) {
 }

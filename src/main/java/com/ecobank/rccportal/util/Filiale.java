@@ -67,6 +67,16 @@ public final class Filiale {
     }
 
     /**
+     * Visible dans un annuaire / une liste de choix de la filiale active : les collaborateurs de la filiale, plus
+     * l'encadrement commun aux deux filiales (administrateur, Superviseur, RH) que tout le monde doit pouvoir joindre.
+     */
+    public static boolean visibleInDirectory(String affiliateBranch, String role) {
+        if (matches(affiliateBranch)) return true;
+        String r = role == null ? "" : role.trim().toUpperCase(Locale.ROOT);
+        return r.equals("ADMIN") || r.equals("SUPERVISOR") || r.equals("RH");
+    }
+
+    /**
      * Condition SQL sur la colonne AFFILIATE_BRANCH de l'alias donné ("u") pour la filiale active — chaîne vide sans filiale.
      * Mêmes règles que Affiliates.countryOf : vide et K01 = Côte d'Ivoire.
      */

@@ -19,7 +19,17 @@ window.RccOffline = (function () {
 
 window.RccFiliale = (function () {
     var KEY = "rcc.filiale", LABELS = { CI: "RCC ECI", TG: "RCC ETG" }, NAMES = { CI: "Côte d'Ivoire", TG: "Togo — Lomé" };
-    function get() { try { var v = localStorage.getItem(KEY); return LABELS[v] ? v : "CI"; } catch (e) { return "CI"; } }
+    // Sans choix enregistré : la filiale du compte (un Superviseur ou un RH de Lomé arrive sur RCC ETG, pas sur RCC ECI).
+    var OWN_KEY = "rcc.filiale.own";
+    function own() { try { var o = localStorage.getItem(OWN_KEY); return LABELS[o] ? o : "CI"; } catch (e) { return "CI"; } }
+    function get() { try { var v = localStorage.getItem(KEY); return LABELS[v] ? v : own(); } catch (e) { return "CI"; } }
+    function setOwn(c) {
+        if (!LABELS[c]) return;
+        var before = get();
+        try { localStorage.setItem(OWN_KEY, c); } catch (e) { /* stockage indisponible */ }
+        // Première visite d'un compte du Togo : la page déjà chargée sur RCC ECI est rechargée une fois sur RCC ETG.
+        if (get() !== before) window.location.reload();
+    }
     function set(c) {
         if (!LABELS[c]) return;
         try { localStorage.setItem(KEY, c); localStorage.setItem("rccHrCountry", c); } catch (e) { /* stockage indisponible */ }
@@ -53,7 +63,7 @@ window.RccFiliale = (function () {
             b.classList.toggle("on", b.getAttribute("data-filiale") === e.detail.country);
         });
     });
-    return { get: get, set: set, label: function (c) { return LABELS[c || get()] || c; }, name: function (c) { return NAMES[c || get()] || c; }, LABELS: LABELS };
+    return { get: get, set: set, setOwn: setOwn, label: function (c) { return LABELS[c || get()] || c; }, name: function (c) { return NAMES[c || get()] || c; }, LABELS: LABELS };
 })();
 
 // Visionneuse commune (articles, procédures, fichiers en fenêtre) — chargée sur toutes les pages.
@@ -871,6 +881,7 @@ window.RccSession = (function () {
                     var permissionOverrides = results[0];
                     var deniedTabCodes = results[1].deniedTabCodes || [];
                     var teamStatus = results[2];
+                    if (teamStatus.country) window.RccFiliale.setOwn(teamStatus.country);
 
                     var isOutboundAgent = profile === "AGENT" && /^\/(outbound-dashboard|portail-televente)$/.test(teamStatus.redirectTo || "");
                     var channelPortal = profile === "AGENT" && /^\/portail-(mail|tchat|rafiki|televente|cib)$/.test(teamStatus.redirectTo || "") ? teamStatus.redirectTo : null;

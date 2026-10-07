@@ -194,8 +194,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // Filiale choisie dans l'en-tête du portail (RCC ECI / RCC ETG) — Superviseur, RH, administrateur, Head QA.
         com.ecobank.rccportal.util.Filiale.set(principal instanceof AuthenticatedUser au0 ? au0 : null,
                 request.getHeader(com.ecobank.rccportal.util.Filiale.HEADER));
-        // Un Team Leader ne pilote que les agents de SA filiale (RCC ECI ou RCC ETG).
-        if (principal instanceof AuthenticatedUser au1 && "TEAM_LEADER".equalsIgnoreCase(au1.role()) && request.getAttribute(LIVE_COUNTRY) instanceof String own) {
+        // Tout autre compte (Team Leader, agent, QA, formateur…) reste dans SA filiale : les collaborateurs du Togo
+        // (RCC ETG) ne sont jamais mélangés à ceux de Côte d'Ivoire (RCC ECI), et inversement.
+        if (principal instanceof AuthenticatedUser au1 && !com.ecobank.rccportal.util.Filiale.canSwitch(au1)
+                && request.getAttribute(LIVE_COUNTRY) instanceof String own) {
             com.ecobank.rccportal.util.Filiale.setOwn(own);
         }
         try {

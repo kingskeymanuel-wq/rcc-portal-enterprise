@@ -202,4 +202,23 @@ class PortalChainTest {
             com.ecobank.rccportal.util.Filiale.clear();
         }
     }
+
+    @Test
+    void togoAndIvoryCoastUsersAreNeverMixed() {
+        try {
+            // Agent de Lomé : enfermé dans RCC ETG, ne voit aucun collaborateur de Côte d'Ivoire.
+            com.ecobank.rccportal.util.Filiale.setOwn("TG");
+            assertTrue(com.ecobank.rccportal.util.Filiale.visibleInDirectory("TG", "AGENT"));
+            assertFalse(com.ecobank.rccportal.util.Filiale.visibleInDirectory("K01", "AGENT"));
+            assertFalse(com.ecobank.rccportal.util.Filiale.visibleInDirectory(null, "TEAM_LEADER"));
+            // L'encadrement commun reste joignable.
+            assertTrue(com.ecobank.rccportal.util.Filiale.visibleInDirectory("K01", "SUPERVISOR"));
+            // Et inversement côté RCC ECI.
+            com.ecobank.rccportal.util.Filiale.setOwn("K01");
+            assertFalse(com.ecobank.rccportal.util.Filiale.visibleInDirectory("TG", "AGENT"));
+            assertTrue(com.ecobank.rccportal.util.Filiale.visibleInDirectory("CI", "AGENT"));
+        } finally {
+            com.ecobank.rccportal.util.Filiale.clear();
+        }
+    }
 }
