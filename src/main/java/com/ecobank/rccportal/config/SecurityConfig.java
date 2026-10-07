@@ -68,6 +68,7 @@ public class SecurityConfig {
                                 "/qa",
                                 "/index.html",
                                 "/favicon.ico",
+                                "/manifest.webmanifest",
                                 "/error",
                                 "/css/**",
                                 "/js/**",

@@ -1,0 +1,17 @@
+{
+  "name": "RCC Portal Enterprise | Ecobank",
+  "short_name": "R360°",
+  "description": "Portail RCC 360° — Relation Client Ecobank",
+  "id": "/login",
+  "start_url": "/login",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#00344F",
+  "theme_color": "#005D83",
+  "lang": "fr",
+  "icons": [
+    { "src": "/images/app/r360-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/images/app/r360-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/images/app/r360-1024.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" }
+  ]
+}
