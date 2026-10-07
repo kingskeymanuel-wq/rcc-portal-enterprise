@@ -217,8 +217,8 @@ public class UserController {
     @GetMapping("/search")
     public List<UserDirectoryResponse> search(@RequestParam String q) {
         if (q == null || q.trim().length() < 2) return List.of();
-        return userService.search(q).stream().filter(u -> Filiale.visibleInDirectory(u.affiliateBranch(), u.role()))
-                .map(this::toDirectory).toList();
+        // Messagerie : on peut écrire à un collègue de l'autre filiale (RCC ECI / RCC ETG).
+        return userService.search(q).stream().map(this::toDirectory).toList();
     }
 
     private UserDirectoryResponse toDirectory(UserResponse u) {

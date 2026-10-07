@@ -217,6 +217,12 @@ class PortalChainTest {
             com.ecobank.rccportal.util.Filiale.setOwn("K01");
             assertFalse(com.ecobank.rccportal.util.Filiale.visibleInDirectory("TG", "AGENT"));
             assertTrue(com.ecobank.rccportal.util.Filiale.visibleInDirectory("CI", "AGENT"));
+            // Team Leader d'un agent : toujours dans la filiale de l'agent.
+            var leaders = java.util.List.of(new String[]{"tl.ci", "K01"}, new String[]{"tl.tg", "TG"});
+            assertEquals(java.util.List.of("tl.tg"), com.ecobank.rccportal.util.Filiale.sameFiliale(leaders, l -> l[1], "TGO")
+                    .stream().map(l -> l[0]).toList());
+            assertEquals(java.util.List.of("tl.ci"), com.ecobank.rccportal.util.Filiale.sameFiliale(leaders, l -> l[1], null)
+                    .stream().map(l -> l[0]).toList());
         } finally {
             com.ecobank.rccportal.util.Filiale.clear();
         }

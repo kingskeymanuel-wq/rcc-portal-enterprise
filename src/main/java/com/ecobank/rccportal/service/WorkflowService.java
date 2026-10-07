@@ -208,7 +208,7 @@ public class WorkflowService {
                 throw ApiException.badRequest(
                         "Votre équipe n'est pas renseignée sur votre profil — impossible de déterminer votre Team Leader. Contactez un administrateur.");
             }
-            assignedTo = findTeamLeaderForTeam(agentTeam);
+            assignedTo = findTeamLeaderForTeam(agentTeam, requester);
             if (assignedTo == null) {
                 notifyAdminsOfMissingTeamLeader(requester, agentTeam);
                 throw ApiException.badRequest(
@@ -221,7 +221,7 @@ public class WorkflowService {
             // Team Leader configuré, la demande n'est pas bloquée (l'agent a un vrai problème de
             // travail) : elle part tout de suite au portail Superviseur, et l'admin est alerté.
             String agentTeam = requester.getActivity();
-            assignedTo = agentTeam == null || agentTeam.isBlank() ? null : findTeamLeaderForTeam(agentTeam);
+            assignedTo = agentTeam == null || agentTeam.isBlank() ? null : findTeamLeaderForTeam(agentTeam, requester);
             if (assignedTo != null) {
                 assignedTeamCode = "TEAM_LEADER";
             } else {
@@ -436,7 +436,7 @@ public class WorkflowService {
     @Transactional(readOnly = true)
     public java.util.Map<String, String> myTeamLeader(String username) {
         User me = findUser(username);
-        User tl = me.getActivity() == null || me.getActivity().isBlank() ? null : findTeamLeaderForTeam(me.getActivity());
+        User tl = me.getActivity() == null || me.getActivity().isBlank() ? null : findTeamLeaderForTeam(me.getActivity(), me);
         java.util.Map<String, String> out = new java.util.HashMap<>();
         out.put("team", me.getActivity());
         out.put("teamLeaderName", tl != null ? label(tl) : null);
@@ -593,13 +593,17 @@ public class WorkflowService {
      *  casse — TeamClassifier code, ex. "INBOUND_VOICE") — null si aucun n'est configuré. Un rôle
      *  TEAM_LEADER existe déjà comme rôle applicatif normal (voir UserRoleRepository) ; ledTeam,
      *  lui, n'est renseigné que pour ces comptes-là (voir User.ledTeam). */
-    private User findTeamLeaderForTeam(String team) {
+    private User findTeamLeaderForTeam(String team, User agent) {
         // Team Leader du canal (Tchat, Rafiki) d'abord, puis celui du pôle — rôle TEAM_LEADER, sinon désigné par le
         // seul service « Team Leader … » (User.ledTeam reste la source de vérité de l'équipe menée).
-        User leader = com.ecobank.rccportal.util.TeamClassifier.leaderFor(team, userRoleRepository.findByRoleNameIgnoreCase("TEAM_LEADER").stream()
-                .map(com.ecobank.rccportal.model.UserRole::getUser).distinct().toList(), User::getLedTeam);
+        // Toujours dans la filiale de l'agent : un agent de Lomé (RCC ETG) n'est jamais confié à un Team Leader de RCC ECI.
+        String branch = agent == null ? null : agent.getAffiliateBranch();
+        User leader = com.ecobank.rccportal.util.TeamClassifier.leaderFor(team, com.ecobank.rccportal.util.Filiale.sameFiliale(
+                userRoleRepository.findByRoleNameIgnoreCase("TEAM_LEADER").stream().map(com.ecobank.rccportal.model.UserRole::getUser).distinct().toList(),
+                User::getAffiliateBranch, branch), User::getLedTeam);
         if (leader != null) return leader;
-        return com.ecobank.rccportal.util.TeamClassifier.leaderFor(team, userRepository.findAll().stream().filter(u -> u.getLedTeam() != null).toList(), User::getLedTeam);
+        return com.ecobank.rccportal.util.TeamClassifier.leaderFor(team, com.ecobank.rccportal.util.Filiale.sameFiliale(
+                userRepository.findAll().stream().filter(u -> u.getLedTeam() != null).toList(), User::getAffiliateBranch, branch), User::getLedTeam);
     }
 
     /** Alerte tous les comptes ADMIN — un agent bloqué de soumettre son congé faute de Team

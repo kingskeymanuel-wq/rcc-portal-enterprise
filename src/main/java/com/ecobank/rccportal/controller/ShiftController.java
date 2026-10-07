@@ -258,7 +258,9 @@ public class ShiftController {
             throw ApiException.forbidden("Réservé à QA, RH, Excelliam, Superviseur, Team Leader ou administrateur.");
         }
 
-        List<com.ecobank.rccportal.dto.LiveShiftStatusResponse> all = shiftService.liveStatusForAllUsers();
+        // Filiale active : un QA ou un Team Leader du Togo ne voit pas les agents de Côte d'Ivoire (et inversement).
+        List<com.ecobank.rccportal.dto.LiveShiftStatusResponse> all = scopeByName(shiftService.liveStatusForAllUsers(),
+                com.ecobank.rccportal.dto.LiveShiftStatusResponse::username);
         if (isAdmin || isRh || isExcelliam || isSupervisor || isQa) return all;
 
         // Team Leader — uniquement sa propre équipe.

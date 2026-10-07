@@ -16,6 +16,10 @@ import java.util.List;
 @RequestMapping("/api/coaching-plans")
 public class CoachingPlanController {
 
+    /** Filiale active (RCC ECI / RCC ETG) — voir util.Filiale. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.ecobank.rccportal.service.FilialeScope filialeScope;
+
     private final CoachingPlanService coachingPlanService;
 
     public CoachingPlanController(CoachingPlanService coachingPlanService) {
@@ -31,7 +35,8 @@ public class CoachingPlanController {
             return coachingPlanService.listForAgent(agentMatricule);
         }
         requireQaOrAdmin(requester);
-        return coachingPlanService.listAll();
+        List<CoachingPlanResponse> all = coachingPlanService.listAll();
+        return filialeScope == null ? all : filialeScope.byUsername(all, CoachingPlanResponse::agentMatricule);
     }
 
     @GetMapping("/me")

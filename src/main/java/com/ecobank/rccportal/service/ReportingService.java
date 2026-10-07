@@ -66,8 +66,12 @@ public class ReportingService {
     @Transactional(readOnly = true)
     public List<PerformanceResponse> teamSummary(java.time.LocalDate periodStart, java.time.LocalDate periodEnd,
                                                    String periodLabel, String countryCode) {
+        // Sans filiale demandée : celle de la requête — un QA ou un Team Leader du Togo ne voit jamais les agents de
+        // Côte d'Ivoire dans ses données d'équipe (null hors requête : toutes filiales, comportement d'origine).
+        if (countryCode == null || countryCode.isBlank()) countryCode = com.ecobank.rccportal.util.Filiale.current();
+        final String country = countryCode;
         List<User> users = userRepository.findAll().stream()
-                .filter(u -> countryCode == null || countryCode.isBlank() || com.ecobank.rccportal.util.Affiliates.sameCountry(countryCode, u.getAffiliateBranch()))
+                .filter(u -> country == null || country.isBlank() || com.ecobank.rccportal.util.Affiliates.sameCountry(country, u.getAffiliateBranch()))
                 .toList();
 
         List<java.util.concurrent.CompletableFuture<PerformanceResponse>> futures = users.stream()

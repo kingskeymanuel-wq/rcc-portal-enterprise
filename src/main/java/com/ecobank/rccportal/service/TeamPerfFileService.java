@@ -714,6 +714,7 @@ public class TeamPerfFileService {
         List<AgentLine> rows = new ArrayList<>();
         for (Rec r : records(COLS + "WHERE Team = ? AND PeriodStart = ? AND PeriodEnd = ?", t.code(), java.sql.Date.valueOf(start), java.sql.Date.valueOf(end))) {
             User u = r.userId() == null ? null : byId.get(r.userId());
+            if (u != null && !com.ecobank.rccportal.util.Filiale.matches(u.getAffiliateBranch())) continue; // agent de l'autre filiale
             rows.add(new AgentLine(r.agentName(), r.userId(), u == null ? null : u.getUsername(), u == null ? null : u.getName(), r.values(), level(r.values()),
                     u == null ? List.of("Agent non rattaché à un compte du portail") : List.of()));
         }

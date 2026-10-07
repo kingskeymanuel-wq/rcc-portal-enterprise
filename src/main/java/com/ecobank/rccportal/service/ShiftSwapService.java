@@ -163,7 +163,7 @@ public class ShiftSwapService {
         User requester = entity.getRequester();
         if (approve) {
             entity.setTeamLeaderStatus("PENDING");
-            User teamLeader = findTeamLeaderForTeam(requester.getActivity());
+            User teamLeader = findTeamLeaderForTeam(requester.getActivity(), requester);
             if (teamLeader != null) {
                 notificationRepository.save(RccNotification.builder()
                         .targetUser(teamLeader)
@@ -321,10 +321,12 @@ public class ShiftSwapService {
                 .orElseThrow(() -> ApiException.notFound("Unknown user."));
     }
 
-    private User findTeamLeaderForTeam(String team) {
+    private User findTeamLeaderForTeam(String team, User agent) {
         if (team == null || team.isBlank()) return null;
-        return com.ecobank.rccportal.util.TeamClassifier.leaderFor(team, userRoleRepository.findByRoleNameIgnoreCase("TEAM_LEADER").stream()
-                .map(UserRole::getUser).distinct().toList(), User::getLedTeam);
+        // Team Leader de la filiale de l'agent (RCC ECI ou RCC ETG), jamais celui de l'autre filiale.
+        return com.ecobank.rccportal.util.TeamClassifier.leaderFor(team, com.ecobank.rccportal.util.Filiale.sameFiliale(
+                userRoleRepository.findByRoleNameIgnoreCase("TEAM_LEADER").stream().map(UserRole::getUser).distinct().toList(),
+                User::getAffiliateBranch, agent == null ? null : agent.getAffiliateBranch()), User::getLedTeam);
     }
 
     private String labelFor(User u) {

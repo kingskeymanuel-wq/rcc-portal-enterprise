@@ -46,10 +46,18 @@ public final class Filiale {
 
     public static void clear() { CURRENT.remove(); }
 
-    /** Filiale propre au compte (Team Leader) : son équipe, son planning et son reporting restent dans sa filiale. */
+    /**
+     * Filiale propre au compte (QA, Team Leader, agent…) : son équipe, son planning et son reporting restent dans sa
+     * filiale. Seuls l'administrateur, le RH et les Head (Superviseur RCC, Head QA) voient les deux filiales (canSwitch).
+     */
     public static void setOwn(String country) {
         String c = country == null ? null : Affiliates.countryOf(country);
         if (c != null && LABELS.containsKey(c)) CURRENT.set(c);
+    }
+
+    /** Ne garde que les personnes de la même filiale que branch (ex. : le Team Leader d'un agent de Lomé est à Lomé). */
+    public static <T> java.util.List<T> sameFiliale(java.util.Collection<T> people, java.util.function.Function<T, String> branchOf, String branch) {
+        return people.stream().filter(p -> p != null && Affiliates.sameCountry(branch, branchOf.apply(p))).toList();
     }
 
     /** Filiale active, null = toutes. */

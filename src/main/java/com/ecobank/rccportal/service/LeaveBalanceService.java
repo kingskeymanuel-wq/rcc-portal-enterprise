@@ -58,6 +58,7 @@ public class LeaveBalanceService {
     public List<LeaveBalanceResponse> getAllBalances(int year) {
         try {
             return userRepository.findAll().stream()
+                    .filter(u -> com.ecobank.rccportal.util.Filiale.matches(u.getAffiliateBranch())) // filiale active (RCC ECI / RCC ETG)
                     .map(u -> toResponse(u, year))
                     .sorted((a, b) -> a.remainingDays().compareTo(b.remainingDays()))
                     .collect(Collectors.toList());

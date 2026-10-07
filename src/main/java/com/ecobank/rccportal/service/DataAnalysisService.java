@@ -161,6 +161,7 @@ public class DataAnalysisService {
     @Transactional(readOnly = true)
     public List<String> listTeamsWithData(YearMonth month) {
         return userRepository.findAll().stream()
+                .filter(u -> com.ecobank.rccportal.util.Filiale.matches(u.getAffiliateBranch()))
                 .map(u -> com.ecobank.rccportal.util.TeamClassifier.classify(u.getActivity()))
                 .filter(t -> t != com.ecobank.rccportal.util.TeamClassifier.Team.OTHER)
                 .map(Enum::name)

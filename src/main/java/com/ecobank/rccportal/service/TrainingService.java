@@ -272,6 +272,8 @@ public class TrainingService {
             Set<Long> userIds = new HashSet<>(byUser.keySet());
             candidateUsers = userRepository.findAllById(userIds);
         }
+        // Filiale active : les stagiaires de l'autre filiale (RCC ECI / RCC ETG) n'apparaissent pas.
+        candidateUsers = candidateUsers.stream().filter(u -> com.ecobank.rccportal.util.Filiale.matches(u.getAffiliateBranch())).collect(Collectors.toList());
 
         if (teamFilter != null && !teamFilter.isBlank()) {
             candidateUsers = candidateUsers.stream()

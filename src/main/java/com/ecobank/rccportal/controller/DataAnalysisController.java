@@ -13,6 +13,10 @@ import java.time.YearMonth;
 @RequestMapping("/api/data-analysis")
 public class DataAnalysisController {
 
+    /** Filiale active (RCC ECI / RCC ETG) — voir util.Filiale. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.ecobank.rccportal.service.FilialeScope filialeScope;
+
     private final DataAnalysisService dataAnalysisService;
     private final com.ecobank.rccportal.service.AlertEngineService alertEngineService;
     private final com.ecobank.rccportal.service.TeamLeaderService teamLeaderService;
@@ -195,6 +199,7 @@ public class DataAnalysisController {
             throw ApiException.badRequest("month must be in YYYY-MM format.");
         }
         java.util.List<com.ecobank.rccportal.dto.PerformanceAlertResponse> all = alertEngineService.listForMonth(targetMonth);
+        if (filialeScope != null) all = filialeScope.byUserId(all, com.ecobank.rccportal.dto.PerformanceAlertResponse::userId);
         if (isFullAccessRole(requester)) return all;
         String myTeam = effectiveTeam(requester, null);
         return all.stream().filter(a -> myTeam.equalsIgnoreCase(a.team())).toList();

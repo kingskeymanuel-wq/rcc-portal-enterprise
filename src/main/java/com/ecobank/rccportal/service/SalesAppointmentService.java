@@ -192,6 +192,7 @@ public class SalesAppointmentService {
         }
         return userRepository.findAll().stream()
                 .filter(u -> TeamClassifier.classify(u.getActivity()) == team)
+                .filter(u -> com.ecobank.rccportal.util.Filiale.matches(u.getAffiliateBranch())) // agents de la filiale active seulement
                 .toList();
     }
 

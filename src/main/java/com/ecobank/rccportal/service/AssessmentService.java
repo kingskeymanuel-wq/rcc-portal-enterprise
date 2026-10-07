@@ -364,7 +364,7 @@ public class AssessmentService {
         for (Map<String, Object> r : jdbc.queryForList("SELECT UserId, Score, Correct, Total, SubmittedAt FROM dbo.AssessmentAttempts WHERE AssessmentId = ? ORDER BY Score DESC", id)) {
             long uid = ((Number) r.get("UserId")).longValue();
             User u = users.findById(uid).orElse(null);
-            if (u == null) continue;
+            if (u == null || !com.ecobank.rccportal.util.Filiale.matches(u.getAffiliateBranch())) continue; // filiale active
             if (tl != null && !TeamClassifier.belongsTo(tl.getLedTeam(), u.getActivity(), serviceCodes(u))) continue;
             doneIds.add(uid);
             int score = ((Number) r.get("Score")).intValue();
@@ -374,6 +374,7 @@ public class AssessmentService {
         List<String> notYet = new ArrayList<>();
         int expected = 0;
         for (User u : targetAgents(a.teamCode())) {
+            if (!com.ecobank.rccportal.util.Filiale.matches(u.getAffiliateBranch())) continue;
             if (tl != null && !TeamClassifier.belongsTo(tl.getLedTeam(), u.getActivity(), serviceCodes(u))) continue;
             expected++;
             if (!doneIds.contains(u.getId())) notYet.add(u.getName() != null && !u.getName().isBlank() ? u.getName() : u.getUsername());

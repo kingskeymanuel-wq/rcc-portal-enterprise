@@ -200,6 +200,8 @@ public class TeamLeaderService {
         List<Candidate> out = new java.util.ArrayList<>();
         for (User u : userRepository.findAll()) {
             if (u.getUsername() != null && u.getUsername().equalsIgnoreCase(requester.username())) continue;
+            // Un Team Leader du Togo n'ajoute que des collaborateurs du Togo (et inversement pour la Côte d'Ivoire).
+            if (!com.ecobank.rccportal.util.Filiale.matches(u.getAffiliateBranch())) continue;
             List<String> c = codes.getOrDefault(u.getId(), List.of());
             String team = teamCodeOf(u.getActivity(), c);
             String teamLabel = team == null ? "Sans équipe" : TEAM_LABELS.getOrDefault(team, team);
@@ -217,7 +219,8 @@ public class TeamLeaderService {
             String management = managementLabel(roles.getOrDefault(u.getId(), List.of()), c);
             String reason = mine ? "Déjà dans votre équipe" : management != null ? "Compte de management (" + management + ")"
                     : !active ? "Compte désactivé — réintégration par le RH" : null;
-            User leader = team == null ? null : TeamClassifier.leaderFor(u.getActivity(), leaders, User::getLedTeam);
+            User leader = team == null ? null : TeamClassifier.leaderFor(u.getActivity(),
+                    com.ecobank.rccportal.util.Filiale.sameFiliale(leaders, User::getAffiliateBranch, u.getAffiliateBranch()), User::getLedTeam);
             out.add(new Candidate(u.getId(), u.getUsername(), u.getName() != null ? u.getName() : u.getUsername(), u.getEmail(), country,
                     team, teamLabel, leader == null ? null : (leader.getName() != null ? leader.getName() : leader.getUsername()),
                     names.getOrDefault(u.getId(), List.of()), active, mine, reason == null, reason));
@@ -269,7 +272,8 @@ public class TeamLeaderService {
         User oldLeader = null;
         if (oldTeam != null && !oldTeam.equals(code)) {
             List<User> leaders = userRepository.findAll().stream().filter(u -> u.getLedTeam() != null && !u.getLedTeam().isBlank()).toList();
-            oldLeader = TeamClassifier.leaderFor(user.getActivity(), leaders, User::getLedTeam);
+            oldLeader = TeamClassifier.leaderFor(user.getActivity(),
+                    com.ecobank.rccportal.util.Filiale.sameFiliale(leaders, User::getAffiliateBranch, user.getAffiliateBranch()), User::getLedTeam);
         }
         if (administration != null) {
             // Même mise à jour que depuis l'Administration : rôle, service, équipe et portail de l'agent, en base.

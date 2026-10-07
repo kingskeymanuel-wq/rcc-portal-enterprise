@@ -16,6 +16,10 @@ import java.util.List;
 @RequestMapping("/api/agent-dossiers")
 public class AgentDossierController {
 
+    /** Filiale active (RCC ECI / RCC ETG) — voir util.Filiale. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.ecobank.rccportal.service.FilialeScope filialeScope;
+
     private final AgentDossierService agentDossierService;
 
     public AgentDossierController(AgentDossierService agentDossierService) {
@@ -26,7 +30,8 @@ public class AgentDossierController {
     @GetMapping
     public List<AgentDossierResponse> listAll(@AuthenticationPrincipal AuthenticatedUser requester) {
         requireQaOrAdmin(requester);
-        return agentDossierService.listAll();
+        List<AgentDossierResponse> all = agentDossierService.listAll();
+        return filialeScope == null ? all : filialeScope.byUsername(all, AgentDossierResponse::linkedUserMatricule);
     }
 
     @GetMapping("/me")
