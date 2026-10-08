@@ -44,9 +44,10 @@ spring:
     cache: false
   servlet:
     multipart:
-      # Photos et vidéos Mon RCC (voir ImageStorageService) — réglable sans recompiler.
-      max-file-size: ${RCC_UPLOAD_MAX_SIZE:500MB}
-      max-request-size: ${RCC_UPLOAD_MAX_SIZE:500MB}
+      # Envois : documents de la base jusqu'à 2 Go chacun, ZIP de la bibliothèque de dispatching jusqu'à 10 Go
+      # (réglable sans recompiler ; chaque service applique ensuite sa propre limite par fichier).
+      max-file-size: ${RCC_UPLOAD_MAX_SIZE:10GB}
+      max-request-size: ${RCC_UPLOAD_MAX_SIZE:10GB}
       file-size-threshold: 2MB
   mail:
     host: ${RCC_MAIL_HOST:localhost}

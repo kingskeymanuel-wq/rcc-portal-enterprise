@@ -18,7 +18,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
@@ -56,9 +55,9 @@ public class KbDispatchService {
 
     static final String ENTITY = "KnowledgeArticle";
     static final Set<String> ALLOWED = Set.of("pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv", "png", "jpg", "jpeg");
-    static final long MAX_FILE = 20L * 1024 * 1024;
+    static final long MAX_FILE = 2L * 1024 * 1024 * 1024; // 2 Go par fichier
     static final int MAX_ENTRIES = 5000;
-    static final long MAX_TOTAL = 2L * 1024 * 1024 * 1024;
+    static final long MAX_TOTAL = 50L * 1024 * 1024 * 1024; // 50 Go décompressés
 
     public record Item(String path, String fileName, String space, Integer categoryId, String category, boolean newCategory,
                        String country, String action, String detail) {}
@@ -215,7 +214,7 @@ public class KbDispatchService {
     }
 
     private record Planned(ZipEntryRef entry, String space, String categoryName, KnowledgeCategory category, KnowledgeCountry country,
-                           String titleKey, String action, String detail, Attachment existing, String sha) {}
+                           String titleKey, String action, String detail, Attachment existing, String sha, long bytes) {}
 
     private Report run(AuthenticatedUser requester, int id, String requestedSpace, boolean apply, boolean removeMissing) {
         requireManager(requester);
@@ -274,13 +273,15 @@ public class KbDispatchService {
                 String action, detail = null;
                 Attachment existing = null;
                 String sha = null;
+                long bytes = e.size;
                 if (!ALLOWED.contains(ext)) { action = "SKIP"; detail = "Format non pris en charge (." + ext + ")"; }
-                else if (e.size > MAX_FILE) { action = "SKIP"; detail = "Fichier trop lourd (" + (e.size / 1024 / 1024) + " Mo, maximum 20 Mo)"; }
+                else if (e.size > MAX_FILE) { action = "SKIP"; detail = "Fichier trop lourd (" + (e.size / 1024 / 1024) + " Mo, maximum 2 Go)"; }
                 else if (cat == null) { action = "SKIP"; detail = "Non classé : placez-le dans un dossier au nom de sa rubrique"; }
                 else if (!isQa(requester) && !KnowledgeService.CIB.equals(space)) { action = "SKIP"; detail = "Base générale : dispatching réservé à la Quality Assurance"; }
                 else {
-                    byte[] bytes = readEntry(zf, e);
-                    sha = sha256(bytes);
+                    Object[] h = hashEntry(zf, e);
+                    sha = (String) h[0];
+                    bytes = (Long) h[1];
                     existing = cat.getCategoryId() == null ? null : findExisting(cat, country, key);
                     if (existing == null) action = "ADD";
                     else {
@@ -289,7 +290,7 @@ public class KbDispatchService {
                         else { action = "UPDATE"; detail = "Remplace « " + existing.getFileName() + " »"; }
                     }
                 }
-                Planned p = new Planned(e, space, cat == null ? null : cat.getTitle(), cat, country, key, action, detail, existing, sha);
+                Planned p = new Planned(e, space, cat == null ? null : cat.getTitle(), cat, country, key, action, detail, existing, sha, bytes);
                 // Deux fichiers du ZIP pour le même titre au même endroit : le dernier modifié l'emporte.
                 if (!"SKIP".equals(action)) {
                     String slot = (cat.getCategoryId() != null ? "c" + cat.getCategoryId() : "n" + cat.getTitle()) + "|" + (country == null ? "" : country.getCountryCode()) + "|" + key;
@@ -325,13 +326,13 @@ public class KbDispatchService {
                         if ("ADD".equals(action)) {
                             KnowledgeArticle container = knowledge.findOrCreateContainer(cat.getCategoryId(), null,
                                     p.country == null ? null : p.country.getCountryCode(), null);
-                            String url = storage.store(new BytesFile(name, readEntry(zf, p.entry)));
+                            String url = storage.store(new ZipEntryFile(name, zf, p.entry.name, p.bytes));
                             var att = attachmentService.attachLocalFile(ENTITY, container.getArticleId(), name, mime(name), url, requester.username());
                             track(att.id(), cat, p.country, p.titleKey, p.sha, id);
                             keptAttachments.add(att.id());
                             lastContainer.put(cat.getCategoryId(), container);
                         } else if ("UPDATE".equals(action)) {
-                            String url = storage.store(new BytesFile(name, readEntry(zf, p.entry)));
+                            String url = storage.store(new ZipEntryFile(name, zf, p.entry.name, p.bytes));
                             Attachment a = attachments.findById(p.existing.getAttachmentId()).orElseThrow();
                             a.setFileName(cut(name, 260));
                             a.setMimeType(mime(name));
@@ -417,7 +418,7 @@ public class KbDispatchService {
     }
 
     private static Planned withAction(Planned p, String action, String detail) {
-        return new Planned(p.entry, p.space, p.categoryName, p.category, p.country, p.titleKey, action, detail, null, p.sha);
+        return new Planned(p.entry, p.space, p.categoryName, p.category, p.country, p.titleKey, action, detail, null, p.sha, p.bytes);
     }
 
     private static String spaceOf(String plannedKey) {
@@ -461,7 +462,10 @@ public class KbDispatchService {
         List<String> known = jdbc.query("SELECT Sha256 FROM dbo.KbDispatchFiles WHERE AttachmentId = ?", (rs, i) -> rs.getString(1), a.getAttachmentId());
         if (!known.isEmpty()) return known.get(0);
         try {
-            if (a.getStorageUrl() != null && a.getStorageUrl().startsWith("/kb-files/")) return sha256(storage.open(a.getStorageUrl(), a.getFileName()).getBytes());
+            if (a.getStorageUrl() != null && a.getStorageUrl().startsWith("/kb-files/")) {
+                Path local = storage.localPath(a.getStorageUrl());
+                try (InputStream in = Files.newInputStream(local)) { return (String) hash(in)[0]; }
+            }
         } catch (Exception ignore) { /* fichier absent du disque : considéré comme différent */ }
         return "";
     }
@@ -606,7 +610,7 @@ public class KbDispatchService {
                 out.add(new ZipEntryRef(name, Math.max(0, e.getSize()), e.isDirectory(), e.getTime()));
                 total += Math.max(0, e.getSize());
                 if (out.size() > MAX_ENTRIES) throw ApiException.badRequest("ZIP trop volumineux : plus de " + MAX_ENTRIES + " éléments.");
-                if (total > MAX_TOTAL) throw ApiException.badRequest("ZIP trop volumineux une fois décompressé (plus de 2 Go).");
+                if (total > MAX_TOTAL) throw ApiException.badRequest("ZIP trop volumineux une fois décompressé (plus de 50 Go).");
             }
             return out;
         } catch (IOException e) {
@@ -614,13 +618,28 @@ public class KbDispatchService {
         }
     }
 
-    private static byte[] readEntry(ZipFile z, ZipEntryRef ref) throws IOException {
+    /** Empreinte SHA-256 et taille d'un élément du ZIP, lu en flux (aucun fichier entier en mémoire, jusqu'à 2 Go). */
+    private static Object[] hashEntry(ZipFile z, ZipEntryRef ref) throws IOException {
         ZipEntry e = z.getEntry(ref.name);
         if (e == null) throw new IOException("élément introuvable : " + ref.name);
         try (InputStream in = z.getInputStream(e)) {
-            byte[] b = in.readNBytes((int) MAX_FILE + 1);
-            if (b.length > MAX_FILE) throw new IOException("fichier de plus de 20 Mo : " + ref.name);
-            return b;
+            return hash(in);
+        }
+    }
+
+    static Object[] hash(InputStream in) throws IOException {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] buf = new byte[1 << 16];
+            long total = 0;
+            for (int n; (n = in.read(buf)) > 0; ) {
+                md.update(buf, 0, n);
+                total += n;
+                if (total > MAX_FILE) throw new IOException("fichier de plus de 2 Go");
+            }
+            return new Object[]{HexFormat.of().formatHex(md.digest()), total};
+        } catch (java.security.NoSuchAlgorithmException ex) {
+            throw new IllegalStateException(ex);
         }
     }
 
@@ -663,14 +682,6 @@ public class KbDispatchService {
 
     // ── Outils ───────────────────────────────────────────────────────────────────────
 
-    static String sha256(byte[] b) {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(b));
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
     static String mime(String name) {
         String n = name.toLowerCase(Locale.ROOT);
         if (n.endsWith(".pdf")) return "application/pdf";
@@ -699,15 +710,19 @@ public class KbDispatchService {
         return s == null ? null : (s.length() > max ? s.substring(0, max) : s);
     }
 
-    /** Fichier en mémoire transmis au stockage de la base (mêmes contrôles de format et de taille qu'un dépôt manuel). */
-    record BytesFile(String name, byte[] bytes) implements MultipartFile {
+    /** Élément du ZIP transmis au stockage en flux : copié tel quel sur disque, jamais chargé en mémoire. */
+    record ZipEntryFile(String name, ZipFile zip, String entry, long size) implements MultipartFile {
         @Override public String getName() { return "file"; }
         @Override public String getOriginalFilename() { return name; }
         @Override public String getContentType() { return mime(name); }
-        @Override public boolean isEmpty() { return bytes.length == 0; }
-        @Override public long getSize() { return bytes.length; }
-        @Override public byte[] getBytes() { return bytes; }
-        @Override public InputStream getInputStream() { return new ByteArrayInputStream(bytes); }
-        @Override public void transferTo(java.io.File dest) throws IOException { Files.write(dest.toPath(), bytes); }
+        @Override public boolean isEmpty() { return size == 0; }
+        @Override public long getSize() { return size; }
+        @Override public byte[] getBytes() throws IOException { try (InputStream in = getInputStream()) { return in.readAllBytes(); } }
+        @Override public InputStream getInputStream() throws IOException {
+            ZipEntry e = zip.getEntry(entry);
+            if (e == null) throw new IOException("élément introuvable : " + entry);
+            return zip.getInputStream(e);
+        }
+        @Override public void transferTo(java.io.File dest) throws IOException { try (InputStream in = getInputStream()) { Files.copy(in, dest.toPath()); } }
     }
 }

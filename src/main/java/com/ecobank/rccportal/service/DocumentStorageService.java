@@ -18,7 +18,9 @@ public class DocumentStorageService {
     private static final List<String> ALLOWED_EXTENSIONS = List.of(
             "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv", "png", "jpg", "jpeg"
     );
-    private static final long MAX_SIZE_BYTES = 20L * 1024 * 1024; // 20 Mo
+    private static final long MAX_SIZE_BYTES = 2L * 1024 * 1024 * 1024; // 2 Go
+    /** Au-delà, un document n'est plus relu en mémoire pour en extraire le texte (génération d'évaluation). */
+    private static final long MAX_ANALYSE_BYTES = 300L * 1024 * 1024;
 
     @Value("${rcc.uploads.kb-files-dir}")
     private String storageDir;
@@ -29,7 +31,7 @@ public class DocumentStorageService {
             throw ApiException.badRequest("File is required.");
         }
         if (file.getSize() > MAX_SIZE_BYTES) {
-            throw ApiException.badRequest("File too large (max 20 MB).");
+            throw ApiException.badRequest("Fichier trop volumineux (2 Go maximum).");
         }
 
         String original = file.getOriginalFilename();
@@ -63,6 +65,7 @@ public class DocumentStorageService {
         if (storageUrl != null && storageUrl.startsWith("/uploaded-photos/") && uploads != null) {
             // Vidéo téléversée du cours (même dossier que les photos)
             java.nio.file.Path p = uploads.resolve(storageUrl);
+            tooBigToAnalyse(p);
             try {
                 String display = originalName != null && !originalName.isBlank() ? originalName : p.getFileName().toString();
                 return new StoredFile(display, Files.readAllBytes(p));
@@ -70,19 +73,35 @@ public class DocumentStorageService {
                 throw ApiException.serviceUnavailable("Lecture du fichier impossible.");
             }
         }
-        if (storageUrl == null || !storageUrl.startsWith("/kb-files/")) throw ApiException.badRequest("Document inconnu.");
-        String name = storageUrl.substring("/kb-files/".length());
-        if (name.isBlank() || name.contains("/") || name.contains("\\") || name.contains("..")) throw ApiException.badRequest("Document inconnu.");
-        Path path = Path.of(storageDir).resolve(name).normalize();
-        if (!path.startsWith(Path.of(storageDir).normalize()) || !Files.isRegularFile(path)) {
-            throw ApiException.notFound("Le document du cours est introuvable sur le serveur.");
-        }
+        Path path = localPath(storageUrl);
+        String name = path.getFileName().toString();
+        tooBigToAnalyse(path);
         try {
             byte[] bytes = Files.readAllBytes(path);
             String display = originalName != null && !originalName.isBlank() ? originalName : name;
             return new StoredFile(display, bytes);
         } catch (IOException e) {
             throw ApiException.serviceUnavailable("Lecture du document impossible.");
+        }
+    }
+
+    /** Chemin sur disque d'un document stocké (/kb-files/…) — refuse tout chemin hors du dossier de stockage. */
+    public Path localPath(String storageUrl) {
+        if (storageUrl == null || !storageUrl.startsWith("/kb-files/")) throw ApiException.badRequest("Document inconnu.");
+        String name = storageUrl.substring("/kb-files/".length());
+        if (name.isBlank() || name.contains("/") || name.contains("\\") || name.contains("..")) throw ApiException.badRequest("Document inconnu.");
+        Path path = Path.of(storageDir).resolve(name).normalize();
+        if (!path.startsWith(Path.of(storageDir).normalize()) || !Files.isRegularFile(path)) {
+            throw ApiException.notFound("Le document est introuvable sur le serveur.");
+        }
+        return path;
+    }
+
+    private static void tooBigToAnalyse(Path p) {
+        try {
+            if (Files.size(p) > MAX_ANALYSE_BYTES) throw ApiException.badRequest("Document trop volumineux pour être analysé (plus de 300 Mo) : utilisez un PDF plus léger.");
+        } catch (IOException e) {
+            throw ApiException.serviceUnavailable("Lecture du fichier impossible.");
         }
     }
 

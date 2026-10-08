@@ -126,7 +126,7 @@
             '<div class="cs-video-preview" id="csVideoPreview"></div>' +
             '<label class="cs-label mt-3">Document de support</label>' +
             '<label class="cs-drop" id="csDocDrop"><input type="file" hidden id="csDocFile" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg">' +
-            '<i class="bi bi-file-earmark-arrow-up"></i><span><b>Joindre un fichier</b> ou glisser-déposer<br><small>PDF, Word, Excel, PowerPoint… · 20 Mo max</small></span></label>' +
+            '<i class="bi bi-file-earmark-arrow-up"></i><span><b>Joindre un fichier</b> ou glisser-déposer<br><small>PDF, Word, Excel, PowerPoint… · 2 Go max</small></span></label>' +
             '<div id="csDocInfo"></div>' +
             '</section>' +
             // 4 — Paramètres
@@ -250,7 +250,7 @@
             state.videoFile = file; syncVideo(); refresh();
         });
         dropzone(q("#csDocDrop"), q("#csDocFile"), function (file) {
-            if (file.size > 20 * 1024 * 1024) return toast("Document trop lourd (20 Mo max).", true);
+            if (file.size > 2 * 1024 * 1024 * 1024) return toast("Document trop lourd (2 Go max).", true);
             state.docFile = file; syncDoc(); refresh();
         });
         q("#csDocInfo").addEventListener("click", function (e) {
