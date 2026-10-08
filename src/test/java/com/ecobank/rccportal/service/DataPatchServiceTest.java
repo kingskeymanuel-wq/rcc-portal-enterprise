@@ -64,4 +64,29 @@ class DataPatchServiceTest {
         assertEquals("TEAM_LEADER_TCHAT", AdministrationService.serviceForRoleName("Team Leader Réseaux sociaux"));
         assertEquals("TEAM_LEADER_INBOUND_VOICE", AdministrationService.serviceForRoleName("Team Leader Inbound Voice"));
     }
+
+    @Test
+    void digitalTeamFilesMatchTheOctoberSheet() throws Exception {
+        int[] shifts = new int[31];
+        int agents = 0;
+        List<String> all = new java.util.ArrayList<>();
+        for (String[] ch : DataPatchService.DIGITAL_CHANNELS) {
+            byte[] csv;
+            try (var in = new ClassPathResource(ch[0]).getInputStream()) { csv = in.readAllBytes(); }
+            all.addAll(DataPatchService.planningNames(csv));
+            String[] lines = new String(csv, StandardCharsets.UTF_8).split("\\R");
+            assertTrue(lines[1].contains("Thu 01") && lines[1].endsWith("Sat 31"), ch[0]);
+            for (String l : lines) {
+                if (!l.matches("^\\d+,.*")) continue;
+                agents++;
+                String[] c = l.split(",");
+                assertEquals(33, c.length, l);
+                for (int d = 0; d < 31; d++) if (List.of("M", "M2", "M3", "M4", "A", "N").contains(c[d + 2])) shifts[d]++;
+            }
+        }
+        assertEquals(11, agents);
+        assertTrue(all.contains("KONATE Haoua") && all.contains("WANGAH CEDRIC"));
+        int[] expected = {7, 7, 5, 5, 8, 8, 10, 7, 7, 5, 5, 9, 8, 9, 7, 7, 5, 5, 9, 8, 9, 7, 7, 5, 5, 9, 8, 9, 7, 7, 5};
+        assertArrayEquals(expected, shifts, "ligne TOTAL SHIFTS de l'onglet Octobre 2026");
+    }
 }

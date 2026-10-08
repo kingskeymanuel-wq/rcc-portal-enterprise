@@ -55,6 +55,18 @@ public class DataPatchService {
     /** Filiale RCC ETG (Togo, Lomé) : agents rattachés à leur filiale, équipe et accès — sans doublon de compte. */
     public static final String TOGO_RCC_ETG = "TOGO_RCC_ETG";
 
+    /** Team Inbound Digital (Tchat / Rafiki et Réseaux sociaux) : planning d'octobre 2026 et équipe de chaque agent. */
+    public static final String DIGITAL_TCHAT_RS_2026_10 = "DIGITAL_TCHAT_RS_2026_10";
+
+    /**
+     * Les deux canaux de la Team Inbound Digital (fichier « PLANNING EQUIPE DIGITAL », onglet Octobre 2026) :
+     * { fichier, service, activité, équipe, rôle }. Activité « Tchat » du fichier → Rafiki (« (RAF) » dans l'onglet de
+     * septembre), « Réseaux Sociaux » → Réseaux sociaux ; un agent mixte (« Tchat - RS le week-end ») suit son canal principal.
+     */
+    static final List<String[]> DIGITAL_CHANNELS = List.of(
+            new String[]{"data/planning/rafiki-2026-10.csv", "AGENT_RAFIKI", "INBOUND RAFIKI", "RAFIKI", "Agent Rafiki"},
+            new String[]{"data/planning/reseaux-sociaux-2026-10.csv", "AGENT_TCHAT", "INBOUND TCHAT", "TCHAT", "Agent Réseaux sociaux"});
+
     /** Équipe RCC ETG (Lomé) : { nom, identifiant, statut du contrat, accès, équipe }. */
     static final List<String[]> TOGO_TEAM = List.of(
             new String[]{"AGBOKOU Nutekpo Yao", "NAGBOKOU", "STAFF", "QA", null},
@@ -88,6 +100,10 @@ public class DataPatchService {
                     "Les 9 collaborateurs de Lomé sont rattachés à la filiale RCC ETG (Togo), contrat Ecobank : 7 agents Inbound Voix, "
                             + "1 agent Réseaux sociaux (LASSEY), 1 QA (AGBOKOU) et FAHE Talitha Team Leader Inbound Voix de RCC ETG. "
                             + "Un compte déjà en base (même identifiant ou même nom) est réorganisé, jamais dupliqué ; seuls les absents sont créés."),
+            new Patch(DIGITAL_TCHAT_RS_2026_10, "Team Inbound Digital — planning d'octobre 2026 (Rafiki et Réseaux sociaux)",
+                    "Planning d'octobre 2026 des 11 agents de la Team Inbound Digital Chat & Social Media : 6 agents Rafiki (activité « Tchat » "
+                            + "du fichier) et 5 agents Réseaux sociaux (dont KONATE Haoua, en congé tout le mois). Chacun reçoit le rôle, le service, "
+                            + "l'équipe et le portail de son canal, sans aucun accès Team Leader ; filiale RCC ECI."),
             new Patch(CAMPAGNES_OUTBOUND, "Campagnes Outbound Digital et Télévente",
                     "Crée deux campagnes actives avec leur parcours interactif : « Ecobank Mobile — Digitalisation » pour l'équipe Digitalisation "
                             + "(activation accompagnée et pas à pas de chaque fonctionnalité) et « Télévente — Prêts, comptes et produits digitaux » pour la Télévente "
@@ -156,6 +172,7 @@ public class DataPatchService {
             case AGENT_ROLES_SERVICES_SYNC -> administrationService.addMissingAgentPairs() + " rôle(s) ou service(s) d'agent ajouté(s) pour aligner rôles et services.";
             case INBOUND_MAIL_LEADERSHIP -> inboundMailLeadership();
             case TOGO_RCC_ETG -> togoTeam();
+            case DIGITAL_TCHAT_RS_2026_10 -> digitalTeam(by);
             case CAMPAGNES_OUTBOUND -> outboundCampaigns();
             default -> throw com.ecobank.rccportal.util.ApiException.notFound("Correctif inconnu : " + code);
         };
@@ -340,6 +357,29 @@ public class DataPatchService {
                     .append(u.getName()).append(" (").append(u.getUsername()).append(")\n");
         }
         out.append("• Team Leader Réseaux sociaux : aucun nom fourni — à désigner dans l'organigramme (Accès → Team Leader · Réseaux sociaux).\n");
+        return out.toString().trim();
+    }
+
+    // ───────────── Team Inbound Digital (Rafiki + Réseaux sociaux) — octobre 2026 ─────────────
+
+    String digitalTeam(String by) {
+        StringBuilder out = new StringBuilder();
+        for (String[] ch : DIGITAL_CHANNELS) {
+            byte[] csv = readResource(ch[0]);
+            String file = ch[0].substring(ch[0].lastIndexOf('/') + 1);
+            ScheduleImportResult r = scheduleService.importFromExcel(new BytesFile(file, csv), ch[1], "CI", ch[2], YearMonth.of(2026, 10), by);
+            out.append(ch[4].replace("Agent ", "")).append(" — planning octobre 2026 : ").append(r.rowsProcessed()).append(" agent(s), ")
+                    .append(r.entriesCreated()).append(" jour(s) enregistré(s), ").append(r.usersAutoCreated()).append(" compte(s) créé(s) faute de compte existant.\n");
+            List<String> notFound = new ArrayList<>();
+            for (String name : planningNames(csv)) {
+                Optional<User> u = scheduleService.findUserByPlanningName(name);
+                if (u.isEmpty()) { notFound.add(name); continue; }
+                List<String> changes = administrationService.alignAgent(u.get().getId(), ch[3], ch[4], "CI");
+                out.append("• ").append(u.get().getName()).append(" (").append(u.get().getUsername()).append(") : ")
+                        .append(changes.isEmpty() ? "déjà conforme" : String.join(", ", changes)).append('\n');
+            }
+            if (!notFound.isEmpty()) out.append("⚠ Compte introuvable ou ambigu (à rattacher à la main) : ").append(String.join(", ", notFound)).append('\n');
+        }
         return out.toString().trim();
     }
 
