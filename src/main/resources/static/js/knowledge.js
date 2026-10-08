@@ -724,6 +724,7 @@
     }
 
     function init() {
+        if ($("kbDispatchBtn")) $("kbDispatchBtn").addEventListener("click", function () { window.RccKbDispatch.open(); });
         wireArticleForm();
         wireImportArticleForm();
         wireCategoryForm();
@@ -740,6 +741,7 @@
             $("newArticleBtn").style.display = isQaOrAdmin() ? "" : "none";
             $("newImportArticleBtn").style.display = isQaOrAdmin() ? "" : "none";
             $("newCategoryBtn").style.display = isQaOrAdmin() ? "" : "none";
+            $("kbDispatchBtn").style.display = isQaOrAdmin() && window.RccKbDispatch ? "" : "none";
             renderTeamTabBar();
 
             var params = new URLSearchParams(window.location.search);

@@ -437,6 +437,11 @@ public class KnowledgeService {
                 .build());
     }
 
+    /** Avis aux agents après un dispatching de la bibliothèque (même ciblage filiale / service qu'un nouvel article). */
+    public void notifyDispatch(KnowledgeArticle container, String content) {
+        notifyArticle(content, container);
+    }
+
     @Transactional
     public void removeArticle(Integer id) {
         if (!articleRepository.existsById(id)) throw ApiException.notFound("Article not found.");

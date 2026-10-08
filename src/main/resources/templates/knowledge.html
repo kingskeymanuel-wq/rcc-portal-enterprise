@@ -96,6 +96,9 @@
                     <button class="btn btn-outline-secondary btn-sm" id="newCategoryBtn" style="display:none;">
                         <i class="bi bi-folder-plus"></i> Nouvelle catégorie
                     </button>
+                    <button class="btn btn-outline-success btn-sm" id="kbDispatchBtn" style="display:none;">
+                        <i class="bi bi-diagram-3"></i> Dispatching (ZIP)
+                    </button>
                 </div>
 
                 <!-- Création de catégorie (QA/Admin) -->
@@ -519,6 +522,7 @@
         });
     })();
 </script>
+<script th:src="@{/js/kb-dispatch.js}"></script>
 <script th:src="@{/js/knowledge.js}"></script>
 </body>
 </html>
