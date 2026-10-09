@@ -117,6 +117,8 @@ function hideLoader() {
 
 function showError(message) {
 
+  errorBox.style.background = "";
+  errorBox.style.color = "";
   errorBox.textContent = message;
 
   errorBox.classList.add("show");
@@ -662,6 +664,20 @@ function escapeHtmlLogin(s) {
     return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
   });
 }
+
+/* ==========================================================
+   FIN DE SHIFT — déconnexion automatique (fin prévue + débordement)
+========================================================== */
+
+(function () {
+  if (!/(?:^|;\s*)rcc_session_end=shift/.test(document.cookie)) return;
+  document.cookie = "rcc_session_end=; Max-Age=0; path=/";
+  errorBox.textContent = "Votre shift est terminé : vous avez été déconnecté automatiquement. "
+      + "Votre prochain shift démarrera à votre connexion, selon votre planning.";
+  errorBox.style.background = "#E8F0FE";
+  errorBox.style.color = "#0B3D91";
+  errorBox.classList.add("show");
+})();
 
 /* ==========================================================
    DEBUG

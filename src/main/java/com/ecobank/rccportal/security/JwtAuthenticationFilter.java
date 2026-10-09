@@ -51,8 +51,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.ecobank.rccportal.service.AdminChangeJournal adminChangeJournal;
 
+    /** Fin de shift : la session d'un agent dont le shift est terminé est fermée (voir shiftEndedSince). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.ecobank.rccportal.service.ShiftService shiftService;
+
+    /** Cookie lisible par la page de connexion : « votre shift est terminé, vous avez été déconnecté ». */
+    public static final String SESSION_END_COOKIE = "rcc_session_end";
+
     public JwtAuthenticationFilter(JwtService jwtService) {
         this.jwtService = jwtService;
+    }
+
+    /** Session ouverte avant la fin du dernier shift de l'agent (fin de shift ou clôture automatique) ? */
+    private boolean shiftEndedSince(Claims claims, String username) {
+        if (shiftService == null || claims.getIssuedAt() == null) return false;
+        java.time.LocalDateTime end = shiftService.shiftEndedAt(username);
+        if (end == null) return false;
+        java.time.Instant endAt = end.atZone(java.time.ZoneId.systemDefault()).toInstant().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        return claims.getIssuedAt().toInstant().isBefore(endAt);
     }
 
     @Override
@@ -107,6 +124,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String name =
                         claims.get("name", String.class);
 
+                boolean shiftEnded = false;
                 if (username != null && !username.isBlank() && accessResolver != null) {
                     try {
                         AccessResolver.Access live = accessResolver.resolve(username);
@@ -120,11 +138,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             role = live.role() != null ? live.role() : role;
                             service = live.service();
                             request.setAttribute(LIVE_COUNTRY, live.country());
+                            if ("AGENT".equalsIgnoreCase(role) && shiftEndedSince(claims, username)) {
+                                // Shift terminé (« Fin de shift », ou clôture automatique à la fin prévue + débordement) :
+                                // l'agent est déconnecté ; son prochain shift commence quand il clique sur « Se connecter »,
+                                // selon son planning (voir ShiftService.recordLogin).
+                                SecurityContextHolder.clearContext();
+                                SessionCookies.clear(response);
+                                jakarta.servlet.http.Cookie end = new jakarta.servlet.http.Cookie(SESSION_END_COOKIE, "shift");
+                                end.setPath("/");
+                                end.setMaxAge(15 * 60);
+                                response.addCookie(end);
+                                shiftEnded = true;
+                            }
                         }
                     } catch (RuntimeException dbUnavailable) {
                         // base indisponible : on garde le rôle du jeton
                     }
                 }
+                if (shiftEnded) throw new IllegalArgumentException("shift ended"); // requête non authentifiée
 
                 if (username != null && !username.isBlank() && renew) {
                     // Session glissante : chaque activité (y compris le maintien automatique de la page) prolonge

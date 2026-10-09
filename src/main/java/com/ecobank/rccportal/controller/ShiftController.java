@@ -44,6 +44,7 @@ public class ShiftController {
 
     @GetMapping("/me")
     public ShiftStatusResponse myStatus(@AuthenticationPrincipal AuthenticatedUser requester) {
+        shiftService.openPlannedShiftIfDue(requester.username()); // shift suivant du planning, agent déjà connecté
         return shiftService.getStatus(requester.username());
     }
 
