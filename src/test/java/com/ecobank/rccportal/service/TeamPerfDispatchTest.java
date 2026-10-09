@@ -35,7 +35,7 @@ class TeamPerfDispatchTest {
                 // équipe absente du fichier
             }
         }
-        return TeamPerfFileService.assignTeam(byTeam, portalTeam);
+        return TeamPerfFileService.assignTeam(byTeam, null, portalTeam);
     }
 
     @Test
@@ -53,6 +53,59 @@ class TeamPerfDispatchTest {
             assertNull(dispatch(wb, "KONATE SOUMAILA", null)[0], "sans compte : à rattacher");
             assertEquals("OUTBOUND", dispatch(wb, "KONATE SOUMAILA", "OUTBOUND")[0]);
         }
+    }
+
+    /** Équipe indiquée dans le fichier (colonne ou titre de section), lue comme le fait le dispatching. */
+    private static String fileTeam(Workbook wb, String agent) {
+        for (TeamPerfFileService.TeamDef t : TeamPerfFileService.CATALOG.values()) {
+            try {
+                String h = TeamPerfFileService.parse(wb, t, LocalDate.of(2026, 10, 9)).hints().get(TeamPerfFileService.nameKey(agent));
+                if (h != null) return TeamPerfFileService.teamInText(h);
+            } catch (RuntimeException noColumns) {
+                // équipe absente du fichier
+            }
+        }
+        return null;
+    }
+
+    @Test
+    void teamWrittenInTheFileWinsEvenWithoutIndicators() throws Exception {
+        try (Workbook wb = new XSSFWorkbook()) {
+            Sheet s = wb.createSheet("RCC");
+            row(s, 0, "PERFORMANCES AGENTS RCC du 21 - 27 Septembre 2026");
+            row(s, 1, "Agent", "Jours travaillés", "Appels sortants", "Target", "Productivité");
+            row(s, 2, "TEAM INBOUND DIGITAL MAIL / CIS");
+            row(s, 3, "DIAMBRA Sopie Audrey", 5, 0, 30, 1.0);
+            row(s, 4, "TEAM OUTBOUND");
+            row(s, 5, "KONATE SOUMAILA", 5, 206, 40, 1.03);
+            assertEquals("INBOUND_MAIL", fileTeam(wb, "DIAMBRA Sopie Audrey"), "titre de section");
+            assertEquals("OUTBOUND", fileTeam(wb, "KONATE SOUMAILA"));
+            assertEquals("INBOUND_MAIL", dispatchWithFileTeam(wb, "DIAMBRA Sopie Audrey")[0], "aucun indicateur propre : l'équipe du fichier suffit");
+        }
+        try (Workbook wb = new XSSFWorkbook()) {
+            Sheet s = wb.createSheet("RCC");
+            row(s, 0, "Agent", "Équipe", "Jours travaillés", "Target", "Productivité");
+            row(s, 1, "KA Djeneba", "Mail", 5, 30, 0.9);
+            row(s, 2, "ABODOU ROSELINE", "Inbound Voix", 5, 80, 1.1);
+            assertEquals("INBOUND_MAIL", fileTeam(wb, "KA Djeneba"), "colonne Équipe");
+            assertEquals("INBOUND_VOICE", fileTeam(wb, "ABODOU ROSELINE"));
+        }
+        assertNull(TeamPerfFileService.teamInText("PERFORMANCES AGENTS INBOUND MAIL ET OUTBOUND"), "titre de plusieurs équipes : rien d'imposé");
+        assertEquals("INBOUND_MAIL", TeamPerfFileService.teamInText("TEAM INBOUND DIGITAL MAIL"));
+    }
+
+    private static String[] dispatchWithFileTeam(Workbook wb, String agent) {
+        Map<String, TeamPerfFileService.AgentLine> byTeam = new LinkedHashMap<>();
+        for (TeamPerfFileService.TeamDef t : TeamPerfFileService.CATALOG.values()) {
+            try {
+                for (TeamPerfFileService.AgentLine l : TeamPerfFileService.parse(wb, t, LocalDate.of(2026, 10, 9)).lines()) {
+                    if (l.agentName().equals(agent)) byTeam.put(t.code(), l);
+                }
+            } catch (RuntimeException noColumns) {
+                // équipe absente du fichier
+            }
+        }
+        return TeamPerfFileService.assignTeam(byTeam, fileTeam(wb, agent), null);
     }
 
     @Test

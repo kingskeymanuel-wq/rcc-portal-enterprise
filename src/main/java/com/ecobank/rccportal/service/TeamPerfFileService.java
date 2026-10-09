@@ -344,10 +344,12 @@ public class TeamPerfFileService {
     }
 
     /**
-     * Équipe d'une ligne du fichier consolidé : celle dont la ligne remplit le plus d'indicateurs propres ; à égalité ou
-     * sans indicateur propre, l'équipe du compte de l'agent dans le portail. {équipe ou null, explication}.
+     * Équipe d'une ligne du fichier consolidé : l'équipe (ou le Team Leader) indiquée dans le fichier ; sinon celle dont la
+     * ligne remplit le plus d'indicateurs propres ; à égalité ou sans indicateur propre, l'équipe du compte de l'agent dans
+     * le portail. {équipe ou null, explication}.
      */
-    static String[] assignTeam(Map<String, AgentLine> byTeam, String portalTeam) {
+    static String[] assignTeam(Map<String, AgentLine> byTeam, String fileTeam, String portalTeam) {
+        if (fileTeam != null && byTeam.containsKey(fileTeam)) return new String[]{fileTeam, null}; // équipe / Team Leader indiqué dans le fichier
         int best = 0;
         List<String> winners = new ArrayList<>();
         for (Map.Entry<String, AgentLine> e : byTeam.entrySet()) {
@@ -364,17 +366,70 @@ public class TeamPerfFileService {
                 + ") : agent à rattacher à son équipe dans le portail"};
     }
 
+    /** Équipe (fichier) citée dans un texte : « Inbound Digital Mail », « Chat », « Rafiki », « Voix », « Outbound », « CIB »… */
+    static String teamInText(String text) {
+        if (text == null) return null;
+        String a = " " + code(text).replace('_', ' ') + " ";
+        Set<String> found = new LinkedHashSet<>();
+        if (a.contains("RAFIKI")) found.add("RAFIKI");
+        if (a.contains("CHAT") || a.contains("RESEAU") || a.contains(" RS ")) found.add("TCHAT");
+        if (a.contains("MAIL") || a.contains(" CIS ")) found.add("INBOUND_MAIL");
+        if (a.contains(" CIB ")) found.add("CIB");
+        if (a.contains("OUTBOUND") || a.contains("TELEVENTE") || a.contains("TELEVENDEUR") || a.contains("DIGITALISATION")) found.add("OUTBOUND");
+        if (a.contains("VOIX") || a.contains("VOICE")) found.add("INBOUND_VOICE");
+        if (found.size() == 1) return found.iterator().next();
+        if (!found.isEmpty()) return null; // plusieurs équipes citées (titre d'un fichier consolidé) : rien d'imposé
+        if (a.contains("INBOUND")) return "INBOUND_VOICE";
+        if (a.contains("DIGITAL")) return "OUTBOUND";
+        return null;
+    }
+
+    /** Équipe d'une mention du fichier : nom d'équipe, sinon nom d'un Team Leader (son équipe menée). */
+    String teamOfHint(String hint, List<User> leaders) {
+        String t = teamInText(hint);
+        if (t != null || hint == null) return t;
+        Set<String> words = tokens(hint);
+        for (User l : leaders) {
+            Set<String> lt = tokens(l.getName());
+            Set<String> common = new HashSet<>(lt);
+            common.retainAll(words);
+            if (!lt.isEmpty() && (common.size() >= 2 || (common.size() == 1 && lt.size() == 1))) {
+                Set<String> files = fileTeamsFor(l.getLedTeam());
+                if (files.contains("INBOUND_MAIL")) return "INBOUND_MAIL";
+                if (!files.isEmpty()) return files.iterator().next();
+            }
+        }
+        return null;
+    }
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.ecobank.rccportal.repository.UserServiceAssignmentRepository serviceAssignments;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.ecobank.rccportal.repository.UserRoleRepository userRoles;
 
     /** Fichier d'équipe correspondant à l'équipe du compte (Télévente, Digitalisation : fichier Outbound). */
     private String portalFileTeam(Long userId) {
         if (userId == null) return null;
         User u = users.findById(userId).orElse(null);
         if (u == null) return null;
-        List<String> codes = serviceAssignments == null ? List.of() : serviceAssignments.findByUserId(userId).stream()
-                .filter(a -> a.getService() != null && a.getService().getCode() != null).map(a -> a.getService().getCode()).toList();
-        String code = TeamLeaderService.teamCodeOf(u.getActivity(), codes);
+        List<String> codes = new ArrayList<>(serviceAssignments == null ? List.of() : serviceAssignments.findByUserId(userId).stream()
+                .filter(a -> a.getService() != null && a.getService().getCode() != null).map(a -> a.getService().getCode().toUpperCase(Locale.ROOT)).toList());
+        String hrTeam = null;
+        try {
+            hrTeam = jdbc.query("SELECT HrTeam FROM dbo.HrAssignments WHERE UserId = ?", rs -> rs.next() ? rs.getString(1) : null, userId);
+        } catch (RuntimeException ignored) {
+            // pas de placement RH
+        }
+        String code = MonRccSpaceService.teamOf(u.getActivity(), codes, hrTeam);
+        if (code == null && userRoles != null) { // rôle d'agent (« Agent Inbound Mail », « Agent Réseaux sociaux »…)
+            for (var ur : userRoles.findByUser_Id(userId)) {
+                String n = ur.getRole() == null ? null : ur.getRole().getName();
+                if (n == null || !n.toUpperCase(Locale.ROOT).startsWith("AGENT")) continue;
+                code = teamInText(n);
+                if (code != null) break;
+            }
+        }
         if (code == null) return null;
         if (CATALOG.containsKey(code)) return code;
         TeamClassifier.Team team = TeamClassifier.teamOf(code);
@@ -410,12 +465,21 @@ public class TeamPerfFileService {
         });
         Map<String, List<AgentLine>> assigned = new LinkedHashMap<>();
         List<AgentLine> unassigned = new ArrayList<>();
-        for (Map<String, AgentLine> lines : byAgent.values()) {
+        List<User> leaders = users.findAll().stream().filter(u -> u.getLedTeam() != null && !u.getLedTeam().isBlank() && u.getName() != null).toList();
+        for (Map.Entry<String, Map<String, AgentLine>> agent : byAgent.entrySet()) {
+            Map<String, AgentLine> lines = agent.getValue();
             AgentLine any = lines.values().iterator().next();
-            String[] a = assignTeam(lines, portalFileTeam(any.userId()));
+            String hint = parsed.values().stream().map(p -> p.hints().get(agent.getKey())).filter(Objects::nonNull).findFirst().orElse(null);
+            String[] a = assignTeam(lines, teamOfHint(hint, leaders), portalFileTeam(any.userId()));
             if (a[0] == null) {
                 List<String> notes = new ArrayList<>(any.notes());
-                notes.add(0, a[1]);
+                String why = a[1];
+                if (why.startsWith("Aucun indicateur")) {
+                    why = any.userId() == null
+                            ? "Aucune équipe indiquée dans le fichier et nom introuvable dans le portail (orthographe différente ?)"
+                            : "Aucune équipe indiquée dans le fichier et compte « " + any.username() + " » sans équipe dans le portail";
+                }
+                notes.add(0, why);
                 unassigned.add(new AgentLine(any.agentName(), any.userId(), any.username(), any.portalName(), any.values(), any.level(), notes));
                 continue;
             }
@@ -481,8 +545,13 @@ public class TeamPerfFileService {
         }
     }
 
+    /** hints : par agent (clé nameKey), l'équipe ou le Team Leader indiqué dans le fichier (colonne, ou titre de section). */
     record Parsed(List<AgentLine> lines, Map<String, String> recognized, List<String> ignored, List<String> missing,
-                  LocalDate from, LocalDate to, String periodText) {}
+                  LocalDate from, LocalDate to, String periodText, Map<String, String> hints) {}
+
+    /** En-têtes d'une colonne donnant l'équipe ou le Team Leader de chaque agent. */
+    private static final Set<String> TEAM_HEADERS = Set.of("EQUIPE", "EQUIPES", "TEAM", "SERVICE", "POLE", "CANAL", "ACTIVITE", "DEPARTEMENT",
+            "TEAM_LEADER", "TL", "SUPERVISEUR", "MANAGER", "RESPONSABLE", "CHEF_D_EQUIPE", "CHEF_EQUIPE", "NOM_TL", "NOM_DU_TL");
 
     /** Lecture du classeur : ligne d'en-tête, colonne des noms, valeurs, indicateurs calculés, période. */
     static Parsed parse(Workbook wb, TeamDef t, LocalDate today) {
@@ -527,9 +596,24 @@ public class TeamPerfFileService {
         best.forEach((col, fld) -> recognized.put(header.get(col), fld.label()));
 
         int nameCol = findNameColumn(grid, headerRow, best.keySet());
+        int teamCol = -1;
+        for (int col = 0; col < header.size(); col++) {
+            String code = code(header.get(col));
+            if (col != nameCol && !best.containsKey(col) && (TEAM_HEADERS.contains(code) || code.startsWith("TEAM_LEADER") || code.startsWith("EQUIPE"))) {
+                teamCol = col;
+                break;
+            }
+        }
+        // Titre au-dessus du tableau (« TEAM INBOUND DIGITAL MAIL — TL : LOUM Olivia »), puis titres de section dans le tableau.
+        String section = null;
+        for (int r = headerRow - 1; r >= Math.max(0, headerRow - 4) && section == null; r--) {
+            String txt = String.join(" ", grid.get(r)).trim();
+            if (!txt.isBlank()) section = txt;
+        }
+        Map<String, String> hints = new HashMap<>();
         List<String> ignored = new ArrayList<>();
         for (int col = 0; col < header.size(); col++) {
-            if (col != nameCol && !best.containsKey(col) && !header.get(col).isBlank()) ignored.add(header.get(col));
+            if (col != nameCol && col != teamCol && !best.containsKey(col) && !header.get(col).isBlank()) ignored.add(header.get(col));
         }
 
         // Pourcentages écrits en fraction (1,75 au lieu de 175 %) : détectés colonne par colonne.
@@ -556,6 +640,9 @@ public class TeamPerfFileService {
             boolean empty = row.stream().allMatch(String::isBlank);
             if (empty) { if (++blanks >= 2 && !lines.isEmpty()) break; continue; }
             blanks = 0;
+            boolean label = row.stream().noneMatch(c -> !c.isBlank() && number(c) != null)
+                    && row.stream().filter(c -> !c.isBlank()).count() <= 3;
+            if (label && !isTotal(String.join(" ", row))) { section = String.join(" ", row).trim(); continue; } // titre de section
             if (name.isBlank() || isTotal(name) || number(name) != null) continue;
             if (mapColumns(row, t).size() >= 2) break; // un autre tableau commence
             Map<String, Object> values = new LinkedHashMap<>();
@@ -573,6 +660,9 @@ public class TeamPerfFileService {
             if (values.values().stream().noneMatch(v -> v instanceof Double)) continue;
             complete(t, values, notes);
             lines.add(new AgentLine(name, null, null, null, values, level(values), notes));
+            String hint = teamCol >= 0 ? cell(row, teamCol) : "";
+            if (hint.isBlank()) hint = section;
+            if (hint != null && !hint.isBlank()) hints.put(nameKey(name), hint);
         }
 
         Collection<Field> found = best.values();
@@ -584,7 +674,7 @@ public class TeamPerfFileService {
         String allText = String.join(" ", grid.stream().limit(Math.max(headerRow, 1) + 1L).flatMap(List::stream).toList());
         LocalDate[] period = detectPeriod(allText, today);
         return new Parsed(lines, recognized, ignored, missing, period == null ? null : period[0], period == null ? null : period[1],
-                period == null ? null : period[0] + " → " + period[1]);
+                period == null ? null : period[0] + " → " + period[1], hints);
     }
 
     /**
