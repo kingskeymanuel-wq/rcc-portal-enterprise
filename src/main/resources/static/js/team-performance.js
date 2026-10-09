@@ -43,7 +43,9 @@ window.RccTeamPerf = (function () {
                 p.columns.map(function (c) { return '<th class="text-end" title="' + esc(c.hint || "") + '">' + esc(c.label) + '</th>'; }).join("") +
                 '<th class="text-end">Performance globale</th></tr></thead><tbody>' +
                 p.rows.map(function (r) {
-                    return '<tr' + (opts.onRowClick ? ' role="button" data-tp-user="' + esc(r.username) + '"' : "") + '><td><b>' + esc(r.name) + '</b>' + (opts.decorateName ? opts.decorateName(r) : "") + '</td>' +
+                    var fileOnly = !r.username; // agent du fichier de performance sans compte portail
+                    return '<tr' + (opts.onRowClick && !fileOnly ? ' role="button" data-tp-user="' + esc(r.username) + '"' : "") + '><td><b>' + esc(r.name) + '</b>' +
+                        (fileOnly ? ' <small class="text-muted" title="Nom du fichier de performance, sans compte dans le portail">(fichier)</small>' : (opts.decorateName ? opts.decorateName(r) : "")) + '</td>' +
                         p.columns.map(function (c) {
                             var v = r.values[c.key];
                             var cls = v !== null && v !== undefined && v === best[c.key] ? " tp-good" : (v !== null && v !== undefined && v === worst[c.key] ? " tp-bad" : "");

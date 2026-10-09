@@ -192,13 +192,20 @@ public class TeamPerformanceService {
         Map<Long, List<String>> services = serviceCodes();
         final TeamClassifier.Team target = team;
         final String ch = channel;
-        List<PerformanceResponse> base = reporting.teamSummary(start, end, label, countryCode).stream()
-                .filter(r -> TeamClassifier.classify(r.activity(), services.getOrDefault(r.userId(), List.of())) == target)
-                .filter(r -> ch == null || ch.equals(TeamClassifier.channel(r.activity(), services.getOrDefault(r.userId(), List.of()))))
-                .toList();
-        Sources src = sources(start, end);
-        String sheetTeam = channel != null && CHANNEL_PROFILES.containsKey(channel) ? channel : team.name();
-        src = perfFiles == null ? src : src.withSheet(perfFiles.aggregate(sheetTeam, start, end));
+        // Fichiers de performance de l'équipe (import ou dispatching) : un agent qui y figure fait partie de la vue,
+        // même si son compte n'est pas (encore) rangé dans cette équipe.
+        String country = com.ecobank.rccportal.util.Filiale.orCurrent(countryCode);
+        TeamPerfFileService.Aggregate sheet = perfFiles == null ? new TeamPerfFileService.Aggregate(Map.of(), Map.of())
+                : TeamPerfFileService.Aggregate.merge(TeamPerfFileService.fileTeamsForView(team.name(), channel).stream()
+                        .map(code -> perfFiles.aggregate(code, start, end, country)).toList());
+        List<PerformanceResponse> base = new ArrayList<>(reporting.teamSummary(start, end, label, countryCode).stream()
+                .filter(r -> sheet.byUser().containsKey(r.userId())
+                        || TeamClassifier.classify(r.activity(), services.getOrDefault(r.userId(), List.of())) == target
+                        && (ch == null || ch.equals(TeamClassifier.channel(r.activity(), services.getOrDefault(r.userId(), List.of())))))
+                .toList());
+        // Lignes du fichier sans compte portail : affichées sous le nom du fichier.
+        sheet.names().forEach((key, name) -> base.add(new PerformanceResponse(null, name, label, 0, null, Map.of(), 0, null, null, null, null, null)));
+        Sources src = sources(start, end).withSheet(sheet);
         return channel != null
                 ? build(CHANNEL_PROFILES.getOrDefault(channel, PROFILES.get(team)), channel, CHANNEL_LABELS.get(channel),
                         team == TeamClassifier.Team.OUTBOUND, label, base, src)
@@ -282,8 +289,9 @@ public class TeamPerformanceService {
                 if (v == null) v = fromKpis(kpis, d.aliases());
                 values.put(d.column().key(), v);
             }
+            boolean fileOnly = r.userId() == null && r.username() == null; // agent du fichier sans compte portail
             rows.add(new Row(r.userId(), r.username(), r.userFullName() != null ? r.userFullName() : r.username(), r.affiliateBranch(),
-                    values, r.presenceRate(), r.performanceGlobale()));
+                    values, fileOnly ? null : r.presenceRate(), r.performanceGlobale()));
         }
         rows.sort(Comparator.comparing(Row::name, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
 

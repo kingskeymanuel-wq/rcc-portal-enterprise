@@ -46,8 +46,10 @@ public class TeamPerfFileService {
     public record Period(LocalDate from, LocalDate to, int agents, String batchId) {}
 
     /** Dispatching : part d'un fichier consolidé revenant à une équipe. */
+    /** allowed : l'utilisateur peut enregistrer cette équipe (un Team Leader : seulement la sienne ; les autres restent à la QA). */
     public record DispatchTeam(String team, String teamLabel, List<Field> fields, Map<String, String> recognizedColumns, List<String> missingFields,
-                               List<AgentLine> lines, int matched, int unmatched, String batchId, int replaced) {}
+                               List<AgentLine> lines, int matched, int unmatched, String batchId, int replaced, boolean allowed,
+                               List<String> placed) {}
 
     public record DispatchReport(LocalDate from, LocalDate to, boolean periodDetected, String detectedPeriod, List<DispatchTeam> teams,
                                  List<AgentLine> unassigned, boolean saved) {}
@@ -61,7 +63,24 @@ public class TeamPerfFileService {
     public record MyPerformance(String team, String teamLabel, List<Field> fields, List<MyWeek> weeks) {}
 
     /** Cumul d'une période (mois) par agent — pour le reporting d'équipe (TeamPerformanceService). */
-    public record Aggregate(Map<Long, Map<String, Double>> byUser, Map<String, Map<String, Double>> byName) {
+    public record Aggregate(Map<Long, Map<String, Double>> byUser, Map<String, Map<String, Double>> byName, Map<String, String> names) {
+        public Aggregate(Map<Long, Map<String, Double>> byUser, Map<String, Map<String, Double>> byName) {
+            this(byUser, byName, Map.of());
+        }
+
+        /** Plusieurs fichiers d'équipe réunis (ex. : Inbound Mail + Réseaux sociaux + Rafiki) ; le premier l'emporte pour un même agent. */
+        public static Aggregate merge(List<Aggregate> parts) {
+            Map<Long, Map<String, Double>> u = new HashMap<>();
+            Map<String, Map<String, Double>> n = new HashMap<>();
+            Map<String, String> names = new HashMap<>();
+            for (Aggregate a : parts) {
+                a.byUser().forEach(u::putIfAbsent);
+                a.byName().forEach(n::putIfAbsent);
+                a.names().forEach(names::putIfAbsent);
+            }
+            return new Aggregate(u, n, names);
+        }
+
         public Map<String, Double> find(Long userId, String name) {
             Map<String, Double> v = userId == null ? null : byUser.get(userId);
             return v != null ? v : byName.get(nameKey(name));
@@ -408,6 +427,23 @@ public class TeamPerfFileService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.ecobank.rccportal.repository.UserRoleRepository userRoles;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private AdministrationService administration;
+
+    /** Compte d'agent (aucun rôle d'encadrement ni équipe menée) : seul ce compte peut être rangé par le dispatching. */
+    private boolean plainAgent(Long userId) {
+        User u = users.findById(userId).orElse(null);
+        if (u == null || u.getLedTeam() != null && !u.getLedTeam().isBlank()) return false;
+        if (userRoles == null) return true;
+        for (var ur : userRoles.findByUser_Id(userId)) {
+            String n = ur.getRole() == null ? null : ur.getRole().getName();
+            String base = n == null ? null : com.ecobank.rccportal.security.AccessResolver.roleOfName(n);
+            if (base != null && !"AGENT".equals(base)) return false;
+        }
+        return true;
+    }
+
     /** Fichier d'équipe correspondant à l'équipe du compte (Télévente, Digitalisation : fichier Outbound). */
     private String portalFileTeam(Long userId) {
         if (userId == null) return null;
@@ -442,8 +478,12 @@ public class TeamPerfFileService {
      */
     @Transactional
     public DispatchReport dispatch(AuthenticatedUser requester, MultipartFile file, String from, String to, String countryCode, boolean dryRun) {
-        List<TeamDef> teams = CATALOG.values().stream().filter(t -> canImportTeam(requester, t.code())).toList();
-        if (teams.isEmpty()) throw ApiException.forbidden("Dispatching réservé à la QA, au Superviseur et aux Team Leaders.");
+        // Répartition sur toutes les équipes (un agent n'est jamais envoyé à tort dans l'équipe de celui qui importe) ;
+        // seules les équipes que l'utilisateur gère sont enregistrées.
+        List<TeamDef> teams = List.copyOf(CATALOG.values());
+        if (teams.stream().noneMatch(t -> canImportTeam(requester, t.code()))) {
+            throw ApiException.forbidden("Dispatching réservé à la QA, au Superviseur et aux Team Leaders.");
+        }
         Map<String, Parsed> parsed = new LinkedHashMap<>();
         try (Workbook wb = readWorkbook(file)) {
             for (TeamDef t : teams) {
@@ -466,11 +506,13 @@ public class TeamPerfFileService {
         Map<String, List<AgentLine>> assigned = new LinkedHashMap<>();
         List<AgentLine> unassigned = new ArrayList<>();
         List<User> leaders = users.findAll().stream().filter(u -> u.getLedTeam() != null && !u.getLedTeam().isBlank() && u.getName() != null).toList();
+        Set<Long> toPlace = new HashSet<>(); // comptes sans équipe : rangés dans l'équipe du dispatching à l'enregistrement
         for (Map.Entry<String, Map<String, AgentLine>> agent : byAgent.entrySet()) {
             Map<String, AgentLine> lines = agent.getValue();
             AgentLine any = lines.values().iterator().next();
             String hint = parsed.values().stream().map(p -> p.hints().get(agent.getKey())).filter(Objects::nonNull).findFirst().orElse(null);
-            String[] a = assignTeam(lines, teamOfHint(hint, leaders), portalFileTeam(any.userId()));
+            String portal = portalFileTeam(any.userId());
+            String[] a = assignTeam(lines, teamOfHint(hint, leaders), portal);
             if (a[0] == null) {
                 List<String> notes = new ArrayList<>(any.notes());
                 String why = a[1];
@@ -484,9 +526,13 @@ public class TeamPerfFileService {
                 continue;
             }
             AgentLine l = lines.get(a[0]);
-            if (a[1] != null) {
+            String other = portal != null && !portal.equals(a[0]) && !fileTeamsForView(portal, null).contains(a[0])
+                    ? "Compte rangé en « " + CATALOG.get(portal).label() + " » dans le portail : à corriger dans l'organigramme si l'agent a changé d'équipe" : null;
+            if (portal == null && l.userId() != null) toPlace.add(l.userId());
+            if (a[1] != null || other != null) {
                 List<String> notes = new ArrayList<>(l.notes());
-                notes.add(a[1]);
+                if (a[1] != null) notes.add(a[1]);
+                if (other != null) notes.add(other);
                 l = new AgentLine(l.agentName(), l.userId(), l.username(), l.portalName(), l.values(), l.level(), notes);
             }
             assigned.computeIfAbsent(a[0], k -> new ArrayList<>()).add(l);
@@ -501,7 +547,9 @@ public class TeamPerfFileService {
         if (start != null && end.isBefore(start)) throw ApiException.badRequest("La date de fin précède la date de début.");
         if (!dryRun) {
             if (start == null) throw ApiException.badRequest("Indiquez la période (du … au …) : elle n'a pas été trouvée dans le fichier.");
-            if (assigned.isEmpty()) throw ApiException.badRequest("Aucun agent n'a pu être réparti dans une équipe.");
+            if (assigned.keySet().stream().noneMatch(c -> canImportTeam(requester, c))) {
+                throw ApiException.badRequest("Aucun agent n'a pu être réparti dans une équipe que vous gérez.");
+            }
         }
         List<DispatchTeam> out = new ArrayList<>();
         for (TeamDef t : teams) {
@@ -510,13 +558,22 @@ public class TeamPerfFileService {
             Parsed p = parsed.get(t.code());
             String batchId = null;
             int replaced = 0;
-            if (!dryRun) {
+            boolean allowed = canImportTeam(requester, t.code());
+            if (!dryRun && allowed) {
                 Object[] r = saveTeam(requester, t, start, end, countryCode, lines, file.getOriginalFilename());
                 batchId = (String) r[0];
                 replaced = (int) r[1];
             }
+            // Agents sans équipe dans le portail : rangés dans cette équipe (rôle, service, portail) pour apparaître chez leur Team Leader.
+            List<String> placed = new ArrayList<>();
+            for (AgentLine l : lines) {
+                if (l.userId() == null || !toPlace.contains(l.userId()) || !allowed || !plainAgent(l.userId())) continue;
+                if (!dryRun && administration != null) administration.setAccess(l.userId(), "AGENT", t.code());
+                placed.add(l.portalName() != null ? l.portalName() : l.agentName());
+            }
             int matched = (int) lines.stream().filter(l -> l.userId() != null).count();
-            out.add(new DispatchTeam(t.code(), t.label(), t.fields(), p.recognized(), p.missing(), lines, matched, lines.size() - matched, batchId, replaced));
+            out.add(new DispatchTeam(t.code(), t.label(), t.fields(), p.recognized(), p.missing(), lines, matched, lines.size() - matched, batchId, replaced,
+                    allowed, placed));
         }
         if (!dryRun) {
             audit.record(requester.username(), "DISPATCH_TEAM_PERF_FILE", Objects.toString(file.getOriginalFilename(), "(sans nom)") + " — " + start + " au " + end
@@ -1023,16 +1080,26 @@ public class TeamPerfFileService {
 
     /** Cumul des semaines commençant dans [start, end] : volumes additionnés, Moy / jour et Productivité recalculées. */
     public Aggregate aggregate(String teamCode, LocalDate start, LocalDate end) {
+        return aggregate(teamCode, start, end, null);
+    }
+
+    /** countryCode : lignes importées pour cette filiale (ou sans filiale) seulement ; null = toutes. */
+    public Aggregate aggregate(String teamCode, LocalDate start, LocalDate end, String countryCode) {
         TeamDef t = CATALOG.get(teamCode);
         Map<Long, Map<String, Double>> byUser = new HashMap<>();
         Map<String, Map<String, Double>> byName = new HashMap<>();
+        Map<String, String> names = new HashMap<>();
         if (t == null) return new Aggregate(byUser, byName);
         Map<String, List<Map<String, Object>>> groups = new LinkedHashMap<>();
         Map<String, Long> ids = new HashMap<>();
-        for (Rec r : records(COLS + "WHERE Team = ? AND PeriodStart >= ? AND PeriodStart <= ?", t.code(), java.sql.Date.valueOf(start), java.sql.Date.valueOf(end))) {
+        String country = countryCode == null || countryCode.isBlank() ? null : com.ecobank.rccportal.util.Affiliates.countryOf(countryCode);
+        for (Rec r : records(COLS + "WHERE Team = ? AND PeriodStart >= ? AND PeriodStart <= ?"
+                        + (country == null ? "" : " AND (CountryCode IS NULL OR CountryCode = '" + country.replace("'", "") + "')"),
+                t.code(), java.sql.Date.valueOf(start), java.sql.Date.valueOf(end))) {
             String k = r.userId() != null ? "#" + r.userId() : r.nameKey();
             groups.computeIfAbsent(k, x -> new ArrayList<>()).add(r.values());
             if (r.userId() != null) ids.put(k, r.userId());
+            else names.putIfAbsent(k, r.agentName());
         }
         groups.forEach((k, list) -> {
             Map<String, Object> sum = new LinkedHashMap<>();
@@ -1053,7 +1120,14 @@ public class TeamPerfFileService {
             if (ids.containsKey(k)) byUser.put(ids.get(k), out);
             else byName.put(k, out);
         });
-        return new Aggregate(byUser, byName);
+        return new Aggregate(byUser, byName, names);
+    }
+
+    /** Fichiers d'équipe lus pour une vue d'équipe du portail : le canal s'il a son fichier, sinon l'équipe (Inbound Mail : avec ses canaux). */
+    public static List<String> fileTeamsForView(String teamName, String channel) {
+        if (channel != null && CATALOG.containsKey(channel)) return List.of(channel);
+        if ("INBOUND_MAIL".equals(teamName) && channel == null) return List.of("INBOUND_MAIL", "TCHAT", "RAFIKI");
+        return CATALOG.containsKey(teamName) ? List.of(teamName) : List.of(); // Télévente, Digitalisation : fichier Outbound
     }
 
     // ───────────── Utilitaires ─────────────

@@ -14,6 +14,7 @@
     <link rel="stylesheet" th:href="@{/css/campaign-forms.css}">
     <link rel="stylesheet" th:href="@{/css/rcc-guides.css}">
     <link rel="stylesheet" th:href="@{/css/kb-embed.css}">
+    <link rel="stylesheet" th:href="@{/css/team-perf-files.css}">
     <style>
         .ob-chat-scroll { max-height: 60vh; overflow-y: auto; padding: 4px; }
         .ob-chat-msg { max-width: 82%; margin-bottom: .6rem; display: flex; }
@@ -145,6 +146,9 @@
                         </div></div>
                     </div>
                 </div>
+
+                <!-- Mes performances : fichiers importés ou dispatchés par la QA / le Team Leader (masqué tant qu'il n'y en a pas) -->
+                <div id="obMyPerf" class="mb-3" style="display:none;"></div>
 
                 <div class="card dashboard-card shadow-sm">
                     <div class="card-header p-0 border-0">
@@ -582,5 +586,11 @@
 <script th:src="@{/js/kb-embed.js}"></script>
 <script th:src="@{/js/campaign-forms.js}"></script>
 <script th:src="@{/js/outbound-dashboard.js}"></script>
+<script th:src="@{/js/team-perf-files.js}"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        if (window.RccPerfFiles && document.getElementById("obMyPerf")) RccPerfFiles.mountMine(document.getElementById("obMyPerf"));
+    });
+</script>
 </body>
 </html>

@@ -161,7 +161,8 @@ window.RccPerfFiles = (function () {
             var box = q("[data-preview]");
             var total = r.teams.reduce(function (n, t) { return n + t.lines.length; }, 0);
             var chips = r.teams.map(function (t) {
-                return '<a href="#tpf-d-' + t.team + '" class="tpf-pill ok">' + esc(t.teamLabel) + ' : ' + t.lines.length + ' agent(s)</a>';
+                return '<a href="#tpf-d-' + t.team + '" class="tpf-pill ' + (t.allowed ? "ok" : "ko") + '">' + esc(t.teamLabel) + ' : ' + t.lines.length + ' agent(s)' +
+                    (t.allowed ? "" : " — réservé à la QA") + '</a>';
             }).join("") + (r.unassigned.length ? '<a href="#tpf-d-none" class="tpf-pill ko">' + r.unassigned.length + ' non réparti(s)</a>' : "");
             var sections = r.teams.map(function (t) {
                 var cols = Object.keys(t.recognizedColumns).map(function (h) {
@@ -169,8 +170,13 @@ window.RccPerfFiles = (function () {
                 }).join("");
                 return '<div class="mt-3" id="tpf-d-' + t.team + '"><h6 class="mb-1"><i class="bi bi-people"></i> ' + esc(t.teamLabel) +
                     ' <span class="tpf-pill">' + t.lines.length + ' agent(s)</span> <span class="tpf-pill ok">' + t.matched + ' rattaché(s)</span>' +
-                    (t.unmatched ? ' <span class="tpf-pill ko">' + t.unmatched + ' non trouvé(s)</span>' : "") + '</h6>' +
-                    '<div class="tpf-cols"><small>Colonnes reconnues :</small>' + cols + '</div>' + table(t.fields, t.lines, null, { showMatch: true }) + '</div>';
+                    (t.unmatched ? ' <span class="tpf-pill ko">' + t.unmatched + ' non trouvé(s)</span>' : "") +
+                    (t.allowed ? "" : ' <span class="tpf-pill ko">non enregistré : équipe gérée par la QA ou son Team Leader</span>') + '</h6>' +
+                    '<div class="tpf-cols"><small>Colonnes reconnues :</small>' + cols + '</div>' +
+                    (t.placed && t.placed.length ? '<div class="tpf-msg"><i class="bi bi-person-plus"></i> Sans équipe dans le portail, ' +
+                        (r.saved ? 'rangé(s) dans ' : 'seront rangé(s) dans ') + esc(t.teamLabel) + ' (visibles par leur Team Leader) : ' +
+                        t.placed.map(esc).join(", ") + '</div>' : "") +
+                    table(t.fields, t.lines, null, { showMatch: true }) + '</div>';
             }).join("");
             var none = r.unassigned.length ? '<div class="mt-3" id="tpf-d-none"><h6 class="mb-1 text-danger"><i class="bi bi-question-circle"></i> Agents non répartis (non enregistrés)</h6>' +
                 '<ul class="small mb-0">' + r.unassigned.map(function (l) {
@@ -190,8 +196,12 @@ window.RccPerfFiles = (function () {
                 var btn = this; btn.disabled = true;
                 sendDispatch(false).then(function (res) {
                     box.innerHTML = '<div class="tpf-msg ok"><i class="bi bi-check-circle-fill"></i> Dispatching enregistré, ' + period(res.from, res.to) + ' : ' +
-                        res.teams.map(function (t) { return esc(t.teamLabel) + ' (' + t.lines.length + ' agent(s)' + (t.replaced ? ", remplace l'import précédent" : "") + ')'; }).join(", ") +
+                        res.teams.filter(function (t) { return t.allowed; }).map(function (t) { return esc(t.teamLabel) + ' (' + t.lines.length + ' agent(s)' + (t.replaced ? ", remplace l'import précédent" : "") + ')'; }).join(", ") +
                         '. Chaque agent rattaché voit ses chiffres dans son portail et a reçu une notification.' +
+                        (function () {
+                            var placed = res.teams.reduce(function (n, t) { return n + (t.placed ? t.placed.length : 0); }, 0);
+                            return placed ? ' ' + placed + ' agent(s) sans équipe rangé(s) dans leur équipe : ils apparaissent chez leur Team Leader.' : "";
+                        })() +
                         (res.unassigned.length ? ' ' + res.unassigned.length + ' agent(s) non réparti(s) : à rattacher à leur équipe dans le portail puis relancer.' : "") + '</div>';
                     loadSheet(res.from + "|" + res.to);
                 }).catch(function (e) { btn.disabled = false; alert(e.message); });

@@ -109,6 +109,23 @@ class TeamPerfDispatchTest {
     }
 
     @Test
+    void teamViewsReadTheRightPerformanceFiles() {
+        assertEquals(java.util.List.of("INBOUND_MAIL", "TCHAT", "RAFIKI"), TeamPerfFileService.fileTeamsForView("INBOUND_MAIL", null),
+                "le pôle Inbound Mail voit aussi ses canaux");
+        assertEquals(java.util.List.of("TCHAT"), TeamPerfFileService.fileTeamsForView("INBOUND_MAIL", "TCHAT"));
+        assertEquals(java.util.List.of("OUTBOUND"), TeamPerfFileService.fileTeamsForView("OUTBOUND", "TELEVENTE"),
+                "Télévente et Digitalisation : fichier Outbound (avant : aucun fichier lu)");
+        assertEquals(java.util.List.of("INBOUND_VOICE"), TeamPerfFileService.fileTeamsForView("INBOUND_VOICE", null));
+        var mail = new TeamPerfFileService.Aggregate(Map.of(1L, Map.of("productivity", 110.0)), Map.of(), Map.of());
+        var chat = new TeamPerfFileService.Aggregate(Map.of(2L, Map.of("productivity", 95.0)), Map.of("kone ali", Map.of("productivity", 80.0)),
+                Map.of("kone ali", "KONE Ali"));
+        var all = TeamPerfFileService.Aggregate.merge(java.util.List.of(mail, chat));
+        assertEquals(110.0, all.find(1L, null).get("productivity"));
+        assertEquals(95.0, all.find(2L, null).get("productivity"));
+        assertEquals("KONE Ali", all.names().get("kone ali"), "ligne du fichier sans compte : affichée sous son nom");
+    }
+
+    @Test
     void oneTablePerTeamIsDispatchedToEachTeam() throws Exception {
         try (Workbook wb = new XSSFWorkbook()) {
             Sheet mail = wb.createSheet("Inbound Mail");
