@@ -37,6 +37,16 @@ public class TeamPerfFileController {
         return service.importFile(requester, file, team, from, to, countryCode, dryRun);
     }
 
+    /** Dispatching d'un fichier consolidé : chaque agent part dans son équipe. dryRun=true : aperçu sans rien enregistrer. */
+    @PostMapping(value = "/dispatch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public TeamPerfFileService.DispatchReport dispatch(@RequestParam("file") MultipartFile file,
+                                                       @RequestParam(required = false) String from, @RequestParam(required = false) String to,
+                                                       @RequestParam(required = false) String countryCode,
+                                                       @RequestParam(defaultValue = "true") boolean dryRun,
+                                                       @AuthenticationPrincipal AuthenticatedUser requester) {
+        return service.dispatch(requester, file, from, to, countryCode, dryRun);
+    }
+
     @GetMapping("/sheet")
     public TeamPerfFileService.TeamSheet sheet(@RequestParam String team, @RequestParam(required = false) String from,
                                                @RequestParam(required = false) String to, @AuthenticationPrincipal AuthenticatedUser requester) {

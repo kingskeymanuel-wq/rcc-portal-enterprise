@@ -45,6 +45,13 @@ public class TeamPerfFileService {
 
     public record Period(LocalDate from, LocalDate to, int agents, String batchId) {}
 
+    /** Dispatching : part d'un fichier consolidé revenant à une équipe. */
+    public record DispatchTeam(String team, String teamLabel, List<Field> fields, Map<String, String> recognizedColumns, List<String> missingFields,
+                               List<AgentLine> lines, int matched, int unmatched, String batchId, int replaced) {}
+
+    public record DispatchReport(LocalDate from, LocalDate to, boolean periodDetected, String detectedPeriod, List<DispatchTeam> teams,
+                                 List<AgentLine> unassigned, boolean saved) {}
+
     public record TeamSheet(String team, String teamLabel, LocalDate from, LocalDate to, List<Field> fields, List<AgentLine> rows,
                             Map<String, Object> totals, List<Period> periods) {}
 
@@ -95,14 +102,14 @@ public class TeamPerfFileService {
         CATALOG.put("INBOUND_MAIL", new TeamDef("INBOUND_MAIL", "Inbound Mail", "totalActivities", List.of(
                 DAYS,
                 f("outboundCalls", "Appels sortants", "COUNT", true, "APPELS_SORTANT", "APPELS_SORTANTS", "APPEL_SORTANT", "~APPEL+SORTANT"),
-                f("cis", "CIS", "COUNT", true, "CIS", "NOMBRE_CIS"),
+                f("cis", "CIS", "COUNT", true, "CIS", "NOMBRE_CIS", "CIS_TRAITES", "CIS_TRAITE"),
                 f("mails", "Mails assistés", "COUNT", true, "MAILS_ASSIST", "MAILS_ASSISTES", "MAILS_ASSISTE", "MAIL_ASSIST", "MAILS_TRAITES", "MAILS", "~MAIL+ASSIST", "~MAIL+TRAIT"),
                 f("requests", "Sollicitations", "COUNT", true, "SOLLICITATIONS", "SOLLICITATION", "~SOLLICITATION"),
                 c("totalActivities", "Total activités", "COUNT", true, "CIS + Mails assistés + Sollicitations", "TOTAL_ACTIVITES", "TOTAL_ACTIVITE", "TOTAL", "~TOTAL+ACTIVIT"),
                 avgPerDay("Total activités"), TARGET, PRODUCTIVITY, QUALITY, SENIORITY)));
         // Rapport « PERFORMANCE AGENTS CHATS » : production = Live Chat + autres activités, rapportée au target de la semaine.
         CATALOG.put("TCHAT", new TeamDef("TCHAT", "Réseaux sociaux", "totalProduction", List.of(
-                f("liveChat", "Live Chat", "COUNT", true, "LIVE_CHAT", "LIVE_CHATS", "CHATS", "CHATS_TRAITES", "NOMBRE_CHATS", "~LIVE+CHAT", "~CHAT+TRAIT"),
+                f("liveChat", "Live Chat", "COUNT", true, "LIVE_CHAT", "LIVE_CHATS", "CHATS", "CHATS_TRAITES", "NOMBRE_CHATS", "RESEAUX_SOCIAUX", "~LIVE+CHAT", "~CHAT+TRAIT"),
                 OTHER_ACTIVITIES, DAYS, WEEKLY_TARGET,
                 c("totalProduction", "Prod globale", "COUNT", true, "Live Chat + Activités annexes", "PROD_GLOBALE", "PRODUCTION_GLOBALE", "~PROD+GLOBAL"),
                 PRESENCE,
@@ -247,24 +254,7 @@ public class TeamPerfFileService {
         if (!canImportTeam(requester, t.code())) {
             throw ApiException.forbidden("Import réservé à la QA, au Superviseur et au Team Leader de l'équipe « " + t.label() + " ».");
         }
-        if (file == null || file.isEmpty()) throw ApiException.badRequest("Le fichier est requis.");
-        Workbook wb;
-        try {
-            KpiFileReader.Result read = KpiFileReader.read(file.getBytes(), file.getOriginalFilename(), file.getContentType());
-            if (read.kind() == KpiFileReader.Kind.IMAGE) {
-                if (!ocr.isConfigured()) {
-                    throw ApiException.badRequest("Une capture d'écran ne peut être lue que si l'OCR local est configuré. Importez plutôt le fichier "
-                            + "Excel, CSV ou la présentation PowerPoint du rapport hebdo.");
-                }
-                wb = ManualKpiEntryService.buildWorkbookFromOcrGrid(ocr.extractRawJson(file));
-            } else {
-                wb = read.workbook();
-            }
-        } catch (ApiException e) {
-            throw e;
-        } catch (Exception e) {
-            throw ApiException.badRequest("Impossible de lire ce fichier : " + e.getMessage());
-        }
+        Workbook wb = readWorkbook(file);
         Parsed p;
         try (wb) {
             p = parse(wb, t, LocalDate.now());
@@ -287,23 +277,188 @@ public class TeamPerfFileService {
         if (save) {
             if (start == null) throw ApiException.badRequest("Indiquez la période (du … au …) : elle n'a pas été trouvée dans le fichier.");
             if (lines.isEmpty()) throw ApiException.badRequest("Aucune ligne agent reconnue dans ce fichier.");
-            batchId = UUID.randomUUID().toString();
-            // Réimporter la même semaine remplace la version précédente (jamais de doublon).
-            replaced = jdbc.update("DELETE FROM dbo.TeamPerfRecords WHERE Team = ? AND PeriodStart = ? AND PeriodEnd = ?",
-                    t.code(), java.sql.Date.valueOf(start), java.sql.Date.valueOf(end));
-            String country = countryCode == null || countryCode.isBlank() ? null : countryCode.trim().toUpperCase(Locale.ROOT);
-            for (AgentLine l : lines) {
-                jdbc.update("INSERT INTO dbo.TeamPerfRecords (Team, PeriodStart, PeriodEnd, UserId, AgentName, NameKey, MetricsJson, CountryCode, BatchId, ImportedBy) "
-                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        t.code(), java.sql.Date.valueOf(start), java.sql.Date.valueOf(end), l.userId(), l.agentName(), nameKey(l.agentName()),
-                        write(l.values()), country, batchId, requester.username());
-            }
-            notifyAgents(t, start, end, lines);
-            audit.record(requester.username(), "IMPORT_TEAM_PERF_FILE", t.label() + " — " + start + " au " + end + " — " + lines.size()
-                    + " agent(s), " + matched + " rattaché(s) — fichier " + Objects.toString(file.getOriginalFilename(), "(sans nom)"));
+            Object[] r = saveTeam(requester, t, start, end, countryCode, lines, file.getOriginalFilename());
+            batchId = (String) r[0];
+            replaced = (int) r[1];
         }
         return new ImportReport(t.code(), t.label(), start, end, detected, p.periodText(), t.fields(), p.recognized(), p.ignored(), p.missing(),
                 lines, matched, lines.size() - matched, save, batchId, replaced);
+    }
+
+    /** Enregistre les lignes d'une équipe pour la période (remplace un import précédent de la même période) ; {batchId, remplacées}. */
+    private Object[] saveTeam(AuthenticatedUser requester, TeamDef t, LocalDate start, LocalDate end, String countryCode,
+                              List<AgentLine> lines, String fileName) {
+        String batchId = UUID.randomUUID().toString();
+        // Réimporter la même semaine remplace la version précédente (jamais de doublon).
+        int replaced = jdbc.update("DELETE FROM dbo.TeamPerfRecords WHERE Team = ? AND PeriodStart = ? AND PeriodEnd = ?",
+                t.code(), java.sql.Date.valueOf(start), java.sql.Date.valueOf(end));
+        String country = countryCode == null || countryCode.isBlank() ? null : countryCode.trim().toUpperCase(Locale.ROOT);
+        for (AgentLine l : lines) {
+            jdbc.update("INSERT INTO dbo.TeamPerfRecords (Team, PeriodStart, PeriodEnd, UserId, AgentName, NameKey, MetricsJson, CountryCode, BatchId, ImportedBy) "
+                            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    t.code(), java.sql.Date.valueOf(start), java.sql.Date.valueOf(end), l.userId(), l.agentName(), nameKey(l.agentName()),
+                    write(l.values()), country, batchId, requester.username());
+        }
+        notifyAgents(t, start, end, lines);
+        long matched = lines.stream().filter(l -> l.userId() != null).count();
+        audit.record(requester.username(), "IMPORT_TEAM_PERF_FILE", t.label() + " — " + start + " au " + end + " — " + lines.size()
+                + " agent(s), " + matched + " rattaché(s) — fichier " + Objects.toString(fileName, "(sans nom)"));
+        return new Object[]{batchId, replaced};
+    }
+
+    private Workbook readWorkbook(MultipartFile file) {
+        if (file == null || file.isEmpty()) throw ApiException.badRequest("Le fichier est requis.");
+        try {
+            KpiFileReader.Result read = KpiFileReader.read(file.getBytes(), file.getOriginalFilename(), file.getContentType());
+            if (read.kind() == KpiFileReader.Kind.IMAGE) {
+                if (!ocr.isConfigured()) {
+                    throw ApiException.badRequest("Une capture d'écran ne peut être lue que si l'OCR local est configuré. Importez plutôt le fichier "
+                            + "Excel, CSV ou la présentation PowerPoint du rapport hebdo.");
+                }
+                return ManualKpiEntryService.buildWorkbookFromOcrGrid(ocr.extractRawJson(file));
+            } else {
+                return read.workbook();
+            }
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw ApiException.badRequest("Impossible de lire ce fichier : " + e.getMessage());
+        }
+    }
+
+    // ───────────── Dispatching d'un fichier consolidé ─────────────
+
+    /** Indicateurs communs à toutes les équipes : ils ne disent pas à quelle équipe appartient une ligne. */
+    static final Set<String> COMMON_KEYS = Set.of("daysWorked", "targetPerDay", "productivity", "quality", "seniority", "weeklyTarget",
+            "otherActivities", "presence", "remark", "avgPerDay");
+
+    /** Nombre d'indicateurs propres à l'équipe renseignés (non nuls) sur la ligne : « Appels émis » pour Outbound, « Mails » pour Inbound Mail… */
+    static int specificScore(TeamDef t, AgentLine l) {
+        int n = 0;
+        for (Field f : t.fields()) {
+            if (f.computed() || COMMON_KEYS.contains(f.key())) continue;
+            Object v = l.values().get(f.key());
+            if (v instanceof Double d ? d != 0 : v != null && !v.toString().isBlank()) n++;
+        }
+        return n;
+    }
+
+    /**
+     * Équipe d'une ligne du fichier consolidé : celle dont la ligne remplit le plus d'indicateurs propres ; à égalité ou
+     * sans indicateur propre, l'équipe du compte de l'agent dans le portail. {équipe ou null, explication}.
+     */
+    static String[] assignTeam(Map<String, AgentLine> byTeam, String portalTeam) {
+        int best = 0;
+        List<String> winners = new ArrayList<>();
+        for (Map.Entry<String, AgentLine> e : byTeam.entrySet()) {
+            int sc = specificScore(CATALOG.get(e.getKey()), e.getValue());
+            if (sc > best) { best = sc; winners.clear(); }
+            if (sc == best && sc > 0) winners.add(e.getKey());
+        }
+        if (winners.size() == 1) return new String[]{winners.get(0), null};
+        if (portalTeam != null && (winners.isEmpty() ? byTeam.containsKey(portalTeam) : winners.contains(portalTeam))) {
+            return new String[]{portalTeam, "Équipe déduite du compte portail de l'agent"};
+        }
+        if (winners.isEmpty()) return new String[]{null, "Aucun indicateur propre à une équipe renseigné et agent sans équipe dans le portail"};
+        return new String[]{null, "Équipe ambiguë (" + winners.stream().map(c -> CATALOG.get(c).label()).collect(java.util.stream.Collectors.joining(" ou "))
+                + ") : agent à rattacher à son équipe dans le portail"};
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.ecobank.rccportal.repository.UserServiceAssignmentRepository serviceAssignments;
+
+    /** Fichier d'équipe correspondant à l'équipe du compte (Télévente, Digitalisation : fichier Outbound). */
+    private String portalFileTeam(Long userId) {
+        if (userId == null) return null;
+        User u = users.findById(userId).orElse(null);
+        if (u == null) return null;
+        List<String> codes = serviceAssignments == null ? List.of() : serviceAssignments.findByUserId(userId).stream()
+                .filter(a -> a.getService() != null && a.getService().getCode() != null).map(a -> a.getService().getCode()).toList();
+        String code = TeamLeaderService.teamCodeOf(u.getActivity(), codes);
+        if (code == null) return null;
+        if (CATALOG.containsKey(code)) return code;
+        TeamClassifier.Team team = TeamClassifier.teamOf(code);
+        return team == null || team == TeamClassifier.Team.OTHER || !CATALOG.containsKey(team.name()) ? null : team.name();
+    }
+
+    /**
+     * Dispatching : un fichier consolidé (plusieurs équipes, en un ou plusieurs tableaux) est lu avec les indicateurs
+     * de chaque équipe, puis chaque agent est envoyé à son équipe (voir assignTeam). dryRun : aperçu sans enregistrer.
+     */
+    @Transactional
+    public DispatchReport dispatch(AuthenticatedUser requester, MultipartFile file, String from, String to, String countryCode, boolean dryRun) {
+        List<TeamDef> teams = CATALOG.values().stream().filter(t -> canImportTeam(requester, t.code())).toList();
+        if (teams.isEmpty()) throw ApiException.forbidden("Dispatching réservé à la QA, au Superviseur et aux Team Leaders.");
+        Map<String, Parsed> parsed = new LinkedHashMap<>();
+        try (Workbook wb = readWorkbook(file)) {
+            for (TeamDef t : teams) {
+                try {
+                    parsed.put(t.code(), parse(wb, t, LocalDate.now()));
+                } catch (ApiException noColumns) {
+                    // aucune colonne de cette équipe dans le fichier
+                }
+            }
+        } catch (java.io.IOException e) {
+            throw ApiException.badRequest("Impossible de lire ce fichier : " + e.getMessage());
+        }
+        if (parsed.isEmpty()) throw ApiException.badRequest("Aucun tableau de performances reconnu dans ce fichier.");
+
+        // Lignes de chaque agent, telles que lues par chaque équipe (ordre du fichier conservé).
+        Map<String, Map<String, AgentLine>> byAgent = new LinkedHashMap<>();
+        parsed.forEach((code, p) -> {
+            for (AgentLine l : matchAgents(p.lines())) byAgent.computeIfAbsent(nameKey(l.agentName()), k -> new LinkedHashMap<>()).put(code, l);
+        });
+        Map<String, List<AgentLine>> assigned = new LinkedHashMap<>();
+        List<AgentLine> unassigned = new ArrayList<>();
+        for (Map<String, AgentLine> lines : byAgent.values()) {
+            AgentLine any = lines.values().iterator().next();
+            String[] a = assignTeam(lines, portalFileTeam(any.userId()));
+            if (a[0] == null) {
+                List<String> notes = new ArrayList<>(any.notes());
+                notes.add(0, a[1]);
+                unassigned.add(new AgentLine(any.agentName(), any.userId(), any.username(), any.portalName(), any.values(), any.level(), notes));
+                continue;
+            }
+            AgentLine l = lines.get(a[0]);
+            if (a[1] != null) {
+                List<String> notes = new ArrayList<>(l.notes());
+                notes.add(a[1]);
+                l = new AgentLine(l.agentName(), l.userId(), l.username(), l.portalName(), l.values(), l.level(), notes);
+            }
+            assigned.computeIfAbsent(a[0], k -> new ArrayList<>()).add(l);
+        }
+
+        Parsed withPeriod = parsed.values().stream().filter(p -> p.from() != null).findFirst().orElse(null);
+        LocalDate start = parseDate(from), end = parseDate(to);
+        boolean detected = withPeriod != null;
+        if (start == null && withPeriod != null) start = withPeriod.from();
+        if (end == null && withPeriod != null) end = withPeriod.to();
+        if (start != null && end == null) end = start.plusDays(6);
+        if (start != null && end.isBefore(start)) throw ApiException.badRequest("La date de fin précède la date de début.");
+        if (!dryRun) {
+            if (start == null) throw ApiException.badRequest("Indiquez la période (du … au …) : elle n'a pas été trouvée dans le fichier.");
+            if (assigned.isEmpty()) throw ApiException.badRequest("Aucun agent n'a pu être réparti dans une équipe.");
+        }
+        List<DispatchTeam> out = new ArrayList<>();
+        for (TeamDef t : teams) {
+            List<AgentLine> lines = assigned.get(t.code());
+            if (lines == null) continue;
+            Parsed p = parsed.get(t.code());
+            String batchId = null;
+            int replaced = 0;
+            if (!dryRun) {
+                Object[] r = saveTeam(requester, t, start, end, countryCode, lines, file.getOriginalFilename());
+                batchId = (String) r[0];
+                replaced = (int) r[1];
+            }
+            int matched = (int) lines.stream().filter(l -> l.userId() != null).count();
+            out.add(new DispatchTeam(t.code(), t.label(), t.fields(), p.recognized(), p.missing(), lines, matched, lines.size() - matched, batchId, replaced));
+        }
+        if (!dryRun) {
+            audit.record(requester.username(), "DISPATCH_TEAM_PERF_FILE", Objects.toString(file.getOriginalFilename(), "(sans nom)") + " — " + start + " au " + end
+                    + " — " + out.size() + " équipe(s), " + unassigned.size() + " agent(s) non réparti(s)");
+        }
+        return new DispatchReport(start, end, detected, withPeriod == null ? null : withPeriod.periodText(), out, unassigned, !dryRun);
     }
 
     /** Mise à jour automatique côté agent : chacun est prévenu que ses chiffres de la semaine sont publiés. */

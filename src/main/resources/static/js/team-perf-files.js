@@ -76,7 +76,10 @@ window.RccPerfFiles = (function () {
             '<label>au <input type="date" class="form-control form-control-sm" data-to></label>' +
             '<label>Filiale <select class="form-select form-select-sm" data-country><option value="">—</option><option value="CI">Côte d\'Ivoire</option><option value="TG">Togo</option></select></label></div>' +
             '<small class="text-muted d-block mb-2">La période est lue dans le titre du fichier (« du 21 - 27 Septembre ») : laissez vide pour la détecter.</small>' +
-            '<button type="button" class="btn btn-primary btn-sm" data-analyse disabled><i class="bi bi-search"></i> Analyser le fichier</button></section>' +
+            '<div class="d-flex flex-wrap gap-2"><button type="button" class="btn btn-primary btn-sm" data-analyse disabled><i class="bi bi-search"></i> Analyser le fichier</button>' +
+            '<button type="button" class="btn btn-warning btn-sm fw-semibold" data-dispatch disabled title="Fichier consolidé de plusieurs équipes : chaque agent est envoyé dans son équipe">' +
+            '<i class="bi bi-diagram-3"></i> Dispatching</button></div>' +
+            '<small class="text-muted d-block mt-1">Fichier consolidé de plusieurs équipes ? « Dispatching » répartit automatiquement chaque agent dans son équipe.</small></section>' +
             '</div>' +
             '<div data-preview></div>' +
             '<div class="tpf-sheet-card"><div class="tpf-sheet-head"><div><h6 class="mb-0"><i class="bi bi-table"></i> Performances de l\'équipe <span data-sheet-team></span></h6>' +
@@ -97,6 +100,7 @@ window.RccPerfFiles = (function () {
                     (f.computed ? '<i class="bi bi-calculator"></i> ' : "") + esc(f.label) + '</span>';
             }).join("") : "<em>Choisissez une équipe.</em>";
             q("[data-analyse]").disabled = !(state.team && state.file);
+            q("[data-dispatch]").disabled = !state.file;
         }
         function selectTeam(code) {
             state.team = state.catalog.filter(function (t) { return t.code === code; })[0];
@@ -132,6 +136,67 @@ window.RccPerfFiles = (function () {
                 renderPreview();
             }).catch(function (e) { box.innerHTML = '<div class="tpf-msg error"><i class="bi bi-exclamation-triangle"></i> ' + esc(e.message) + '</div>'; });
         });
+
+        // ───── Dispatching d'un fichier consolidé ─────
+        function sendDispatch(dryRun) {
+            var fd = new FormData();
+            fd.append("file", state.file);
+            var url = "/api/team-perf-files/dispatch?dryRun=" + dryRun +
+                (q("[data-from]").value ? "&from=" + q("[data-from]").value : "") + (q("[data-to]").value ? "&to=" + q("[data-to]").value : "") +
+                (q("[data-country]").value ? "&countryCode=" + q("[data-country]").value : "");
+            return fetch(url, { method: "POST", credentials: "same-origin", body: fd }).then(function (res) { return res.ok ? res.json() : errorOf(res); });
+        }
+
+        q("[data-dispatch]").addEventListener("click", function () {
+            var box = q("[data-preview]");
+            box.innerHTML = '<div class="tpf-msg">Dispatching du fichier : lecture des tableaux de chaque équipe…</div>';
+            sendDispatch(true).then(function (r) {
+                if (r.from && !q("[data-from]").value) q("[data-from]").value = r.from;
+                if (r.to && !q("[data-to]").value) q("[data-to]").value = r.to;
+                renderDispatch(r);
+            }).catch(function (e) { box.innerHTML = '<div class="tpf-msg error"><i class="bi bi-exclamation-triangle"></i> ' + esc(e.message) + '</div>'; });
+        });
+
+        function renderDispatch(r) {
+            var box = q("[data-preview]");
+            var total = r.teams.reduce(function (n, t) { return n + t.lines.length; }, 0);
+            var chips = r.teams.map(function (t) {
+                return '<a href="#tpf-d-' + t.team + '" class="tpf-pill ok">' + esc(t.teamLabel) + ' : ' + t.lines.length + ' agent(s)</a>';
+            }).join("") + (r.unassigned.length ? '<a href="#tpf-d-none" class="tpf-pill ko">' + r.unassigned.length + ' non réparti(s)</a>' : "");
+            var sections = r.teams.map(function (t) {
+                var cols = Object.keys(t.recognizedColumns).map(function (h) {
+                    return '<span class="tpf-map">' + esc(h || "(sans titre)") + ' <i class="bi bi-arrow-right"></i> <b>' + esc(t.recognizedColumns[h]) + '</b></span>';
+                }).join("");
+                return '<div class="mt-3" id="tpf-d-' + t.team + '"><h6 class="mb-1"><i class="bi bi-people"></i> ' + esc(t.teamLabel) +
+                    ' <span class="tpf-pill">' + t.lines.length + ' agent(s)</span> <span class="tpf-pill ok">' + t.matched + ' rattaché(s)</span>' +
+                    (t.unmatched ? ' <span class="tpf-pill ko">' + t.unmatched + ' non trouvé(s)</span>' : "") + '</h6>' +
+                    '<div class="tpf-cols"><small>Colonnes reconnues :</small>' + cols + '</div>' + table(t.fields, t.lines, null, { showMatch: true }) + '</div>';
+            }).join("");
+            var none = r.unassigned.length ? '<div class="mt-3" id="tpf-d-none"><h6 class="mb-1 text-danger"><i class="bi bi-question-circle"></i> Agents non répartis (non enregistrés)</h6>' +
+                '<ul class="small mb-0">' + r.unassigned.map(function (l) {
+                    return '<li><b>' + esc(l.agentName) + '</b> — ' + esc((l.notes || [])[0] || "") + '</li>';
+                }).join("") + '</ul></div>' : "";
+            box.innerHTML = '<div class="tpf-preview">' +
+                '<div class="tpf-preview-head"><div><h6><i class="bi bi-diagram-3"></i> Dispatching — ' + total + ' agent(s) répartis dans ' + r.teams.length + ' équipe(s), ' + period(r.from, r.to) +
+                (r.periodDetected ? ' <span class="tpf-pill ok">période lue dans le fichier</span>' : "") + '</h6><div class="tpf-pills">' + chips + '</div></div>' +
+                '<div class="d-flex gap-2"><button type="button" class="btn btn-outline-secondary btn-sm" data-cancel>Annuler</button>' +
+                '<button type="button" class="btn btn-success btn-sm" data-save-dispatch' + (r.from && r.teams.length ? "" : " disabled") + '><i class="bi bi-check2-circle"></i> Enregistrer le dispatching</button></div></div>' +
+                (r.from ? "" : '<div class="tpf-msg error">Indiquez la période (du … au …) ci-dessus puis relancez le dispatching.</div>') +
+                '<div class="tpf-msg"><i class="bi bi-info-circle"></i> Chaque agent va dans l\'équipe dont il remplit les indicateurs propres (appels émis, mails, chats…) ; à défaut, dans l\'équipe de son compte. ' +
+                'Enregistrer remplace, pour chaque équipe, un import précédent de la même période.</div>' +
+                sections + none + '</div>';
+            box.querySelector("[data-cancel]").addEventListener("click", function () { box.innerHTML = ""; });
+            box.querySelector("[data-save-dispatch]").addEventListener("click", function () {
+                var btn = this; btn.disabled = true;
+                sendDispatch(false).then(function (res) {
+                    box.innerHTML = '<div class="tpf-msg ok"><i class="bi bi-check-circle-fill"></i> Dispatching enregistré, ' + period(res.from, res.to) + ' : ' +
+                        res.teams.map(function (t) { return esc(t.teamLabel) + ' (' + t.lines.length + ' agent(s)' + (t.replaced ? ", remplace l'import précédent" : "") + ')'; }).join(", ") +
+                        '. Chaque agent rattaché voit ses chiffres dans son portail et a reçu une notification.' +
+                        (res.unassigned.length ? ' ' + res.unassigned.length + ' agent(s) non réparti(s) : à rattacher à leur équipe dans le portail puis relancer.' : "") + '</div>';
+                    loadSheet(res.from + "|" + res.to);
+                }).catch(function (e) { btn.disabled = false; alert(e.message); });
+            });
+        }
 
         function renderPreview() {
             var r = state.preview, box = q("[data-preview]");
